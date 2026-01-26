@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
@@ -56,7 +57,15 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
 });
 
+app.use(express.static(path.join(__dirname, '../../client/dist')));
+
+// API Routes
 app.use('/api', apiRoutes);
+
+// Catch-all route to serve React frontend for any unmatched routes
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
+});
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

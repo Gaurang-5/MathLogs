@@ -1,0 +1,14 @@
+{
+    "name": "mathlogs-app",
+    "version": "1.0.0",
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "scripts": {
+        "start": "cd server && npm start",
+        "heroku-postbuild": "echo 'Installing Client...' && cd client && npm install && npm run build && echo 'Installing Server...' && cd ../server && npm install && npm run build"
+    },
+    "engines": {
+        "node": "20.x"
+    }
+}
