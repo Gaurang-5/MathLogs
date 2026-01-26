@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id                  String  @id @default(uuid())
+  username            String  @unique
+  password            String
+  passwordVersion     Int     @default(1)  // Increment on password change to invalidate old JWTs
+  currentAcademicYear String  @default("2024-2025")
+  
+  // New Academic Year Logic
+  currentAcademicYearId String?
+  activeAcademicYear    AcademicYear? @relation("ActiveYear", fields: [currentAcademicYearId], references: [id])
+  
+  ownedAcademicYears    AcademicYear[] @relation("OwnedYears")
+
+  batches             Batch[]
+  tests               Test[]
+}
+
+model AcademicYear {
+  id        String   @id @default(uuid())
+  name      String
+  startDate DateTime?
+  endDate   DateTime?
+  isDefault Boolean  @default(false)
+  
+  teacherId String
+  teacher   Admin    @relation("OwnedYears", fields: [teacherId], references: [id])
+  
+  activeForAdmins Admin[] @relation("ActiveYear")
+  
+  batches   Batch[]
+  students  Student[]
+  tests     Test[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([teacherId, name])
+}
+
+model Batch {
+  id                  String           @id @default(uuid())
+  name                String
+  subject             String?
+  className           String?
+  timeSlot            String?
+  feeAmount           Float            @default(0)
+  academicYear        String?
+  
+  academicYearId      String?
+  academicYearRef     AcademicYear?    @relation(fields: [academicYearId], references: [id])
+
+  whatsappGroupLink   String?
+  isRegistrationOpen  Boolean          @default(true)
+  isRegistrationEnded Boolean          @default(false)
+  batchNumber         Int?
+  teacherId           String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  teacher             Admin?           @relation(fields: [teacherId], references: [id])
+  feeInstallments     FeeInstallment[]
+  students            Student[]
+}
+
+model Student {
+  id             String       @id @default(uuid())
+  humanId        String?
+  name           String
+  parentName     String
+  parentWhatsapp String
+  parentEmail    String?
+  status         String       @default("PENDING")
+  batchId        String?
+  
+  academicYearId String?
+  academicYearRef AcademicYear? @relation(fields: [academicYearId], references: [id])
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  schoolName     String?
+  feePayments    FeePayment[]
+  fees           FeeRecord[]
+  marks          Mark[]
+  batch          Batch?       @relation(fields: [batchId], references: [id])
+
+  @@index([batchId])
+  @@index([status])
+  @@index([name])
+  @@unique([humanId, academicYearId])
+  @@unique([name, parentWhatsapp, batchId], name: "student_natural_key")
+}
+
+model FeeRecord {
+  id        String   @id @default(uuid())
+  amount    Float
+  date      DateTime @default(now())
+  status    String   @default("PAID")
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+}
+
+model Test {
+  id           String   @id @default(uuid())
+  name         String
+  subject      String
+  className    String?
+  date         DateTime
+  maxMarks     Float
+  teacherId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  academicYear String?
+  
+  academicYearId String?
+  academicYearRef AcademicYear? @relation(fields: [academicYearId], references: [id])
+
+  marks        Mark[]
+  teacher      Admin?   @relation(fields: [teacherId], references: [id])
+}
+
+model Mark {
+  id        String  @id @default(uuid())
+  score     Float
+  studentId String
+  testId    String
+  test      Test    @relation(fields: [testId], references: [id])
+  student   Student @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, testId])
+  @@index([testId])
+  @@index([studentId])
+}
+
+model FeeInstallment {
+  id        String       @id @default(uuid())
+  name      String
+  amount    Float
+  batchId   String
+  createdAt DateTime     @default(now())
+  batch     Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  payments  FeePayment[]
+
+  @@index([batchId])
+}
+
+model FeePayment {
+  id            String         @id @default(uuid())
+  date          DateTime       @default(now())
+  amountPaid    Float
+  studentId     String
+  installmentId String
+  createdAt     DateTime       @default(now())
+  installment   FeeInstallment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+  student       Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Removed @@unique([studentId, installmentId]) to allow multiple partial payments
+  @@index([studentId])
+  @@index([installmentId])
+  @@index([studentId, installmentId]) // Added for query performance
+}
+
+model IdCounter {
+  prefix String @id
+  seq    Int
+}
