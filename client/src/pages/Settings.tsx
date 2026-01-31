@@ -54,7 +54,7 @@ function ChangePasswordForm() {
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text transition-colors"
+                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text dark:text-white transition-colors"
                     placeholder="Enter current password"
                     required
                 />
@@ -67,7 +67,7 @@ function ChangePasswordForm() {
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text transition-colors"
+                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text dark:text-white transition-colors"
                         placeholder="Min 6 chars"
                         required
                     />
@@ -78,7 +78,7 @@ function ChangePasswordForm() {
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text transition-colors"
+                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text dark:text-white transition-colors"
                         placeholder="Re-enter new"
                         required
                     />
@@ -241,7 +241,7 @@ export default function Settings() {
                                     type="text"
                                     value={newYearName}
                                     onChange={e => setNewYearName(e.target.value)}
-                                    className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text transition-colors"
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text dark:text-white transition-colors"
                                     placeholder="2025-2026"
                                     required
                                 />

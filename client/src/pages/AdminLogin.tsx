@@ -75,7 +75,7 @@ export default function AdminLogin() {
                             <User className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
                             <input
                                 type="text"
-                                className="w-full bg-neutral-50 dark:bg-neutral-900 border-[1.5px] border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-4 focus:ring-black/5 focus:border-black dark:focus:border-white outline-none transition-all placeholder:text-gray-400 font-medium"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border-[1.5px] border-app-border text-app-text dark:text-white pl-12 p-3.5 rounded-xl focus:ring-4 focus:ring-black/5 focus:border-black dark:focus:border-white outline-none transition-all placeholder:text-gray-400 font-medium"
                                 placeholder="Enter admin username"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -88,7 +88,7 @@ export default function AdminLogin() {
                             <Lock className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
                             <input
                                 type="password"
-                                className="w-full bg-neutral-50 dark:bg-neutral-900 border-[1.5px] border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-4 focus:ring-black/5 focus:border-black dark:focus:border-white outline-none transition-all placeholder:text-gray-400 font-medium"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border-[1.5px] border-app-border text-app-text dark:text-white pl-12 p-3.5 rounded-xl focus:ring-4 focus:ring-black/5 focus:border-black dark:focus:border-white outline-none transition-all placeholder:text-gray-400 font-medium"
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}

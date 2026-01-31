@@ -233,7 +233,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                         <div className="relative group">
                             <User className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
                             <input
-                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text dark:text-white pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
                                 placeholder="Enter full name"
                                 value={studentName}
                                 onChange={e => setStudentName(e.target.value)}
@@ -247,7 +247,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                         <div className="relative group">
                             <Users className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
                             <input
-                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text dark:text-white pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
                                 placeholder="Enter parent name"
                                 value={parentName}
                                 onChange={e => setParentName(e.target.value)}
@@ -261,7 +261,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                         <div className="relative group">
                             <Smartphone className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
                             <input
-                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text dark:text-white pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
                                 placeholder="10-digit number"
                                 value={whatsapp}
                                 onChange={e => setWhatsapp(e.target.value)}
@@ -275,7 +275,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                         <div className="relative group">
                             <School className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
                             <input
-                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text dark:text-white pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
                                 placeholder="Enter school name"
                                 value={schoolName}
                                 onChange={e => setSchoolName(e.target.value)}
@@ -289,7 +289,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                         <div className="relative group">
                             <Mail className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
                             <input
-                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text dark:text-white pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
                                 type="email"
                                 placeholder="email@example.com"
                                 value={email}
