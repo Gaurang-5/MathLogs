@@ -13,7 +13,31 @@ const PORT = process.env.PORT || 3001;
 configureSecurityHeaders(app);
 
 app.set('trust proxy', 1); // Trust first proxy (necessary for rate limiting behind load balancers)
-app.use(compression());
+
+// PERF: Optimize compression for JSON API responses (70-80% size reduction)
+app.use(compression({
+    level: 9,  // Maximum compression - JSON compresses extremely well
+    threshold: 1024,  // Only compress responses > 1KB
+    filter: (req, res) => {
+        // Always compress JSON API responses
+        if (res.getHeader('Content-Type')?.toString().includes('json')) {
+            return true;
+        }
+        return compression.filter(req, res);
+    }
+}));
+
+// PERF: Request timing middleware for observability
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        if (duration > 1000) {  // Log slow requests
+            console.warn(`[SLOW_REQUEST] ${req.method} ${req.path} took ${duration}ms`);
+        }
+    });
+    next();
+});
 
 // CORS Configuration - Security hardened
 const allowedOrigins = [

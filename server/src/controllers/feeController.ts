@@ -212,14 +212,40 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 batch: { teacherId },
                 academicYearId: currentAcademicYearId
             },
-            include: {
+            select: {
+                id: true,
+                humanId: true,
+                name: true,
+                createdAt: true, // Needed for oldestDue fallback
                 batch: {
-                    include: {
-                        feeInstallments: { orderBy: { createdAt: 'asc' } }
+                    select: {
+                        name: true,
+                        feeAmount: true,
+                        feeInstallments: {
+                            select: {
+                                id: true,
+                                name: true,
+                                amount: true,
+                                createdAt: true
+                            },
+                            orderBy: { createdAt: 'asc' }
+                        }
                     }
                 },
-                fees: true,
-                feePayments: true
+                fees: {
+                    select: {
+                        amount: true,
+                        status: true,
+                        date: true
+                    }
+                },
+                feePayments: {
+                    select: {
+                        amountPaid: true,
+                        date: true,
+                        installmentId: true
+                    }
+                }
             },
             orderBy: { name: 'asc' }
         });

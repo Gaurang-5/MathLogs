@@ -68,6 +68,8 @@ model Batch {
   teacher             Admin?           @relation(fields: [teacherId], references: [id])
   feeInstallments     FeeInstallment[]
   students            Student[]
+
+  @@index([teacherId, academicYearId, className])  // PERF: Common filter combination
 }
 
 model Student {
@@ -94,6 +96,9 @@ model Student {
   @@index([batchId])
   @@index([status])
   @@index([name])
+  @@index([status, academicYearId])  // PERF: For approved student listings
+  @@index([batchId, status])          // PERF: For batch details queries
+  @@index([createdAt])                // PERF: For growth stats chronological queries
   @@unique([humanId, academicYearId])
   @@unique([name, parentWhatsapp, batchId], name: "student_natural_key")
 }
@@ -107,6 +112,7 @@ model FeeRecord {
   student   Student  @relation(fields: [studentId], references: [id])
 
   @@index([studentId])
+  @@index([date])  // PERF: For recent transactions and chronological queries
 }
 
 model Test {
@@ -126,6 +132,9 @@ model Test {
 
   marks        Mark[]
   teacher      Admin?   @relation(fields: [teacherId], references: [id])
+
+  @@index([teacherId, academicYearId])  // PERF: For teacher test lookups
+  @@index([date])                       // PERF: For chronological test lists
 }
 
 model Mark {

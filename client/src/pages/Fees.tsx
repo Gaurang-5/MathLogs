@@ -125,20 +125,23 @@ const Fees: React.FC = () => {
 
     const batches = Array.from(new Set(students.map(s => s.batchName))).filter(b => b !== 'N/A').sort();
 
-    const filteredStudents = students.filter(s => {
-        const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (s.humanId && s.humanId.toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchesBatch = selectedBatch === 'All' || s.batchName === selectedBatch;
-        const matchesView = viewMode === 'all' || (viewMode === 'defaulters' && s.balance > 0);
-        return matchesSearch && matchesBatch && matchesView;
-    }).sort((a, b) => {
-        if (listSort === 'date') {
-            const dateA = a.oldestDue ? new Date(a.oldestDue).getTime() : Number.MAX_VALUE;
-            const dateB = b.oldestDue ? new Date(b.oldestDue).getTime() : Number.MAX_VALUE;
-            return dateA - dateB; // Ascending (Oldest First)
-        }
-        return b.balance - a.balance; // Descending Amount
-    });
+    // PERF: Memoize filtering to prevent lag when typing in search
+    const filteredStudents = React.useMemo(() => {
+        return students.filter(s => {
+            const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (s.humanId && s.humanId.toLowerCase().includes(searchTerm.toLowerCase()));
+            const matchesBatch = selectedBatch === 'All' || s.batchName === selectedBatch;
+            const matchesView = viewMode === 'all' || (viewMode === 'defaulters' && s.balance > 0);
+            return matchesSearch && matchesBatch && matchesView;
+        }).sort((a, b) => {
+            if (listSort === 'date') {
+                const dateA = a.oldestDue ? new Date(a.oldestDue).getTime() : Number.MAX_VALUE;
+                const dateB = b.oldestDue ? new Date(b.oldestDue).getTime() : Number.MAX_VALUE;
+                return dateA - dateB; // Ascending (Oldest First)
+            }
+            return b.balance - a.balance; // Descending Amount
+        });
+    }, [students, searchTerm, selectedBatch, viewMode, listSort]);
 
     // Corrected Logic: Only count positive balances as "Due".
     // "Balance" = Total Fee - Total Paid. If negative, it means surplus. We shouldn't subtract surplus from total pending dues of others.

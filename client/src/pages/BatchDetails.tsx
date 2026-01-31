@@ -224,12 +224,9 @@ export default function BatchDetails() {
     };
 
     useEffect(() => {
-        setTimeout(() => fetchDetails(), 300);
-
-        // Auto-refresh when tabs change to ensure fresh data
-        const onFocus = () => setTimeout(() => fetchDetails(), 300);
-        window.addEventListener('focus', onFocus);
-        return () => window.removeEventListener('focus', onFocus);
+        // PERF: Removed window focus listener - it was causing full refetch on every tab switch
+        // Users can manually refresh if they need fresh data
+        fetchDetails();
     }, [id, navigate]);
 
     const handleDownloadPDF = async () => {
