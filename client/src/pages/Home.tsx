@@ -133,12 +133,12 @@ const Home = () => {
                     >
                         <motion.div variants={fadeIn} className="mb-6">
                             <span className="text-xs font-bold tracking-widest text-gray-500 uppercase">
-                                The #1 Platform for Modern Tuition Centers
+                                The #1 Platform for Modern Coaching Centers
                             </span>
                         </motion.div>
 
                         <motion.h1 variants={fadeIn} className="text-5xl md:text-7xl font-bold tracking-tight mb-8 text-gray-900 leading-[1.1]">
-                            Manage Your Tuition Classes <br className="hidden md:block" />
+                            Manage Your Coaching Classes <br className="hidden md:block" />
                             Like a Pro
                         </motion.h1>
 

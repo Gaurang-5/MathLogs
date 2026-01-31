@@ -73,7 +73,7 @@ export default function BatchList() {
         <Layout title="Manage Batches">
             {/* Action Bar */}
             <div className="mb-8 flex justify-between items-center">
-                <p className="text-app-text-secondary">View and manage your tuition batches.</p>
+                <p className="text-app-text-secondary">View and manage your coaching batches.</p>
                 <button
                     onClick={() => setShowForm(!showForm)}
                     className="bg-app-text text-app-bg hover:bg-app-text/90 border border-black dark:border-white px-5 py-2.5 rounded-full font-semibold shadow-lg transition-all active:scale-95 flex items-center text-sm"
