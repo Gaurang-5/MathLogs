@@ -114,3 +114,13 @@ h6 {
     background-color: var(--text-secondary);
     border: 2px solid transparent;
 }
+@keyframes scan {
+  0%, 100% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.animate-scan {
+  animation: scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
