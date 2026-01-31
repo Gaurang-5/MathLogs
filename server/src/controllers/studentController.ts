@@ -342,6 +342,16 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
     const teacherId = (req as any).user?.id;
     try {
         const academicYearId = (req as any).user?.currentAcademicYearId;
+
+        // Get academic year details to determine start month
+        const academicYear = await prisma.academicYear.findUnique({
+            where: { id: academicYearId }
+        });
+
+        if (!academicYear || !academicYear.startDate) {
+            return res.json([]);
+        }
+
         const students = await prisma.student.findMany({
             where: {
                 batch: { teacherId },
@@ -351,33 +361,51 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
             orderBy: { createdAt: 'asc' }
         });
 
-        // Group students by month
-        const monthlyStats: Record<string, number> = {};
+        if (students.length === 0) {
+            return res.json([{ name: 'Jan', students: 0 }]);
+        }
+
+        // Get the start date of the academic year and current date
+        const startDate = new Date(academicYear.startDate);
+        const currentDate = new Date();
+
+        // Build list of months from academic year start to current month
+        const months: { name: string; year: number; monthIndex: number }[] = [];
+        const tempDate = new Date(startDate);
+
+        while (tempDate <= currentDate) {
+            months.push({
+                name: tempDate.toLocaleString('default', { month: 'short' }),
+                year: tempDate.getFullYear(),
+                monthIndex: tempDate.getMonth()
+            });
+            tempDate.setMonth(tempDate.getMonth() + 1);
+        }
+
+        // Count students for each month
+        const monthlyData: Record<string, number> = {};
         students.forEach(s => {
-            const month = new Date(s.createdAt).toLocaleString('default', { month: 'short' });
-            monthlyStats[month] = (monthlyStats[month] || 0) + 1;
+            const date = new Date(s.createdAt);
+            const year = date.getFullYear();
+            const monthIndex = date.getMonth();
+            const key = `${year}-${monthIndex}`;
+            monthlyData[key] = (monthlyData[key] || 0) + 1;
         });
 
-        // Convert to cumulative growth data
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        // Build cumulative data
         let cumulativeCount = 0;
         const data = months.map(month => {
-            cumulativeCount += monthlyStats[month] || 0;
+            const key = `${month.year}-${month.monthIndex}`;
+            cumulativeCount += monthlyData[key] || 0;
             return {
-                name: month,
+                name: month.name,
                 students: cumulativeCount
             };
         });
 
-        // Only return months that have data (non-zero cumulative count)
-        const filteredData = data.filter((d, i) => {
-            // Include this month if it has students, or if a later month has students
-            return data.slice(i).some(laterMonth => laterMonth.students > 0);
-        });
-
-        res.json(filteredData.length > 0 ? filteredData : [{ name: 'Jan', students: 0 }]);
+        res.json(data);
     } catch (e) {
+        console.error('Growth stats error:', e);
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 };
-
