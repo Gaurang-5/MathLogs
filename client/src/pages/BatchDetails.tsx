@@ -1721,17 +1721,7 @@ export default function BatchDetails() {
                             <div className="p-6">
                                 <form onSubmit={handleMarkPaid} className="space-y-6">
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Amount (₹)</label>
-                                            <input
-                                                type="number"
-                                                value={paymentModal.installment.amount}
-                                                disabled
-                                                className="w-full !bg-neutral-100 border-2 !border-neutral-300 rounded-xl px-4 py-3 text-app-text font-bold text-lg cursor-not-allowed outline-none"
-                                                required
-                                            />
-                                            <p className="text-xs text-app-text-tertiary">This is the remaining amount to be collected</p>
-                                        </div>
+                                        {/* Amount input removed as per user request (redundant with header badge) */}
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Payment Date</label>
                                             <div className="relative">

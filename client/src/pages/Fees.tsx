@@ -68,7 +68,7 @@ const Fees: React.FC = () => {
 
     const fetchFees = async () => {
         try {
-            const data = await api.get('/fees');
+            const data = await api.get(`/fees?t=${Date.now()}`);
             setStudents(data);
         } catch (error) {
             toast.error("Failed to load fee records");
@@ -79,7 +79,7 @@ const Fees: React.FC = () => {
 
     const fetchTransactions = async () => {
         try {
-            const data = await api.get('/fees/recent');
+            const data = await api.get(`/fees/recent?t=${Date.now()}`);
             setTransactions(data);
         } catch (e) {
             console.error(e);
