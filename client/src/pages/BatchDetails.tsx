@@ -1132,7 +1132,7 @@ export default function BatchDetails() {
 
                                 <form onSubmit={handleUpdate} className="grid grid-cols-1 gap-6">
                                     {/* Student Section */}
-                                    <div className="space-y-4 p-4 border border-app-border rounded-2xl bg-app-bg/50">
+                                    <div className="space-y-4 p-4 border-2 border-black rounded-2xl bg-white">
                                         <div className="flex items-center gap-2 mb-2">
                                             <div className="p-1.5 bg-accent/10 rounded-lg text-accent"><User className="w-4 h-4" /></div>
                                             <h4 className="text-sm font-bold text-app-text tracking-tight">Student Details</h4>
@@ -1180,7 +1180,7 @@ export default function BatchDetails() {
                                     </div>
 
                                     {/* Guardian Section */}
-                                    <div className="space-y-4 p-4 border border-app-border rounded-2xl bg-app-bg/50">
+                                    <div className="space-y-4 p-4 border-2 border-black rounded-2xl bg-white">
                                         <div className="flex items-center gap-2 mb-2">
                                             <div className="p-1.5 bg-success/10 rounded-lg text-success"><Users className="w-4 h-4" /></div>
                                             <h4 className="text-sm font-bold text-app-text tracking-tight">Parent & Contact</h4>
@@ -1231,7 +1231,7 @@ export default function BatchDetails() {
                                     <div className="flex justify-end pt-4 border-t border-app-border">
                                         <button
                                             type="submit"
-                                            className="bg-gray-900 hover:bg-black text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg shadow-gray-200 transition-all active:scale-[0.98]"
+                                            className="!bg-black hover:!bg-neutral-800 !text-white border-2 !border-black px-8 py-3 rounded-xl font-bold flex items-center shadow-lg shadow-gray-200 transition-all active:scale-[0.98]"
                                         >
                                             <Save className="w-4 h-4 mr-2" /> Save Changes
                                         </button>
@@ -1345,7 +1345,7 @@ export default function BatchDetails() {
 
                                 <form onSubmit={handleAddStudent} className="grid grid-cols-1 gap-6">
                                     {/* Student Section */}
-                                    <div className="space-y-4 p-4 border border-app-border rounded-2xl bg-app-bg/50">
+                                    <div className="space-y-4 p-4 border-2 border-black rounded-2xl bg-white">
                                         <div className="flex items-center gap-2 mb-2">
                                             <div className="p-1.5 bg-accent/10 rounded-lg text-accent"><User className="w-4 h-4" /></div>
                                             <h4 className="text-sm font-bold text-app-text tracking-tight">Student Details</h4>
@@ -1381,7 +1381,7 @@ export default function BatchDetails() {
                                     </div>
 
                                     {/* Guardian Section */}
-                                    <div className="space-y-4 p-4 border border-app-border rounded-2xl bg-app-bg/50">
+                                    <div className="space-y-4 p-4 border-2 border-black rounded-2xl bg-white">
                                         <div className="flex items-center gap-2 mb-2">
                                             <div className="p-1.5 bg-success/10 rounded-lg text-success"><Users className="w-4 h-4" /></div>
                                             <h4 className="text-sm font-bold text-app-text tracking-tight">Parent & Contact</h4>
@@ -1432,7 +1432,7 @@ export default function BatchDetails() {
                                     <div className="flex justify-end pt-4">
                                         <button
                                             type="submit"
-                                            className="bg-neutral-900 hover:bg-black dark:bg-white dark:text-black dark:hover:bg-neutral-200 text-white border border-gray-900 dark:border-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center"
+                                            className="!bg-black hover:!bg-neutral-800 !text-white border-2 !border-black  px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center"
                                         >
                                             <Plus className="w-4 h-4 mr-2" /> Add Student
                                         </button>
@@ -1678,7 +1678,7 @@ export default function BatchDetails() {
                                     <div className="flex justify-end pt-4">
                                         <button
                                             type="submit"
-                                            className="bg-neutral-900 hover:bg-black dark:bg-white dark:text-black dark:hover:bg-neutral-200 text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center"
+                                            className="bg-neutral-900 hover:bg-black  text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center"
                                         >
                                             Create Installment
                                         </button>
@@ -1756,7 +1756,7 @@ export default function BatchDetails() {
                                         <button
                                             type="button"
                                             onClick={() => setPaymentModal(null)}
-                                            className="px-4 py-3 rounded-xl bg-app-bg hover:bg-app-border text-danger font-bold text-sm transition-colors border border-neutral-900 dark:border-white hover:border-danger/10"
+                                            className="px-4 py-3 rounded-xl bg-app-bg hover:bg-app-border text-danger font-bold text-sm transition-colors border border-neutral-900  hover:border-danger/10"
                                         >
                                             Deny
                                         </button>

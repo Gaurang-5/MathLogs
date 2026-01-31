@@ -110,7 +110,7 @@ export default function TestList() {
                 <p className="text-app-text-secondary">View and manage your tests and results.</p>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    className="bg-app-text text-app-bg hover:bg-app-text/90 border border-black dark:border-white px-5 py-2.5 rounded-full font-semibold shadow-lg transition-all active:scale-95 flex items-center text-sm"
+                    className="bg-app-text text-app-bg hover:bg-app-text/90 border border-black  px-5 py-2.5 rounded-full font-semibold shadow-lg transition-all active:scale-95 flex items-center text-sm"
                 >
                     {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
                     {showForm ? 'Cancel' : 'Create New Test'}
@@ -186,7 +186,7 @@ export default function TestList() {
                                 </div>
 
                                 <div className="md:col-span-2 flex justify-end pt-4">
-                                    <button type="submit" className="bg-neutral-900 hover:bg-black dark:bg-white dark:text-black dark:hover:bg-neutral-200 text-white px-8 py-3.5 rounded-xl font-bold shadow-lg shadow-neutral-500/10 transition-all hover:scale-[1.02] active:scale-95 w-full md:w-auto">
+                                    <button type="submit" className="bg-neutral-900 hover:bg-black  text-white px-8 py-3.5 rounded-xl font-bold shadow-lg shadow-neutral-500/10 transition-all hover:scale-[1.02] active:scale-95 w-full md:w-auto">
                                         Create & Start
                                     </button>
                                 </div>
