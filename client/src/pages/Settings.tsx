@@ -145,7 +145,8 @@ export default function Settings() {
         try {
             // Trigger download
             const token = localStorage.getItem('token');
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/academic-years/${id}/backup`, {
+            const API_BASE = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
+            const response = await fetch(`${API_BASE}/api/academic-years/${id}/backup`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -273,7 +274,7 @@ export default function Settings() {
                         <div
                             key={year.id}
                             className={`relative p-6 rounded-[24px] border transition-all duration-300 flex flex-col justify-between ${year.id === currentYearId
-                                ? 'bg-white border-black shadow-sm ring-1 ring-black'
+                                ? 'bg-white dark:bg-zinc-900 border-black dark:border-white shadow-sm ring-1 ring-black dark:ring-white'
                                 : 'bg-app-surface-opaque border-app-border hover:border-gray-400 dark:hover:border-gray-600'
                                 }`}
                         >
@@ -281,15 +282,15 @@ export default function Settings() {
                             {year.id === currentYearId ? (
                                 <>
                                     <div className="flex items-start justify-between mb-8">
-                                        <Calendar className="w-8 h-8 text-black" strokeWidth={1.5} />
-                                        <span className="bg-black text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest">
+                                        <Calendar className="w-8 h-8 text-black dark:text-white" strokeWidth={1.5} />
+                                        <span className="bg-black dark:bg-white text-white dark:text-black text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest">
                                             Active
                                         </span>
                                     </div>
 
                                     <div className="mb-10">
-                                        <h3 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">{year.name}</h3>
-                                        <p className="text-base text-gray-500 font-medium">
+                                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">{year.name}</h3>
+                                        <p className="text-base text-gray-500 dark:text-gray-400 font-medium">
                                             {new Date(year.createdAt).toLocaleDateString()}
                                         </p>
                                     </div>

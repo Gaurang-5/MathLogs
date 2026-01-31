@@ -225,7 +225,8 @@ export default function BatchDetails() {
         const toastId = toast.loading('Generating PDF...');
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/batches/${id}/download`, {
+            const API_BASE = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
+            const res = await fetch(`${API_BASE}/batches/${id}/download`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -1733,7 +1734,7 @@ export default function BatchDetails() {
                                                     type="date"
                                                     value={paymentModal.date}
                                                     onChange={(e) => setPaymentModal({ ...paymentModal, date: e.target.value })}
-                                                    className="w-full bg-app-bg border border-app-border rounded-xl pl-10 pr-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
+                                                    className="w-full bg-neutral-50 dark:bg-neutral-800 border border-app-border rounded-xl pl-10 pr-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
                                                     required
                                                 />
                                             </div>
