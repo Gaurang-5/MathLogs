@@ -50,7 +50,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 {/* Total Students */}
                 <div className="bg-app-surface-opaque px-6 py-6 rounded-[24px] border border-app-border shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
-                    <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-800 text-app-text rounded-2xl flex items-center justify-center">
+                    <div className="w-12 h-12 bg-neutral-100 text-app-text rounded-2xl flex items-center justify-center">
                         <Users className="w-6 h-6" strokeWidth={1.5} />
                     </div>
                     <div>
@@ -61,7 +61,7 @@ export default function Dashboard() {
 
                 {/* Collection Rate */}
                 <div className="bg-app-surface-opaque px-6 py-6 rounded-[24px] border border-app-border shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
-                    <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-800 text-app-text rounded-2xl flex items-center justify-center">
+                    <div className="w-12 h-12 bg-neutral-100 text-app-text rounded-2xl flex items-center justify-center">
                         <Wallet className="w-6 h-6" strokeWidth={1.5} />
                     </div>
                     <div>
@@ -77,7 +77,7 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                 {/* Student Growth Chart - 2 Columns */}
-                <div className="xl:col-span-2 bg-white dark:bg-neutral-900 p-6 rounded-[24px] border border-app-border shadow-sm">
+                <div className="xl:col-span-2 bg-white p-6 rounded-[24px] border border-app-border shadow-sm">
                     <h3 className="text-lg font-bold text-app-text mb-6">Student Growth</h3>
                     <div className="h-[300px] w-full min-h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
@@ -119,7 +119,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Batch Pending Dues List - 1 Column */}
-                <div className="bg-white dark:bg-neutral-900 p-6 rounded-[24px] border border-app-border shadow-sm flex flex-col">
+                <div className="bg-white p-6 rounded-[24px] border border-app-border shadow-sm flex flex-col">
                     <h3 className="text-lg font-bold text-app-text mb-4">Batch Pending Dues</h3>
                     <div className="flex-1 overflow-auto space-y-4">
                         {defaulters.length === 0 ? (
