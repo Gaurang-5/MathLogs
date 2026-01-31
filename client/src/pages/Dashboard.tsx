@@ -50,7 +50,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 {/* Total Students */}
                 <div className="bg-app-surface-opaque px-6 py-6 rounded-[24px] border border-app-border shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
-                    <div className="w-12 h-12 bg-neutral-100 text-app-text rounded-2xl flex items-center justify-center">
+                    <div className="w-12 h-12 bg-app-bg border border-app-border text-app-text rounded-2xl flex items-center justify-center">
                         <Users className="w-6 h-6" strokeWidth={1.5} />
                     </div>
                     <div>
@@ -61,7 +61,7 @@ export default function Dashboard() {
 
                 {/* Collection Rate */}
                 <div className="bg-app-surface-opaque px-6 py-6 rounded-[24px] border border-app-border shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
-                    <div className="w-12 h-12 bg-neutral-100 text-app-text rounded-2xl flex items-center justify-center">
+                    <div className="w-12 h-12 bg-app-bg border border-app-border text-app-text rounded-2xl flex items-center justify-center">
                         <Wallet className="w-6 h-6" strokeWidth={1.5} />
                     </div>
                     <div>
