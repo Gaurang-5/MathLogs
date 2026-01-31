@@ -224,10 +224,10 @@ export default function BatchDetails() {
     };
 
     useEffect(() => {
-        fetchDetails();
+        setTimeout(() => fetchDetails(), 300);
 
         // Auto-refresh when tabs change to ensure fresh data
-        const onFocus = () => fetchDetails();
+        const onFocus = () => setTimeout(() => fetchDetails(), 300);
         window.addEventListener('focus', onFocus);
         return () => window.removeEventListener('focus', onFocus);
     }, [id, navigate]);
@@ -360,7 +360,7 @@ export default function BatchDetails() {
             toast.success('Student added successfully', { id: toastId });
             setShowAddStudent(false);
             setNewName(''); setNewParentName(''); setNewWhatsapp(''); setNewEmail(''); setNewSchoolName('');
-            fetchDetails();
+            setTimeout(() => fetchDetails(), 300);
         } catch (e) {
             toast.error('Failed to add student', { id: toastId });
         }
@@ -383,7 +383,7 @@ export default function BatchDetails() {
             await apiRequest(`/students/${studentToDelete.id}/reject`, 'POST');
             toast.success('Student removed', { id: toastId });
             setStudentToDelete(null);
-            fetchDetails();
+            setTimeout(() => fetchDetails(), 300);
         } catch (e) {
             toast.error('Failed to remove student', { id: toastId });
         }
@@ -398,7 +398,7 @@ export default function BatchDetails() {
             await apiRequest(`/students/${editingStudent.id}`, 'PUT', editingStudent);
             toast.success('Student updated', { id: toastId });
             setEditingStudent(null);
-            fetchDetails();
+            setTimeout(() => fetchDetails(), 300);
         } catch (e) {
             toast.error('Failed to update student', { id: toastId });
         }
@@ -468,7 +468,7 @@ export default function BatchDetails() {
             toast.success('Installment created', { id: toastId });
             setShowAddInstallment(false);
             setNewInstallment({ name: '', amount: '' });
-            fetchDetails();
+            setTimeout(() => fetchDetails(), 300);
         } catch (e) {
             toast.error('Failed to create installment', { id: toastId });
         }
@@ -518,7 +518,7 @@ export default function BatchDetails() {
             });
             toast.success('Payment recorded', { id: toastId });
             setPaymentModal(null);
-            fetchDetails(); // Ensure real data is fetched
+            setTimeout(() => fetchDetails(), 300); // Small delay to ensure backend processed
         } catch (e: any) {
             console.error("Payment Error:", e);
             const errorMessage = e.message || 'Failed to record payment';
@@ -527,11 +527,11 @@ export default function BatchDetails() {
             if (errorMessage.includes('already exists') || errorMessage.includes('409')) {
                 toast.success('Payment already recorded', { id: toastId, icon: 'info' });
                 setPaymentModal(null);
-                fetchDetails();
+                setTimeout(() => fetchDetails(), 300);
             } else {
                 toast.error(errorMessage, { id: toastId });
                 // Revert optimistic update by refreshing data
-                fetchDetails();
+                setTimeout(() => fetchDetails(), 300);
             }
         } finally {
             setIsSubmitting(false);
@@ -1729,13 +1729,11 @@ export default function BatchDetails() {
                                             <input
                                                 type="number"
                                                 value={paymentModal.installment.amount}
-                                                onChange={(e) => setPaymentModal({
-                                                    ...paymentModal,
-                                                    installment: { ...paymentModal.installment, amount: Number(e.target.value) }
-                                                })}
-                                                className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
+                                                disabled
+                                                className="w-full !bg-neutral-100 border-2 !border-neutral-300 rounded-xl px-4 py-3 text-app-text font-bold text-lg cursor-not-allowed outline-none"
                                                 required
                                             />
+                                            <p className="text-xs text-app-text-tertiary">This is the remaining amount to be collected</p>
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Payment Date</label>
