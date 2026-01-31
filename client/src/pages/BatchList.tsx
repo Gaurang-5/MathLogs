@@ -91,7 +91,7 @@ export default function BatchList() {
                         exit={{ opacity: 0, height: 0 }}
                         className="overflow-hidden mb-8"
                     >
-                        <div className="bg-app-surface-opaque border border-app-border p-8 rounded-[24px] shadow-xl">
+                        <div className="bg-app-surface border border-app-border p-5 md:p-8 rounded-[24px] shadow-xl">
                             <h3 className="font-semibold text-lg mb-8 text-app-text flex items-center">
                                 <span className="w-8 h-8 rounded-full bg-accent-subtle flex items-center justify-center mr-3 text-accent text-sm font-bold">01</span>
                                 Create New Batch
@@ -141,7 +141,7 @@ export default function BatchList() {
                                     />
                                 </div>
                                 <div className="md:col-span-2 flex justify-end pt-4">
-                                    <button type="submit" className="bg-gray-900 hover:bg-black text-white px-8 py-3.5 rounded-xl font-semibold shadow-lg shadow-gray-200 transition-all hover:scale-[1.02] active:scale-95">Save Batch</button>
+                                    <button type="submit" className="bg-neutral-900 hover:bg-black dark:bg-white dark:text-black dark:hover:bg-neutral-200 text-white px-8 py-3.5 rounded-xl font-bold shadow-lg shadow-neutral-500/10 transition-all hover:scale-[1.02] active:scale-95 w-full md:w-auto">Save Batch</button>
                                 </div>
                             </form>
                         </div>
