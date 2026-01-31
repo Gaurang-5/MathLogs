@@ -443,6 +443,7 @@ export const payInstallment = async (req: Request, res: Response) => {
             });
         }
 
+
         // Create payment record
         const payment = await prisma.feePayment.create({
             data: {
@@ -453,7 +454,7 @@ export const payInstallment = async (req: Request, res: Response) => {
             }
         });
 
-        // Payment recorded successfully
+        // Payment recorded successfully (this will automatically appear in transaction reports)
         res.json(payment);
     } catch (error) {
         console.error("Error paying installment:", error);

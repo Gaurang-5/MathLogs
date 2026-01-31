@@ -348,14 +348,11 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
             where: { id: academicYearId }
         });
 
-        if (!academicYear || !academicYear.startDate) {
-            return res.json([]);
-        }
 
         const students = await prisma.student.findMany({
             where: {
                 batch: { teacherId },
-                academicYearId
+                ...(academicYearId && { academicYearId })
             },
             select: { createdAt: true },
             orderBy: { createdAt: 'asc' }
@@ -365,8 +362,11 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
             return res.json([{ name: 'Jan', students: 0 }]);
         }
 
-        // Get the start date of the academic year and current date
-        const startDate = new Date(academicYear.startDate);
+        // Get the start date - use academic year start or default to start of current year
+        const currentYear = new Date().getFullYear();
+        const startDate = (academicYear?.startDate)
+            ? new Date(academicYear.startDate)
+            : new Date(currentYear, 0, 1); // January 1 of current year
         const currentDate = new Date();
 
         // Build list of months from academic year start to current month
