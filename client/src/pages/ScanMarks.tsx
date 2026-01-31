@@ -197,7 +197,7 @@ export default function ScanMarks() {
 
             {/* Camera Viewport */}
             <div className={`max-w-lg mx-auto ${!scanning ? 'hidden' : 'block'}`}>
-                <div className="bg-white dark:bg-zinc-900 p-4 rounded-3xl shadow-lg border border-slate-100 dark:border-neutral-800">
+                <div className="!bg-white p-4 rounded-3xl shadow-lg border border-slate-100">
                     <div className="relative w-full rounded-2xl overflow-hidden shadow-inner h-64 md:h-96 bg-black">
                         <div id="reader" className="w-full h-full"></div>
                         {/* Scanner Overlay */}

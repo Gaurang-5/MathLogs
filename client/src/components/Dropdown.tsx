@@ -47,7 +47,7 @@ export default function Dropdown({ label, value, onChange, options, placeholder 
 
             {/* Dropdown Menu - Always opens downward */}
             {isOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-neutral-900 border border-app-border rounded-xl shadow-xl z-50 max-h-60 overflow-auto">
+                <div className="absolute top-full left-0 right-0 mt-2 !bg-white border border-app-border rounded-xl shadow-xl z-50 max-h-60 overflow-auto">
                     {options.map((option) => (
                         <button
                             key={option.value}

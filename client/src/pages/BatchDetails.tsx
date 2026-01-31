@@ -658,7 +658,7 @@ export default function BatchDetails() {
                                                     initial={{ opacity: 0, scale: 0.95, y: -5 }}
                                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                                                    className="absolute right-0 top-10 min-w-[220px] bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-2xl z-50 py-1.5 text-left text-sm font-medium"
+                                                    className="absolute right-0 top-10 min-w-[220px] !bg-white border border-neutral-200 rounded-xl shadow-2xl z-50 py-1.5 text-left text-sm font-medium"
                                                 >
                                                     <div className="px-3 py-2 text-xs font-bold text-neutral-400 uppercase tracking-wider mb-1">Options</div>
                                                     <button
@@ -1123,7 +1123,7 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
+                                className="!bg-white border border-app-border rounded-[24px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
                             >
                                 <div className="flex justify-between items-center mb-8">
                                     <h3 className="text-xl font-bold text-app-text">Edit Student</h3>
@@ -1258,7 +1258,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-8 max-w-2xl w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
+                            className="!bg-white border border-app-border rounded-[24px] p-8 max-w-2xl w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
                         >
                             <div className="flex justify-between items-center mb-6">
                                 <div>
@@ -1336,7 +1336,7 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
+                                className="!bg-white border border-app-border rounded-[24px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
                             >
                                 <div className="flex justify-between items-center mb-8">
                                     <h3 className="text-xl font-bold text-app-text">Add New Student</h3>
@@ -1459,7 +1459,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-8 max-w-md w-full shadow-2xl relative z-10"
+                            className="!bg-white border border-app-border rounded-[24px] p-8 max-w-md w-full shadow-2xl relative z-10"
                         >
                             <div className="flex justify-between items-start mb-6">
                                 <div>
@@ -1525,7 +1525,7 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10"
+                                className="!bg-white border border-app-border rounded-[24px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10"
                             >
                                 <div className="flex justify-between items-center mb-8">
                                     <h3 className="text-xl font-bold text-app-text">Edit Batch Details</h3>
@@ -1593,7 +1593,7 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-5 md:p-8 max-w-md w-full shadow-2xl relative z-10"
+                                className="!bg-white border border-app-border rounded-[24px] p-5 md:p-8 max-w-md w-full shadow-2xl relative z-10"
                             >
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-xl font-bold text-app-text">WhatsApp Group Link</h3>
@@ -1646,7 +1646,7 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
+                                className="!bg-white border border-app-border rounded-[24px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
                             >
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-xl font-bold text-app-text">Add Fee Installment</h3>
@@ -1705,7 +1705,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-0 max-w-sm w-full shadow-2xl relative z-10 overflow-hidden"
+                            className="!bg-white border border-app-border rounded-[24px] p-0 max-w-sm w-full shadow-2xl relative z-10 overflow-hidden"
                         >
                             {/* Header */}
                             <div className="p-6 border-b border-app-border flex justify-between items-start bg-app-surface-opaque">
@@ -1869,7 +1869,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
+                            className="!bg-white border border-app-border rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
                         >
                             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
                                 <Trash2 className="w-8 h-8" />
@@ -1912,7 +1912,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
+                            className="!bg-white border border-app-border rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
                         >
                             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
                                 <Trash2 className="w-8 h-8" />
@@ -1966,7 +1966,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white dark:bg-zinc-900 border border-app-border rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
+                            className="!bg-white border border-app-border rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
                         >
                             <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                 {sendingState.completed ? (
