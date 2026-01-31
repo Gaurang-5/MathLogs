@@ -36,8 +36,9 @@ const Home = () => {
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
-            const { clientX, clientY, currentTarget } = e;
-            const { clientWidth, clientHeight } = currentTarget as Window;
+            const { clientX, clientY } = e;
+            const clientWidth = window.innerWidth;
+            const clientHeight = window.innerHeight;
 
             // Normalize to -1 to 1
             const x = (clientX / clientWidth - 0.5) * 2;

@@ -565,9 +565,10 @@ Coaching Administration`;
 export const getRecentTransactions = async (req: Request, res: Response) => {
     try {
         const teacherId = (req as any).user?.id;
-        const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
-        // Fetch recent installment payments
+        console.log('[DEBUG] Fetching recent transactions for teacher:', teacherId);
+
+        // Fetch recent installment payments (NO academic year filter)
         const recentInstallments = await prisma.feePayment.findMany({
             where: {
                 student: {
@@ -582,6 +583,8 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
             }
         });
 
+        console.log('[DEBUG] Found installment payments:', recentInstallments.length);
+
         // Fetch recent ad-hoc payments (FeeRecord)
         const recentRecords = await prisma.feeRecord.findMany({
             where: {
@@ -595,6 +598,8 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
                 student: { select: { name: true, batch: { select: { name: true } } } }
             }
         });
+
+        console.log('[DEBUG] Found ad-hoc payments:', recentRecords.length);
 
         // Combine and Sort
         const combined = [
@@ -617,8 +622,11 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
         ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 10);
 
+        console.log('[DEBUG] Returning combined transactions:', combined.length);
+
         res.json(combined);
     } catch (e) {
+        console.error('[ERROR] Failed to fetch transactions:', e);
         res.status(500).json({ error: 'Failed to fetch transactions' });
     }
 };
