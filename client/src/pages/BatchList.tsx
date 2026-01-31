@@ -183,7 +183,7 @@ export default function BatchList() {
                                                         {batch.subject}
                                                     </div>
                                                 </div>
-                                                <span className="bg-neutral-100 dark:bg-neutral-800 text-app-text-secondary text-xs px-3 py-1.5 rounded-full font-bold border border-app-border flex items-center">
+                                                <span className="bg-app-surface text-app-text-secondary text-xs px-3 py-1.5 rounded-full font-bold border border-app-border flex items-center">
                                                     <Users className="w-3 h-3 mr-1.5" />
                                                     {batch._count?.students || 0}
                                                 </span>
@@ -225,7 +225,7 @@ export default function BatchList() {
                                                     {batch.subject}
                                                 </div>
                                             </div>
-                                            <span className="bg-neutral-100 dark:bg-neutral-800 text-app-text-secondary text-xs px-3 py-1.5 rounded-full font-bold border border-app-border flex items-center">
+                                            <span className="bg-app-surface text-app-text-secondary text-xs px-3 py-1.5 rounded-full font-bold border border-app-border flex items-center">
                                                 <Users className="w-3 h-3 mr-1.5" />
                                                 {batch._count?.students || 0}
                                             </span>

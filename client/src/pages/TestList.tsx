@@ -85,7 +85,7 @@ export default function TestList() {
             className="bg-app-surface border border-app-border rounded-[24px] p-6 hover:shadow-lg transition-all cursor-pointer group hover:border-app-text/20 relative overflow-hidden"
         >
             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-neutral-100 dark:bg-neutral-800 rounded-xl group-hover:bg-neutral-200 transition-colors">
+                <div className="p-3 bg-app-bg border border-app-border rounded-xl group-hover:bg-app-surface-hover transition-colors">
                     <FileText className="w-6 h-6 text-app-text" />
                 </div>
                 <div className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100 flex items-center">
