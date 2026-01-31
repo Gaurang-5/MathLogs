@@ -78,3 +78,48 @@ export const createInitialAdmin = async (req: Request, res: Response) => {
         res.status(400).json({ error: 'Admin likely exists' });
     }
 }
+
+export const changePassword = async (req: Request, res: Response) => {
+    const { currentPassword, newPassword } = req.body;
+    const adminId = (req as any).user?.id;
+
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Current and new password are required' });
+    }
+
+    try {
+        const admin = await prisma.admin.findUnique({
+            where: { id: adminId }
+        });
+
+        if (!admin) return res.status(404).json({ error: 'Admin not found' });
+
+        const isMatch = await bcrypt.compare(currentPassword, admin.password);
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Incorrect current password' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Update password and increment version to invalidate old tokens
+        await prisma.admin.update({
+            where: { id: adminId },
+            data: {
+                password: hashedPassword,
+                passwordVersion: { increment: 1 }
+            }
+        });
+
+        // Generate new token directly so user doesn't have to re-login immediately
+        const token = jwt.sign({
+            id: admin.id,
+            username: admin.username,
+            passwordVersion: admin.passwordVersion + 1
+        }, JWT_SECRET, { expiresIn: '8h' });
+
+        res.json({ success: true, message: 'Password changed successfully', token });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ error: 'Failed to change password' });
+    }
+};

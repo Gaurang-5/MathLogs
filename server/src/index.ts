@@ -63,7 +63,7 @@ app.use(express.static(path.join(__dirname, '../../client/dist')));
 app.use('/api', apiRoutes);
 
 // Catch-all route to serve React frontend for any unmatched routes
-app.get('*', (req, res) => {
+app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
 });
 

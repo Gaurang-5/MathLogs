@@ -1,8 +1,107 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { api } from '../utils/api';
-import { Calendar, Plus, Download, RefreshCcw, Trash2 } from 'lucide-react';
+import { Calendar, Plus, Download, RefreshCcw, Trash2, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+function ChangePasswordForm() {
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (newPassword !== confirmPassword) {
+            toast.error('New passwords do not match');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            toast.error('Password must be at least 6 characters');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await api.post('/auth/change-password', {
+                currentPassword,
+                newPassword
+            });
+
+            if (res.token) {
+                localStorage.setItem('token', res.token);
+            }
+
+            toast.success('Password changed successfully');
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+        } catch (e: any) {
+            console.error(e);
+            toast.error(e.message || 'Failed to change password');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+                <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1.5 ml-1">Current Password</label>
+                <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text transition-colors"
+                    placeholder="Enter current password"
+                    required
+                />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1.5 ml-1">New Password</label>
+                    <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text transition-colors"
+                        placeholder="Min 6 chars"
+                        required
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1.5 ml-1">Confirm New</label>
+                    <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text transition-colors"
+                        placeholder="Re-enter new"
+                        required
+                    />
+                </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex items-center gap-2 bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                    {loading ? 'Updating...' : (
+                        <>
+                            <Lock size={16} />
+                            <span>Update Password</span>
+                        </>
+                    )}
+                </button>
+            </div>
+        </form>
+    );
+}
 
 export default function Settings() {
     const [years, setYears] = useState<any[]>([]);
@@ -169,7 +268,7 @@ export default function Settings() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
                     {years.map(year => (
                         <div
                             key={year.id}
@@ -245,6 +344,18 @@ export default function Settings() {
                             )}
                         </div>
                     ))}
+                </div>
+
+                {/* Security Section */}
+                <div className="max-w-xl">
+                    <div className="mb-6">
+                        <h2 className="text-xl font-bold text-app-text">Security</h2>
+                        <p className="text-app-text-secondary text-sm mt-1">Update your login credentials.</p>
+                    </div>
+
+                    <div className="bg-white dark:bg-zinc-900/50 border border-app-border p-6 rounded-[24px]">
+                        <ChangePasswordForm />
+                    </div>
                 </div>
 
                 {/* Delete Confirmation Modal */}

@@ -108,7 +108,7 @@ export default function BatchDetails() {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
     // View Payment Details State
-    const [viewPayment, setViewPayment] = useState<{ student: Student, installment: FeeInstallment, payment: FeePayment } | null>(null);
+    const [viewPayment, setViewPayment] = useState<{ student: Student, installment: FeeInstallment, payments: FeePayment[] } | null>(null);
 
     // ... existing search logic ...
     const filteredStudents = useMemo(() => {
@@ -872,9 +872,9 @@ export default function BatchDetails() {
                                         </td>
                                         <td className={cn("text-center font-bold text-app-text", getCellPadding())}>{getStudentAverage(student)}</td>
                                         {batch.feeInstallments?.map(inst => {
-                                            const payment = student.feePayments?.find(p => p.installmentId === inst.id);
+                                            const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
                                             // Use calculated amount from map, fallback to simple check if missing (shouldn't happen)
-                                            const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : (payment?.amountPaid || 0);
+                                            const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);
                                             const isFullyPaid = paidAmount >= inst.amount;
                                             const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
 
@@ -883,8 +883,8 @@ export default function BatchDetails() {
                                                     <button
                                                         onClick={() => {
                                                             if (isFullyPaid) {
-                                                                if (payment) {
-                                                                    setViewPayment({ student, installment: inst, payment });
+                                                                if (payments.length > 0) {
+                                                                    setViewPayment({ student, installment: inst, payments });
                                                                 } else {
                                                                     toast.success('Paid via Account Balance');
                                                                 }
@@ -909,7 +909,7 @@ export default function BatchDetails() {
                                                         )}
                                                         title={
                                                             isFullyPaid
-                                                                ? (payment ? `Paid on ${new Date(payment.date).toLocaleDateString()}` : 'Paid via Balance')
+                                                                ? (payments.length > 0 ? `Paid on ${new Date(payments[0].date).toLocaleDateString()}` : 'Paid via Balance')
                                                                 : isPartiallyPaid
                                                                     ? `Partial: ₹${paidAmount}/${inst.amount}`
                                                                     : "Mark as Paid"
@@ -1021,9 +1021,9 @@ export default function BatchDetails() {
                                             <div className="mt-2 pt-3 border-t border-app-border/50">
                                                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
                                                     {batch.feeInstallments.map(inst => {
-                                                        const payment = student.feePayments?.find(p => p.installmentId === inst.id);
+                                                        const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
                                                         // Use calculated amount from map
-                                                        const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : (payment?.amountPaid || 0);
+                                                        const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);
                                                         const isFullyPaid = paidAmount >= inst.amount;
                                                         const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
 
@@ -1032,8 +1032,8 @@ export default function BatchDetails() {
                                                                 key={inst.id}
                                                                 onClick={() => {
                                                                     if (isFullyPaid) {
-                                                                        if (payment) {
-                                                                            setViewPayment({ student, installment: inst, payment });
+                                                                        if (payments.length > 0) {
+                                                                            setViewPayment({ student, installment: inst, payments });
                                                                         } else {
                                                                             toast.success('Paid via Account Balance');
                                                                         }
@@ -1775,19 +1775,34 @@ export default function BatchDetails() {
                             <h3 className="text-lg font-bold text-neutral-900 mb-1">{viewPayment.student.name}</h3>
                             <p className="text-neutral-500 text-xs uppercase tracking-wider font-semibold mb-6">{viewPayment.installment.name}</p>
 
-                            <div className="bg-neutral-50 border border-neutral-100 rounded-2xl w-full p-4 space-y-3 mb-6">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-neutral-500">Amount</span>
-                                    <span className="font-bold text-neutral-900 text-base">₹{viewPayment.payment.amountPaid}</span>
-                                </div>
-                                <div className="w-full h-px bg-neutral-200" />
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-neutral-500">Date</span>
-                                    <span className="font-medium text-neutral-900">{new Date(viewPayment.payment.date).toLocaleDateString()}</span>
-                                </div>
-                                {viewPayment.payment.id.startsWith('temp-') && (
-                                    <div className="text-xs text-blue-600 bg-blue-50 py-1 px-2 rounded-lg text-center mt-2 border border-blue-100">
-                                        Syncing with server...
+                            <div className="bg-neutral-50 border border-neutral-100 rounded-2xl w-full text-sm mb-6 max-h-[300px] overflow-y-auto">
+                                {viewPayment.payments.map((payment, idx) => (
+                                    <div key={payment.id} className={cn("p-4 space-y-2", idx > 0 && "border-t border-neutral-200")}>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-neutral-500">Amount</span>
+                                            <span className="font-bold text-neutral-900 text-base">₹{payment.amountPaid}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-neutral-500">Date</span>
+                                            <span className="font-medium text-neutral-900">{new Date(payment.date).toLocaleDateString()}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-neutral-500">Fee Head</span>
+                                            <span className="font-medium text-neutral-900">{viewPayment.installment.name}</span>
+                                        </div>
+                                        {payment.id.startsWith('temp-') && (
+                                            <div className="text-xs text-blue-600 bg-blue-50 py-1 px-2 rounded-lg text-center mt-2 border border-blue-100">
+                                                Syncing with server...
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                {viewPayment.payments.length > 1 && (
+                                    <div className="bg-neutral-100 p-4 border-t border-neutral-200 flex justify-between items-center">
+                                        <span className="font-bold text-neutral-600">Total Paid</span>
+                                        <span className="font-bold text-neutral-900 text-lg">
+                                            ₹{viewPayment.payments.reduce((sum, p) => sum + p.amountPaid, 0)}
+                                        </span>
                                     </div>
                                 )}
                             </div>

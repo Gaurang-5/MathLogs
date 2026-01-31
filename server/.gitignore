@@ -12,3 +12,8 @@ prisma/backups/
 # Exclude log files
 logs/
 *.log
+
+# Migration artifacts
+migration-data/
+dev.db.backup
+migrations_sqlite_archived/

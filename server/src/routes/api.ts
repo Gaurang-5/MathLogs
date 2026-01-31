@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { loginAdmin, createInitialAdmin } from '../controllers/authController';
+import { loginAdmin, createInitialAdmin, changePassword } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
 import { authLimiter, publicLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { loginSchema, setupSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
+import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
 import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF } from '../controllers/batchController';
 import { registerStudent, getPendingStudents, approveStudent, rejectStudent, updateStudent, addStudentManually, getStudentGrowthStats } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
@@ -24,6 +24,7 @@ router.delete('/academic-years/:id', authenticateToken as any, deleteAcademicYea
 // Auth
 router.post('/auth/login', authLimiter, validateRequest(loginSchema), loginAdmin as any);
 router.post('/auth/setup', authLimiter, validateRequest(setupSchema), createInitialAdmin as any);
+router.post('/auth/change-password', authenticateToken as any, validateRequest(changePasswordSchema), changePassword as any);
 
 // Batches
 router.get('/batches', authenticateToken as any, getBatches as any);
