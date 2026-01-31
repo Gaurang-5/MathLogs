@@ -359,24 +359,15 @@ export const recordPayment = async (req: Request, res: Response) => {
                 // Determine how much we can pay for this installment
                 const allocate = Math.min(pendingForThis, remainingAmount);
 
-                if (existingPayment) {
-                    await prisma.feePayment.update({
-                        where: { id: existingPayment.id },
-                        data: {
-                            amountPaid: paidSoFar + allocate,
-                            date: new Date()
-                        }
-                    });
-                } else {
-                    await prisma.feePayment.create({
-                        data: {
-                            studentId,
-                            installmentId: inst.id,
-                            amountPaid: allocate,
-                            date: new Date()
-                        }
-                    });
-                }
+                // Always create a NEW payment record to preserve transaction history
+                await prisma.feePayment.create({
+                    data: {
+                        studentId,
+                        installmentId: inst.id,
+                        amountPaid: allocate,
+                        date: new Date()
+                    }
+                });
 
                 remainingAmount -= allocate;
             }

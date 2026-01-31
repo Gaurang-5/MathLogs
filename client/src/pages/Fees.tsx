@@ -650,7 +650,8 @@ const Fees: React.FC = () => {
                                             const toastId = toast.loading('Downloading...');
                                             try {
                                                 const token = localStorage.getItem('token');
-                                                const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/fees/download-pending?batch=${reportBatch}&sortBy=${reportSort}`, {
+                                                const API_BASE = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
+                                                const response = await fetch(`${API_BASE}/fees/download-pending?batch=${reportBatch}&sortBy=${reportSort}`, {
                                                     headers: { 'Authorization': `Bearer ${token}` }
                                                 });
                                                 if (!response.ok) throw new Error('Download failed');
@@ -751,7 +752,8 @@ const Fees: React.FC = () => {
                                             const toastId = toast.loading('Generating...');
                                             try {
                                                 const token = localStorage.getItem('token');
-                                                const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/fees/download-transactions?month=${reportMonth}&year=${reportYear}`, {
+                                                const API_BASE = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
+                                                const response = await fetch(`${API_BASE}/fees/download-transactions?month=${reportMonth}&year=${reportYear}`, {
                                                     headers: { 'Authorization': `Bearer ${token}` }
                                                 });
                                                 if (!response.ok) throw new Error('Download failed');

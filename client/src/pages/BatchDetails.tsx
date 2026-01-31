@@ -1711,17 +1711,32 @@ export default function BatchDetails() {
 
                             <div className="p-6">
                                 <form onSubmit={handleMarkPaid} className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Payment Date</label>
-                                        <div className="relative">
-                                            <Clock className="absolute left-3 top-3 w-4 h-4 text-app-text-tertiary" />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Amount (₹)</label>
                                             <input
-                                                type="date"
-                                                value={paymentModal.date}
-                                                onChange={(e) => setPaymentModal({ ...paymentModal, date: e.target.value })}
-                                                className="w-full bg-app-bg border border-app-border rounded-xl pl-10 pr-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
+                                                type="number"
+                                                value={paymentModal.installment.amount}
+                                                onChange={(e) => setPaymentModal({
+                                                    ...paymentModal,
+                                                    installment: { ...paymentModal.installment, amount: Number(e.target.value) }
+                                                })}
+                                                className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
                                                 required
                                             />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Payment Date</label>
+                                            <div className="relative">
+                                                <Clock className="absolute left-3 top-3 w-4 h-4 text-app-text-tertiary" />
+                                                <input
+                                                    type="date"
+                                                    value={paymentModal.date}
+                                                    onChange={(e) => setPaymentModal({ ...paymentModal, date: e.target.value })}
+                                                    className="w-full bg-app-bg border border-app-border rounded-xl pl-10 pr-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
+                                                    required
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
