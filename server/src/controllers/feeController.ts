@@ -571,8 +571,7 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
         const recentInstallments = await prisma.feePayment.findMany({
             where: {
                 student: {
-                    batch: { teacherId },
-                    academicYearId: currentAcademicYearId
+                    batch: { teacherId }
                 }
             },
             take: 10,
@@ -587,8 +586,7 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
         const recentRecords = await prisma.feeRecord.findMany({
             where: {
                 student: {
-                    batch: { teacherId },
-                    academicYearId: currentAcademicYearId
+                    batch: { teacherId }
                 }
             },
             take: 10,
