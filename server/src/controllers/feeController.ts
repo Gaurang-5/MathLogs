@@ -668,6 +668,10 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
             }))
         ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+        if (allTx.length === 0) {
+            return res.status(404).json({ error: 'No transactions found for this period' });
+        }
+
         // Generate PDF
         const doc = new PDFDocument({ margin: 30, size: 'A4' });
         res.setHeader('Content-Type', 'application/pdf');
@@ -685,20 +689,24 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         doc.text(`Total Transactions: ${allTx.length}`, { align: 'right' });
         doc.moveDown();
 
-        // Table
+        // Table Constants
         const startX = 30;
         let currentY = doc.y;
 
-        // Headers
-        doc.font('Helvetica-Bold').fontSize(9);
-        doc.text('Date', startX, currentY, { width: 60 });
-        doc.text('ID', startX + 60, currentY, { width: 60 });
-        doc.text('Name', startX + 120, currentY, { width: 120 });
-        doc.text('Batch', startX + 240, currentY, { width: 100 });
-        doc.text('Type', startX + 340, currentY, { width: 120 });
-        doc.text('Amount', startX + 460, currentY, { width: 70, align: 'right' });
+        const drawTableHeader = (y: number) => {
+            doc.font('Helvetica-Bold').fontSize(9);
+            doc.text('Date', startX, y, { width: 60 });
+            doc.text('ID', startX + 60, y, { width: 60 });
+            doc.text('Name', startX + 120, y, { width: 120 });
+            doc.text('Batch', startX + 240, y, { width: 100 });
+            doc.text('Type', startX + 340, y, { width: 120 });
+            doc.text('Amount', startX + 460, y, { width: 70, align: 'right' });
 
-        doc.moveTo(startX, currentY + 15).lineTo(565, currentY + 15).stroke();
+            doc.moveTo(startX, y + 15).lineTo(565, y + 15).stroke();
+        };
+
+        // Draw Initial Header
+        drawTableHeader(currentY);
         currentY += 25;
 
         doc.font('Helvetica').fontSize(9);
@@ -707,10 +715,18 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
             if (currentY > 750) {
                 doc.addPage();
                 currentY = 40;
-                // Re-draw header if strict, but for now just continue
+                drawTableHeader(currentY);
+                currentY += 25;
+                doc.font('Helvetica').fontSize(9); // Reset font
             }
 
-            // Alternating row background? Maybe overkill.
+            // Zebra striping (optional, keeps code clean if omitted, but helps readability)
+            if (i % 2 === 1) {
+                doc.save();
+                doc.fillColor('#F9FAFB');
+                doc.rect(startX, currentY - 5, 535, 20).fill();
+                doc.restore();
+            }
 
             doc.text(new Date(tx.date).toLocaleDateString(), startX, currentY, { width: 60 });
             doc.text(tx.id, startX + 60, currentY, { width: 60 });

@@ -20,6 +20,7 @@ interface Student {
     status: string;
     feePayments: FeePayment[];
     fees: any[];
+    marks?: any[];
 }
 
 interface FeeInstallment {
@@ -63,7 +64,12 @@ export default function BatchDetails() {
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteCodeInput, setDeleteCodeInput] = useState('');
-    const [viewMarks, setViewMarks] = useState<any>(null);
+    const [viewMarksId, setViewMarksId] = useState<string | null>(null);
+
+    const viewMarks = useMemo(() => {
+        if (!viewMarksId || !batch) return null;
+        return batch.students.find(s => s.id === viewMarksId) || null;
+    }, [viewMarksId, batch]);
 
     const getStudentAverage = (student: any) => {
         if (!student.marks || student.marks.length === 0) return '-';
@@ -219,6 +225,11 @@ export default function BatchDetails() {
 
     useEffect(() => {
         fetchDetails();
+
+        // Auto-refresh when tabs change to ensure fresh data
+        const onFocus = () => fetchDetails();
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
     }, [id, navigate]);
 
     const handleDownloadPDF = async () => {
@@ -867,7 +878,7 @@ export default function BatchDetails() {
                                             </div>
                                         </td>
                                         <td className={cn("text-center", getCellPadding())}>
-                                            <button onClick={() => setViewMarks(student)} className="p-2 hover:bg-black/5 rounded-lg transition-colors inline-flex items-center justify-center text-app-text-secondary hover:text-app-text" title="View Marks">
+                                            <button onClick={() => setViewMarksId(student.id)} className="p-2 hover:bg-black/5 rounded-lg transition-colors inline-flex items-center justify-center text-app-text-secondary hover:text-app-text" title="View Marks">
                                                 <Eye className={getIconSizeClass()} />
                                             </button>
                                         </td>
@@ -993,7 +1004,7 @@ export default function BatchDetails() {
                                                 )}
                                             </div>
                                             <div className="flex gap-2 shrink-0">
-                                                <button onClick={() => setViewMarks(student)} className="p-2 bg-app-text/5 text-app-text rounded-lg active:scale-95 transition-transform"><Eye className={getIconSizeClass()} /></button>
+                                                <button onClick={() => setViewMarksId(student.id)} className="p-2 bg-app-text/5 text-app-text rounded-lg active:scale-95 transition-transform"><Eye className={getIconSizeClass()} /></button>
                                                 <a href={`tel:${student.parentWhatsapp}`} className="p-2 bg-success/10 text-success rounded-lg active:scale-95 transition-transform"><Phone className={getIconSizeClass()} /></a>
                                                 <button onClick={() => setEditingStudent(student)} className="p-2 bg-accent/10 text-accent rounded-lg active:scale-95 transition-transform"><Edit2 className={getIconSizeClass()} /></button>
                                                 <button onClick={() => handleDelete(student)} className="p-2 bg-danger/10 text-danger rounded-lg active:scale-95 transition-transform"><Trash2 className={getIconSizeClass()} /></button>
@@ -1241,7 +1252,7 @@ export default function BatchDetails() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             className="absolute inset-0 bg-black/40 backdrop-blur-md"
-                            onClick={() => setViewMarks(null)}
+                            onClick={() => setViewMarksId(null)}
                         />
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -1254,7 +1265,7 @@ export default function BatchDetails() {
                                     <h3 className="text-xl font-bold text-app-text">{viewMarks.name}'s Performance</h3>
                                     <p className="text-sm text-app-text-secondary mt-1">Detailed breakdown of test scores</p>
                                 </div>
-                                <button onClick={() => setViewMarks(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                <button onClick={() => setViewMarksId(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
                             </div>
 
                             <div className="border border-app-border rounded-xl overflow-hidden">
