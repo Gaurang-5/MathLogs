@@ -1644,7 +1644,7 @@ export default function BatchDetails() {
 
                                 <form onSubmit={handleAddInstallment} className="space-y-4">
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider ml-1">Installment Name</label>
+                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Installment Name</label>
                                         <input
                                             value={newInstallment.name}
                                             onChange={(e) => setNewInstallment({ ...newInstallment, name: e.target.value })}
@@ -1654,7 +1654,7 @@ export default function BatchDetails() {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider ml-1">Amount (₹)</label>
+                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Amount (₹)</label>
                                         <input
                                             type="number"
                                             value={newInstallment.amount}

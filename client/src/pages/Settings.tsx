@@ -49,7 +49,7 @@ function ChangePasswordForm() {
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-                <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1.5 ml-1">Current Password</label>
+                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">Current Password</label>
                 <input
                     type="password"
                     value={currentPassword}
@@ -62,7 +62,7 @@ function ChangePasswordForm() {
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1.5 ml-1">New Password</label>
+                    <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">New Password</label>
                     <input
                         type="password"
                         value={newPassword}
@@ -73,7 +73,7 @@ function ChangePasswordForm() {
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1.5 ml-1">Confirm New</label>
+                    <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">Confirm New</label>
                     <input
                         type="password"
                         value={confirmPassword}
