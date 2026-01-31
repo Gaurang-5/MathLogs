@@ -6,7 +6,7 @@
     "license": "ISC",
     "scripts": {
         "start": "cd server && npm start",
-        "heroku-postbuild": "echo 'Installing Client...' && cd client && npm install && npm run build && echo 'Installing Server...' && cd ../server && npm install && npm run build"
+        "heroku-postbuild": "echo 'Installing Client...' && cd client && npm install --production=false && npm run build && echo 'Installing Server...' && cd ../server && npm install --production=false && npm run build"
     },
     "engines": {
         "node": "20.x"
