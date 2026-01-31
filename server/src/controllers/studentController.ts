@@ -351,19 +351,33 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
             orderBy: { createdAt: 'asc' }
         });
 
-        const stats: Record<string, number> = {};
+        // Group students by month
+        const monthlyStats: Record<string, number> = {};
         students.forEach(s => {
             const month = new Date(s.createdAt).toLocaleString('default', { month: 'short' });
-            stats[month] = (stats[month] || 0) + 1;
+            monthlyStats[month] = (monthlyStats[month] || 0) + 1;
         });
 
-        // Ensure chronological order if possible, or just send data
-        // Since we iterated sorted students, insertion order *might* be preserved in modern JS for string keys (mostly).
-        // But better to map explicitly if needed. For now, simple object to array.
-        const data = Object.entries(stats).map(([name, count]) => ({ name, students: count }));
+        // Convert to cumulative growth data
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        let cumulativeCount = 0;
+        const data = months.map(month => {
+            cumulativeCount += monthlyStats[month] || 0;
+            return {
+                name: month,
+                students: cumulativeCount
+            };
+        });
 
-        res.json(data);
+        // Only return months that have data (non-zero cumulative count)
+        const filteredData = data.filter((d, i) => {
+            // Include this month if it has students, or if a later month has students
+            return data.slice(i).some(laterMonth => laterMonth.students > 0);
+        });
+
+        res.json(filteredData.length > 0 ? filteredData : [{ name: 'Jan', students: 0 }]);
     } catch (e) {
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 };
+
