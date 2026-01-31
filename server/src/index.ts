@@ -26,11 +26,7 @@ app.use(cors({
     origin: (origin, callback) => {
         // In production, reject requests without Origin header (prevents server-to-server attacks)
         if (!origin) {
-            if (process.env.NODE_ENV === 'production') {
-                console.warn('[SECURITY] Blocked request with no Origin header in production');
-                return callback(new Error('Not allowed by CORS'));
-            }
-            // Allow in development for testing tools (curl, Postman)
+            // Allow requests with no Origin (e.g. standard browser navigation, same-origin requests)
             return callback(null, true);
         }
 
