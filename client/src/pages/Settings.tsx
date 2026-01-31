@@ -89,7 +89,7 @@ function ChangePasswordForm() {
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                    className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                     {loading ? 'Updating...' : (
                         <>
@@ -281,14 +281,14 @@ export default function Settings() {
                             {year.id === currentYearId ? (
                                 <>
                                     <div className="flex items-start justify-between mb-8">
-                                        <Calendar className="w-8 h-8 text-black dark:text-white" strokeWidth={1.5} />
-                                        <span className="bg-black dark:bg-white text-white dark:text-black text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest">
+                                        <Calendar className="w-8 h-8 text-black" strokeWidth={1.5} />
+                                        <span className="bg-black text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest">
                                             Active
                                         </span>
                                     </div>
 
                                     <div className="mb-10">
-                                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">{year.name}</h3>
+                                        <h3 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">{year.name}</h3>
                                         <p className="text-base text-gray-500 font-medium">
                                             {new Date(year.createdAt).toLocaleDateString()}
                                         </p>
@@ -353,7 +353,7 @@ export default function Settings() {
                         <p className="text-app-text-secondary text-sm mt-1">Update your login credentials.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-zinc-900/50 border border-app-border p-6 rounded-[24px]">
+                    <div className="bg-white border border-app-border p-6 rounded-[24px]">
                         <ChangePasswordForm />
                     </div>
                 </div>

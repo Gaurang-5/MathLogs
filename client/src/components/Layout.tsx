@@ -84,7 +84,7 @@ export default function Layout({ children, title }: LayoutProps) {
                                     isSidebarCollapsed ? "justify-center px-0 py-3" : "px-4 py-3",
                                     isActive
                                         ? "text-accent font-semibold"
-                                        : "text-app-text-secondary hover:text-app-text hover:bg-black/5 dark:hover:bg-white/5"
+                                        : "text-app-text-secondary hover:text-app-text hover:bg-black/5"
                                 )}
                                 title={isSidebarCollapsed ? item.name : undefined}
                             >
@@ -251,7 +251,7 @@ export default function Layout({ children, title }: LayoutProps) {
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80px] h-[80px] z-20">
                         <button
                             onClick={() => setShowQuickFeeModal(true)}
-                            className="flex w-full h-full bg-app-text rounded-full items-center justify-center text-app-bg shadow-xl border-[6px] border-app-bg dark:border-neutral-900 overflow-hidden active:scale-95 transition-all group"
+                            className="flex w-full h-full bg-app-text rounded-full items-center justify-center text-app-bg shadow-xl border-[6px] border-app-bg overflow-hidden active:scale-95 transition-all group"
                         >
                             <Zap className="w-8 h-8" fill="currentColor" />
                             <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
