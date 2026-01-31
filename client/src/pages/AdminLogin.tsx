@@ -70,12 +70,12 @@ export default function AdminLogin() {
 
                 <form onSubmit={handleLogin} className="space-y-6">
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-app-text-secondary uppercase tracking-widest ml-1">Username</label>
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest ml-1">Username</label>
                         <div className="relative group">
-                            <User className="absolute left-4 top-3.5 w-5 h-5 text-app-text-tertiary group-focus-within:text-black transition-colors" />
+                            <User className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
                             <input
                                 type="text"
-                                className="w-full bg-app-bg border-[1.5px] border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-4 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-app-text-tertiary/50 font-medium"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border-[1.5px] border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-4 focus:ring-black/5 focus:border-black dark:focus:border-white outline-none transition-all placeholder:text-gray-400 font-medium"
                                 placeholder="Enter admin username"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -83,12 +83,12 @@ export default function AdminLogin() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-app-text-secondary uppercase tracking-widest ml-1">Password</label>
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest ml-1">Password</label>
                         <div className="relative group">
-                            <Lock className="absolute left-4 top-3.5 w-5 h-5 text-app-text-tertiary group-focus-within:text-black transition-colors" />
+                            <Lock className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
                             <input
                                 type="password"
-                                className="w-full bg-app-bg border-[1.5px] border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-4 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-app-text-tertiary/50 font-medium"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border-[1.5px] border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-4 focus:ring-black/5 focus:border-black dark:focus:border-white outline-none transition-all placeholder:text-gray-400 font-medium"
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -98,7 +98,7 @@ export default function AdminLogin() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl mt-6 shadow-lg shadow-gray-200 transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center group"
+                        className="w-full bg-gray-900 hover:bg-black dark:bg-white dark:text-black dark:hover:bg-gray-200 text-white font-bold py-4 rounded-xl mt-6 shadow-lg transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center group"
                     >
                         {loading ? 'Authenticating...' : 'Access Dashboard'}
                         {!loading && <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />}

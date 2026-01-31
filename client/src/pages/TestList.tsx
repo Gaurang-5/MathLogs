@@ -143,7 +143,7 @@ export default function TestList() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-app-text-secondary uppercase tracking-wider mb-2">Batch</label>
+                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Batch</label>
                                     <div className="relative">
                                         <select
                                             className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all appearance-none"
