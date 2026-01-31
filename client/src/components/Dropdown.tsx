@@ -38,7 +38,7 @@ export default function Dropdown({ label, value, onChange, options, placeholder 
                 type="button"
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 disabled={disabled}
-                className={`w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text dark:text-white p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all text-left flex items-center justify-between ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-accent'
+                className={`w-full !bg-neutral-50 border border-app-border text-app-text  p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all text-left flex items-center justify-between ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-accent'
                     } ${!value ? 'text-app-text-secondary/50 dark:text-gray-400' : ''}`}
             >
                 <span>{selectedOption?.label || placeholder}</span>
@@ -56,7 +56,7 @@ export default function Dropdown({ label, value, onChange, options, placeholder 
                                 onChange(option.value);
                                 setIsOpen(false);
                             }}
-                            className={`w-full px-4 py-3 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors flex items-center justify-between ${value === option.value ? 'bg-accent/10 text-accent font-medium' : 'text-app-text dark:text-white'
+                            className={`w-full px-4 py-3 text-left hover:bg-neutral-100  transition-colors flex items-center justify-between ${value === option.value ? 'bg-accent/10 text-accent font-medium' : 'text-app-text '
                                 }`}
                         >
                             <span>{option.label}</span>

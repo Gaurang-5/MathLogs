@@ -1359,7 +1359,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={newName}
                                                         onChange={(e) => setNewName(e.target.value)}
-                                                        className="w-full bg-neutral-50 dark:bg-neutral-800 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text dark:text-white focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full !bg-neutral-50 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         required
                                                         placeholder="e.g. Rahul Sharma"
                                                     />
@@ -1372,7 +1372,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={newSchoolName}
                                                         onChange={(e) => setNewSchoolName(e.target.value)}
-                                                        className="w-full bg-neutral-50 dark:bg-neutral-800 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text dark:text-white focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full !bg-neutral-50 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         placeholder="e.g. DPS, KV, etc."
                                                     />
                                                 </div>
@@ -1395,7 +1395,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={newParentName}
                                                         onChange={(e) => setNewParentName(e.target.value)}
-                                                        className="w-full bg-neutral-50 dark:bg-neutral-800 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text dark:text-white focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full !bg-neutral-50 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         required
                                                         placeholder="Guardian's Name"
                                                     />
@@ -1408,7 +1408,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={newWhatsapp}
                                                         onChange={(e) => setNewWhatsapp(e.target.value)}
-                                                        className="w-full bg-neutral-50 dark:bg-neutral-800 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text dark:text-white focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full !bg-neutral-50 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         required
                                                         placeholder="10-digit Number"
                                                     />
@@ -1421,7 +1421,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={newEmail}
                                                         onChange={(e) => setNewEmail(e.target.value)}
-                                                        className="w-full bg-neutral-50 dark:bg-neutral-800 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text dark:text-white focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full !bg-neutral-50 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         placeholder="Optional"
                                                     />
                                                 </div>
@@ -1659,7 +1659,7 @@ export default function BatchDetails() {
                                         <input
                                             value={newInstallment.name}
                                             onChange={(e) => setNewInstallment({ ...newInstallment, name: e.target.value })}
-                                            className="w-full bg-neutral-50 dark:bg-neutral-800 border border-app-border rounded-xl px-4 py-2.5 text-app-text dark:text-white focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                             placeholder="e.g. Jan-Mar 2024"
                                             required
                                         />
@@ -1670,7 +1670,7 @@ export default function BatchDetails() {
                                             type="number"
                                             value={newInstallment.amount}
                                             onChange={(e) => setNewInstallment({ ...newInstallment, amount: e.target.value })}
-                                            className="w-full bg-neutral-50 dark:bg-neutral-800 border border-app-border rounded-xl px-4 py-2.5 text-app-text dark:text-white focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                             required
                                         />
                                     </div>
@@ -1745,7 +1745,7 @@ export default function BatchDetails() {
                                                     type="date"
                                                     value={paymentModal.date}
                                                     onChange={(e) => setPaymentModal({ ...paymentModal, date: e.target.value })}
-                                                    className="w-full bg-neutral-50 dark:bg-neutral-800 border border-app-border rounded-xl pl-10 pr-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
+                                                    className="w-full !bg-neutral-50 border border-app-border rounded-xl pl-10 pr-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
                                                     required
                                                 />
                                             </div>

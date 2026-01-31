@@ -133,7 +133,7 @@ export default function BatchList() {
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Time Slot</label>
                                     <input
-                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border text-app-text dark:text-white p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
+                                        className="w-full !bg-neutral-50 border border-app-border text-app-text  p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
                                         placeholder="e.g. Mon-Wed-Fri 4 PM"
                                         value={timeSlot}
                                         onChange={e => setTimeSlot(e.target.value)}
@@ -204,7 +204,7 @@ export default function BatchList() {
 
                     {batches.some(b => b.className !== 'Class 10' && b.className !== 'Class 9') && (
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-5 pl-1 flex items-center gap-3">
+                            <h2 className="text-xl font-bold text-gray-900  mb-5 pl-1 flex items-center gap-3">
                                 <span className="w-1.5 h-6 rounded-full bg-neutral-400"></span>
                                 Other Batches
                             </h2>

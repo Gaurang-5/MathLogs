@@ -54,7 +54,7 @@ function ChangePasswordForm() {
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text dark:text-white transition-colors"
+                    className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text  transition-colors"
                     placeholder="Enter current password"
                     required
                 />
@@ -67,7 +67,7 @@ function ChangePasswordForm() {
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text dark:text-white transition-colors"
+                        className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text  transition-colors"
                         placeholder="Min 6 chars"
                         required
                     />
@@ -78,7 +78,7 @@ function ChangePasswordForm() {
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text dark:text-white transition-colors"
+                        className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text  transition-colors"
                         placeholder="Re-enter new"
                         required
                     />
@@ -241,7 +241,7 @@ export default function Settings() {
                                     type="text"
                                     value={newYearName}
                                     onChange={e => setNewYearName(e.target.value)}
-                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text dark:text-white transition-colors"
+                                    className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text  transition-colors"
                                     placeholder="2025-2026"
                                     required
                                 />
@@ -282,14 +282,14 @@ export default function Settings() {
                             {year.id === currentYearId ? (
                                 <>
                                     <div className="flex items-start justify-between mb-8">
-                                        <Calendar className="w-8 h-8 text-black dark:text-white" strokeWidth={1.5} />
+                                        <Calendar className="w-8 h-8 text-black " strokeWidth={1.5} />
                                         <span className="bg-black dark:bg-white text-white dark:text-black text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest">
                                             Active
                                         </span>
                                     </div>
 
                                     <div className="mb-10">
-                                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">{year.name}</h3>
+                                        <h3 className="text-2xl font-bold text-gray-900  mb-2 tracking-tight">{year.name}</h3>
                                         <p className="text-base text-gray-500 dark:text-gray-400 font-medium">
                                             {new Date(year.createdAt).toLocaleDateString()}
                                         </p>
@@ -297,7 +297,7 @@ export default function Settings() {
 
                                     <button
                                         onClick={() => handleBackup(year.id, year.name)}
-                                        className="w-full flex items-center justify-center gap-3 bg-transparent border border-gray-800 dark:border-gray-200 py-3 rounded-2xl text-base font-semibold text-gray-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-[0.98]"
+                                        className="w-full flex items-center justify-center gap-3 bg-transparent border border-gray-800 dark:border-gray-200 py-3 rounded-2xl text-base font-semibold text-gray-900  hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-[0.98]"
                                     >
                                         <Download size={20} />
                                         <span>Backup</span>
@@ -368,9 +368,9 @@ export default function Settings() {
                                     <Trash2 size={24} />
                                 </div>
 
-                                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Delete Academic Year?</h3>
+                                <h3 className="text-2xl font-bold text-gray-900  mb-2">Delete Academic Year?</h3>
                                 <p className="text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">
-                                    Are you sure you want to delete <span className="font-bold text-gray-900 dark:text-white">"{deleteModal.name}"</span>?
+                                    Are you sure you want to delete <span className="font-bold text-gray-900 ">"{deleteModal.name}"</span>?
                                     This will unlink all students, batches, and data associated with it. This action cannot be undone.
                                 </p>
 
@@ -381,7 +381,7 @@ export default function Settings() {
                                             type="password"
                                             value={deletePassword}
                                             onChange={(e) => setDeletePassword(e.target.value)}
-                                            className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:border-red-500 transition-colors font-medium text-gray-900 dark:text-white placeholder-gray-400"
+                                            className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:border-red-500 transition-colors font-medium text-gray-900  placeholder-gray-400"
                                             placeholder="Enter your password"
                                             autoFocus
                                             required
@@ -418,7 +418,7 @@ export default function Settings() {
                                     <RefreshCcw size={24} />
                                 </div>
 
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Switch to {switchModal.name}?</h3>
+                                <h3 className="text-xl font-bold text-gray-900  mb-2">Switch to {switchModal.name}?</h3>
                                 <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed text-sm">
                                     The dashboard will update to show data for the selected academic year.
                                 </p>
