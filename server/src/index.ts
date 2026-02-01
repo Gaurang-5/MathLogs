@@ -127,6 +127,12 @@ app.get('/metrics', async (req, res) => {
     }
 });
 
+// Sentry test endpoint (only for testing error tracking)
+app.get('/debug-sentry', (req, res) => {
+    throw new Error('🧪 Sentry Test Error - If you see this in Sentry, it works!');
+});
+
+
 app.use(express.static(path.join(__dirname, '../../client/dist')));
 
 // API Routes
