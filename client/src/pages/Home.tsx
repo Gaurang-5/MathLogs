@@ -87,6 +87,12 @@ export default function Home() {
                                 Sign In
                             </Link>
                         </div>
+                        {/* Mobile Sign In Button */}
+                        <div className="md:hidden">
+                            <Link to="/login" className="px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-full hover:bg-black transition-all shadow-sm active:scale-95">
+                                Sign In
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </nav>
