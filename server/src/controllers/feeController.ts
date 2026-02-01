@@ -421,7 +421,7 @@ export const recordPayment = async (req: Request, res: Response) => {
 export const payInstallment = async (req: Request, res: Response) => {
     const { studentId, installmentId, amount, date } = req.body;
 
-    // Log payment attempt (PII sanitized)
+    console.log('[DEBUG] payInstallment called:', { studentId, installmentId, amount, date });
 
     if (!studentId || !installmentId || amount === undefined || amount === null) {
         res.status(400).json({ error: 'Missing required fields' });
@@ -436,6 +436,9 @@ export const payInstallment = async (req: Request, res: Response) => {
             where: { id: studentId },
             include: { batch: true }
         });
+
+        console.log('[DEBUG] Student found:', student ? { id: student.id, name: student.name, batchId: student.batchId, hasBatch: !!student.batch } : 'NOT FOUND');
+
         if (!student) return res.status(404).json({ error: 'Student not found' });
         if (student.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -480,10 +483,18 @@ export const payInstallment = async (req: Request, res: Response) => {
             }
         });
 
+        console.log('[DEBUG] Payment created successfully:', {
+            paymentId: payment.id,
+            studentId: payment.studentId,
+            installmentId: payment.installmentId,
+            amount: payment.amountPaid,
+            date: payment.date
+        });
+
         // Payment recorded successfully (this will automatically appear in transaction reports)
         res.json(payment);
     } catch (error) {
-        console.error("Error paying installment:", error);
+        console.error('[ERROR] Error paying installment:', error);
         res.status(500).json({ error: 'Failed to record payment' });
     }
 };
