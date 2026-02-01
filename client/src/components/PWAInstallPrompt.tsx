@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { X, Download, Smartphone } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -7,6 +8,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function PWAInstallPrompt() {
+    const location = useLocation();
     const [showPrompt, setShowPrompt] = useState(false);
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [isIOS, setIsIOS] = useState(false);
@@ -72,7 +74,10 @@ export default function PWAInstallPrompt() {
         localStorage.setItem('pwa-install-dismissed', 'true');
     };
 
-    if (!showPrompt || isStandalone) return null;
+    // Don't show on login/register/home pages
+    const isAuthPage = ['/', '/login', '/register', '/setup-account'].includes(location.pathname);
+
+    if (!showPrompt || isStandalone || isAuthPage) return null;
 
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-r from-gray-900 to-black text-white p-4 shadow-2xl border-t border-gray-700 animate-slide-up">
