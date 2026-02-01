@@ -45,7 +45,7 @@ export const loginAdmin = async (req: Request, res: Response) => {
             passwordVersion: admin.passwordVersion,
             instituteId: admin.instituteId,
             role: admin.role
-        }, JWT_SECRET, { expiresIn: '8h' });
+        }, JWT_SECRET, { expiresIn: '30d' });
 
         res.json({ success: true, adminId: admin.id, token, role: admin.role, message: "Login successful" });
     } catch (error) {
@@ -126,7 +126,7 @@ export const changePassword = async (req: Request, res: Response) => {
             id: admin.id,
             username: admin.username,
             passwordVersion: admin.passwordVersion + 1
-        }, JWT_SECRET, { expiresIn: '8h' });
+        }, JWT_SECRET, { expiresIn: '30d' });
 
         res.json({ success: true, message: 'Password changed successfully', token });
     } catch (error) {
