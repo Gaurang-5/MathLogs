@@ -115,7 +115,8 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 collected: totalCollected,
                 pending: totalPending
             },
-            defaulters
+            defaulters,
+            userName: user.username
         });
 
     } catch (error) {

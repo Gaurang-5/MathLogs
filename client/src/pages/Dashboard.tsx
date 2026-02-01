@@ -11,6 +11,7 @@ export default function Dashboard() {
     const [growthData, setGrowthData] = useState([]);
     const [finances, setFinances] = useState({ collected: 0, pending: 0 });
     const [defaulters, setDefaulters] = useState<any[]>([]);
+    const [userName, setUserName] = useState('');
 
     // Separate loading states for progressive rendering
     const [loading, setLoading] = useState({ summary: true, growth: true });
@@ -35,6 +36,7 @@ export default function Dashboard() {
                 setStats(data.stats);
                 setFinances(data.finances);
                 setDefaulters(data.defaulters);
+                setUserName(data.userName || 'Teacher');
 
                 setLoading(prev => ({ ...prev, summary: false }));
             } catch (error) {
@@ -88,8 +90,23 @@ export default function Dashboard() {
         ? Math.min(100, Math.round((finances.collected / (finances.collected + finances.pending)) * 100))
         : 0;
 
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good Morning';
+        if (hour < 18) return 'Good Afternoon';
+        return 'Good Evening';
+    };
+
     return (
-        <Layout title="Dashboard">
+        <Layout>
+            {/* Personalized Greeting */}
+            <div className="mb-8 animate-fadeIn">
+                <h1 className="text-4xl font-bold text-gray-900 tracking-tight mb-2">
+                    {getGreeting()}, <span className="text-gray-500">{userName}</span>
+                </h1>
+                <p className="text-gray-500 font-medium text-lg">Here's what's happening with your institute today.</p>
+            </div>
+
             {/* Smart Insights Card - Animated Rotation */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
