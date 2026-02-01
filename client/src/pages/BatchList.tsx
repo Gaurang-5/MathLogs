@@ -24,7 +24,7 @@ export default function BatchList() {
 
     // Form State
     const [batchNumber, setBatchNumber] = useState('');
-    // Subject is auto-set to Mathematics
+    const [subject, setSubject] = useState('Mathematics');
     const [timeSlot, setTimeSlot] = useState('');
     // Fee is removed from creation
     const [className, setClassName] = useState('');
@@ -51,7 +51,7 @@ export default function BatchList() {
         try {
             const payload = {
                 batchNumber,
-                subject: 'Mathematics',
+                subject,
                 timeSlot,
                 className,
                 feeAmount: 0
@@ -130,6 +130,16 @@ export default function BatchList() {
                                     disabled={!className}
                                     required
                                 />
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Subject</label>
+                                    <input
+                                        className="w-full !bg-neutral-50 border border-app-border text-app-text  p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
+                                        placeholder="e.g. Mathematics, Science"
+                                        value={subject}
+                                        onChange={e => setSubject(e.target.value)}
+                                        required
+                                    />
+                                </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Time Slot</label>
                                     <input
