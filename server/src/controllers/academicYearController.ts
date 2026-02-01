@@ -1,16 +1,17 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
+import { secureLogger } from '../utils/secureLogger';
 
 export const listAcademicYears = async (req: Request, res: Response) => {
     const teacherId = (req as any).user?.id;
     try {
-        console.log(`[listAcademicYears] Fetching for teacher: ${teacherId}`);
+        secureLogger.debug('Fetching academic years', { teacherId });
         const years = await prisma.academicYear.findMany({
             where: { teacherId },
             // orderBy: { startDate: 'desc' } // Temporarily removed for debugging
         });
-        console.log(`[listAcademicYears] Found ${years.length} years`);
+        secureLogger.debug('Academic years found', { count: years.length });
         const currentId = (req as any).user?.currentAcademicYearId;
 
         res.json({
@@ -124,7 +125,7 @@ export const backupAcademicYear = async (req: Request, res: Response) => {
         res.send(JSON.stringify(backupData, null, 2));
 
     } catch (e) {
-        console.error(e);
+        secureLogger.error('Academic year backup failed', e as Error);
         res.status(500).json({ error: 'Failed to create backup' });
     }
 };
@@ -208,7 +209,7 @@ export const deleteAcademicYear = async (req: Request, res: Response) => {
 
         res.json({ success: true });
     } catch (e) {
-        console.error(e);
+        secureLogger.error('Academic year deletion failed', e as Error);
         res.status(500).json({ error: 'Failed to delete academic year' });
     }
 };

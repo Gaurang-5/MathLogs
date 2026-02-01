@@ -7,12 +7,53 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Institute {
+  id            String         @id @default(uuid())
+  name          String
+  createdAt     DateTime       @default(now())
+
+  updatedAt     DateTime       @updatedAt
+  
+  // Contact Details
+  teacherName   String?
+  phoneNumber   String?
+  email         String?
+  config        Json?          @default("{\"allowedClasses\": [\"9\", \"10\"], \"subjects\": [\"Math\", \"Science\"]}")
+  plan          Tier           @default(FREE)
+  
+  // Status
+  status           String      @default("ACTIVE") // ACTIVE, SUSPENDED
+  suspensionReason String?
+
+  admins        Admin[]
+  academicYears AcademicYear[]
+  students      Student[]
+  batches       Batch[]
+  tests         Test[]
+  invites       InviteToken[]
+}
+
+model InviteToken {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  instituteId String
+  institute   Institute @relation(fields: [instituteId], references: [id])
+  isUsed      Boolean   @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+}
+
 model Admin {
   id                  String  @id @default(uuid())
   username            String  @unique
   password            String
   passwordVersion     Int     @default(1)  // Increment on password change to invalidate old JWTs
   currentAcademicYear String  @default("2024-2025")
+  
+  // Multi-tenancy
+  role                String  @default("INSTITUTE_ADMIN") // SUPER_ADMIN, INSTITUTE_ADMIN, STAFF
+  instituteId         String? // Optional during migration
+  institute           Institute? @relation(fields: [instituteId], references: [id])
   
   // New Academic Year Logic
   currentAcademicYearId String?
@@ -30,6 +71,9 @@ model AcademicYear {
   startDate DateTime?
   endDate   DateTime?
   isDefault Boolean  @default(false)
+  
+  instituteId String? // Optional during migration
+  institute   Institute? @relation(fields: [instituteId], references: [id])
   
   teacherId String
   teacher   Admin    @relation("OwnedYears", fields: [teacherId], references: [id])
@@ -57,6 +101,9 @@ model Batch {
   
   academicYearId      String?
   academicYearRef     AcademicYear?    @relation(fields: [academicYearId], references: [id])
+  
+  instituteId         String? // Optional during migration
+  institute           Institute? @relation(fields: [instituteId], references: [id])
 
   whatsappGroupLink   String?
   isRegistrationOpen  Boolean          @default(true)
@@ -84,6 +131,9 @@ model Student {
   
   academicYearId String?
   academicYearRef AcademicYear? @relation(fields: [academicYearId], references: [id])
+
+  instituteId    String? // Optional during migration
+  institute      Institute? @relation(fields: [instituteId], references: [id])
 
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -122,6 +172,10 @@ model Test {
   className    String?
   date         DateTime
   maxMarks     Float
+  
+  instituteId  String? // Optional during migration
+  institute    Institute? @relation(fields: [instituteId], references: [id])
+
   teacherId    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -181,4 +235,10 @@ model FeePayment {
 model IdCounter {
   prefix String @id
   seq    Int
+}
+
+enum Tier {
+  FREE
+  PRO
+  ENTERPRISE
 }

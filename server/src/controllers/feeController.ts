@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import PDFDocument from 'pdfkit';
 import nodemailer from 'nodemailer';
+import { secureLogger } from '../utils/secureLogger';
 
 // Email Transporter (Reused logic)
 const transporter = nodemailer.createTransport({
@@ -198,6 +199,31 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
     } catch (error) {
         console.error("Error generating report:", error);
         res.status(500).json({ error: 'Failed to generate report' });
+    }
+};
+
+export const getPaymentHistory = async (req: Request, res: Response) => {
+    const { studentId } = req.params;
+    const teacherId = (req as any).user?.id;
+
+    try {
+        const student = await prisma.student.findUnique({
+            where: { id: String(studentId) },
+            include: { batch: true }
+        });
+
+        if (!student) return res.status(404).json({ error: 'Student not found' });
+        if (student.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const history = await prisma.feePayment.findMany({
+            where: { studentId: String(studentId) },
+            include: { installment: { select: { name: true } } },
+            orderBy: { date: 'desc' }
+        });
+
+        res.json(history);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed' });
     }
 };
 
@@ -421,7 +447,7 @@ export const recordPayment = async (req: Request, res: Response) => {
 export const payInstallment = async (req: Request, res: Response) => {
     const { studentId, installmentId, amount, date } = req.body;
 
-    console.log('[DEBUG] payInstallment called:', { studentId, installmentId, amount, date });
+    secureLogger.debug('payInstallment called', { studentId, installmentId, amount, date });
 
     if (!studentId || !installmentId || amount === undefined || amount === null) {
         res.status(400).json({ error: 'Missing required fields' });
@@ -430,6 +456,7 @@ export const payInstallment = async (req: Request, res: Response) => {
 
     try {
         const teacherId = (req as any).user?.id;
+        const user = (req as any).user;
 
         // Verify student ownership
         const student = await prisma.student.findUnique({
@@ -437,10 +464,20 @@ export const payInstallment = async (req: Request, res: Response) => {
             include: { batch: true }
         });
 
-        console.log('[DEBUG] Student found:', student ? { id: student.id, name: student.name, batchId: student.batchId, hasBatch: !!student.batch } : 'NOT FOUND');
+        secureLogger.debug('Student found', student ? { id: student.id, name: student.name, batchId: student.batchId, hasBatch: !!student.batch } : 'NOT FOUND');
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
-        if (student.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        // ✅ SECURITY: Defense-in-depth - validate instituteId directly
+        if (!student.batch) {
+            return res.status(400).json({ error: 'Student has no batch assigned' });
+        }
+        if (student.instituteId && student.instituteId !== user.instituteId) {
+            return res.status(403).json({ error: 'Unauthorized: Cross-institute access denied' });
+        }
+        if (student.batch.teacherId && student.batch.teacherId !== teacherId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
 
         // Calculate total already paid for this installment
         const existingPayments = await prisma.feePayment.findMany({
@@ -577,7 +614,7 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
     try {
         const teacherId = (req as any).user?.id;
 
-        console.log('[DEBUG] Fetching recent transactions for teacher:', teacherId);
+        secureLogger.debug('Fetching recent transactions for teacher', { teacherId });
 
         // Fetch recent installment payments (NO academic year filter)
         const recentInstallments = await prisma.feePayment.findMany({
@@ -594,7 +631,7 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
             }
         });
 
-        console.log('[DEBUG] Found installment payments:', recentInstallments.length);
+        secureLogger.debug('Found installment payments', { count: recentInstallments.length });
 
         // Fetch recent ad-hoc payments (FeeRecord)
         const recentRecords = await prisma.feeRecord.findMany({
@@ -610,7 +647,7 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
             }
         });
 
-        console.log('[DEBUG] Found ad-hoc payments:', recentRecords.length);
+        secureLogger.debug('Found ad-hoc payments', { count: recentRecords.length });
 
         // Combine and Sort
         const combined = [
@@ -633,7 +670,7 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
         ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 10);
 
-        console.log('[DEBUG] Returning combined transactions:', combined.length);
+        secureLogger.debug('Returning combined transactions', { count: combined.length });
 
         res.json(combined);
     } catch (e) {

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
+import { secureLogger } from '../utils/secureLogger';
 
 /**
  * Check if a student is registered in a batch
@@ -49,11 +50,10 @@ export const checkRegistrationStatus = async (req: Request, res: Response) => {
                 }
             });
         } else {
-            console.log('[REGISTRATION_STATUS_CHECK]', {
-                whatsapp: '***' + sanitizedWhatsapp.slice(-4),
+            secureLogger.debug('Registration status check - not found', {
+                whatsappLast4: sanitizedWhatsapp.slice(-4),
                 batchId,
-                found: false,
-                timestamp: new Date().toISOString()
+                found: false
             });
 
             return res.json({
@@ -62,10 +62,7 @@ export const checkRegistrationStatus = async (req: Request, res: Response) => {
             });
         }
     } catch (error: any) {
-        console.error('[REGISTRATION_STATUS_CHECK_ERROR]', {
-            error: error.message,
-            timestamp: new Date().toISOString()
-        });
+        secureLogger.error('Registration status check failed', error);
         res.status(500).json({ error: 'Failed to check registration status' });
     }
 };

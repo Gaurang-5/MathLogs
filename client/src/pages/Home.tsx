@@ -80,10 +80,12 @@ export default function Home() {
                             Math<span className="text-gray-600">Logs</span>
                         </div>
                         <div className="hidden md:flex items-center gap-8">
-                            <a href="#features" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Features</a>
-                            <a href="#pricing" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Pricing</a>
-                            <a href="#faq" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">FAQ</a>
-                            <Link to="/login" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Sign In</Link>
+                            <a href="#features" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Features</a>
+                            <a href="#pricing" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Pricing</a>
+                            <a href="#faq" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">FAQ</a>
+                            <Link to="/login" className="px-5 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-full hover:bg-black transition-all shadow-sm hover:shadow active:scale-95">
+                                Sign In
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -460,6 +462,7 @@ export default function Home() {
                             <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
                             <a href="#faq" className="hover:text-gray-900 transition-colors">FAQ</a>
                             <Link to="/login" className="hover:text-gray-900 transition-colors">Sign In</Link>
+                            <Link to="/login" className="hover:text-gray-900 transition-colors opacity-50 text-xs">Admin Login</Link>
                         </div>
                     </div>
                     <div className="mt-8 pt-8 border-t border-gray-200 text-center text-sm text-gray-500">

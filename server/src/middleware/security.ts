@@ -100,3 +100,31 @@ export const publicLimiter = rateLimit({
     },
     skipSuccessfulRequests: false
 });
+
+// ✅ HIGH-2 FIX: Payment Endpoint Rate Limiter
+// Prevents spam attacks on financial transactions
+export const paymentLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 10, // Limit each user to 10 payment submissions per minute
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many payment submissions. Please wait a moment before trying again.' },
+    handler: (req: Request, res: Response) => {
+        const user = (req as any).user;
+        console.warn('[RATE_LIMIT_EXCEEDED]', {
+            type: 'payment',
+            userId: user?.id || 'unknown',
+            username: user?.username || 'unknown',
+            ip: req.ip,
+            path: req.path,
+            method: req.method,
+            timestamp: new Date().toISOString(),
+            severity: 'MEDIUM',
+            message: 'Payment endpoint rate limit hit - possible spam or attack'
+        });
+        res.status(429).json({
+            error: 'Too many payment submissions. Please wait a moment before trying again.'
+        });
+    }
+});
+

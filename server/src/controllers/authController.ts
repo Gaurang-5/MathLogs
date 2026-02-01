@@ -14,7 +14,8 @@ export const loginAdmin = async (req: Request, res: Response) => {
 
     try {
         const admin = await prisma.admin.findUnique({
-            where: { username }
+            where: { username },
+            include: { institute: true }
         });
 
         if (!admin) {
@@ -30,13 +31,23 @@ export const loginAdmin = async (req: Request, res: Response) => {
             return;
         }
 
+        // Check Suspension
+        if (admin.institute && admin.institute.status === 'SUSPENDED') {
+            return res.status(403).json({
+                error: 'Your institute account has been suspended.',
+                reason: admin.institute.suspensionReason
+            });
+        }
+
         const token = jwt.sign({
             id: admin.id,
             username: admin.username,
-            passwordVersion: admin.passwordVersion
+            passwordVersion: admin.passwordVersion,
+            instituteId: admin.instituteId,
+            role: admin.role
         }, JWT_SECRET, { expiresIn: '8h' });
 
-        res.json({ success: true, adminId: admin.id, token, message: "Login successful" });
+        res.json({ success: true, adminId: admin.id, token, role: admin.role, message: "Login successful" });
     } catch (error) {
         res.status(500).json({ error: 'Login failed' });
     }

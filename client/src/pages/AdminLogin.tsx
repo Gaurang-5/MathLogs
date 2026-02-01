@@ -21,12 +21,27 @@ export default function AdminLogin() {
             if (data.success) {
                 localStorage.setItem('adminId', data.adminId);
                 localStorage.setItem('token', data.token); // Store JWT
-                navigate('/dashboard');
+                localStorage.setItem('token', data.token); // Store JWT
+                if (data.role === 'SUPER_ADMIN') {
+                    navigate('/super-admin');
+                } else {
+                    navigate('/dashboard');
+                }
             } else {
                 setError(data.error || 'Login failed');
             }
         } catch (err: any) {
-            setError(err.message || 'Login failed');
+            // Handle suspension errors with reason
+            if (err.message?.includes('suspended')) {
+                const errorData = err.response?.data;
+                const reason = errorData?.reason;
+                setError(reason ?
+                    `🚫 ${err.message}\n\n📋 Reason: ${reason}\n\n📧 Contact support for assistance.` :
+                    err.message
+                );
+            } else {
+                setError(err.message || 'Login failed');
+            }
         } finally {
             setLoading(false);
         }
@@ -61,10 +76,10 @@ export default function AdminLogin() {
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
-                        className="bg-danger/5 border border-danger/10 text-danger p-4 rounded-2xl mb-6 text-sm flex items-center"
+                        className="bg-danger/5 border border-danger/10 text-danger p-4 rounded-2xl mb-6 text-sm flex items-start"
                     >
-                        <AlertOctagon className="w-5 h-5 mr-3 flex-shrink-0" />
-                        {error}
+                        <AlertOctagon className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" />
+                        <span className="whitespace-pre-line">{error}</span>
                     </motion.div>
                 )}
 

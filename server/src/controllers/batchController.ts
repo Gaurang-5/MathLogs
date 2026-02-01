@@ -5,13 +5,15 @@ import fs from 'fs';
 import path from 'path';
 import bwipjs from 'bwip-js';
 import nodemailer from 'nodemailer';
+import { secureLogger } from '../utils/secureLogger';
 
 export const createBatch = async (req: Request, res: Response) => {
     const { timeSlot, feeAmount, className, batchNumber, subject } = req.body;
     const teacherId = (req as any).user?.id;
+    const user = (req as any).user;
     const academicYearId = (req as any).user?.currentAcademicYearId;
 
-    if (!teacherId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user.instituteId) return res.status(401).json({ error: 'Unauthorized: No institute assigned' });
     if (!academicYearId) return res.status(400).json({ error: 'No academic year selected' });
 
     if (!className || !batchNumber) {
@@ -22,12 +24,49 @@ export const createBatch = async (req: Request, res: Response) => {
     const num = parseInt(batchNumber);
     if (isNaN(num)) return res.status(400).json({ error: 'Invalid Batch Number' });
 
-    if (className === 'Class 9') {
-        if (num < 1 || num > 2) return res.status(400).json({ error: 'Class 9 can only have Batch 1 and 2' });
-    } else if (className === 'Class 10') {
-        if (num < 1 || num > 3) return res.status(400).json({ error: 'Class 10 can only have Batch 1, 2, and 3' });
+    // Dynamic Validation based on Institute Config
+    const institute = await prisma.institute.findUnique({
+        where: { id: user.instituteId },
+        select: { config: true }
+    });
+
+    if (!institute) return res.status(404).json({ error: 'Institute not found' });
+
+    // Default Config if none exists
+    const config = (institute.config as any) || {
+        classes: [
+            { name: 'Class 9', maxBatches: 2 },
+            { name: 'Class 10', maxBatches: 3 }
+        ]
+    };
+
+    // Simplify parsing if config is old format vs new format
+    // Normalize config to array of objects
+    let classConfig;
+    if (Array.isArray(config.allowedClasses)) {
+        // Migration support for simple array format
+        if (!config.allowedClasses.includes(className)) {
+            return res.status(400).json({ error: `Class "${className}" is not allowed for this institute` });
+        }
+        classConfig = { maxBatches: 5 }; // Default limit for simple array
+    } else if (config.classes) {
+        // Robust object format
+        classConfig = config.classes.find((c: any) => c.name === className);
+        if (!classConfig) {
+            return res.status(400).json({ error: `Class "${className}" is not allowed for this institute` });
+        }
     } else {
-        return res.status(400).json({ error: 'Invalid Class' });
+        // Fallback for empty config
+        if (className !== 'Class 9' && className !== 'Class 10') {
+            return res.status(400).json({ error: 'Invalid Class (Default Rule)' });
+        }
+        classConfig = { maxBatches: className === 'Class 9' ? 2 : 3 };
+    }
+
+    if (num < 1 || num > classConfig.maxBatches) {
+        return res.status(400).json({
+            error: `${className} can only have up to ${classConfig.maxBatches} batches`
+        });
     }
 
     try {
@@ -52,8 +91,10 @@ export const createBatch = async (req: Request, res: Response) => {
                 className,
                 batchNumber: num,
                 feeAmount: feeAmount ? parseFloat(feeAmount) : 0,
+
                 teacherId,
-                academicYearId
+                academicYearId,
+                instituteId: user.instituteId
             }
         });
         res.json(batch);
@@ -65,13 +106,12 @@ export const createBatch = async (req: Request, res: Response) => {
 
 export const getBatches = async (req: Request, res: Response) => {
     try {
-        const teacherId = (req as any).user?.id;
-        const academicYearId = (req as any).user?.currentAcademicYearId;
+        const user = (req as any).user;
 
         const batches = await prisma.batch.findMany({
             where: {
-                teacherId,
-                academicYearId // Filter by active year
+                instituteId: user.instituteId,
+                academicYearId: user.currentAcademicYearId // Filter by active year
             },
             orderBy: [
                 { className: 'desc' },
@@ -109,6 +149,7 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                 isRegistrationOpen: true,
                 isRegistrationEnded: true,
                 teacherId: true,
+                instituteId: true,
                 feeInstallments: {
                     select: {
                         id: true,
@@ -164,7 +205,9 @@ export const getBatchDetails = async (req: Request, res: Response) => {
         });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
-        if (batch.teacherId && batch.teacherId !== teacherId) {
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) {
             return res.status(403).json({ error: 'Unauthorized access to batch' });
         }
         res.json(batch);
@@ -185,7 +228,9 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
         });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
-        if (batch.teacherId && batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
@@ -240,7 +285,9 @@ export const toggleBatchRegistration = async (req: Request, res: Response) => {
     try {
         const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
-        if (batch.teacherId && batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         const updated = await prisma.batch.update({
             where: { id: String(id) },
@@ -264,7 +311,9 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
     try {
         const batch = await prisma.batch.findUnique({ where: { id } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
-        if (batch.teacherId && batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         const installment = await prisma.feeInstallment.create({
             data: {
@@ -307,7 +356,9 @@ export const endBatchRegistration = async (req: Request, res: Response) => {
     try {
         const batch = await prisma.batch.findUnique({ where: { id } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
-        if (batch.teacherId && batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         const updated = await prisma.batch.update({
             where: { id: String(id) },
@@ -328,7 +379,9 @@ export const updateBatch = async (req: Request, res: Response) => {
     try {
         const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
-        if (batch.teacherId && batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         // Academic year boundary check
         if (batch.academicYearId && batch.academicYearId !== currentAcademicYearId) {
@@ -361,7 +414,9 @@ export const deleteBatch = async (req: Request, res: Response) => {
     try {
         const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
-        if (batch.teacherId && batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         // Academic year boundary check
         if (batch.academicYearId && batch.academicYearId !== currentAcademicYearId) {
@@ -391,7 +446,7 @@ const transporter = nodemailer.createTransport({
 const sendEmail = async (to: string, subject: string, body: string) => {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
         console.warn('[EMAIL WARNING] No email credentials configured. Falling back to mock.');
-        console.log(`[EMAIL MOCK] To: ${to}\nSubject: ${subject}\n\n${body}`);
+        secureLogger.debug('Email mock mode', { to, subject });
         return true;
     }
 
@@ -402,7 +457,7 @@ const sendEmail = async (to: string, subject: string, body: string) => {
             subject,
             text: body
         });
-        console.log(`[EMAIL SENT] To: ${to}`);
+        secureLogger.info('Email sent successfully', { to });
         return true;
     } catch (error) {
         console.error(`[EMAIL ERROR] Failed to send to ${to}:`, error);
@@ -420,7 +475,8 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
             include: { students: { where: { status: 'APPROVED' } } }
         });
 
-        if (batch?.teacherId && batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+        const user = (req as any).user;
+        if (batch?.instituteId && batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
         if (!batch.whatsappGroupLink) return res.status(400).json({ error: 'No WhatsApp group link configured for this batch' });
@@ -475,7 +531,9 @@ Please join the group to stay informed.
 };
 
 // Check env on load (Debug)
-console.log('[EMAIL SERVICE] Configured with User:', process.env.EMAIL_USER ? '***SET***' : 'NOT SET');
+secureLogger.info('Email service configured', {
+    user: process.env.EMAIL_USER ? '***SET***' : 'NOT SET'
+});
 
 export const sendStudentWhatsappInvite = async (req: Request, res: Response) => {
     const { id } = req.params; // Student ID
@@ -487,7 +545,8 @@ export const sendStudentWhatsappInvite = async (req: Request, res: Response) => 
             include: { batch: true }
         });
 
-        if (student?.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+        const user = (req as any).user;
+        if (student?.batch?.instituteId && student.batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
         if (!student.batch) return res.status(400).json({ error: 'Student is not assigned to a batch' });
@@ -534,7 +593,9 @@ export const downloadBatchQRPDF = async (req: Request, res: Response) => {
     try {
         const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
-        if (batch.teacherId && batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
 

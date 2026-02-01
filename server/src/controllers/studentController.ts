@@ -61,6 +61,9 @@ export const registerStudent = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'Registration for this batch is closed.' });
         }
 
+        // Multi-Tenant: Ensure Student inherits instituteId from Batch
+        if (!batch.instituteId) return res.status(500).json({ error: 'Batch has no institute assigned' });
+
 
         // Idempotency Check: Prevent duplicate registrations
         const existingStudent = await prisma.student.findFirst({
@@ -93,7 +96,8 @@ export const registerStudent = async (req: Request, res: Response) => {
                         schoolName,
                         status: 'APPROVED', // Auto-approve
                         humanId,
-                        academicYearId: batch.academicYearId
+                        academicYearId: batch.academicYearId,
+                        instituteId: batch.instituteId
                     }
                 });
                 success = true;
@@ -151,7 +155,9 @@ export const addStudentManually = async (req: Request, res: Response) => {
             include: { academicYearRef: true }
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
-        if (batch.teacherId && batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
 
         // Idempotency Check
@@ -177,7 +183,8 @@ export const addStudentManually = async (req: Request, res: Response) => {
                         schoolName,
                         status: 'APPROVED',
                         humanId,
-                        academicYearId: batch.academicYearId
+                        academicYearId: batch.academicYearId,
+                        instituteId: batch.instituteId
                     }
                 });
                 success = true;
@@ -216,19 +223,15 @@ export const addStudentManually = async (req: Request, res: Response) => {
 export const updateStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, parentName, parentWhatsapp, parentEmail, schoolName, humanId } = req.body;
-    const teacherId = (req as any).user?.id;
-    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
+    const user = (req as any).user;
 
     try {
         const student = await prisma.student.findUnique({ where: { id: String(id) }, include: { batch: true } });
+
         if (!student) return res.status(404).json({ error: 'Student not found' });
-        if (student.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+        if (student.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
-        // Academic year boundary check
-        if (student.academicYearId && student.academicYearId !== currentAcademicYearId) {
-            return res.status(400).json({ error: 'Cannot modify student from non-active academic year' });
-        }
-
+        // Update logic
         const updated = await prisma.student.update({
             where: { id: String(id) },
             data: { name, parentName, parentWhatsapp, parentEmail, schoolName, humanId }
@@ -241,11 +244,12 @@ export const updateStudent = async (req: Request, res: Response) => {
 
 export const getPendingStudents = async (req: Request, res: Response) => {
     try {
-        const teacherId = (req as any).user?.id;
+        const user = (req as any).user;
         const students = await prisma.student.findMany({
             where: {
                 status: 'PENDING',
-                academicYearId: (req as any).user?.currentAcademicYearId
+                instituteId: user.instituteId,
+                academicYearId: user.currentAcademicYearId
             },
             include: { batch: true },
             orderBy: { createdAt: 'desc' }
@@ -270,7 +274,8 @@ export const approveStudent = async (req: Request, res: Response) => {
             }
         });
 
-        if (studentToApprove?.batch?.teacherId && studentToApprove.batch.teacherId !== teacherId) {
+        const user = (req as any).user;
+        if (studentToApprove?.instituteId && studentToApprove.instituteId !== user.instituteId) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
@@ -322,9 +327,11 @@ export const rejectStudent = async (req: Request, res: Response) => {
     const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
     try {
+        const user = (req as any).user;
+
         const student = await prisma.student.findUnique({ where: { id: String(id) }, include: { batch: true } });
         if (!student) return res.status(404).json({ error: 'Student not found' });
-        if (student.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+        if (student.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         // Academic year boundary check
         if (student.academicYearId && student.academicYearId !== currentAcademicYearId) {
@@ -351,7 +358,7 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
 
         const students = await prisma.student.findMany({
             where: {
-                batch: { teacherId },
+                instituteId: (req as any).user.instituteId,
                 ...(academicYearId && { academicYearId })
             },
             select: { createdAt: true },

@@ -18,6 +18,8 @@
   "type": "commonjs",
   "dependencies": {
     "@prisma/client": "5.22.0",
+    "@sentry/node": "^10.38.0",
+    "@sentry/profiling-node": "^10.38.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

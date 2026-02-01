@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { loginAdmin, createInitialAdmin, changePassword } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
-import { authLimiter, publicLimiter } from '../middleware/security';
+import { authLimiter, publicLimiter, paymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
 import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
 import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF } from '../controllers/batchController';
@@ -11,7 +11,10 @@ import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport } from '../controllers/testController';
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
+
 import { getDashboardSummary } from '../controllers/dashboardController';
+import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
+import { getPaymentHistory } from '../controllers/feeController';
 
 const router = Router();
 
@@ -71,13 +74,30 @@ router.post('/marks', authenticateToken as any, validateRequest(submitMarkSchema
 router.get('/fees', authenticateToken as any, getFeeSummary as any);
 router.get('/fees/summary', authenticateToken as any, getFeeSummary as any);
 router.get('/fees/download-pending', authenticateToken as any, downloadPendingFeesReport as any);
-router.post('/fees/pay', authenticateToken as any, validateRequest(paymentSchema), recordPayment as any);
-router.post('/fees/pay-installment', authenticateToken as any, validateRequest(payInstallmentSchema), payInstallment as any);
+// ✅ HIGH-2 FIX: Rate limiting on payment endpoints
+router.post('/fees/pay', authenticateToken as any, paymentLimiter, validateRequest(paymentSchema), recordPayment as any);
+router.post('/fees/pay-installment', authenticateToken as any, paymentLimiter, validateRequest(payInstallmentSchema), payInstallment as any);
 router.get('/fees/recent', authenticateToken as any, getRecentTransactions as any);
 router.get('/fees/download-transactions', authenticateToken as any, downloadMonthlyReport as any);
 router.post('/fees/remind', authenticateToken as any, sendFeeReminder as any);
 
 // Stats
 router.get('/stats/growth', authenticateToken as any, getStudentGrowthStats as any);
+
+// Invites
+router.post('/invites', authenticateToken as any, generateInvite as any);
+router.get('/institutes', authenticateToken as any, getInstitutes as any);
+// New Analytics & Config Routes
+// New Analytics & Config Routes
+import { getGlobalAnalytics, updateInstituteConfig, getInstituteDetails, suspendInstitute, deleteInstitute } from '../controllers/instituteController';
+router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
+router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
+router.get('/institute/:id/details', authenticateToken as any, getInstituteDetails as any);
+router.put('/institutes/:id/suspend', authenticateToken as any, suspendInstitute as any);
+router.delete('/institutes/:id', authenticateToken as any, deleteInstitute as any);
+
+
+router.get('/invites/:token', publicLimiter, validateInvite as any);
+router.post('/auth/setup-account', publicLimiter, setupAccount as any);
 
 export default router;

@@ -6,9 +6,16 @@ import compression from 'compression';
 import apiRoutes from './routes/api';
 import { prisma } from './prisma';
 import { configureSecurityHeaders, apiLimiter } from './middleware/security';
+import { initializeSentry, sentryRequestHandler, sentryTracingHandler, sentryErrorHandler } from './monitoring/sentry';
+import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// ✅ MONITORING: Initialize Sentry FIRST (before all other middleware)
+initializeSentry(app);
+app.use(sentryRequestHandler());
+app.use(sentryTracingHandler());
 
 configureSecurityHeaders(app);
 
@@ -44,6 +51,18 @@ const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
     'http://localhost:5173', // Development fallback
     'http://localhost:3000', // Alternative dev port
+    'http://localhost:5174', // Vite default retry
+    'http://localhost:5175', // Vite default retry
+    'http://localhost:5176', // Vite default retry
+    'http://localhost:5177', // Vite default retry
+    'http://localhost:5178', // Vite default retry
+    'http://localhost:5179', // Vite default retry
+    'http://localhost:5180', // Vite default retry
+    'http://localhost:5181', // Vite default retry
+    'http://localhost:5182', // Vite default retry
+    'http://localhost:5183', // Vite default retry
+    'http://localhost:5184', // Vite default retry
+    'http://localhost:5185', // Vite default retry
 ];
 
 app.use(cors({
@@ -74,14 +93,57 @@ app.use(express.json({ limit: '10mb' })); // Limit payload size
 // Global API rate limiter (can be overridden/tightened in specific routes)
 app.use('/api', apiLimiter);
 
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date() });
+// ✅ MONITORING: Health check endpoints
+app.get('/health', async (req, res) => {
+    try {
+        const health = await getSimpleHealth();
+        res.status(health.status === 'ok' ? 200 : 503).json(health);
+    } catch (error) {
+        res.status(503).json({ status: 'error', timestamp: new Date().toISOString() });
+    }
+});
+
+app.get('/health/detailed', async (req, res) => {
+    try {
+        const health = await getHealthStatus();
+        const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
+        res.status(statusCode).json(health);
+    } catch (error) {
+        res.status(503).json({ status: 'unhealthy', error: 'Health check failed' });
+    }
+});
+
+app.get('/metrics', async (req, res) => {
+    try {
+        const [systemMetrics, dbStats] = await Promise.all([
+            Promise.resolve(getSystemMetrics()),
+            getDatabaseStats()
+        ]);
+        res.json({
+            system: systemMetrics,
+            database: dbStats,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch metrics' });
+    }
 });
 
 app.use(express.static(path.join(__dirname, '../../client/dist')));
 
 // API Routes
 app.use('/api', apiRoutes);
+
+// ✅ MONITORING: Sentry error handler (MUST be after routes, BEFORE other error handlers)
+app.use(sentryErrorHandler());
+
+// Generic error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('[ERROR]', err);
+    const statusCode = err.statusCode || 500;
+    const message = process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message;
+    res.status(statusCode).json({ error: message });
+});
 
 // Catch-all route to serve React frontend for any unmatched routes
 app.get(/.*/, (req, res) => {
@@ -90,5 +152,8 @@ app.get(/.*/, (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`Detailed health: http://localhost:${PORT}/health/detailed`);
+    console.log(`Metrics: http://localhost:${PORT}/metrics`);
 });
-

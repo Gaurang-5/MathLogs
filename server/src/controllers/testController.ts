@@ -5,8 +5,11 @@ import PDFDocument from 'pdfkit';
 export const createTest = async (req: Request, res: Response) => {
     const { name, subject, date, maxMarks, className } = req.body;
     const teacherId = (req as any).user?.id;
+    const user = (req as any).user;
     const academicYearId = (req as any).user?.currentAcademicYearId;
+
     if (!teacherId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user.instituteId) return res.status(401).json({ error: 'No institute assigned' });
     if (!academicYearId) return res.status(400).json({ error: 'No academic year selected' });
 
     try {
@@ -18,7 +21,8 @@ export const createTest = async (req: Request, res: Response) => {
                 date: new Date(date),
                 maxMarks: parseFloat(maxMarks),
                 teacherId,
-                academicYearId
+                academicYearId,
+                instituteId: user.instituteId  // ✅ SECURITY: Multi-tenant isolation
             }
         });
         res.json(test);

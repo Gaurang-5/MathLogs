@@ -35,7 +35,14 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
 
             const dbUser = await prisma.admin.findUnique({
                 where: { id: user.id },
-                select: { id: true, username: true, currentAcademicYearId: true, passwordVersion: true }
+                select: {
+                    id: true,
+                    username: true,
+                    currentAcademicYearId: true,
+                    passwordVersion: true,
+                    instituteId: true,
+                    role: true
+                }
             });
 
             if (!dbUser) {

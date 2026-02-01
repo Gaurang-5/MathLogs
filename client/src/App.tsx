@@ -15,11 +15,32 @@ const Fees = lazy(() => import('./pages/Fees'));
 const Home = lazy(() => import('./pages/Home'));
 const Settings = lazy(() => import('./pages/Settings'));
 const CheckStatus = lazy(() => import('./pages/CheckStatus'));
+const SetupAccount = lazy(() => import('./pages/SetupAccount'));
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 
 // Protected Route Component
 function PrivateRoute({ children }: { children: any }) {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" />;
+}
+
+// Role Protected Route Component
+function RoleRoute({ children, allowedRole }: { children: any, allowedRole: string }) {
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/login" />;
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.role !== allowedRole) {
+      if (allowedRole === 'SUPER_ADMIN') {
+        return <Navigate to="/dashboard" />;
+      }
+      return <Navigate to="/login" />;
+    }
+    return children;
+  } catch (e) {
+    return <Navigate to="/login" />;
+  }
 }
 
 // Simple Loading Spinner
@@ -38,6 +59,13 @@ function App() {
           <Route path="/" element={<Home />} />
 
           <Route path="/login" element={<AdminLogin />} />
+          <Route path="/setup" element={<SetupAccount />} />
+          <Route path="/super-admin" element={
+            <RoleRoute allowedRole="SUPER_ADMIN">
+              <SuperAdminDashboard />
+            </RoleRoute>
+          } />
+
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/batches" element={<PrivateRoute><BatchList /></PrivateRoute>} />
           <Route path="/batches/:id" element={<PrivateRoute><BatchDetails /></PrivateRoute>} />

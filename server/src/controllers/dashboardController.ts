@@ -10,6 +10,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
     try {
         const teacherId = (req as any).user?.id;
         const academicYearId = (req as any).user?.currentAcademicYearId;
+        const user = (req as any).user;
 
         if (!teacherId || !academicYearId) {
             return res.status(400).json({ error: 'Missing teacher or academic year context' });
@@ -17,11 +18,12 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
 
         // Execute all queries in parallel
         const [batches, students, feeSummaryData] = await Promise.all([
-            // Query 1: Get batch count
+            // Query 1: Get batch count with instituteId filter (defense-in-depth)
             prisma.batch.count({
                 where: {
                     teacherId,
-                    academicYearId
+                    academicYearId,
+                    instituteId: user.instituteId  // ✅ SECURITY: Multi-tenant isolation
                 }
             }),
 
