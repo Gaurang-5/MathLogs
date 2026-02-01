@@ -13,9 +13,22 @@ const getCourseCode = (subject: string | null) => {
         'English': 'ENG',
         'Science': 'SCI',
         'History': 'HIS',
-        'Geography': 'GEO'
+        'Geography': 'GEO',
+        'Accounts': 'ACC', 'Accountancy': 'ACC',
+        'Economics': 'ECO',
+        'Business Studies': 'BUS',
+        'Computer Science': 'CSC',
+        'Abacus': 'ABA', 'Vedic Maths': 'VED',
+        'C Programming': 'CPR', 'C++': 'CPP', 'Java': 'JAV', 'Python': 'PYT',
+        'Tally': 'TAL',
+        'Social Science': 'SST'
     };
-    return map[subject] || subject.substring(0, 3).toUpperCase();
+
+    if (map[subject]) return map[subject];
+
+    // Fallback: Remove non-alphanumeric, take first 3 chars uppercase
+    const cleanSubject = subject.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    return cleanSubject.substring(0, 3) || 'GEN';
 };
 
 const generateHumanId = async (batch: any) => {
