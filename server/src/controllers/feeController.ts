@@ -276,10 +276,10 @@ export const getFeeSummary = async (req: Request, res: Response) => {
 
             installments.forEach((inst: any) => {
                 installmentTotal += inst.amount;
-                const payment = student.feePayments.find((p: any) => p.installmentId === inst.id);
 
-                // 1. Direct payment linked to this installment
-                const paidDirectly = payment ? payment.amountPaid : 0;
+                // BUG FIX: Sum ALL payments for this installment, not just one
+                const paymentsForThis = student.feePayments.filter((p: any) => p.installmentId === inst.id);
+                const paidDirectly = paymentsForThis.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
 
                 // 2. Remaining due on this installment
                 let due = inst.amount - paidDirectly;
@@ -381,11 +381,13 @@ export const recordPayment = async (req: Request, res: Response) => {
         }
 
         // 2. Auto-Allocate to Installments
+        // BUG FIX: Must sum ALL payments for each installment, not just find one
         for (const inst of installments) {
             if (remainingAmount <= 0) break;
 
-            const existingPayment = student.feePayments.find(p => p.installmentId === inst.id);
-            const paidSoFar = existingPayment ? existingPayment.amountPaid : 0;
+            // Calculate total paid for this installment across ALL payment records
+            const paymentsForThisInstallment = student.feePayments.filter(p => p.installmentId === inst.id);
+            const paidSoFar = paymentsForThisInstallment.reduce((sum, p) => sum + p.amountPaid, 0);
             const pendingForThis = inst.amount - paidSoFar;
 
             if (pendingForThis > 0) {
@@ -543,8 +545,9 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
 
         // Check Installments
         installments.forEach(inst => {
-            const payment = student.feePayments.find(p => p.installmentId === inst.id);
-            const paidAmount = payment ? payment.amountPaid : 0;
+            // BUG FIX: Sum ALL payments for this installment, not just one
+            const paymentsForThis = student.feePayments.filter(p => p.installmentId === inst.id);
+            const paidAmount = paymentsForThis.reduce((sum, p) => sum + p.amountPaid, 0);
             const remaining = inst.amount - paidAmount;
 
             if (remaining > 0) {
