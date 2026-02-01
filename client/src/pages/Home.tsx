@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { QrCode, Users, Receipt, BarChart3, Clock, Shield, Zap, ChevronDown, CheckCircle2, X } from 'lucide-react';
+import { QrCode, Users, Receipt, BarChart3, Clock, Shield, Zap, ChevronDown, CheckCircle2, X, MessageCircle } from 'lucide-react';
 
 export default function Home() {
     const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -449,6 +449,42 @@ export default function Home() {
                     </Link>
                 </div>
             </section>
+
+            {/* 9. Contact / WhatsApp CTA */}
+            <section className="py-24 bg-white px-6 lg:px-8 border-t border-gray-200">
+                <div className="max-w-4xl mx-auto text-center">
+                    <h2 className="text-3xl font-bold text-gray-900 mb-6">
+                        Still have questions?
+                    </h2>
+                    <p className="text-lg text-gray-600 mb-8">
+                        Directly chat with us on WhatsApp. We usually reply within minutes.
+                    </p>
+                    <a
+                        href="https://wa.me/919876543210?text=Hi%2C%20I%20have%20a%20question%20about%20MathLogs"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-8 py-4 bg-[#25D366] text-white font-bold rounded-full hover:bg-[#20bd5a] transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
+                    >
+                        <MessageCircle className="w-6 h-6 mr-3" />
+                        Chat on WhatsApp
+                    </a>
+                </div>
+            </section>
+
+            {/* Floating WhatsApp Button */}
+            <a
+                href="https://wa.me/919876543210?text=Hi%2C%20I%20have%20a%20question%20about%20MathLogs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-2xl hover:bg-[#20bd5a] transition-all active:scale-90 hover:scale-110"
+                title="Chat on WhatsApp"
+            >
+                <MessageCircle className="w-8 h-8" />
+                <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+                </span>
+            </a>
 
             {/* Footer */}
             <footer className="border-t border-gray-200 py-12 px-6 lg:px-8">
