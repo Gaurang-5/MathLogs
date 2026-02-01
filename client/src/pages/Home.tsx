@@ -354,7 +354,7 @@ const Home = () => {
                                 viewport={{ once: true }}
                                 transition={{ delay: index * 0.1, duration: 0.5 }}
                                 whileHover={{ scale: 1.02, y: -5 }}
-                                className="group p-8 rounded-3xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-xl transition-all duration-300 relative overflow-hidden"
+                                className="group p-8 rounded-3xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-xl transition-all duration-300 relative overflow-hidden cursor-pointer"
                             >
                                 {/* Subtle hover gradient */}
                                 <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
@@ -377,7 +377,7 @@ const Home = () => {
                         initial={{ opacity: 0, scale: 0.9 }}
                         whileInView={{ opacity: 1, scale: 1 }}
                         viewport={{ once: true }}
-                        className="p-12 rounded-3xl bg-gray-50 border border-gray-200 relative overflow-hidden shadow-xl"
+                        className="p-12 rounded-3xl bg-gray-50 border border-gray-200 relative overflow-hidden shadow-xl cursor-pointer hover:shadow-2xl transition-shadow duration-300"
                     >
                         <div className="absolute inset-0 bg-gradient-to-br from-gray-100/50 to-transparent -z-10" />
 
@@ -389,7 +389,7 @@ const Home = () => {
                         </p>
                         <button
                             onClick={toggleEnquire}
-                            className="px-10 py-4 rounded-full bg-black text-white font-bold text-lg shadow-2xl shadow-gray-300/50 hover:shadow-gray-400/50 hover:scale-105 transition-all duration-300"
+                            className="px-10 py-4 rounded-full bg-black text-white font-bold text-lg shadow-2xl shadow-gray-300/50 hover:shadow-gray-400/50 hover:scale-105 transition-all duration-300 cursor-pointer"
                         >
                             Start Your Free Trial
                         </button>

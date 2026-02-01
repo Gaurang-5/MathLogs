@@ -44,7 +44,7 @@ export default {
                 danger: 'var(--danger)',
             },
             fontFamily: {
-                sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                sans: ['Plus Jakarta Sans', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
             },
             boxShadow: {
                 'sm': 'var(--shadow-sm)',
