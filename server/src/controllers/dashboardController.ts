@@ -23,7 +23,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
 
         // PERF OPTIMIZATION: Execute all queries in parallel using database aggregations
         // This reduces payload from ~500KB to ~5KB and query time from 2.5s to ~200ms
-        const [batches, students, monthlyCollected, totalPending, batchDefaulters] = await Promise.all([
+        const [batches, students, monthlyCollected, totalCollected, totalPending, batchDefaulters] = await Promise.all([
             // Query 1: Get batch count with instituteId filter (defense-in-depth)
             prisma.batch.count({
                 where: {
@@ -72,7 +72,33 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 ) as total
             `.then(result => Number(result[0]?.total || 0)),
 
-            // Query 4: Total pending fees (aggregated at DB level)
+            // Query 4: Total collection (all-time) - for collection rate percentage
+            prisma.$queryRaw<[{ total: number }]>`
+                SELECT COALESCE(
+                    (
+                        SELECT COALESCE(SUM(fr.amount), 0)
+                        FROM "FeeRecord" fr
+                        JOIN "Student" s ON s.id = fr."studentId"
+                        JOIN "Batch" b ON b.id = s."batchId"
+                        WHERE fr.status = 'PAID'
+                            AND b."teacherId" = ${teacherId}
+                            AND s."academicYearId" = ${academicYearId}
+                            AND s.status = 'APPROVED'
+                    ), 0
+                ) + COALESCE(
+                    (
+                        SELECT COALESCE(SUM(fp."amountPaid"), 0)
+                        FROM "FeePayment" fp
+                        JOIN "Student" s ON s.id = fp."studentId"
+                        JOIN "Batch" b ON b.id = s."batchId"
+                        WHERE b."teacherId" = ${teacherId}
+                            AND s."academicYearId" = ${academicYearId}
+                            AND s.status = 'APPROVED'
+                    ), 0
+                ) as total
+            `.then(result => Number(result[0]?.total || 0)),
+
+            // Query 5: Total pending fees (aggregated at DB level)
             prisma.$queryRaw<[{ pending: number }]>`
                 WITH student_fees AS (
                     SELECT 
@@ -112,7 +138,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 FROM student_fees
             `.then(result => Number(result[0]?.pending || 0)),
 
-            // Query 5: Top 5 defaulting batches (aggregated at DB level)
+            // Query 6: Top 5 defaulting batches (aggregated at DB level)
             prisma.$queryRaw<Array<{ name: string; amount: number }>>`
                 WITH student_balances AS (
                     SELECT 
@@ -156,7 +182,8 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 students
             },
             finances: {
-                collected: monthlyCollected,  // Changed to monthly collection
+                collected: monthlyCollected,  // Monthly collection (for "This Month" card)
+                totalCollected,  // Total all-time collection (for collection rate percentage)
                 pending: totalPending
             },
             defaulters,

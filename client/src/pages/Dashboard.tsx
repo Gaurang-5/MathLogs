@@ -9,7 +9,7 @@ import CountUp from 'react-countup';
 export default function Dashboard() {
     const [stats, setStats] = useState({ batches: 0, students: 0 });
     const [growthData, setGrowthData] = useState([]);
-    const [finances, setFinances] = useState({ collected: 0, pending: 0 });
+    const [finances, setFinances] = useState({ collected: 0, totalCollected: 0, pending: 0 });
     const [defaulters, setDefaulters] = useState<any[]>([]);
     const [userName, setUserName] = useState('');
 
@@ -86,8 +86,9 @@ export default function Dashboard() {
         return () => clearInterval(interval);
     }, []);
 
-    const collectionRate = finances.collected + finances.pending > 0
-        ? Math.min(100, Math.round((finances.collected / (finances.collected + finances.pending)) * 100))
+    // Collection rate based on total collected (all-time), not monthly
+    const collectionRate = finances.totalCollected + finances.pending > 0
+        ? Math.min(100, Math.round((finances.totalCollected / (finances.totalCollected + finances.pending)) * 100))
         : 0;
 
     const getGreeting = () => {
