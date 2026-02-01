@@ -694,7 +694,7 @@ export default function BatchDetails() {
                                     onClick={async () => {
                                         try {
                                             const token = localStorage.getItem('token');
-                                            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/batches/${batch.id}/qr-pdf`, {
+                                            const response = await fetch(`${API_URL}/batches/${batch.id}/qr-pdf`, {
                                                 headers: { Authorization: `Bearer ${token}` }
                                             });
                                             if (!response.ok) throw new Error('Failed to download');
