@@ -103,6 +103,60 @@ function ChangePasswordForm() {
     );
 }
 
+
+function ProfileSection() {
+    const [profile, setProfile] = useState<any>(null);
+
+    useEffect(() => {
+        api.get('/auth/me').then(setProfile).catch(console.error);
+    }, []);
+
+    if (!profile) return <div className="animate-pulse bg-gray-100 h-48 rounded-[24px] mb-12" />;
+
+    return (
+        <div className="max-w-4xl mx-auto mb-12">
+            <h2 className="text-xl font-bold text-app-text mb-1 flex items-center gap-2">
+                Profile
+            </h2>
+            <p className="text-app-text-secondary text-sm mb-6">Your personal contact details and plan info.</p>
+
+            <div className="bg-app-surface-opaque border border-app-border rounded-[24px] p-8 grid grid-cols-1 md:grid-cols-2 gap-6 relative overflow-hidden">
+                {/* Decorative background */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-gray-100 to-transparent rounded-bl-[100px] opacity-50 pointer-events-none" />
+
+                <div className="relative z-10">
+                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-2 pl-1">Teacher Name</label>
+                    <div className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3.5 text-app-text font-semibold shadow-sm">
+                        {profile.username}
+                    </div>
+                </div>
+                <div className="relative z-10">
+                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-2 pl-1">Email</label>
+                    <div className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3.5 text-app-text font-medium shadow-sm">
+                        {profile.email}
+                    </div>
+                </div>
+                <div className="relative z-10">
+                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-2 pl-1">Phone</label>
+                    <div className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3.5 text-app-text font-medium shadow-sm">
+                        {profile.phone}
+                    </div>
+                </div>
+                <div className="relative z-10">
+                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-2 pl-1">Current Plan</label>
+                    <div className="w-full bg-black dark:bg-white text-white dark:text-black border border-black dark:border-white rounded-xl px-4 py-3.5 font-bold flex justify-between items-center shadow-lg">
+                        <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                            Basic Plan
+                        </span>
+                        <span>₹999/mo</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Settings() {
     const [years, setYears] = useState<any[]>([]);
     const [currentYearId, setCurrentYearId] = useState<string | null>(null);
@@ -217,6 +271,8 @@ export default function Settings() {
     return (
         <Layout title="Settings">
             <div className="max-w-4xl mx-auto">
+                <ProfileSection />
+
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h2 className="text-xl font-bold text-app-text">Academic Years</h2>

@@ -134,3 +134,24 @@ export const changePassword = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to change password' });
     }
 };
+
+export const getProfile = async (req: Request, res: Response) => {
+    const adminId = (req as any).user?.id;
+    try {
+        const admin = await prisma.admin.findUnique({
+            where: { id: adminId },
+            include: { institute: true }
+        });
+        if (!admin) return res.status(404).json({ error: 'User not found' });
+
+        res.json({
+            username: admin.username,
+            email: admin.institute?.email || '',
+            phone: admin.institute?.phoneNumber || '',
+            instituteName: admin.institute?.name || ''
+        });
+    } catch (e) {
+        console.error('Profile fetch error:', e);
+        res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+};

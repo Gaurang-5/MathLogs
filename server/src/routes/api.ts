@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { loginAdmin, createInitialAdmin, changePassword } from '../controllers/authController';
+import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
 import { authLimiter, publicLimiter, paymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
@@ -32,6 +32,7 @@ router.delete('/academic-years/:id', authenticateToken as any, deleteAcademicYea
 router.post('/auth/login', authLimiter, validateRequest(loginSchema), loginAdmin as any);
 router.post('/auth/setup', authLimiter, validateRequest(setupSchema), createInitialAdmin as any);
 router.post('/auth/change-password', authenticateToken as any, validateRequest(changePasswordSchema), changePassword as any);
+router.get('/auth/me', authenticateToken as any, getProfile as any);
 
 // Batches
 router.get('/batches', authenticateToken as any, getBatches as any);
