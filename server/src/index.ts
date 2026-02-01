@@ -54,7 +54,7 @@ app.use(cors({
             return callback(null, true);
         }
 
-        if (allowedOrigins.includes(origin)) {
+        if (allowedOrigins.includes(origin) || origin.endsWith('.herokuapp.com')) {
             callback(null, true);
         } else {
             console.warn(`[SECURITY] Blocked CORS request from unauthorized origin: ${origin}`);
