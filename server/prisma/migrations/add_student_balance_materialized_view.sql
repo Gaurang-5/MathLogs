@@ -31,23 +31,49 @@ DECLARE
     v_total_paid DOUBLE PRECISION;
     v_balance DOUBLE PRECISION;
     v_last_payment TIMESTAMP;
+    v_batch_id TEXT;
 BEGIN
+    -- Get batch ID (may be null)
+    SELECT s."batchId" INTO v_batch_id
+    FROM "Student" s
+    WHERE s.id = p_student_id;
+
+    -- If no batch, set defaults and exit
+    IF v_batch_id IS NULL THEN
+        INSERT INTO "StudentBalance" ("studentId", "totalFee", "totalPaid", "balance", "lastPaymentDate", "updatedAt")
+        VALUES (p_student_id, 0, 0, 0, NULL, NOW())
+        ON CONFLICT ("studentId") DO UPDATE SET
+            "totalFee" = 0,
+            "totalPaid" = 0,
+            "balance" = 0,
+            "updatedAt" = NOW();
+        RETURN;
+    END IF;
+
     -- Calculate total fee (batch fee or sum of installments)
     SELECT 
-        CASE 
-            WHEN COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id), 0) > 0
-            THEN COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id), 0)
-            ELSE b."feeAmount"
-        END INTO v_total_fee
+        COALESCE(
+            CASE 
+                WHEN COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id), 0) > 0
+                THEN COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id), 0)
+                ELSE b."feeAmount"
+            END,
+            0
+        ) INTO v_total_fee
     FROM "Student" s
     JOIN "Batch" b ON b.id = s."batchId"
     WHERE s.id = p_student_id;
+
+    -- Default to 0 if still null
+    v_total_fee := COALESCE(v_total_fee, 0);
 
     -- Calculate total paid
     SELECT 
         COALESCE((SELECT SUM(fr.amount) FROM "FeeRecord" fr WHERE fr."studentId" = p_student_id AND fr.status = 'PAID'), 0) +
         COALESCE((SELECT SUM(fp."amountPaid") FROM "FeePayment" fp WHERE fp."studentId" = p_student_id), 0)
     INTO v_total_paid;
+
+    v_total_paid := COALESCE(v_total_paid, 0);
 
     -- Calculate balance
     v_balance := GREATEST(0, v_total_fee - v_total_paid);
