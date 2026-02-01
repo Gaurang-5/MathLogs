@@ -127,6 +127,17 @@ app.get('/metrics', async (req, res) => {
     }
 });
 
+// Query performance stats endpoint (development/debugging)
+app.get('/health/query-stats', async (req, res) => {
+    const { getQueryStats, getTopSlowQueries } = await import('./middleware/queryMonitor');
+
+    res.json({
+        stats: getQueryStats(),
+        slowestQueries: getTopSlowQueries(10),
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Sentry test endpoint (only for testing error tracking)
 app.get('/debug-sentry', (req, res) => {
     throw new Error('🧪 Sentry Test Error - If you see this in Sentry, it works!');
