@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import PDFDocument from 'pdfkit';
+import { addMathLogsHeader } from '../utils/pdfUtils';
 
 export const createTest = async (req: Request, res: Response) => {
     const { name, subject, date, maxMarks, className } = req.body;
@@ -232,6 +233,10 @@ export const downloadTestReport = async (req: Request, res: Response) => {
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=${test.name}_Report.pdf`);
         doc.pipe(res);
+
+        // Add MathLogs branding
+        addMathLogsHeader(doc, 30);
+        doc.moveDown(2);
 
         // Header
         doc.fontSize(20).text(`Test: ${test.name}`, { align: 'center' });

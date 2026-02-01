@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import PDFDocument from 'pdfkit';
 import { secureLogger } from '../utils/secureLogger';
 import { sendEmail } from '../utils/email';
+import { addMathLogsHeader } from '../utils/pdfUtils';
 
 // Email handling moved to utils/email.ts
 
@@ -115,6 +116,10 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
         res.setHeader('Content-Disposition', 'attachment; filename=pending_fees_report.pdf');
 
         doc.pipe(res);
+
+        // Add MathLogs branding
+        addMathLogsHeader(doc, 30);
+        doc.moveDown(2);
 
         // Header
         doc.fontSize(20).text('Fee Defaulters Report', { align: 'center' });
@@ -745,6 +750,10 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=Transactions_${month}_${year}.pdf`);
         doc.pipe(res);
+
+        // Add MathLogs branding
+        addMathLogsHeader(doc, 20);
+        doc.moveDown(2);
 
         // Header
         doc.fontSize(18).text(`Transaction Report`, { align: 'center' });

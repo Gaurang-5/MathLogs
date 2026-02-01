@@ -6,6 +6,7 @@ import path from 'path';
 import bwipjs from 'bwip-js';
 import { secureLogger } from '../utils/secureLogger';
 import { sendEmail } from '../utils/email';
+import { addMathLogsHeader } from '../utils/pdfUtils';
 
 export const createBatch = async (req: Request, res: Response) => {
     const { timeSlot, feeAmount, className, batchNumber, subject } = req.body;
@@ -257,6 +258,10 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${batch.name}-fee-details.pdf"`);
         doc.pipe(res);
+
+        // Add MathLogs branding at top-left
+        addMathLogsHeader(doc, 20);
+        doc.moveDown(2);
 
         // Header
         doc.fontSize(16).font('Helvetica-Bold').text(`${batch.name} - Fee Payment Details`, { align: 'center' });
@@ -746,6 +751,10 @@ export const downloadBatchQRPDF = async (req: Request, res: Response) => {
         res.setHeader('Content-Disposition', `attachment; filename=QR-${batch.name.replace(/\s+/g, '-')}.pdf`);
 
         doc.pipe(res);
+
+        // Add MathLogs branding
+        addMathLogsHeader(doc, 30);
+        doc.moveDown(2);
 
         // -- Content --
         // Header
