@@ -136,7 +136,8 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 students
             },
             finances: {
-                collected: monthlyCollected,  // Changed to monthly collection
+                collected: totalCollected,      // RESTORED: For Collection Rate (Total / Total + Pending)
+                monthlyCollected: monthlyCollected, // NEW: For "This Month" display
                 pending: totalPending
             },
             defaulters,

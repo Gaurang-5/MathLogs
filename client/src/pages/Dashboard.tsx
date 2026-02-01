@@ -9,7 +9,7 @@ import CountUp from 'react-countup';
 export default function Dashboard() {
     const [stats, setStats] = useState({ batches: 0, students: 0 });
     const [growthData, setGrowthData] = useState([]);
-    const [finances, setFinances] = useState({ collected: 0, pending: 0 });
+    const [finances, setFinances] = useState({ collected: 0, monthlyCollected: 0, pending: 0 }); // Added monthlyCollected
     const [defaulters, setDefaulters] = useState<any[]>([]);
     const [userName, setUserName] = useState('');
 
@@ -98,177 +98,146 @@ export default function Dashboard() {
         <Layout>
             {/* Personalized Greeting */}
             <div className="mb-8 animate-fadeIn">
-                <h1 className="text-4xl font-bold text-gray-900 tracking-tight mb-2">
-                    {getGreeting()}, <span className="text-gray-500">{userName}</span>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-800">
+                    {getGreeting()}, <span className="text-slate-500">{userName || 'Admin'}</span>
                 </h1>
-                <p className="text-gray-500 font-medium text-lg">Here's what's happening with your institute today.</p>
+                <p className="text-slate-500 mt-2 text-lg">
+                    Here's what's happening with your institute today.
+                </p>
             </div>
 
-            {/* Smart Insights Card - Animated Rotation */}
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 relative overflow-hidden"
-            >
-                <div className="absolute inset-0 bg-white/50 backdrop-blur-sm"></div>
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={currentInsight}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ duration: 0.4 }}
-                        className="flex items-center gap-3 relative z-10"
-                    >
-                        <p className="text-sm font-medium text-gray-800">{insights[currentInsight].text}</p>
-                    </motion.div>
-                </AnimatePresence>
-                <div className="absolute bottom-2 right-4 flex gap-1">
-                    {insights.map((_, i) => (
-                        <div
-                            key={i}
-                            className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentInsight ? 'bg-gray-900 w-4' : 'bg-gray-400'
-                                }`}
-                        />
-                    ))}
+            {/* Smart Insights Ticker */}
+            <div className="mb-8 animate-fadeIn" style={{ animationDelay: '0.1s' }}>
+                <div className="bg-white/80 backdrop-blur-sm border border-slate-200 rounded-2xl p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                        <AnimatePresence mode='wait'>
+                            <motion.div
+                                key={currentInsight}
+                                initial={{ y: 20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                exit={{ y: -20, opacity: 0 }}
+                                className="flex items-center gap-3"
+                            >
+                                <div className={`w-2 h-2 rounded-full ${insights[currentInsight].type === 'warning' ? 'bg-amber-500' :
+                                    insights[currentInsight].type === 'success' ? 'bg-green-500' : 'bg-blue-500'
+                                    }`} />
+                                <span className="text-slate-600 font-medium whitespace-nowrap">
+                                    {insights[currentInsight].text}
+                                </span>
+                            </motion.div>
+                        </AnimatePresence>
+                    </div>
+                    <div className="flex gap-1">
+                        <div className="w-8 h-1.5 rounded-full bg-slate-800 transition-colors" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                    </div>
                 </div>
-            </motion.div>
+            </div>
 
-            {/* Stats Overview - Mobile First Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                {/* Total Students - Glassmorphism */}
-                {loading.summary ? (
-                    <div className="animate-pulse bg-gray-100 h-24 rounded-2xl"></div>
-                ) : (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        whileHover={{ scale: 1.02 }}
-                        className="group bg-white/70 backdrop-blur-xl px-5 py-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="flex items-center gap-4 relative z-10">
-                            <div className="w-12 h-12 bg-gray-100 border border-gray-200 text-gray-900 rounded-xl flex items-center justify-center">
-                                <Users className="w-6 h-6" strokeWidth={1.5} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Total Students</p>
-                                <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                                    <CountUp end={stats.students} duration={2} />
-                                </p>
-                            </div>
+            {/* Main Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {/* Total Students */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all cursor-pointer group"
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-50 text-slate-700 rounded-2xl flex items-center justify-center group-hover:bg-slate-100 transition-colors">
+                            <Users size={24} />
                         </div>
-                    </motion.div>
-                )}
+                        <div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Students</p>
+                            <h3 className="text-3xl font-black text-slate-800">
+                                {loading.summary ? <div className="h-8 w-16 bg-slate-100 rounded animate-pulse" /> : <CountUp end={stats.students} duration={2} />}
+                            </h3>
+                        </div>
+                    </div>
+                </motion.div>
 
                 {/* Active Batches */}
-                {loading.summary ? (
-                    <div className="animate-pulse bg-gray-100 h-24 rounded-2xl"></div>
-                ) : (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.1 }}
-                        whileHover={{ scale: 1.02 }}
-                        className="group bg-white/70 backdrop-blur-xl px-5 py-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="flex items-center gap-4 relative z-10">
-                            <div className="w-12 h-12 bg-gray-100 border border-gray-200 text-gray-900 rounded-xl flex items-center justify-center">
-                                <BookOpen className="w-6 h-6" strokeWidth={1.5} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Active Batches</p>
-                                <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                                    <CountUp end={stats.batches} duration={2} />
-                                </p>
-                            </div>
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all cursor-pointer group"
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-50 text-slate-700 rounded-2xl flex items-center justify-center group-hover:bg-slate-100 transition-colors">
+                            <BookOpen size={24} />
                         </div>
-                    </motion.div>
-                )}
-
-                {/* Fee Collection Rate - Circular Progress */}
-                {loading.summary ? (
-                    <div className="animate-pulse bg-gray-100 h-24 rounded-2xl"></div>
-                ) : (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.2 }}
-                        whileHover={{ scale: 1.02 }}
-                        className="group bg-white/70 backdrop-blur-xl px-5 py-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="flex items-center gap-4 relative z-10">
-                            <div className="relative w-12 h-12">
-                                <svg className="w-12 h-12 transform -rotate-90">
-                                    <circle cx="24" cy="24" r="20" stroke="#e5e7eb" strokeWidth="4" fill="none" />
-                                    <motion.circle
-                                        cx="24"
-                                        cy="24"
-                                        r="20"
-                                        stroke="#111827"
-                                        strokeWidth="4"
-                                        fill="none"
-                                        strokeLinecap="round"
-                                        initial={{ strokeDasharray: '0 125.6' }}
-                                        animate={{ strokeDasharray: `${(collectionRate / 100) * 125.6} 125.6` }}
-                                        transition={{ duration: 2 }}
-                                    />
-                                </svg>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <Wallet className="w-5 h-5 text-gray-900" strokeWidth={1.5} />
-                                </div>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Collection Rate</p>
-                                <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                                    <CountUp end={collectionRate} duration={2} suffix="%" />
-                                </p>
-                            </div>
+                        <div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Active Batches</p>
+                            <h3 className="text-3xl font-black text-slate-800">
+                                {loading.summary ? <div className="h-8 w-16 bg-slate-100 rounded animate-pulse" /> : <CountUp end={stats.batches} duration={2} />}
+                            </h3>
                         </div>
-                    </motion.div>
-                )}
+                    </div>
+                </motion.div>
 
-                {/* Monthly Revenue - with Privacy Toggle */}
-                {loading.summary ? (
-                    <div className="animate-pulse bg-gray-100 h-24 rounded-2xl"></div>
-                ) : (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.3 }}
-                        whileHover={{ scale: 1.02 }}
-                        className="group bg-white/70 backdrop-blur-xl px-5 py-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="flex items-center gap-4 relative z-10">
-                            <div className="w-12 h-12 bg-gray-100 border border-gray-200 text-gray-900 rounded-xl flex items-center justify-center">
-                                <IndianRupee className="w-6 h-6" strokeWidth={1.5} />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">This Month</p>
-                                <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                                    {showFeeData ? (
-                                        <>₹<CountUp end={finances.collected} duration={2} separator="," /></>
-                                    ) : (
-                                        <span className="text-gray-400">••••••</span>
-                                    )}
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setShowFeeData(!showFeeData)}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
+                {/* Collection Rate */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all cursor-pointer group"
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-50 text-slate-700 rounded-2xl flex items-center justify-center group-hover:bg-slate-100 transition-colors">
+                            <Wallet size={24} />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Collection Rate</p>
+                            <h3 className="text-3xl font-black text-slate-800">
+                                {loading.summary ? <div className="h-8 w-16 bg-slate-100 rounded animate-pulse" /> : <CountUp end={collectionRate} duration={2} suffix="%" />}
+                            </h3>
+                        </div>
+                    </div>
+                </motion.div>
+
+                {/* Monthly Collected */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    whileHover={{ scale: 1.02 }}
+                    className="group bg-white/70 backdrop-blur-xl px-5 py-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="flex items-center gap-4 relative z-10">
+                        <div className="w-12 h-12 bg-gray-100 border border-gray-200 text-gray-900 rounded-xl flex items-center justify-center">
+                            <IndianRupee className="w-6 h-6" strokeWidth={1.5} />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">This Month</p>
+                            <p className="text-3xl font-bold text-gray-900 tracking-tight">
                                 {showFeeData ? (
-                                    <Eye className="w-4 h-4 text-gray-600" />
+                                    <>₹<CountUp end={finances.monthlyCollected} duration={2} separator="," /></>
                                 ) : (
-                                    <EyeOff className="w-4 h-4 text-gray-400" />
+                                    <span className="text-gray-400">••••••</span>
                                 )}
-                            </button>
+                            </p>
                         </div>
-                    </motion.div>
-                )}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowFeeData(!showFeeData);
+                            }}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            {showFeeData ? (
+                                <Eye className="w-4 h-4 text-gray-600" />
+                            ) : (
+                                <EyeOff className="w-4 h-4 text-gray-400" />
+                            )}
+                        </button>
+                    </div>
+                </motion.div>
             </div>
 
             {/* Charts Grid - Mobile First */}
