@@ -463,7 +463,7 @@ export default function Home() {
                         href="https://wa.me/918439245302?text=Hi%2C%20I%20have%20a%20question%20about%20MathLogs"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-8 py-4 bg-[#25D366] text-white font-bold rounded-full hover:bg-[#20bd5a] transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
+                        className="inline-flex items-center px-8 py-4 bg-gray-900 text-white font-bold rounded-full hover:bg-black transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
                     >
                         <MessageCircle className="w-6 h-6 mr-3" />
                         Chat on WhatsApp
@@ -476,13 +476,13 @@ export default function Home() {
                 href="https://wa.me/918439245302?text=Hi%2C%20I%20have%20a%20question%20about%20MathLogs"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-2xl hover:bg-[#20bd5a] transition-all active:scale-90 hover:scale-110"
+                className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-gray-900 text-white rounded-full flex items-center justify-center shadow-2xl hover:bg-black transition-all active:scale-90 hover:scale-110"
                 title="Chat on WhatsApp"
             >
                 <MessageCircle className="w-8 h-8" />
-                <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+                <span className="absolute top-0 right-0 gap-1 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-white"></span>
                 </span>
             </a>
 
