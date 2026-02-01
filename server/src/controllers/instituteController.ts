@@ -214,3 +214,24 @@ export const deleteInstitute = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to delete institute. Data constraints exist.' });
     }
 };
+
+export const getMyInstitute = async (req: Request, res: Response) => {
+    const user = (req as any).user;
+    if (!user.instituteId) return res.status(400).json({ error: 'No institute assigned' });
+
+    try {
+        const institute = await prisma.institute.findUnique({
+            where: { id: user.instituteId },
+            select: {
+                id: true,
+                name: true,
+                config: true
+            }
+        });
+        if (!institute) return res.status(404).json({ error: 'Institute not found' });
+        res.json(institute);
+    } catch (e) {
+        console.error('Failed to fetch my institute:', e);
+        res.status(500).json({ error: 'Failed to fetch institute details' });
+    }
+};

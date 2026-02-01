@@ -25,6 +25,7 @@ export default function BatchList() {
     // Form State
     const [batchNumber, setBatchNumber] = useState('');
     const [subject, setSubject] = useState('Mathematics');
+    const [allowedSubjects, setAllowedSubjects] = useState<string[]>([]);
     const [timeSlot, setTimeSlot] = useState('');
     // Fee is removed from creation
     const [className, setClassName] = useState('');
@@ -41,7 +42,25 @@ export default function BatchList() {
     };
 
     useEffect(() => {
-        fetchBatches();
+        const loadData = async () => {
+            // Fetch Batches
+            fetchBatches();
+
+            // Fetch Institute Config for Subjects
+            try {
+                const institute = await apiRequest('/institute/me');
+                if (institute?.config?.subjects && Array.isArray(institute.config.subjects)) {
+                    setAllowedSubjects(institute.config.subjects);
+                    // Default to first subject if available
+                    if (institute.config.subjects.length > 0) {
+                        setSubject(institute.config.subjects[0]);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load institute config", e);
+            }
+        };
+        loadData();
     }, []);
 
     const handleCreate = async (e: React.FormEvent) => {
@@ -130,16 +149,27 @@ export default function BatchList() {
                                     disabled={!className}
                                     required
                                 />
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Subject</label>
-                                    <input
-                                        className="w-full !bg-neutral-50 border border-app-border text-app-text  p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
-                                        placeholder="e.g. Mathematics, Science"
+                                {allowedSubjects.length > 0 ? (
+                                    <Dropdown
+                                        label="Subject"
                                         value={subject}
-                                        onChange={e => setSubject(e.target.value)}
+                                        onChange={setSubject}
+                                        options={allowedSubjects.map(s => ({ value: s, label: s }))}
+                                        placeholder="Select Subject"
                                         required
                                     />
-                                </div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Subject</label>
+                                        <input
+                                            className="w-full !bg-neutral-50 border border-app-border text-app-text  p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
+                                            placeholder="e.g. Mathematics, Science"
+                                            value={subject}
+                                            onChange={e => setSubject(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                )}
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Time Slot</label>
                                     <input
