@@ -247,7 +247,7 @@ export default function Dashboard() {
                                 <IndianRupee className="w-6 h-6" strokeWidth={1.5} />
                             </div>
                             <div className="flex-1">
-                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Total Collected</p>
+                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">This Month</p>
                                 <p className="text-3xl font-bold text-gray-900 tracking-tight">
                                     {showFeeData ? (
                                         <>₹<CountUp end={finances.collected} duration={2} separator="," /></>

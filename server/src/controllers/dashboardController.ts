@@ -59,20 +59,28 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                     fees: {
                         where: { status: 'PAID' },
                         select: {
-                            amount: true
+                            amount: true,
+                            date: true  // Correct field name
                         }
                     },
                     feePayments: {
                         select: {
-                            amountPaid: true
+                            amountPaid: true,
+                            date: true  // Correct field name
                         }
                     }
                 }
             })
         ]);
 
+        // Get current month start and end dates
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
         // Compute financial summary and defaulters
         let totalCollected = 0;
+        let monthlyCollected = 0;  // New: Track monthly collection
         let totalPending = 0;
         const batchDuesMap = new Map<string, number>();
 
@@ -88,8 +96,24 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
             const paymentsPaid = student.feePayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
             const totalPaid = feesPaid + paymentsPaid;
 
+            // Calculate monthly collection (current month only)
+            const monthlyFees = student.fees
+                .filter((f: any) => {
+                    const paidDate = new Date(f.date);
+                    return paidDate >= monthStart && paidDate <= monthEnd;
+                })
+                .reduce((sum: number, f: any) => sum + f.amount, 0);
+
+            const monthlyPayments = student.feePayments
+                .filter((p: any) => {
+                    const paidDate = new Date(p.date);
+                    return paidDate >= monthStart && paidDate <= monthEnd;
+                })
+                .reduce((sum: number, p: any) => sum + p.amountPaid, 0);
+
             // Aggregate
             totalCollected += totalPaid;
+            monthlyCollected += monthlyFees + monthlyPayments;
             const balance = Math.max(0, totalFee - totalPaid);
             totalPending += balance;
 
@@ -112,7 +136,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 students
             },
             finances: {
-                collected: totalCollected,
+                collected: monthlyCollected,  // Changed to monthly collection
                 pending: totalPending
             },
             defaulters,
