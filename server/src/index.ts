@@ -6,7 +6,7 @@ import compression from 'compression';
 import apiRoutes from './routes/api';
 import { prisma } from './prisma';
 import { configureSecurityHeaders, apiLimiter } from './middleware/security';
-import { initializeSentry, sentryRequestHandler, sentryTracingHandler, sentryErrorHandler } from './monitoring/sentry';
+import { initializeSentry } from './monitoring/sentry';
 import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
 
 const app = express();
@@ -14,8 +14,6 @@ const PORT = process.env.PORT || 3001;
 
 // ✅ MONITORING: Initialize Sentry FIRST (before all other middleware)
 initializeSentry(app);
-app.use(sentryRequestHandler());
-app.use(sentryTracingHandler());
 
 configureSecurityHeaders(app);
 
@@ -133,9 +131,6 @@ app.use(express.static(path.join(__dirname, '../../client/dist')));
 
 // API Routes
 app.use('/api', apiRoutes);
-
-// ✅ MONITORING: Sentry error handler (MUST be after routes, BEFORE other error handlers)
-app.use(sentryErrorHandler());
 
 // Generic error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

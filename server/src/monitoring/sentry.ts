@@ -4,7 +4,7 @@
  */
 
 import * as Sentry from '@sentry/node';
-import { ProfilingIntegration } from '@sentry/profiling-node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { Express } from 'express';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
@@ -34,16 +34,14 @@ export const initializeSentry = (app: Express) => {
         // Profiling
         profilesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,
         integrations: [
-            new ProfilingIntegration(),
-            new Sentry.Integrations.Http({ tracing: true }),
-            new Sentry.Integrations.Express({ app })
+            nodeProfilingIntegration()
         ],
 
         // Release tracking
         release: process.env.HEROKU_SLUG_COMMIT || 'local-development',
 
         // PII filtering (CRITICAL for GDPR)
-        beforeSend(event, hint) {
+        beforeSend(event) {
             // Remove PII from error data
             if (event.request) {
                 delete event.request.cookies;
@@ -68,30 +66,12 @@ export const initializeSentry = (app: Express) => {
         ]
     });
 
+    // Setup Express error handler
+    Sentry.setupExpressErrorHandler(app);
+
     console.log('[SENTRY] ✅ Initialized successfully');
     console.log(`[SENTRY] Environment: ${process.env.NODE_ENV}`);
     console.log(`[SENTRY] Sample Rate: ${IS_PRODUCTION ? '10%' : '100%'}`);
-};
-
-/**
- * Sentry request handler (must be first middleware)
- */
-export const sentryRequestHandler = () => {
-    return Sentry.Handlers.requestHandler();
-};
-
-/**
- * Sentry tracing handler (after request handler)
- */
-export const sentryTracingHandler = () => {
-    return Sentry.Handlers.tracingHandler();
-};
-
-/**
- * Sentry error handler (must be AFTER all routes, BEFORE other error handlers)
- */
-export const sentryErrorHandler = () => {
-    return Sentry.Handlers.errorHandler();
 };
 
 /**
@@ -140,32 +120,6 @@ export const addBreadcrumb = (category: string, message: string, data?: any) => 
         level: 'info',
         data
     });
-};
-
-/**
- * Performance monitoring for specific operations
- */
-export const measurePerformance = async <T>(
-    operation: string,
-    fn: () => Promise<T>
-): Promise<T> => {
-    if (!SENTRY_DSN) return fn();
-
-    const transaction = Sentry.startTransaction({
-        op: operation,
-        name: operation
-    });
-
-    try {
-        const result = await fn();
-        transaction.setStatus('ok');
-        return result;
-    } catch (error) {
-        transaction.setStatus('internal_error');
-        throw error;
-    } finally {
-        transaction.finish();
-    }
 };
 
 export default Sentry;
