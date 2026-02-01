@@ -27,7 +27,7 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
             orderBy: { name: 'asc' }
         });
 
-        // Calculate dues and filter defaulters
+        // PERF OPTIMIZATION: Calculate dues and filter defaulters (O(n) instead of O(n²))
         let defaulters = students.map((student: any) => {
             // Calculate Total Paid first to use for dynamic allocation
             const paidSimple = student.fees
@@ -48,14 +48,21 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
             const totalPaid = paidSimple + paidInstallments;
             const balance = totalFee - totalPaid;
 
-            // Oldest Due Date Calc
+            // PERF: Pre-build payment lookup map - O(n) instead of O(n²)
+            // This eliminates nested .find() which was causing O(n²) complexity
+            const paymentsByInstallment = new Map<string, number>();
+            student.feePayments?.forEach((p: any) => {
+                const current = paymentsByInstallment.get(p.installmentId) || 0;
+                paymentsByInstallment.set(p.installmentId, current + p.amountPaid);
+            });
+
+            // Oldest Due Date Calc (now O(n) with Map lookup)
             let oldestDue = new Date(); // Fallback
             if (sortedInstallments.length > 0) {
                 let found = false;
                 for (const inst of sortedInstallments) {
-                    // Check if this specific installment is fully paid (including unallocated cash offset)
-                    const payment = student.feePayments?.find((p: any) => p.installmentId === inst.id);
-                    const paidDirectly = payment ? payment.amountPaid : 0;
+                    // O(1) map lookup instead of O(n) find()
+                    const paidDirectly = paymentsByInstallment.get(inst.id) || 0;
                     let remainingCost = inst.amount - paidDirectly;
 
                     // Use unallocated cash if available

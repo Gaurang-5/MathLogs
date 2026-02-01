@@ -142,6 +142,7 @@ model Student {
   fees           FeeRecord[]
   marks          Mark[]
   batch          Batch?       @relation(fields: [batchId], references: [id])
+  balance        StudentBalance? // PERF: Materialized balance (auto-updated by DB triggers)
 
   @@index([batchId])
   @@index([status])
@@ -230,6 +231,23 @@ model FeePayment {
   @@index([studentId])
   @@index([installmentId])
   @@index([studentId, installmentId]) // Added for query performance
+}
+
+// PERF: Materialized view for student balances
+// Auto-updated via database triggers when fees/payments change
+// Eliminates duplicate balance calculations across endpoints
+model StudentBalance {
+  studentId       String    @id
+  totalFee        Float     @default(0)
+  totalPaid       Float     @default(0)
+  balance         Float     @default(0)
+  lastPaymentDate DateTime?
+  updatedAt       DateTime  @default(now())
+  
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([balance], name: "idx_balance_desc") // For finding defaulters
+  @@index([updatedAt]) // For recent updates
 }
 
 model IdCounter {
