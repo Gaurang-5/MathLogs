@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { cn } from '../utils/cn';
 import ToastProvider from './ToastProvider';
 import QuickFeeModal from './QuickFeeModal';
+import PWAInstallPrompt from './PWAInstallPrompt';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -259,6 +260,9 @@ export default function Layout({ children, title }: LayoutProps) {
                     </div>
                 </nav>
             )}
+
+            {/* PWA Install Prompt */}
+            <PWAInstallPrompt />
         </div >
     );
 }

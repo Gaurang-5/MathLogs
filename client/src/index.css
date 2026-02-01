@@ -68,6 +68,7 @@ body {
 
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
@@ -125,13 +126,45 @@ h6 {
     background-color: var(--text-secondary);
     border: 2px solid transparent;
 }
+
 @keyframes scan {
-  0%, 100% { top: 0%; opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { top: 100%; opacity: 0; }
+
+    0%,
+    100% {
+        top: 0%;
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    90% {
+        opacity: 1;
+    }
+
+    100% {
+        top: 100%;
+        opacity: 0;
+    }
 }
 
 .animate-scan {
-  animation: scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    animation: scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes slide-up {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-slide-up {
+    animation: slide-up 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
