@@ -222,9 +222,21 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
     const teacherId = (req as any).user?.id;
     try {
+        // Fetch batch with full student details including fees, marks, and installments
         const batch = await prisma.batch.findUnique({
             where: { id },
-            include: { students: { orderBy: { name: 'asc' } } }
+            include: {
+                students: {
+                    where: { status: 'APPROVED' },
+                    orderBy: { name: 'asc' },
+                    include: {
+                        fees: { select: { amount: true, date: true, status: true } },
+                        feePayments: { select: { amountPaid: true, date: true, installmentId: true } },
+                        marks: { select: { score: true } }
+                    }
+                },
+                feeInstallments: { orderBy: { createdAt: 'asc' } }
+            }
         });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
@@ -232,43 +244,142 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
         const user = (req as any).user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
-        if (!batch) return res.status(404).json({ error: 'Batch not found' });
+        // Create PDF in LANDSCAPE mode for more columns
+        const doc = new PDFDocument({
+            size: 'A4',
+            layout: 'landscape',  // Landscape for wider columns
+            margin: 30
+        });
 
-        const batchWithStudents = batch as typeof batch & { students: any[] };
-
-        const doc = new PDFDocument();
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${batch.name}-students.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${batch.name}-students-detailed.pdf"`);
         doc.pipe(res);
 
         // Header
-        doc.fontSize(20).text(`Batch: ${batch.name}`, { align: 'center' });
-        doc.fontSize(12).text(`Subject: ${batch.subject}`, { align: 'center' });
-        doc.moveDown();
+        doc.fontSize(18).font('Helvetica-Bold').text(`${batch.name} - Student Details`, { align: 'center' });
+        doc.fontSize(10).font('Helvetica').text(`Subject: ${batch.subject} | Generated: ${new Date().toLocaleDateString()}`, { align: 'center' });
+        doc.moveDown(1);
 
-        // Table Header
-        let y = doc.y;
-        doc.font('Helvetica-Bold');
-        doc.text('ID', 50, y);
-        doc.text('Name', 150, y);
-        doc.text('Parent', 300, y);
-        doc.text('Whatsapp', 450, y);
-        doc.moveDown();
-        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+        // Table Headers (landscape A4 width ~842pt with 30pt margins = ~782pt usable)
+        const startX = 30;
+        let currentY = doc.y;
+
+        doc.font('Helvetica-Bold').fontSize(8);
+        doc.text('Name', startX, currentY, { width: 90 });
+        doc.text('School', startX + 95, currentY, { width: 90 });
+        doc.text('Phone', startX + 190, currentY, { width: 70 });
+        doc.text('Parent', startX + 265, currentY, { width: 80 });
+        doc.text('Email', startX + 350, currentY, { width: 110 });
+        doc.text('Avg %', startX + 465, currentY, { width: 40 });
+        doc.text('Fee Status', startX + 510, currentY, { width: 245 });
+
+        doc.moveDown(0.3);
+        doc.moveTo(startX, doc.y).lineTo(startX + 752, doc.y).stroke();
         doc.moveDown(0.5);
 
         // Rows
-        doc.font('Helvetica');
-        batchWithStudents.students.forEach((student: any) => {
-            y = doc.y;
-            if (y > 700) { doc.addPage(); y = 50; } // Basic pagination check
+        doc.font('Helvetica').fontSize(7);
 
-            doc.text(student.humanId || '-', 50, y);
-            doc.text(student.name, 150, y);
-            doc.text(student.parentName, 300, y);
-            doc.text(student.parentWhatsapp, 450, y);
-            doc.moveDown();
+        batch.students.forEach((student: any) => {
+            currentY = doc.y;
+
+            // Add new page if needed
+            if (currentY > 520) {
+                doc.addPage({ layout: 'landscape' });
+                currentY = 50;
+
+                // Repeat headers on new page
+                doc.font('Helvetica-Bold').fontSize(8);
+                doc.text('Name', startX, currentY, { width: 90 });
+                doc.text('School', startX + 95, currentY, { width: 90 });
+                doc.text('Phone', startX + 190, currentY, { width: 70 });
+                doc.text('Parent', startX + 265, currentY, { width: 80 });
+                doc.text('Email', startX + 350, currentY, { width: 110 });
+                doc.text('Avg %', startX + 465, currentY, { width: 40 });
+                doc.text('Fee Status', startX + 510, currentY, { width: 245 });
+                doc.moveDown(0.3);
+                doc.moveTo(startX, doc.y).lineTo(startX + 752, doc.y).stroke();
+                doc.moveDown(0.5);
+                currentY = doc.y;
+                doc.font('Helvetica').fontSize(7);
+            }
+
+            // Calculate average marks
+            const avgMarks = student.marks.length > 0
+                ? Math.round(student.marks.reduce((sum: number, m: any) => sum + m.score, 0) / student.marks.length)
+                : 0;
+
+            // Calculate fee installment status
+            const installments = batch.feeInstallments || [];
+            let feeStatus = '';
+            let lastPaymentDateMs = 0; // Track as timestamp to avoid type issues
+
+            if (installments.length > 0) {
+                // For each installment, check if paid
+                const installmentStatuses = installments.map(inst => {
+                    const paymentsForThis = student.feePayments.filter((p: any) => p.installmentId === inst.id);
+                    const totalPaid = paymentsForThis.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
+                    const isPaid = totalPaid >= inst.amount - 0.01;
+
+                    // Track last payment date
+                    paymentsForThis.forEach((p: any) => {
+                        const paymentTime = new Date(p.date).getTime();
+                        if (paymentTime > lastPaymentDateMs) {
+                            lastPaymentDateMs = paymentTime;
+                        }
+                    });
+
+                    return isPaid ? '✓' : '✗';
+                });
+
+                feeStatus = installmentStatuses.join(' ');
+                if (lastPaymentDateMs > 0) {
+                    const lastDate = new Date(lastPaymentDateMs);
+                    const month = (lastDate.getMonth() + 1).toString().padStart(2, '0');
+                    const day = lastDate.getDate().toString().padStart(2, '0');
+                    feeStatus += ` (Last: ${day}/${month})`;
+                }
+            } else {
+                // Flat fee
+                const totalPaid =
+                    student.fees.filter((f: any) => f.status === 'PAID').reduce((sum: number, f: any) => sum + f.amount, 0) +
+                    student.feePayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
+                const totalExpected = batch.feeAmount || 0;
+                feeStatus = totalPaid >= totalExpected - 0.01 ? 'Paid ✓' : `₹${totalExpected - totalPaid} due`;
+
+                // Get last payment date
+                const allDates = [
+                    ...student.fees.map((f: any) => f.date),
+                    ...student.feePayments.map((p: any) => p.date)
+                ];
+                if (allDates.length > 0) {
+                    const maxTimestamp = Math.max(...allDates.map((d: any) => new Date(d).getTime()));
+                    lastPaymentDateMs = maxTimestamp;
+                    const maxDate = new Date(maxTimestamp);
+                    const month = (maxDate.getMonth() + 1).toString().padStart(2, '0');
+                    const day = maxDate.getDate().toString().padStart(2, '0');
+                    feeStatus += ` (${day}/${month})`;
+                }
+            }
+
+            // Print row
+            doc.text(student.name || '-', startX, currentY, { width: 90, ellipsis: true });
+            doc.text(student.schoolName || 'N/A', startX + 95, currentY, { width: 90, ellipsis: true });
+            doc.text(student.parentWhatsapp || '-', startX + 190, currentY, { width: 70 });
+            doc.text(student.parentName || '-', startX + 265, currentY, { width: 80, ellipsis: true });
+            doc.text(student.parentEmail || 'N/A', startX + 350, currentY, { width: 110, ellipsis: true });
+            doc.text(avgMarks > 0 ? `${avgMarks}%` : 'N/A', startX + 465, currentY, { width: 40, align: 'center' });
+            doc.text(feeStatus || 'N/A', startX + 510, currentY, { width: 245 });
+
+            doc.moveDown(0.8);
         });
+
+        // Footer
+        doc.moveDown(1);
+        doc.fontSize(8).fillColor('gray').text(
+            `Total Students: ${batch.students.length} | Generated by MathLogs`,
+            { align: 'center' }
+        );
 
         doc.end();
     } catch (e) {
