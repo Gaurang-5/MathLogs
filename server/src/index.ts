@@ -54,7 +54,8 @@ app.use(cors({
             return callback(null, true);
         }
 
-        if (allowedOrigins.includes(origin) || origin.endsWith('.herokuapp.com')) {
+        // Allow Heroku domains AND custom domain mathlogs.app
+        if (allowedOrigins.includes(origin) || origin.endsWith('.herokuapp.com') || origin.endsWith('mathlogs.app')) {
             callback(null, true);
         } else {
             console.warn(`[SECURITY] Blocked CORS request from unauthorized origin: ${origin}`);
