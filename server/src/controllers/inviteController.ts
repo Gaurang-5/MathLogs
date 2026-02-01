@@ -3,6 +3,8 @@ import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+import { secureLogger } from '../utils/secureLogger';
+
 const JWT_SECRET = process.env.JWT_SECRET!;
 
 // SUPER ADMIN ONLY
@@ -38,6 +40,8 @@ export const generateInvite = async (req: Request, res: Response) => {
     }
 
     try {
+        secureLogger.debug('Generating invite', { instituteName, teacherName });
+
         // Create Institute
         const institute = await prisma.institute.create({
             data: {
@@ -66,15 +70,17 @@ export const generateInvite = async (req: Request, res: Response) => {
             }
         });
 
+        secureLogger.info('Invite generated successfully', { instituteId: institute.id });
+
         res.json({
             success: true,
             inviteLink: `${process.env.CLIENT_URL}/setup?token=${invite.token}`,
             token: invite.token,
             instituteId: institute.id
         });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: 'Failed to generate invite' });
+    } catch (e: any) {
+        secureLogger.error('Failed to generate invite', { error: e.message, stack: e.stack });
+        res.status(500).json({ error: 'Failed to generate invite: ' + e.message });
     }
 };
 
