@@ -206,16 +206,7 @@ export default function ScanMarks() {
                             <div className="absolute inset-0 shadow-[0_0_0_100vmax_rgba(0,0,0,0.5)]"></div>
 
                             {/* Scanning Box */}
-                            <div className="relative w-[280px] h-[100px] border-2 border-red-500 rounded-lg bg-transparent shadow-lg">
-                                {/* Corner Markers */}
-                                <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500 -mt-1 -ml-1 rounded-tl-sm"></div>
-                                <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500 -mt-1 -mr-1 rounded-tr-sm"></div>
-                                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500 -mb-1 -ml-1 rounded-bl-sm"></div>
-                                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500 -mb-1 -mr-1 rounded-br-sm"></div>
 
-                                {/* Scan Line Animation */}
-                                <div className="absolute w-full h-[2px] bg-red-500/80 shadow-[0_0_4px_rgba(239,68,68,0.8)] animate-[scan_2s_ease-in-out_infinite] top-1/2 -translate-y-1/2"></div>
-                            </div>
 
                             <div className="absolute mt-32 text-white/90 text-xs font-bold bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-sm border border-white/10">
                                 Align barcode within box
