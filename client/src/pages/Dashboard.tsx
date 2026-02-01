@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Users, Wallet } from 'lucide-react';
-
-
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart } from 'recharts';
+import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import CountUp from 'react-countup';
 
 export default function Dashboard() {
     const [stats, setStats] = useState({ batches: 0, students: 0 });
@@ -13,147 +12,345 @@ export default function Dashboard() {
     const [finances, setFinances] = useState({ collected: 0, pending: 0 });
     const [defaulters, setDefaulters] = useState<any[]>([]);
 
+    // Separate loading states for progressive rendering
+    const [loading, setLoading] = useState({ summary: true, growth: true });
+
+    // Privacy toggle for fee data
+    const [showFeeData, setShowFeeData] = useState(true);
+
+    // Rotating insights
+    const [currentInsight, setCurrentInsight] = useState(0);
+    const insights = [
+        { text: 'Monitor fee collection regularly', type: 'warning' },
+        { text: 'Student growth trending upward', type: 'success' },
+        { text: 'Keep track of batch performance', type: 'info' }
+    ];
+
     useEffect(() => {
-        // PERF: Parallelize API calls to eliminate waterfall delay (3x faster)
-        const loadDashboard = async () => {
+        // OPTIMIZATION 1: Load critical summary data FIRST (non-blocking)
+        const loadSummary = async () => {
             try {
-                const [batchesData, growthData, feesData] = await Promise.all([
-                    api.get('/batches'),
-                    api.get('/stats/growth'),
-                    api.get('/fees/summary')
-                ]);
+                const data = await api.get('/dashboard/summary');
 
-                // Process batches and student count
-                const batchCount = batchesData.length;
-                const studentCount = batchesData.reduce((sum: number, b: any) => sum + (b._count?.students || 0), 0);
-                setStats({ batches: batchCount, students: studentCount });
+                setStats(data.stats);
+                setFinances(data.finances);
+                setDefaulters(data.defaulters);
 
-                // Set growth data
-                setGrowthData(growthData);
-
-                // Process financial data
-                const collected = feesData.reduce((sum: any, s: any) => sum + s.totalPaid, 0);
-                const pending = feesData.reduce((sum: any, s: any) => sum + Math.max(0, s.balance), 0);
-                setFinances({ collected, pending });
-
-                // Calculate batch-wise pending dues
-                const batchMap = new Map<string, number>();
-                feesData.forEach((s: any) => {
-                    if (s.balance > 0) {
-                        const current = batchMap.get(s.batchName) || 0;
-                        batchMap.set(s.batchName, current + s.balance);
-                    }
-                });
-
-                const batchDues = Array.from(batchMap.entries())
-                    .map(([name, amount]) => ({ name, amount }))
-                    .sort((a, b) => b.amount - a.amount);
-
-                setDefaulters(batchDues);
+                setLoading(prev => ({ ...prev, summary: false }));
             } catch (error) {
-                console.error('Failed to load dashboard data:', error);
+                console.error('Failed to load dashboard summary:', error);
+                setLoading(prev => ({ ...prev, summary: false }));
             }
         };
 
-        loadDashboard();
+        // OPTIMIZATION 2: Load chart data in BACKGROUND (defer to idle time)
+        const loadCharts = () => {
+            // Use requestIdleCallback to defer chart loading until main thread is idle
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(async () => {
+                    try {
+                        const growth = await api.get('/stats/growth');
+                        setGrowthData(growth);
+                        setLoading(prev => ({ ...prev, growth: false }));
+                    } catch (error) {
+                        console.error('Failed to load growth data:', error);
+                        setLoading(prev => ({ ...prev, growth: false }));
+                    }
+                });
+            } else {
+                // Fallback for browsers without requestIdleCallback
+                setTimeout(async () => {
+                    try {
+                        const growth = await api.get('/stats/growth');
+                        setGrowthData(growth);
+                        setLoading(prev => ({ ...prev, growth: false }));
+                    } catch (error) {
+                        console.error('Failed to load growth data:', error);
+                        setLoading(prev => ({ ...prev, growth: false }));
+                    }
+                }, 100);
+            }
+        };
+
+        loadSummary();
+        loadCharts();
     }, []);
+
+    // Rotate insights every 4 seconds
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentInsight((prev) => (prev + 1) % insights.length);
+        }, 4000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const collectionRate = finances.collected + finances.pending > 0
+        ? Math.min(100, Math.round((finances.collected / (finances.collected + finances.pending)) * 100))
+        : 0;
 
     return (
         <Layout title="Dashboard">
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {/* Total Students */}
-                <div className="bg-app-surface-opaque px-6 py-6 rounded-[24px] border border-app-border shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
-                    <div className="w-12 h-12 bg-app-bg border border-app-border text-app-text rounded-2xl flex items-center justify-center">
-                        <Users className="w-6 h-6" strokeWidth={1.5} />
-                    </div>
-                    <div>
-                        <p className="text-xs text-app-text-tertiary font-bold uppercase tracking-wider mb-1">Total Students</p>
-                        <p className="text-3xl font-bold text-app-text tracking-tight">{stats.students}</p>
-                    </div>
+            {/* Smart Insights Card - Animated Rotation */}
+            <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 relative overflow-hidden"
+            >
+                <div className="absolute inset-0 bg-white/50 backdrop-blur-sm"></div>
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={currentInsight}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.4 }}
+                        className="flex items-center gap-3 relative z-10"
+                    >
+                        <p className="text-sm font-medium text-gray-800">{insights[currentInsight].text}</p>
+                    </motion.div>
+                </AnimatePresence>
+                <div className="absolute bottom-2 right-4 flex gap-1">
+                    {insights.map((_, i) => (
+                        <div
+                            key={i}
+                            className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentInsight ? 'bg-gray-900 w-4' : 'bg-gray-400'
+                                }`}
+                        />
+                    ))}
                 </div>
+            </motion.div>
 
-                {/* Collection Rate */}
-                <div className="bg-app-surface-opaque px-6 py-6 rounded-[24px] border border-app-border shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
-                    <div className="w-12 h-12 bg-app-bg border border-app-border text-app-text rounded-2xl flex items-center justify-center">
-                        <Wallet className="w-6 h-6" strokeWidth={1.5} />
-                    </div>
-                    <div>
-                        <p className="text-xs text-app-text-tertiary font-bold uppercase tracking-wider mb-1">Fee Collection Rate</p>
-                        <p className="text-3xl font-bold text-app-text tracking-tight">
-                            {finances.collected + finances.pending > 0
-                                ? Math.min(100, Math.round((finances.collected / (finances.collected + finances.pending)) * 100))
-                                : 0}%
-                        </p>
-                    </div>
-                </div>
-            </div>
+            {/* Stats Overview - Mobile First Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {/* Total Students - Glassmorphism */}
+                {loading.summary ? (
+                    <div className="animate-pulse bg-gray-100 h-24 rounded-2xl"></div>
+                ) : (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        whileHover={{ scale: 1.02 }}
+                        className="group bg-white/70 backdrop-blur-xl px-5 py-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="flex items-center gap-4 relative z-10">
+                            <div className="w-12 h-12 bg-gray-100 border border-gray-200 text-gray-900 rounded-xl flex items-center justify-center">
+                                <Users className="w-6 h-6" strokeWidth={1.5} />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Total Students</p>
+                                <p className="text-3xl font-bold text-gray-900 tracking-tight">
+                                    <CountUp end={stats.students} duration={2} />
+                                </p>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                {/* Student Growth Chart - 2 Columns */}
-                <div className="xl:col-span-2 bg-white p-6 rounded-[24px] border border-app-border shadow-sm">
-                    <h3 className="text-lg font-bold text-app-text mb-6">Student Growth</h3>
-                    <div className="h-[300px] w-full min-h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={growthData}>
-                                <defs>
-                                    <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                    dy={10}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    itemStyle={{ color: '#1e293b' }}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="students"
-                                    stroke="#6366f1"
-                                    strokeWidth={3}
-                                    fillOpacity={1}
-                                    fill="url(#colorStudents)"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
+                {/* Active Batches */}
+                {loading.summary ? (
+                    <div className="animate-pulse bg-gray-100 h-24 rounded-2xl"></div>
+                ) : (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.1 }}
+                        whileHover={{ scale: 1.02 }}
+                        className="group bg-white/70 backdrop-blur-xl px-5 py-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="flex items-center gap-4 relative z-10">
+                            <div className="w-12 h-12 bg-gray-100 border border-gray-200 text-gray-900 rounded-xl flex items-center justify-center">
+                                <BookOpen className="w-6 h-6" strokeWidth={1.5} />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Active Batches</p>
+                                <p className="text-3xl font-bold text-gray-900 tracking-tight">
+                                    <CountUp end={stats.batches} duration={2} />
+                                </p>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
 
-                {/* Batch Pending Dues List - 1 Column */}
-                <div className="bg-white p-6 rounded-[24px] border border-app-border shadow-sm flex flex-col">
-                    <h3 className="text-lg font-bold text-app-text mb-4">Batch Pending Dues</h3>
-                    <div className="flex-1 overflow-auto space-y-4">
-                        {defaulters.length === 0 ? (
-                            <div className="h-full flex items-center justify-center text-app-text-tertiary text-sm">No pending dues</div>
-                        ) : (
-                            defaulters.map((batch: any, index) => (
-                                <div key={index} className="flex justify-between items-center p-3 rounded-2xl bg-app-surface-opaque border border-app-border/50">
-                                    <div>
-                                        <p className="font-semibold text-app-text text-sm">{batch.name}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-bold text-red-500 text-sm">₹{batch.amount.toLocaleString()}</p>
-                                        <p className="text-[10px] text-app-text-tertiary uppercase font-bold tracking-wide">Total Due</p>
-                                    </div>
+                {/* Fee Collection Rate - Circular Progress */}
+                {loading.summary ? (
+                    <div className="animate-pulse bg-gray-100 h-24 rounded-2xl"></div>
+                ) : (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.2 }}
+                        whileHover={{ scale: 1.02 }}
+                        className="group bg-white/70 backdrop-blur-xl px-5 py-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="flex items-center gap-4 relative z-10">
+                            <div className="relative w-12 h-12">
+                                <svg className="w-12 h-12 transform -rotate-90">
+                                    <circle cx="24" cy="24" r="20" stroke="#e5e7eb" strokeWidth="4" fill="none" />
+                                    <motion.circle
+                                        cx="24"
+                                        cy="24"
+                                        r="20"
+                                        stroke="#111827"
+                                        strokeWidth="4"
+                                        fill="none"
+                                        strokeLinecap="round"
+                                        initial={{ strokeDasharray: '0 125.6' }}
+                                        animate={{ strokeDasharray: `${(collectionRate / 100) * 125.6} 125.6` }}
+                                        transition={{ duration: 2 }}
+                                    />
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <Wallet className="w-5 h-5 text-gray-900" strokeWidth={1.5} />
                                 </div>
-                            ))
-                        )}
-                    </div>
-                </div>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Collection Rate</p>
+                                <p className="text-3xl font-bold text-gray-900 tracking-tight">
+                                    <CountUp end={collectionRate} duration={2} suffix="%" />
+                                </p>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
+                {/* Monthly Revenue - with Privacy Toggle */}
+                {loading.summary ? (
+                    <div className="animate-pulse bg-gray-100 h-24 rounded-2xl"></div>
+                ) : (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.3 }}
+                        whileHover={{ scale: 1.02 }}
+                        className="group bg-white/70 backdrop-blur-xl px-5 py-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="flex items-center gap-4 relative z-10">
+                            <div className="w-12 h-12 bg-gray-100 border border-gray-200 text-gray-900 rounded-xl flex items-center justify-center">
+                                <IndianRupee className="w-6 h-6" strokeWidth={1.5} />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Total Collected</p>
+                                <p className="text-3xl font-bold text-gray-900 tracking-tight">
+                                    {showFeeData ? (
+                                        <>₹<CountUp end={finances.collected} duration={2} separator="," /></>
+                                    ) : (
+                                        <span className="text-gray-400">••••••</span>
+                                    )}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowFeeData(!showFeeData)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                {showFeeData ? (
+                                    <Eye className="w-4 h-4 text-gray-600" />
+                                ) : (
+                                    <EyeOff className="w-4 h-4 text-gray-400" />
+                                )}
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
             </div>
+
+            {/* Charts Grid - Mobile First */}
+            <div className="mb-6">
+                {/* Growth Trends Chart - Full Width */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="bg-white/70 backdrop-blur-xl p-5 rounded-2xl border border-gray-200 shadow-sm"
+                >
+                    <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-gray-900" />
+                        Growth Trends
+                    </h3>
+                    {loading.growth ? (
+                        <div className="h-[250px] flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        </div>
+                    ) : growthData.length > 0 ? (
+                        <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={growthData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                    <XAxis dataKey="name" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                                    <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '12px',
+                                            backdropFilter: 'blur(10px)'
+                                        }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="students"
+                                        stroke="#111827"
+                                        strokeWidth={2}
+                                        dot={{ fill: '#111827', r: 4 }}
+                                        animationDuration={2000}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <div className="h-[250px] flex items-center justify-center">
+                            <div className="text-center">
+                                <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                                <p className="text-sm text-gray-400">No growth data available</p>
+                            </div>
+                        </div>
+                    )}
+                </motion.div>
+            </div>
+
+            {/* Pending Dues List */}
+            {showFeeData && defaulters.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                    className="bg-white/70 backdrop-blur-xl p-5 rounded-2xl border border-gray-200 shadow-sm"
+                >
+                    <h3 className="text-base font-bold text-gray-900 mb-4">Pending Dues by Batch</h3>
+                    {loading.summary ? (
+                        <div className="space-y-3">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-xl"></div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {defaulters.map((batch, index) => (
+                                <motion.div
+                                    key={batch.name}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.1 * index }}
+                                    className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-gray-900 text-white rounded-lg flex items-center justify-center text-sm font-bold">
+                                            {index + 1}
+                                        </div>
+                                        <span className="font-medium text-gray-900">{batch.name}</span>
+                                    </div>
+                                    <span className="text-gray-900 font-bold text-lg">
+                                        ₹{batch.amount.toLocaleString()}
+                                    </span>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+                </motion.div>
+            )}
         </Layout>
     );
 }

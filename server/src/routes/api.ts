@@ -11,8 +11,12 @@ import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport } from '../controllers/testController';
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
+import { getDashboardSummary } from '../controllers/dashboardController';
 
 const router = Router();
+
+// Dashboard (Optimized endpoint)
+router.get('/dashboard/summary', authenticateToken as any, getDashboardSummary as any);
 
 // Academic Year
 router.get('/academic-years', authenticateToken as any, listAcademicYears as any);

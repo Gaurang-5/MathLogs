@@ -56,9 +56,9 @@ export default function Layout({ children, title }: LayoutProps) {
             >
                 <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center p-6" : "justify-between p-8")}>
                     {!isSidebarCollapsed && (
-                        <h1 className="text-2xl font-semibold tracking-tight text-app-text whitespace-nowrap overflow-hidden">
+                        <Link to="/dashboard" className="text-2xl font-semibold tracking-tight text-app-text whitespace-nowrap overflow-hidden hover:opacity-80 transition-opacity cursor-pointer">
                             Math<span className="text-accent">Logs</span>
-                        </h1>
+                        </Link>
                     )}
                     <button
                         onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
