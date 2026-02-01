@@ -222,7 +222,7 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
     const teacherId = (req as any).user?.id;
     try {
-        // Fetch batch with full student details including fees, marks, and installments
+        // Fetch batch with full student details
         const batch = await prisma.batch.findUnique({
             where: { id },
             include: {
@@ -244,64 +244,81 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
         const user = (req as any).user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
-        // Create PDF in LANDSCAPE mode for more columns
+        const installments = batch.feeInstallments || [];
+        const numInstallments = installments.length;
+
+        // Create PDF in LANDSCAPE mode
         const doc = new PDFDocument({
             size: 'A4',
-            layout: 'landscape',  // Landscape for wider columns
-            margin: 30
+            layout: 'landscape',
+            margin: 20
         });
 
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${batch.name}-students-detailed.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${batch.name}-fee-details.pdf"`);
         doc.pipe(res);
 
         // Header
-        doc.fontSize(18).font('Helvetica-Bold').text(`${batch.name} - Student Details`, { align: 'center' });
-        doc.fontSize(10).font('Helvetica').text(`Subject: ${batch.subject} | Generated: ${new Date().toLocaleDateString()}`, { align: 'center' });
-        doc.moveDown(1);
+        doc.fontSize(16).font('Helvetica-Bold').text(`${batch.name} - Fee Payment Details`, { align: 'center' });
+        doc.fontSize(9).font('Helvetica').text(`Subject: ${batch.subject} | Generated: ${new Date().toLocaleDateString()}`, { align: 'center' });
+        doc.moveDown(0.8);
 
-        // Table Headers (landscape A4 width ~842pt with 30pt margins = ~782pt usable)
-        const startX = 30;
+        // Dynamic column calculation (landscape A4: ~800pt usable width)
+        const startX = 20;
+        const nameWidth = 70;
+        const schoolWidth = 60;
+        const phoneWidth = 55;
+        const avgWidth = 30;
+        const feeDueWidth = 40;
+
+        // Remaining width for installments
+        const remainingWidth = 800 - nameWidth - schoolWidth - phoneWidth - avgWidth - feeDueWidth - 50;
+        const installmentWidth = Math.max(40, Math.floor(remainingWidth / Math.max(numInstallments, 1)));
+
+        // Helper function to draw headers
+        const drawHeaders = (y: number) => {
+            doc.font('Helvetica-Bold').fontSize(7);
+            let x = startX;
+
+            doc.text('Name', x, y, { width: nameWidth });
+            x += nameWidth + 5;
+            doc.text('School', x, y, { width: schoolWidth });
+            x += schoolWidth + 5;
+            doc.text('Phone', x, y, { width: phoneWidth });
+            x += phoneWidth + 5;
+            doc.text('Avg%', x, y, { width: avgWidth });
+            x += avgWidth + 5;
+
+            // Installment columns
+            installments.forEach((inst, idx) => {
+                const instName = inst.name.length > 8 ? inst.name.substring(0, 7) + '.' : inst.name;
+                doc.text(instName, x, y, { width: installmentWidth, align: 'center' });
+                x += installmentWidth + 2;
+            });
+
+            doc.text('Due', x, y, { width: feeDueWidth, align: 'center' });
+        };
+
+        // Draw initial headers
         let currentY = doc.y;
-
-        doc.font('Helvetica-Bold').fontSize(8);
-        doc.text('Name', startX, currentY, { width: 90 });
-        doc.text('School', startX + 95, currentY, { width: 90 });
-        doc.text('Phone', startX + 190, currentY, { width: 70 });
-        doc.text('Parent', startX + 265, currentY, { width: 80 });
-        doc.text('Email', startX + 350, currentY, { width: 110 });
-        doc.text('Avg %', startX + 465, currentY, { width: 40 });
-        doc.text('Fee Status', startX + 510, currentY, { width: 245 });
-
+        drawHeaders(currentY);
+        doc.moveDown(0.2);
+        doc.moveTo(startX, doc.y).lineTo(startX + 780, doc.y).stroke();
         doc.moveDown(0.3);
-        doc.moveTo(startX, doc.y).lineTo(startX + 752, doc.y).stroke();
-        doc.moveDown(0.5);
 
-        // Rows
-        doc.font('Helvetica').fontSize(7);
-
+        // Process each student
         batch.students.forEach((student: any) => {
             currentY = doc.y;
 
-            // Add new page if needed
-            if (currentY > 520) {
+            // Pagination
+            if (currentY > 510) {
                 doc.addPage({ layout: 'landscape' });
-                currentY = 50;
-
-                // Repeat headers on new page
-                doc.font('Helvetica-Bold').fontSize(8);
-                doc.text('Name', startX, currentY, { width: 90 });
-                doc.text('School', startX + 95, currentY, { width: 90 });
-                doc.text('Phone', startX + 190, currentY, { width: 70 });
-                doc.text('Parent', startX + 265, currentY, { width: 80 });
-                doc.text('Email', startX + 350, currentY, { width: 110 });
-                doc.text('Avg %', startX + 465, currentY, { width: 40 });
-                doc.text('Fee Status', startX + 510, currentY, { width: 245 });
+                currentY = 40;
+                drawHeaders(currentY);
+                doc.moveDown(0.2);
+                doc.moveTo(startX, doc.y).lineTo(startX + 780, doc.y).stroke();
                 doc.moveDown(0.3);
-                doc.moveTo(startX, doc.y).lineTo(startX + 752, doc.y).stroke();
-                doc.moveDown(0.5);
                 currentY = doc.y;
-                doc.font('Helvetica').fontSize(7);
             }
 
             // Calculate average marks
@@ -309,75 +326,104 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
                 ? Math.round(student.marks.reduce((sum: number, m: any) => sum + m.score, 0) / student.marks.length)
                 : 0;
 
-            // Calculate fee installment status
-            const installments = batch.feeInstallments || [];
-            let feeStatus = '';
-            let lastPaymentDateMs = 0; // Track as timestamp to avoid type issues
-
+            // Calculate total fee due
+            let totalDue = 0;
             if (installments.length > 0) {
-                // For each installment, check if paid
-                const installmentStatuses = installments.map(inst => {
-                    const paymentsForThis = student.feePayments.filter((p: any) => p.installmentId === inst.id);
-                    const totalPaid = paymentsForThis.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-                    const isPaid = totalPaid >= inst.amount - 0.01;
-
-                    // Track last payment date
-                    paymentsForThis.forEach((p: any) => {
-                        const paymentTime = new Date(p.date).getTime();
-                        if (paymentTime > lastPaymentDateMs) {
-                            lastPaymentDateMs = paymentTime;
-                        }
-                    });
-
-                    return isPaid ? '✓' : '✗';
-                });
-
-                feeStatus = installmentStatuses.join(' ');
-                if (lastPaymentDateMs > 0) {
-                    const lastDate = new Date(lastPaymentDateMs);
-                    const month = (lastDate.getMonth() + 1).toString().padStart(2, '0');
-                    const day = lastDate.getDate().toString().padStart(2, '0');
-                    feeStatus += ` (Last: ${day}/${month})`;
-                }
+                const totalExpected = installments.reduce((sum, inst) => sum + inst.amount, 0);
+                const totalPaidFromPayments = student.feePayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
+                const totalPaidFromFees = student.fees
+                    .filter((f: any) => f.status === 'PAID')
+                    .reduce((sum: number, f: any) => sum + f.amount, 0);
+                totalDue = Math.max(0, totalExpected - totalPaidFromPayments - totalPaidFromFees);
             } else {
-                // Flat fee
-                const totalPaid =
-                    student.fees.filter((f: any) => f.status === 'PAID').reduce((sum: number, f: any) => sum + f.amount, 0) +
-                    student.feePayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
                 const totalExpected = batch.feeAmount || 0;
-                feeStatus = totalPaid >= totalExpected - 0.01 ? 'Paid ✓' : `₹${totalExpected - totalPaid} due`;
-
-                // Get last payment date
-                const allDates = [
-                    ...student.fees.map((f: any) => f.date),
-                    ...student.feePayments.map((p: any) => p.date)
-                ];
-                if (allDates.length > 0) {
-                    const maxTimestamp = Math.max(...allDates.map((d: any) => new Date(d).getTime()));
-                    lastPaymentDateMs = maxTimestamp;
-                    const maxDate = new Date(maxTimestamp);
-                    const month = (maxDate.getMonth() + 1).toString().padStart(2, '0');
-                    const day = maxDate.getDate().toString().padStart(2, '0');
-                    feeStatus += ` (${day}/${month})`;
-                }
+                const totalPaid = student.fees
+                    .filter((f: any) => f.status === 'PAID')
+                    .reduce((sum: number, f: any) => sum + f.amount, 0) +
+                    student.feePayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
+                totalDue = Math.max(0, totalExpected - totalPaid);
             }
 
-            // Print row
-            doc.text(student.name || '-', startX, currentY, { width: 90, ellipsis: true });
-            doc.text(student.schoolName || 'N/A', startX + 95, currentY, { width: 90, ellipsis: true });
-            doc.text(student.parentWhatsapp || '-', startX + 190, currentY, { width: 70 });
-            doc.text(student.parentName || '-', startX + 265, currentY, { width: 80, ellipsis: true });
-            doc.text(student.parentEmail || 'N/A', startX + 350, currentY, { width: 110, ellipsis: true });
-            doc.text(avgMarks > 0 ? `${avgMarks}%` : 'N/A', startX + 465, currentY, { width: 40, align: 'center' });
-            doc.text(feeStatus || 'N/A', startX + 510, currentY, { width: 245 });
+            // Print basic info
+            doc.font('Helvetica').fontSize(6.5).fillColor('black');
+            let x = startX;
 
-            doc.moveDown(0.8);
+            doc.text(student.name || '-', x, currentY, { width: nameWidth, ellipsis: true });
+            x += nameWidth + 5;
+            doc.text(student.schoolName || 'N/A', x, currentY, { width: schoolWidth, ellipsis: true });
+            x += schoolWidth + 5;
+            doc.text(student.parentWhatsapp || '-', x, currentY, { width: phoneWidth });
+            x += phoneWidth + 5;
+            doc.text(avgMarks > 0 ? `${avgMarks}%` : '-', x, currentY, { width: avgWidth, align: 'center' });
+            x += avgWidth + 5;
+
+            // Installment columns
+            if (installments.length > 0) {
+                installments.forEach((inst) => {
+                    const paymentsForThis = student.feePayments.filter((p: any) => p.installmentId === inst.id);
+                    const totalPaid = paymentsForThis.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
+                    const due = inst.amount - totalPaid;
+
+                    if (totalPaid >= inst.amount - 0.01) {
+                        // Fully paid - show last payment date
+                        const latestPayment = paymentsForThis.sort((a: any, b: any) =>
+                            new Date(b.date).getTime() - new Date(a.date).getTime()
+                        )[0];
+                        const payDate = new Date(latestPayment.date);
+                        const month = (payDate.getMonth() + 1).toString().padStart(2, '0');
+                        const day = payDate.getDate().toString().padStart(2, '0');
+
+                        doc.fillColor('green').text(`${day}/${month}`, x, currentY, {
+                            width: installmentWidth,
+                            align: 'center'
+                        });
+                    } else if (totalPaid > 0) {
+                        // Partial payment - show due amount in yellow/orange
+                        const latestPayment = paymentsForThis.sort((a: any, b: any) =>
+                            new Date(b.date).getTime() - new Date(a.date).getTime()
+                        )[0];
+                        const payDate = new Date(latestPayment.date);
+                        const month = (payDate.getMonth() + 1).toString().padStart(2, '0');
+                        const day = payDate.getDate().toString().padStart(2, '0');
+
+                        doc.fillColor('orange').fontSize(5.5).text(
+                            `₹${Math.round(due)}`,
+                            x,
+                            currentY,
+                            { width: installmentWidth, align: 'center' }
+                        );
+                        doc.fontSize(6.5).text(
+                            `${day}/${month}`,
+                            x,
+                            currentY + 6,
+                            { width: installmentWidth, align: 'center' }
+                        );
+                    } else {
+                        // Not paid - show checkbox
+                        doc.fillColor('black').text('☐', x, currentY, {
+                            width: installmentWidth,
+                            align: 'center'
+                        });
+                    }
+
+                    x += installmentWidth + 2;
+                });
+            }
+
+            // Total Due column
+            doc.fillColor(totalDue > 0 ? 'red' : 'green').fontSize(6.5);
+            doc.text(totalDue > 0 ? `₹${Math.round(totalDue)}` : '₹0', x, currentY, {
+                width: feeDueWidth,
+                align: 'center'
+            });
+
+            doc.moveDown(0.6);
         });
 
         // Footer
-        doc.moveDown(1);
-        doc.fontSize(8).fillColor('gray').text(
-            `Total Students: ${batch.students.length} | Generated by MathLogs`,
+        doc.moveDown(0.5);
+        doc.fontSize(7).fillColor('gray').text(
+            `Total Students: ${batch.students.length} | Legend: ☐=Unpaid, Date=Paid, Orange=Partial | Generated by MathLogs`,
             { align: 'center' }
         );
 
