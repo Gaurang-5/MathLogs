@@ -177,6 +177,7 @@ export default function TestList() {
                                     <label className="block text-xs font-semibold text-app-text-secondary uppercase tracking-wider mb-2">Max Marks</label>
                                     <input
                                         type="number"
+                                    inputMode="numeric"
                                         className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all"
                                         placeholder="e.g. 50"
                                         value={maxMarks}

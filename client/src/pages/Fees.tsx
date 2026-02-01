@@ -500,6 +500,7 @@ const Fees: React.FC = () => {
                                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Payment Amount (₹)</label>
                                     <input
                                         type="number"
+                                    inputMode="numeric"
                                         required
                                         min="1"
                                         className="w-full bg-transparent text-5xl font-black text-gray-900 placeholder-gray-200 border-none outline-none py-2 transition-colors p-0"

@@ -472,6 +472,7 @@ export default function SuperAdminDashboard() {
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Config Limits</label>
                                     <input
                                         type="number"
+                                    inputMode="numeric"
                                         value={totalClasses}
                                         onChange={(e) => setTotalClasses(e.target.value)}
                                         placeholder="Max Classes"
@@ -483,6 +484,7 @@ export default function SuperAdminDashboard() {
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Batches</label>
                                     <input
                                         type="number"
+                                    inputMode="numeric"
                                         value={batchesPerClass}
                                         onChange={(e) => setBatchesPerClass(e.target.value)}
                                         placeholder="Batches/Class"

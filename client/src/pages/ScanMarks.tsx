@@ -284,6 +284,7 @@ export default function ScanMarks() {
                                 <label className="block text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Obtained Marks</label>
                                 <input
                                     type="number"
+                                    inputMode="numeric"
                                     className="w-full text-center text-5xl font-black text-slate-800 bg-transparent border-none focus:ring-0 placeholder-slate-200 outline-none"
                                     placeholder="00"
                                     autoFocus

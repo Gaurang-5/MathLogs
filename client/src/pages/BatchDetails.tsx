@@ -1665,6 +1665,7 @@ export default function BatchDetails() {
                                         <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Amount (₹)</label>
                                         <input
                                             type="number"
+                                    inputMode="numeric"
                                             value={newInstallment.amount}
                                             onChange={(e) => setNewInstallment({ ...newInstallment, amount: e.target.value })}
                                             className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"

@@ -10,5 +10,8 @@
     },
     "engines": {
         "node": "20.x"
+    },
+    "dependencies": {
+        "@sentry/node": "^10.38.0"
     }
 }

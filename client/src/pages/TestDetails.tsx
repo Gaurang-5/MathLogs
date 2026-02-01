@@ -271,6 +271,7 @@ export default function TestDetails() {
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Max Marks</label>
                                         <input
                                             type="number"
+                                    inputMode="numeric"
                                             value={editMaxMarks}
                                             onChange={(e) => setEditMaxMarks(e.target.value)}
                                             className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"

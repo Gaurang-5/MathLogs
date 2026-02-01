@@ -187,6 +187,7 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
                                         <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                         <input
                                             type="number"
+                                            inputMode="numeric"
                                             placeholder="0.00"
                                             className="w-full bg-gray-50 border border-gray-200 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 rounded-xl pl-12 pr-4 py-3.5 outline-none transition-all font-bold text-lg text-gray-900 placeholder:font-normal"
                                             value={amount}
