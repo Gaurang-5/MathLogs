@@ -142,8 +142,11 @@ export default function Layout({ children, title }: LayoutProps) {
                 </div>
             </aside>
 
-            {/* Mobile Header - Glassy */}
-            <header className="fixed top-0 left-0 right-0 h-16 glass border-b-0 flex items-center justify-between px-6 xl:hidden z-50 transition-colors">
+            {/* Mobile Header - Glassy with Safe Area */}
+            <header className="fixed top-0 left-0 right-0 glass border-b-0 flex items-center justify-between px-6 xl:hidden z-50 transition-colors" style={{
+                height: 'calc(4rem + env(safe-area-inset-top))',
+                paddingTop: 'max(0.5rem, env(safe-area-inset-top))'
+            }}>
                 <Link to="/dashboard" className="font-semibold text-xl text-app-text tracking-tight">ML</Link>
                 <div className="flex items-center gap-3">
                     <Link
@@ -199,7 +202,8 @@ export default function Layout({ children, title }: LayoutProps) {
                     isSidebarCollapsed ? "xl:pl-[8rem]" : "xl:pl-[20rem]"
                 )}
             >
-                <div className="h-16 xl:hidden"></div> {/* Spacer for mobile header */}
+                <div className="xl:hidden" style={{ height: 'calc(4rem + env(safe-area-inset-top))' }}></div> {/* Spacer for mobile header with safe area */}
+
 
                 <div className="flex-1 p-4 lg:p-8 w-full max-w-full mx-auto animate-fadeIn relative z-0 overflow-x-hidden">
                     {title && (

@@ -195,29 +195,47 @@ export default function ScanMarks() {
                 </div>
             )}
 
-            {/* Camera Viewport */}
-            <div className={`max-w-lg mx-auto ${!scanning ? 'hidden' : 'block'}`}>
-                <div className="!bg-white p-4 rounded-3xl shadow-lg border border-slate-100">
-                    <div className="relative w-full rounded-2xl overflow-hidden shadow-inner h-64 md:h-96 bg-black">
+            {/* Scanner Active */}
+            <div className="w-full max-w-md mx-auto px-4 pt-safe" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+                <div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100">
+                    {/* Scanner Preview */}
+                    <div className="relative w-full rounded-2xl overflow-hidden shadow-inner bg-black" style={{ aspectRatio: '4/3' }}>
                         <div id="reader" className="w-full h-full"></div>
+
                         {/* Scanner Overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                            {/* Darken background outside the scan area */}
-                            <div className="absolute inset-0 shadow-[0_0_0_100vmax_rgba(0,0,0,0.5)]"></div>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            {/* Scan Frame */}
+                            <div className="relative w-full max-w-xs">
+                                {/* Corners */}
+                                <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-white rounded-tl-2xl"></div>
+                                <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-white rounded-tr-2xl"></div>
+                                <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-white rounded-bl-2xl"></div>
+                                <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-white rounded-br-2xl"></div>
 
-                            {/* Scanning Box */}
+                                {/* Center indicator */}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="h-1 w-3/4 bg-green-400 shadow-lg shadow-green-400/50 rounded-full animate-pulse"></div>
+                                </div>
+                            </div>
 
-
-                            <div className="absolute mt-32 text-white/90 text-xs font-bold bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-sm border border-white/10">
-                                Align barcode within box
+                            {/* Instruction Text */}
+                            <div className="absolute bottom-8 left-0 right-0 flex justify-center">
+                                <div className="text-white text-sm font-medium bg-black/70 px-6 py-2.5 rounded-full backdrop-blur-md border border-white/20 shadow-lg">
+                                    Align barcode within box
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div className="mt-4 text-center">
-                        <p className="text-slate-500 text-sm font-medium animate-pulse">Scanning for barcodes...</p>
+
+                    {/* Status and Stop Button */}
+                    <div className="mt-6 text-center space-y-4">
+                        <p className="text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                            Scanning for barcodes...
+                        </p>
                         <button
                             onClick={() => window.location.reload()}
-                            className="mt-4 text-xs font-bold text-red-500 hover:text-red-700 underline"
+                            className="text-sm font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-4 py-2 rounded-lg transition-all active:scale-95"
                         >
                             Stop Scanner
                         </button>
