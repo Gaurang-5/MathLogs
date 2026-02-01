@@ -143,7 +143,7 @@ export default function Layout({ children, title }: LayoutProps) {
 
             {/* Mobile Header - Glassy */}
             <header className="fixed top-0 left-0 right-0 h-16 glass border-b-0 flex items-center justify-between px-6 xl:hidden z-50 transition-colors">
-                <div className="font-semibold text-xl text-app-text tracking-tight">ML</div>
+                <Link to="/dashboard" className="font-semibold text-xl text-app-text tracking-tight">ML</Link>
                 <div className="flex items-center gap-3">
                     <Link
                         to="/scan"
