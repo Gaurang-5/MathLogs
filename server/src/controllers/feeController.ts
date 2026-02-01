@@ -1,36 +1,10 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import PDFDocument from 'pdfkit';
-import nodemailer from 'nodemailer';
 import { secureLogger } from '../utils/secureLogger';
+import { sendEmail } from '../utils/email';
 
-// Email Transporter (Reused logic)
-const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
-const sendEmail = async (to: string, subject: string, text: string) => {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.warn("Email credentials missing");
-        return false;
-    }
-    try {
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER, // "Coaching Name <email>" ideally
-            to,
-            subject,
-            text
-        });
-        return true;
-    } catch (error) {
-        console.error('Email error:', error);
-        return false;
-    }
-};
+// Email handling moved to utils/email.ts
 
 export const downloadPendingFeesReport = async (req: Request, res: Response) => {
     try {
@@ -544,7 +518,7 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
         const student = await prisma.student.findUnique({
             where: { id: studentId },
             include: {
-                batch: { include: { feeInstallments: true } },
+                batch: { include: { feeInstallments: true, institute: true } },
                 feePayments: true
             }
         });
@@ -579,6 +553,9 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
         }
 
         const subject = `Fee Payment Reminder for ${student.name}`;
+        const senderName = student.batch?.institute?.name || 'Coaching Administration';
+        const replyTo = student.batch?.institute?.email || undefined;
+
         const body = `Dear ${student.parentName},
 
 We hope you are doing well.
@@ -595,9 +572,9 @@ Total Pending Amount: Rs. ${totalPendingCalc.toLocaleString()}
 Please create the payment at your earliest convenience.
 
 Regards,
-Coaching Administration`;
+${senderName}`;
 
-        const sent = await sendEmail(student.parentEmail, subject, body);
+        const sent = await sendEmail(student.parentEmail, subject, body, { senderName, replyTo });
         if (sent) {
             res.json({ success: true, message: 'Reminder sent' });
         } else {

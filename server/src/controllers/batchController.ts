@@ -4,8 +4,8 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 import bwipjs from 'bwip-js';
-import nodemailer from 'nodemailer';
 import { secureLogger } from '../utils/secureLogger';
+import { sendEmail } from '../utils/email';
 
 export const createBatch = async (req: Request, res: Response) => {
     const { timeSlot, feeAmount, className, batchNumber, subject } = req.body;
@@ -435,35 +435,7 @@ export const deleteBatch = async (req: Request, res: Response) => {
 
 // Real Email Service with Nodemailer
 
-const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail', // Default to Gmail
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
-const sendEmail = async (to: string, subject: string, body: string) => {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.warn('[EMAIL WARNING] No email credentials configured. Falling back to mock.');
-        secureLogger.debug('Email mock mode', { to, subject });
-        return true;
-    }
-
-    try {
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to,
-            subject,
-            text: body
-        });
-        secureLogger.info('Email sent successfully', { to });
-        return true;
-    } catch (error) {
-        console.error(`[EMAIL ERROR] Failed to send to ${to}:`, error);
-        return false;
-    }
-};
+// Email handling moved to utils/email.ts
 
 export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
     const { id } = req.params;
@@ -472,7 +444,10 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
         const teacherId = (req as any).user?.id;
         const batch = await prisma.batch.findUnique({
             where: { id: String(id) },
-            include: { students: { where: { status: 'APPROVED' } } }
+            include: {
+                students: { where: { status: 'APPROVED' } },
+                institute: true
+            }
         });
 
         const user = (req as any).user;
@@ -494,6 +469,9 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
         // But for UI feedback "Invites sent to 58 students", we need to wait or return a "Processing" status.
         // The prompt says "UI feedback after sending: 'Invites sent to 58 students'". So we should await it.
 
+        const senderName = batch.institute?.name || 'Coaching Centre';
+        const replyTo = batch.institute?.email || undefined;
+
         // Process in parallel to reduce latency
         const emailPromises = batch.students.map(async (student) => {
             const email = student.parentEmail;
@@ -513,9 +491,9 @@ Join the official WhatsApp group for announcements and updates:
 
 Please join the group to stay informed.
 
-– Coaching Centre`;
+– ${senderName}`;
 
-            const success = await sendEmail(email, `Welcome to ${batch.name} – ${batch.subject}`, body);
+            const success = await sendEmail(email, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo });
             return success ? 1 : 0;
         });
 
@@ -542,7 +520,12 @@ export const sendStudentWhatsappInvite = async (req: Request, res: Response) => 
         const teacherId = (req as any).user?.id;
         const student = await prisma.student.findUnique({
             where: { id: String(id) },
-            include: { batch: true }
+
+            include: {
+                batch: {
+                    include: { institute: true }
+                }
+            }
         });
 
         const user = (req as any).user;
@@ -555,6 +538,9 @@ export const sendStudentWhatsappInvite = async (req: Request, res: Response) => 
 
         const batch = student.batch;
         const link = batch.whatsappGroupLink;
+
+        const senderName = batch.institute?.name || 'Coaching Centre';
+        const replyTo = batch.institute?.email || undefined;
 
         const body = `Hello ${student.name},
 
@@ -570,9 +556,9 @@ Join the official WhatsApp group for announcements and updates:
 
 Please join the group to stay informed.
 
-– Coaching Centre`;
+– ${senderName}`;
 
-        const success = await sendEmail(student.parentEmail, `Welcome to ${batch.name} – ${batch.subject}`, body);
+        const success = await sendEmail(student.parentEmail, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo });
 
         if (success) {
             res.json({ success: true });
