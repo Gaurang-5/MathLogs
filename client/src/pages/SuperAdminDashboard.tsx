@@ -311,7 +311,10 @@ export default function SuperAdminDashboard() {
                             >
                                 Edit Config
                             </button>
-                            <button className="px-4 py-2 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors">
+                            <button
+                                onClick={() => alert('Full report feature coming soon!')}
+                                className="px-4 py-2 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                            >
                                 View Full Report
                             </button>
                         </div>
@@ -592,7 +595,7 @@ export default function SuperAdminDashboard() {
                                             </button>
                                             {inst.status === 'SUSPENDED' ? (
                                                 <button
-                                                    onClick={() => handleSuspendInstitute('ACTIVATE')}
+                                                    onClick={() => handleSuspendInstitute('ACTIVATE', inst.id)}
                                                     className="p-3 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl transition-all border border-green-200 font-medium text-sm"
                                                     title="Reactivate Institute"
                                                 >
