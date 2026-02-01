@@ -346,7 +346,6 @@ export const rejectStudent = async (req: Request, res: Response) => {
 };
 
 export const getStudentGrowthStats = async (req: Request, res: Response) => {
-    const teacherId = (req as any).user?.id;
     try {
         const academicYearId = (req as any).user?.currentAcademicYearId;
 
@@ -354,7 +353,6 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
         const academicYear = await prisma.academicYear.findUnique({
             where: { id: academicYearId }
         });
-
 
         const students = await prisma.student.findMany({
             where: {
@@ -370,17 +368,27 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
         }
 
         // Get the start date - use academic year start or default to start of current year
-        const currentYear = new Date().getFullYear();
-        const startDate = (academicYear?.startDate)
+        const currentSysDate = new Date();
+        const startRawDate = (academicYear?.startDate)
             ? new Date(academicYear.startDate)
-            : new Date(currentYear, 0, 1); // January 1 of current year
-        const currentDate = new Date();
+            : new Date(currentSysDate.getFullYear(), 0, 1);
 
-        // Build list of months from academic year start to current month
+        // Normalize execution to IST (GMT+5:30)
+        // We add offset to UTC timestamps so that getMonth() (which is UTC on server) reflects IST date
+        const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+
+        // Iterate months safely by setting date to 1st
         const months: { name: string; year: number; monthIndex: number }[] = [];
-        const tempDate = new Date(startDate);
+        const tempDate = new Date(startRawDate);
+        tempDate.setDate(1); // Force to 1st to avoid Jan 31 -> Mar 3 skip issue
 
-        while (tempDate <= currentDate) {
+        // Calculate end date (Today + IST Buffer)
+        const endDate = new Date(Date.now() + IST_OFFSET);
+
+        // Standardize loop comparison using YYYYMM
+        const getMonthKey = (d: Date) => d.getFullYear() * 100 + d.getMonth();
+
+        while (getMonthKey(tempDate) <= getMonthKey(endDate)) {
             months.push({
                 name: tempDate.toLocaleString('default', { month: 'short' }),
                 year: tempDate.getFullYear(),
@@ -389,12 +397,13 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
             tempDate.setMonth(tempDate.getMonth() + 1);
         }
 
-        // Count students for each month
+        // Count students for each month (shifted to IST)
         const monthlyData: Record<string, number> = {};
         students.forEach(s => {
-            const date = new Date(s.createdAt);
-            const year = date.getFullYear();
-            const monthIndex = date.getMonth();
+            // Shift UTC createdAt to IST
+            const istDate = new Date(new Date(s.createdAt).getTime() + IST_OFFSET);
+            const year = istDate.getFullYear();
+            const monthIndex = istDate.getMonth();
             const key = `${year}-${monthIndex}`;
             monthlyData[key] = (monthlyData[key] || 0) + 1;
         });
