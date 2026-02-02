@@ -13,11 +13,11 @@ interface EmailConfig {
 }
 
 const getEmailConfig = (type: SenderType): EmailConfig | null => {
-    // Zoho SMTP configuration for custom domain emails
+    // Zoho SMTP configuration - trying TLS on port 587
     const commonConfig = {
-        host: 'smtp.zoho.com', // Standard Zoho SMTP for custom domains
-        port: 465,
-        secure: true
+        host: 'smtp.zoho.in',
+        port: 587, // Using STARTTLS instead of SSL
+        secure: false // false for port 587, true for 465
     };
 
     switch (type) {
@@ -88,7 +88,9 @@ const getTransporter = (config: EmailConfig) => {
             auth: {
                 user: config.user,
                 pass: config.pass
-            }
+            },
+            debug: process.env.NODE_ENV === 'development',
+            logger: process.env.NODE_ENV === 'development'
         });
     }
     return transporters[config.user];
