@@ -63,7 +63,7 @@ export default function ScanMarks() {
 
                     // Lookup Student
                     try {
-                        const studentData = await apiRequest('/students/lookup/' + decodedText);
+                        const studentData = await apiRequest('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
 
                         const existing = studentData.marks?.find((m: any) => m.testId === selectedTestId);
 

@@ -101,6 +101,7 @@ export const submitMark = async (req: Request, res: Response) => {
 
 export const getStudentByHumanId = async (req: Request, res: Response) => {
     const { humanId } = req.params;
+    const { testId } = req.query;
     const teacherId = (req as any).user?.id;
     const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
@@ -112,7 +113,10 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
                 humanId: String(humanId),
                 academicYearId: currentAcademicYearId
             },
-            include: { batch: true, marks: true }
+            include: {
+                batch: true,
+                marks: testId ? { where: { testId: String(testId) } } : true
+            }
         });
 
         if (!student) {
