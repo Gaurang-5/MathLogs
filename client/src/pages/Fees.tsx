@@ -40,6 +40,13 @@ const Fees: React.FC = () => {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+        return () => clearTimeout(t);
+    }, [searchTerm]);
+
     const [selectedBatch, setSelectedBatch] = useState('All');
     const [viewMode, setViewMode] = useState<'all' | 'defaulters'>('defaulters'); // Default to defaulters usually more useful
 
@@ -128,8 +135,8 @@ const Fees: React.FC = () => {
     // PERF: Memoize filtering to prevent lag when typing in search
     const filteredStudents = React.useMemo(() => {
         return students.filter(s => {
-            const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (s.humanId && s.humanId.toLowerCase().includes(searchTerm.toLowerCase()));
+            const matchesSearch = s.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                (s.humanId && s.humanId.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
             const matchesBatch = selectedBatch === 'All' || s.batchName === selectedBatch;
             const matchesView = viewMode === 'all' || (viewMode === 'defaulters' && s.balance > 0);
             return matchesSearch && matchesBatch && matchesView;
@@ -141,7 +148,7 @@ const Fees: React.FC = () => {
             }
             return b.balance - a.balance; // Descending Amount
         });
-    }, [students, searchTerm, selectedBatch, viewMode, listSort]);
+    }, [students, debouncedSearchTerm, selectedBatch, viewMode, listSort]);
 
     // Corrected Logic: Only count positive balances as "Due".
     // "Balance" = Total Fee - Total Paid. If negative, it means surplus. We shouldn't subtract surplus from total pending dues of others.
@@ -500,7 +507,7 @@ const Fees: React.FC = () => {
                                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Payment Amount (₹)</label>
                                     <input
                                         type="number"
-                                    inputMode="numeric"
+                                        inputMode="numeric"
                                         required
                                         min="1"
                                         className="w-full bg-transparent text-5xl font-black text-gray-900 placeholder-gray-200 border-none outline-none py-2 transition-colors p-0"

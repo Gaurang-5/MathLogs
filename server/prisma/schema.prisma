@@ -231,6 +231,7 @@ model FeePayment {
   @@index([studentId])
   @@index([installmentId])
   @@index([studentId, installmentId]) // Added for query performance
+  @@index([date]) // PERF: For dashboard monthly collection queries
 }
 
 // PERF: Materialized view for student balances

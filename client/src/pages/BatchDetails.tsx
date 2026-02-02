@@ -110,6 +110,13 @@ export default function BatchDetails() {
 
     // Search State
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
     const [tableFontSize, setTableFontSize] = useState(1); // 0: Small, 1: Medium, 2: Large
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
@@ -119,11 +126,11 @@ export default function BatchDetails() {
     // ... existing search logic ...
     const filteredStudents = useMemo(() => {
         let students = (batch?.students || []).filter(student =>
-            student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            student.schoolName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            student.humanId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            student.parentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            student.parentWhatsapp.includes(searchQuery)
+            student.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+            student.schoolName?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+            student.humanId?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+            student.parentName.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+            student.parentWhatsapp.includes(debouncedSearchQuery)
         ) || [];
 
         if (sortConfig !== null) {
@@ -144,7 +151,7 @@ export default function BatchDetails() {
             });
         }
         return students;
-    }, [batch, searchQuery, sortConfig]);
+    }, [batch, debouncedSearchQuery, sortConfig]);
 
     // Helper for dynamic classes
     const getTextSizeClass = (type: 'body' | 'header' | 'sub') => {
