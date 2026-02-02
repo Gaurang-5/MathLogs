@@ -6,12 +6,19 @@ export type SenderType = 'NOREPLY' | 'WELCOME' | 'SUPPORT' | 'ADMIN' | 'DEFAULT'
 interface EmailConfig {
     user: string;
     pass: string;
-    service: string;
+    host: string;
+    port: number;
+    secure: boolean;
     name: string;
 }
 
 const getEmailConfig = (type: SenderType): EmailConfig | null => {
-    const service = process.env.EMAIL_SERVICE || 'zoho'; // Default to zoho as per user request
+    // FORCE Indian Data Center for Zoho
+    const commonConfig = {
+        host: 'smtp.zoho.in', // CRITICAL FIX for India users
+        port: 465,
+        secure: true
+    };
 
     switch (type) {
         case 'NOREPLY':
@@ -19,7 +26,7 @@ const getEmailConfig = (type: SenderType): EmailConfig | null => {
                 return {
                     user: process.env.EMAIL_USER_NOREPLY,
                     pass: process.env.EMAIL_PASS_NOREPLY,
-                    service,
+                    ...commonConfig,
                     name: 'MathLogs Notification'
                 };
             }
@@ -29,7 +36,7 @@ const getEmailConfig = (type: SenderType): EmailConfig | null => {
                 return {
                     user: process.env.EMAIL_USER_WELCOME,
                     pass: process.env.EMAIL_PASS_WELCOME,
-                    service,
+                    ...commonConfig,
                     name: 'Team MathLogs'
                 };
             }
@@ -39,7 +46,7 @@ const getEmailConfig = (type: SenderType): EmailConfig | null => {
                 return {
                     user: process.env.EMAIL_USER_SUPPORT,
                     pass: process.env.EMAIL_PASS_SUPPORT,
-                    service,
+                    ...commonConfig,
                     name: 'MathLogs Support'
                 };
             }
@@ -49,7 +56,7 @@ const getEmailConfig = (type: SenderType): EmailConfig | null => {
                 return {
                     user: process.env.EMAIL_USER_ADMIN,
                     pass: process.env.EMAIL_PASS_ADMIN,
-                    service,
+                    ...commonConfig,
                     name: 'Gaurang from MathLogs'
                 };
             }
@@ -61,7 +68,7 @@ const getEmailConfig = (type: SenderType): EmailConfig | null => {
         return {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,
-            service,
+            ...commonConfig,
             name: 'MathLogs'
         };
     }
@@ -75,7 +82,9 @@ const transporters: Record<string, nodemailer.Transporter> = {};
 const getTransporter = (config: EmailConfig) => {
     if (!transporters[config.user]) {
         transporters[config.user] = nodemailer.createTransport({
-            service: config.service,
+            host: config.host,
+            port: config.port,
+            secure: config.secure,
             auth: {
                 user: config.user,
                 pass: config.pass
