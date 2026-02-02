@@ -260,3 +260,30 @@ enum Tier {
   PRO
   ENTERPRISE
 }
+
+model EmailJob {
+  id          String    @id @default(uuid())
+  recipient   String
+  subject     String
+  body        String
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  error       String?
+  options     Json?     // Stores { senderName, replyTo, senderType }
+  
+  instituteId String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt]) // FIFO processing
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}

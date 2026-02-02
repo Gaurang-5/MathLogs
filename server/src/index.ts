@@ -11,6 +11,7 @@ import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } 
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+import { emailWorker } from './utils/emailWorker';
 
 // ✅ MONITORING: Initialize Sentry FIRST (before all other middleware)
 initializeSentry(app);
@@ -163,6 +164,9 @@ app.get(/.*/, (req, res) => {
 });
 
 app.listen(PORT, () => {
+    // Initialize background workers
+    emailWorker.start();
+
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Health check: http://localhost:${PORT}/health`);

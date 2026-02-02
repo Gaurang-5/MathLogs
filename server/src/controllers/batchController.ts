@@ -634,35 +634,27 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
         const senderName = batch.institute?.name || 'Coaching Centre';
         const replyTo = batch.institute?.email || undefined;
 
-        // Process in parallel to reduce latency
-        const emailPromises = batch.students.map(async (student) => {
-            const email = student.parentEmail;
-            if (!email) return 0;
+        // Queue emails asynchronously
+        const jobs = batch.students
+            .filter(student => student.parentEmail)
+            .map(student => {
+                const body = `Hello ${student.name},\n\nWelcome to ${batch.name} (${batch.subject || 'Course'}).\n\nBatch Details:\n• Class: ${batch.className || 'N/A'}\n• Time: ${batch.timeSlot || 'N/A'}\n• Student ID: ${student.humanId || 'N/A'}\n\nJoin the official WhatsApp group for announcements and updates:\n👉 ${link}\n\nPlease join the group to stay informed.\n\n– ${senderName}`;
 
-            const body = `Hello ${student.name},
+                return {
+                    recipient: student.parentEmail!,
+                    subject: `Welcome to ${batch.name} – ${batch.subject}`,
+                    body,
+                    status: 'PENDING',
+                    options: { senderName, replyTo, senderType: 'WELCOME' },
+                    instituteId: batch.instituteId
+                };
+            });
 
-Welcome to ${batch.name} (${batch.subject || 'Course'}).
+        if (jobs.length > 0) {
+            await prisma.emailJob.createMany({ data: jobs as any });
+        }
 
-Batch Details:
-• Class: ${batch.className || 'N/A'}
-• Time: ${batch.timeSlot || 'N/A'}
-• Student ID: ${student.humanId || 'N/A'}
-
-Join the official WhatsApp group for announcements and updates:
-👉 ${link}
-
-Please join the group to stay informed.
-
-– ${senderName}`;
-
-            const result = await sendEmail(email, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo, senderType: 'WELCOME' });
-            return result.success ? 1 : 0;
-        });
-
-        const results = await Promise.all(emailPromises);
-        sentCount = results.reduce((acc: number, curr) => acc + curr, 0);
-
-        res.json({ success: true, count: sentCount, message: `Invites sent to ${sentCount} students` });
+        res.json({ success: true, count: jobs.length, message: `Invites queued for ${jobs.length} students` });
 
     } catch (e) {
         console.error('Error sending invites:', e);
@@ -720,13 +712,18 @@ Please join the group to stay informed.
 
 – ${senderName}`;
 
-        const result = await sendEmail(student.parentEmail, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo, senderType: 'WELCOME' });
+        await prisma.emailJob.create({
+            data: {
+                recipient: student.parentEmail,
+                subject: `Welcome to ${batch.name} – ${batch.subject}`,
+                body,
+                status: 'PENDING',
+                options: { senderName, replyTo, senderType: 'WELCOME' },
+                instituteId: student.batch.instituteId
+            } as any
+        });
 
-        if (result.success) {
-            res.json({ success: true });
-        } else {
-            res.status(500).json({ error: 'Failed to send email: ' + result.error });
-        }
+        res.json({ success: true, message: 'Invite queued successfully' });
 
     } catch (e) {
         console.error('Error sending invite:', e);

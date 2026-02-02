@@ -589,12 +589,17 @@ Please create the payment at your earliest convenience.
 Regards,
 ${senderName}`;
 
-        const result = await sendEmail(student.parentEmail, subject, body, { senderName, replyTo, senderType: 'NOREPLY' });
-        if (result.success) {
-            res.json({ success: true, message: 'Reminder sent' });
-        } else {
-            res.status(500).json({ error: 'Failed to send email: ' + result.error });
-        }
+        await prisma.emailJob.create({
+            data: {
+                recipient: student.parentEmail,
+                subject,
+                body,
+                status: 'PENDING',
+                options: { senderName, replyTo, senderType: 'NOREPLY' },
+                instituteId: student.batch?.instituteId
+            } as any
+        });
+        res.json({ success: true, message: 'Reminder queued successfully' });
 
     } catch (e) {
         console.error(e);
