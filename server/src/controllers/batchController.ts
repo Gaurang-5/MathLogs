@@ -655,8 +655,8 @@ Please join the group to stay informed.
 
 – ${senderName}`;
 
-            const success = await sendEmail(email, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo, senderType: 'WELCOME' });
-            return success ? 1 : 0;
+            const result = await sendEmail(email, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo, senderType: 'WELCOME' });
+            return result.success ? 1 : 0;
         });
 
         const results = await Promise.all(emailPromises);
@@ -720,12 +720,12 @@ Please join the group to stay informed.
 
 – ${senderName}`;
 
-        const success = await sendEmail(student.parentEmail, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo, senderType: 'WELCOME' });
+        const result = await sendEmail(student.parentEmail, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo, senderType: 'WELCOME' });
 
-        if (success) {
+        if (result.success) {
             res.json({ success: true });
         } else {
-            res.status(500).json({ error: 'Failed to send email' });
+            res.status(500).json({ error: 'Failed to send email: ' + result.error });
         }
 
     } catch (e) {

@@ -100,14 +100,14 @@ interface EmailOptions {
     senderType?: SenderType;
 }
 
-export const sendEmail = async (to: string, subject: string, body: string, options: EmailOptions = {}) => {
+export const sendEmail = async (to: string, subject: string, body: string, options: EmailOptions = {}): Promise<{ success: boolean; error?: string }> => {
     const senderType = options.senderType || 'DEFAULT';
     const config = getEmailConfig(senderType);
 
     if (!config) {
         console.warn('[EMAIL WARNING] No email credentials configured for ' + senderType + '. Falling back to mock.');
         secureLogger.debug('Email mock mode', { to, subject, senderType });
-        return true;
+        return { success: true };
     }
 
     try {
@@ -126,9 +126,9 @@ export const sendEmail = async (to: string, subject: string, body: string, optio
             replyTo
         });
         secureLogger.info('Email sent successfully', { to, sender: fromName, type: senderType });
-        return true;
-    } catch (error) {
+        return { success: true };
+    } catch (error: any) {
         console.error(`[EMAIL ERROR] Failed to send to ${to} using ${senderType}:`, error);
-        return false;
+        return { success: false, error: error.message || 'Unknown error' };
     }
 };
