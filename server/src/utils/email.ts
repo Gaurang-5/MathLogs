@@ -13,9 +13,9 @@ interface EmailConfig {
 }
 
 const getEmailConfig = (type: SenderType): EmailConfig | null => {
-    // FORCE Indian Data Center for Zoho
+    // Zoho SMTP configuration for custom domain emails
     const commonConfig = {
-        host: 'smtp.zoho.in', // CRITICAL FIX for India users
+        host: 'smtp.zoho.com', // Standard Zoho SMTP for custom domains
         port: 465,
         secure: true
     };
