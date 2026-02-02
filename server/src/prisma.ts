@@ -13,6 +13,8 @@ export const prisma = new PrismaClient({
     datasources: {
         db: {
             url: process.env.DATABASE_URL
+                ? `${process.env.DATABASE_URL}${process.env.DATABASE_URL.includes('?') ? '&' : '?'}connection_limit=10&pool_timeout=20`
+                : undefined
         }
     }
 });
