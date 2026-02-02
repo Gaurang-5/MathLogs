@@ -20,14 +20,14 @@ export const loginAdmin = async (req: Request, res: Response) => {
 
         if (!admin) {
             console.warn(`[Auth] Failed login attempt for username: ${username} (User not found)`);
-            res.status(401).json({ error: 'Invalid credentials' });
+            res.status(404).json({ error: 'User not found' });
             return;
         }
 
         const isMatch = await bcrypt.compare(password, admin.password);
         if (!isMatch) {
             console.warn(`[Auth] Failed login attempt for username: ${username} (Invalid password)`);
-            res.status(401).json({ error: 'Invalid credentials' });
+            res.status(401).json({ error: 'Incorrect password' });
             return;
         }
 

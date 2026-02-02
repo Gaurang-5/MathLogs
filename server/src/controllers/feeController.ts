@@ -589,7 +589,7 @@ Please create the payment at your earliest convenience.
 Regards,
 ${senderName}`;
 
-        const sent = await sendEmail(student.parentEmail, subject, body, { senderName, replyTo });
+        const sent = await sendEmail(student.parentEmail, subject, body, { senderName, replyTo, senderType: 'NOREPLY' });
         if (sent) {
             res.json({ success: true, message: 'Reminder sent' });
         } else {

@@ -26,7 +26,7 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
         if (!res.ok) {
             // Handle authentication errors
             // Exception: DELETE /academic-years/:id returns 401 for wrong password, not invalid session
-            const isPasswordVerification = method === 'DELETE' && endpoint.includes('/academic-years/');
+            const isPasswordVerification = (method === 'DELETE' && endpoint.includes('/academic-years/')) || endpoint.includes('/auth/login');
 
             if ((res.status === 401 || res.status === 403) && !isPasswordVerification) {
                 localStorage.removeItem('token');

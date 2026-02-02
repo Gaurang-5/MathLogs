@@ -655,7 +655,7 @@ Please join the group to stay informed.
 
 – ${senderName}`;
 
-            const success = await sendEmail(email, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo });
+            const success = await sendEmail(email, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo, senderType: 'WELCOME' });
             return success ? 1 : 0;
         });
 
@@ -720,7 +720,7 @@ Please join the group to stay informed.
 
 – ${senderName}`;
 
-        const success = await sendEmail(student.parentEmail, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo });
+        const success = await sendEmail(student.parentEmail, `Welcome to ${batch.name} – ${batch.subject}`, body, { senderName, replyTo, senderType: 'WELCOME' });
 
         if (success) {
             res.json({ success: true });

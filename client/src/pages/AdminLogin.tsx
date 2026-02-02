@@ -68,7 +68,7 @@ export default function AdminLogin() {
                     <div className="w-16 h-16 bg-transparent border-[1.5px] border-black rounded-3xl flex items-center justify-center mx-auto mb-6 text-black">
                         <ShieldCheck className="w-8 h-8" strokeWidth={1.5} />
                     </div>
-                    <h1 className="text-3xl font-bold text-app-text tracking-tight mb-2">CoachPanel</h1>
+                    <h1 className="text-3xl font-bold text-app-text tracking-tight mb-2">MathLogs</h1>
                     <p className="text-app-text-secondary text-sm">Secure Authentication Gateway</p>
                 </div>
 
