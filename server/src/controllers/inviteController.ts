@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 import { secureLogger } from '../utils/secureLogger';
+import { getClientUrl } from '../utils/urlConfig';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -74,7 +75,7 @@ export const generateInvite = async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            inviteLink: `${process.env.CLIENT_URL}/setup?token=${invite.token}`,
+            inviteLink: `${getClientUrl(req)}/setup?token=${invite.token}`,
             token: invite.token,
             instituteId: institute.id
         });

@@ -7,6 +7,7 @@ import bwipjs from 'bwip-js';
 import { secureLogger } from '../utils/secureLogger';
 import { sendEmail } from '../utils/email';
 import { addMathLogsHeader } from '../utils/pdfUtils';
+import { getClientUrl } from '../utils/urlConfig';
 
 export const createBatch = async (req: Request, res: Response) => {
     const { timeSlot, feeAmount, className, batchNumber, subject } = req.body;
@@ -763,7 +764,7 @@ export const downloadBatchQRPDF = async (req: Request, res: Response) => {
         doc.moveDown(2);
 
         // QR Code
-        const registerUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/register/${batch.id}`;
+        const registerUrl = `${getClientUrl(req)}/register/${batch.id}`;
 
         // Generate QR Buffer
         const qrPng = await bwipjs.toBuffer({
