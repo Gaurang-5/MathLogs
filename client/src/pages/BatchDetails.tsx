@@ -464,7 +464,7 @@ export default function BatchDetails() {
                 a.remove();
                 toast.success('Stickers downloaded', { id: toastId });
             })
-            .catch(() => toast.error("Failed to print barcodes", { id: toastId }));
+            .catch(() => toast.error("Failed to download stickers", { id: toastId }));
     };
 
     const handleAddInstallment = async (e: React.FormEvent) => {
@@ -615,7 +615,7 @@ export default function BatchDetails() {
                                 onClick={handlePrintStickers}
                                 className="bg-app-bg hover:bg-app-border text-app-text px-6 py-3.5 rounded-xl font-bold flex items-center justify-center border border-app-border transition-all active:scale-95 flex-1"
                             >
-                                <Printer className="w-5 h-5 mr-2" /> Print Barcodes
+                                <Printer className="w-5 h-5 mr-2" /> Print Stickers
                             </button>
                             <button
                                 onClick={() => setShowAddStudent(true)}

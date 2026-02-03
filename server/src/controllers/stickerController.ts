@@ -35,21 +35,17 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
         doc.pipe(res);
 
         // A4: 210 x 297 mm
-        // 84 Labels: 4 columns x 21 rows? 
-        // Requirement: 84 labels per A4. 
-        // Label size: 46 x 11 mm.
-        // 4 cols * 46 = 184mm. (26mm margin left)
-        // 21 rows * 11 = 231mm. (66mm margin left) -> This fits easily.
-
-        // Grid Configuration
+        // 84 Labels: 4 columns x 21 rows
+        // Label size: 46 x 11 mm
         const cols = 4;
         const rows = 21;
-        const labelWidth = 46 * 2.83465; // mm to points (1mm = 2.83465pt)
-        const labelHeight = 11 * 2.83465;
-        const startX = 10 * 2.83465; // Left margin
-        const startY = 15 * 2.83465; // Top margin
-        const gapX = 2 * 2.83465; // Horizontal gap
-        const gapY = 1 * 2.83465; // Vertical gap
+        const mmToPt = 2.83465;
+        const labelWidth = 46 * mmToPt;
+        const labelHeight = 11 * mmToPt;
+        const startX = 10 * mmToPt;
+        const startY = 15 * mmToPt;
+        const gapX = 2 * mmToPt;
+        const gapY = 1 * mmToPt;
 
         let col = 0;
         let row = 0;
@@ -64,25 +60,78 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
             const x = startX + (col * (labelWidth + gapX));
             const y = startY + (row * (labelHeight + gapY));
 
-            // Draw Label
-            // Generate Barcode Buffer
+            // Draw Label Container
+            doc.roundedRect(x, y, labelWidth, labelHeight, 2)
+                .lineWidth(0.5)
+                .strokeColor('#9CA3AF') // Gray-400
+                .stroke();
+
             if (student.humanId) {
-                const png = await bwipjs.toBuffer({
-                    bcid: 'code128',       // Barcode type
-                    text: student.humanId, // Text to encode
-                    scale: 2,              // 3x scaling factor
-                    height: 5,             // Bar height, in millimeters
-                    includetext: false,    // Show human-readable text
-                    textxalign: 'center',  // Always good to set this
-                });
+                // --- LEFT: QR Code ---
+                // Maximize QR size for scannability
+                const padding = 2; // pts
+                const qrSize = labelHeight - (padding * 2);
 
-                doc.image(png, x + 5, y + 2, { width: labelWidth - 10, height: labelHeight - 12 });
-
-                doc.fontSize(7)
-                    .text(student.name.substring(0, 20), x, y + labelHeight - 8, {
-                        width: labelWidth,
-                        align: 'center'
+                try {
+                    const png = await bwipjs.toBuffer({
+                        bcid: 'qrcode',
+                        text: student.humanId,
+                        scale: 4,
                     });
+
+                    // Cast to any/Buffer to avoid TS issues with bwip-js types
+                    doc.image(png as any, x + padding, y + padding, {
+                        width: qrSize,
+                        height: qrSize
+                    });
+                } catch (err) {
+                    console.error('Error generating QR for', student.humanId, err);
+                }
+
+                // --- DIVIDER ---
+                const dividerX = x + qrSize + (padding * 2);
+                doc.moveTo(dividerX, y + 2)
+                    .lineTo(dividerX, y + labelHeight - 2)
+                    .lineWidth(0.5)
+                    .strokeColor('#E5E7EB') // Gray-200
+                    .stroke();
+
+                // --- RIGHT: Info & Marks ---
+                const contentX = dividerX + 4;
+                const contentWidth = (x + labelWidth) - contentX - 2;
+
+                // 1. Student Name (Truncated)
+                doc.font('Helvetica')
+                    .fontSize(6)
+                    .fillColor('#111827') // Gray-900
+                    .text(student.name, contentX, y + 3, {
+                        width: contentWidth,
+                        height: 6,
+                        ellipsis: true,
+                        align: 'left'
+                    });
+
+                // 2. Marks Field
+                const marksLabelY = y + labelHeight - 9;
+
+                // Set font before measuring
+                doc.font('Helvetica-Bold')
+                    .fontSize(6)
+                    .fillColor('#000000');
+
+                doc.text('MARKS:', contentX, marksLabelY);
+
+                // Underline/Box for marks
+                const marksTextWidth = doc.widthOfString('MARKS:');
+                const lineStartX = contentX + marksTextWidth + 2;
+                const lineEndX = x + labelWidth - 4;
+                const lineY = marksLabelY + 6; // Baseline
+
+                doc.moveTo(lineStartX, lineY)
+                    .lineTo(lineEndX, lineY)
+                    .lineWidth(0.5)
+                    .strokeColor('#000000')
+                    .stroke();
             }
 
             col++;
