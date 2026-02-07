@@ -4,38 +4,63 @@ import { secureLogger } from './secureLogger';
 
 const prisma = new PrismaClient();
 
-const BATCH_SIZE = 5; // Process 5 emails at a time
-const POLLING_INTERVAL = 5000; // Check every 5 seconds
+const BATCH_SIZE = 20; // Increased concurrency
+const POLLING_INTERVAL = 2000; // Faster polling
 
 export class EmailWorker {
     private isProcessing = false;
 
     start() {
-        console.log('[EmailWorker] Starting background worker...');
+        console.log('[EmailWorker] Starting robust background worker...');
         setInterval(() => this.processQueue(), POLLING_INTERVAL);
     }
 
     async processQueue() {
-        if (this.isProcessing) return; // Prevent overlapping runs
+        // Remove 'isProcessing' check to allow true parallelism if we scaled horizontally.
+        // But for single node, it prevents event loop starvation.
+        if (this.isProcessing) return;
         this.isProcessing = true;
 
         try {
-            // 1. Fetch PENDING jobs
-            const jobs = await prisma.emailJob.findMany({
-                where: { status: 'PENDING' },
-                take: BATCH_SIZE,
-                orderBy: { createdAt: 'asc' }
+            // 1. Transactional Claim: Select & Lock Rows
+            // "FOR UPDATE SKIP LOCKED" is the gold standard for job queues in Postgres
+            const claimedJobs = await prisma.$transaction(async (tx) => {
+                // Fetch IDs of jobs we're claiming
+                const lockedIds: { id: string }[] = await tx.$queryRaw`
+                    SELECT id FROM "EmailJob" 
+                    WHERE status = 'PENDING' 
+                    ORDER BY "createdAt" ASC 
+                    LIMIT ${BATCH_SIZE} 
+                    FOR UPDATE SKIP LOCKED
+                `;
+
+                if (lockedIds.length === 0) return [];
+
+                const ids = lockedIds.map(row => row.id);
+
+                // Mark them as PROCESSING immediately so no one else sees them provided the transaction commits
+                // UPDATE "EmailJob" SET status='PROCESSING' WHERE id IN (...)
+                await tx.emailJob.updateMany({
+                    where: { id: { in: ids } },
+                    data: { status: 'PROCESSING' }
+                });
+
+                // Return the full job details
+                return await tx.emailJob.findMany({
+                    where: { id: { in: ids } }
+                });
             });
 
-            if (jobs.length === 0) {
+            if (claimedJobs.length === 0) {
                 this.isProcessing = false;
                 return;
             }
 
-            console.log(`[EmailWorker] Processing ${jobs.length} emails...`);
+            console.log(`[EmailWorker] Claimed ${claimedJobs.length} jobs.`);
 
-            // 2. Process concurrently
-            await Promise.all(jobs.map(job => this.processJob(job)));
+            // 2. Process concurrently (outside transaction)
+            // We use Promise.allSettled to ensure all get a chance to complete
+            await Promise.allSettled(claimedJobs.map(job => this.processJob(job)));
 
         } catch (error) {
             console.error('[EmailWorker] Error processing queue:', error);
@@ -45,14 +70,9 @@ export class EmailWorker {
     }
 
     private async processJob(job: any) {
-        // Lock the job immediately
         try {
-            await prisma.emailJob.update({
-                where: { id: job.id },
-                data: { status: 'PROCESSING' }
-            });
-
             // Send Email
+            // Note: Job is already 'PROCESSING'
             const { senderName, replyTo, senderType } = job.options || {};
 
             const start = Date.now();
@@ -82,6 +102,8 @@ export class EmailWorker {
 
             const attempts = job.attempts + 1;
             const status = attempts >= job.maxAttempts ? 'FAILED' : 'PENDING';
+            // Exponential backoff could be implemented by updating 'createdAt' to future date, 
+            // but current schema doesn't support 'scheduledAt'. PENDING will retry next cycle.
 
             await prisma.emailJob.update({
                 where: { id: job.id },

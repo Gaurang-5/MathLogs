@@ -82,6 +82,9 @@ const transporters: Record<string, nodemailer.Transporter> = {};
 const getTransporter = (config: EmailConfig) => {
     if (!transporters[config.user]) {
         transporters[config.user] = nodemailer.createTransport({
+            pool: true, // Use a connection pool
+            maxConnections: 5, // Limit concurrent connections
+            maxMessages: 100, // Messages per connection
             host: config.host,
             port: config.port,
             secure: config.secure,
