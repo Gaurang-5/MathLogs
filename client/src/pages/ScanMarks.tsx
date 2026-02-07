@@ -26,67 +26,86 @@ export default function ScanMarks() {
         // Fetch available tests
         apiRequest('/tests').then(setTests).catch(console.error);
 
-        // Cleanup scanner on unmount
         return () => {
             mountedRef.current = false;
-            // safeguard: if valid scanner actually running
-            if (scannerRef.current && scannerRef.current.isScanning) {
-                scannerRef.current.stop().catch(console.error);
+            // Immediate cleanup if unmounting
+            if (scannerRef.current) {
+                if (scannerRef.current.isScanning) {
+                    scannerRef.current.stop().catch(err => console.error("Failed to stop scanner", err));
+                }
+                // clear() returns Promise<void> usually, but let's be safe
+                try {
+                    scannerRef.current.clear();
+                } catch (e) {
+                    // console.error("Failed to clear scanner", e);
+                }
             }
         };
     }, []);
 
-    const startScanner = async () => {
+    // Effect to start scanner when 'scanning' state becomes true
+    useEffect(() => {
+        if (scanning && mountedRef.current) {
+            // Slight delay to ensure DOM is ready
+            const timer = setTimeout(async () => {
+                // Prevent multiple initializations
+                if (scannerRef.current?.isScanning) return;
+
+                const html5QrCode = new Html5Qrcode("reader");
+                scannerRef.current = html5QrCode;
+
+                try {
+                    await html5QrCode.start(
+                        { facingMode: "environment" },
+                        {
+                            fps: 10,
+                            qrbox: { width: 300, height: 90 }
+                        },
+                        async (decodedText) => {
+                            // Success callback
+                            console.log("Matched: " + decodedText);
+
+                            // Pause scanning
+                            html5QrCode.pause();
+
+                            // Lookup Student
+                            try {
+                                const studentData = await apiRequest('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
+
+                                const existing = studentData.marks?.find((m: any) => m.testId === selectedTestId);
+
+                                if (existing) {
+                                    setExistingMark(existing.score);
+                                    setPendingStudent(studentData);
+                                } else {
+                                    setStudent(studentData);
+                                }
+                            } catch (e) {
+                                alert('Student not found or Invalid QR Code');
+                                html5QrCode.resume();
+                            }
+                        },
+                        (_errorMessage: any) => {
+                            // ignore
+                        }
+                    );
+                } catch (err) {
+                    console.error("Error starting scanner:", err);
+                    setScanning(false);
+                    alert('Failed to start camera. Ensure permission is granted.');
+                }
+            }, 100); // 100ms delay to ensure DOM paint
+
+            return () => clearTimeout(timer);
+        }
+    }, [scanning, selectedTestId]);
+
+    const startScanner = () => {
         if (!selectedTestId) {
             alert("Please select a test first!");
             return;
         }
-
         setScanning(true);
-        // Use verbose ID but safeguard it
-        const html5QrCode = new Html5Qrcode("reader");
-        scannerRef.current = html5QrCode;
-
-        try {
-            await html5QrCode.start(
-                { facingMode: "environment" },
-                {
-                    fps: 10,
-                    qrbox: { width: 280, height: 100 }
-                },
-                async (decodedText) => {
-                    // Success callback
-                    console.log("Matched: " + decodedText);
-
-                    // Pause scanning
-                    html5QrCode.pause();
-
-                    // Lookup Student
-                    try {
-                        const studentData = await apiRequest('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
-
-                        const existing = studentData.marks?.find((m: any) => m.testId === selectedTestId);
-
-                        if (existing) {
-                            setExistingMark(existing.score);
-                            setPendingStudent(studentData);
-                        } else {
-                            setStudent(studentData);
-                        }
-                    } catch (e) {
-                        alert('Student not found or Invalid Barcode');
-                        html5QrCode.resume();
-                    }
-                },
-                (_errorMessage: any) => {
-                    // ignore
-                }
-            );
-        } catch (err) {
-            console.error(err);
-            setScanning(false);
-            alert('Failed to start camera. Ensure permission is granted.');
-        }
     };
 
     const handleSubmitMark = async (e: React.FormEvent) => {
@@ -196,52 +215,65 @@ export default function ScanMarks() {
             )}
 
             {/* Scanner Active */}
-            <div className="w-full max-w-md mx-auto px-4 pt-safe" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-                <div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100">
-                    {/* Scanner Preview */}
-                    <div className="relative w-full rounded-2xl overflow-hidden shadow-inner bg-black" style={{ aspectRatio: '4/3' }}>
-                        <div id="reader" className="w-full h-full"></div>
+            {scanning && (
+                <div className="w-full max-w-md mx-auto px-4 pt-safe" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+                    <div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100">
+                        {/* Scanner Preview */}
+                        <div className="relative w-full rounded-2xl overflow-hidden shadow-inner bg-black" style={{ aspectRatio: '4/3' }}>
+                            <div id="reader" className="w-full h-full"></div>
 
-                        {/* Scanner Overlay */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            {/* Scan Frame */}
-                            <div className="relative w-full max-w-xs">
-                                {/* Corners */}
-                                <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-white rounded-tl-2xl"></div>
-                                <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-white rounded-tr-2xl"></div>
-                                <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-white rounded-bl-2xl"></div>
-                                <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-white rounded-br-2xl"></div>
+                            {/* Scanner Overlay */}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                {/* Scan Frame - Wide Rectangle for Sticker */}
+                                <div className="relative w-80 h-24 border-2 border-white/50 rounded-xl overflow-hidden">
+                                    {/* Left: QR Section Guide */}
+                                    <div className="absolute top-0 left-0 bottom-0 w-24 border-r border-white/30 bg-white/5 flex items-center justify-center">
+                                        <div className="w-16 h-16 border-2 border-green-400/50 rounded-lg animate-pulse"></div>
+                                    </div>
 
-                                {/* Center indicator */}
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="h-1 w-3/4 bg-green-400 shadow-lg shadow-green-400/50 rounded-full animate-pulse"></div>
+                                    {/* Right: Marks Section Guide */}
+                                    <div className="absolute top-0 right-0 bottom-0 left-24 flex items-center justify-end pr-4 gap-2">
+                                        {/* 3 Ghost Boxes for Marks */}
+                                        <div className="w-8 h-10 border border-white/20 rounded bg-white/5"></div>
+                                        <div className="w-8 h-10 border border-white/20 rounded bg-white/5"></div>
+                                        <div className="w-8 h-10 border border-white/20 rounded bg-white/5"></div>
+                                    </div>
+
+                                    {/* Center Scan Line */}
+                                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500/50 w-full shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+
+                                    {/* Corner Accents */}
+                                    <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-white rounded-tl-lg"></div>
+                                    <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-white rounded-tr-lg"></div>
+                                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-white rounded-bl-lg"></div>
+                                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-white rounded-br-lg"></div>
                                 </div>
-                            </div>
 
-                            {/* Instruction Text */}
-                            <div className="absolute bottom-8 left-0 right-0 flex justify-center">
-                                <div className="text-white text-sm font-medium bg-black/70 px-6 py-2.5 rounded-full backdrop-blur-md border border-white/20 shadow-lg">
-                                    Align barcode within box
+                                {/* Instruction Text */}
+                                <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                                    <div className="text-white text-xs font-semibold bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
+                                        Align entire sticker within box
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Status and Stop Button */}
-                    <div className="mt-6 text-center space-y-4">
-                        <p className="text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
-                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            Scanning for barcodes...
-                        </p>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="text-sm font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-4 py-2 rounded-lg transition-all active:scale-95"
-                        >
-                            Stop Scanner
-                        </button>
+                        {/* Status and Stop Button */}
+                        <div className="mt-6 text-center space-y-4">
+                            <p className="text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
+                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                Scanning for QR codes...
+                            </p>
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="text-sm font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-4 py-2 rounded-lg transition-all active:scale-95"
+                            >
+                                Stop Scanner
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Warning Modal */}
             {pendingStudent && (

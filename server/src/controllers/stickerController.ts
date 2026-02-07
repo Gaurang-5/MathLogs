@@ -97,41 +97,75 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
                     .stroke();
 
                 // --- RIGHT: Info & Marks ---
-                const contentX = dividerX + 4;
+                const contentX = dividerX + 3; // Reduced padding
                 const contentWidth = (x + labelWidth) - contentX - 2;
 
-                // 1. Student Name (Truncated)
-                doc.font('Helvetica')
-                    .fontSize(6)
-                    .fillColor('#111827') // Gray-900
-                    .text(student.name, contentX, y + 3, {
+                // 1. Student Name (Larger & Bolder)
+                doc.font('Helvetica-Bold')
+                    .fontSize(9) // Increased from 6
+                    .fillColor('#000000') // Black for better contrast
+                    .text(student.name, contentX, y + 2, {
                         width: contentWidth,
-                        height: 6,
+                        height: 10,
                         ellipsis: true,
                         align: 'left'
                     });
 
-                // 2. Marks Field
-                const marksLabelY = y + labelHeight - 9;
+                // 2. Marks Field - Maximized for Easy Writing
+                const marksAreaY = y + 14; // Push down below name
+                const availableHeight = (y + labelHeight) - marksAreaY - 2;
 
-                // Set font before measuring
+                // Label (Small but clear)
                 doc.font('Helvetica-Bold')
-                    .fontSize(6)
-                    .fillColor('#000000');
+                    .fontSize(5)
+                    .fillColor('#4B5563') // Gray-600
+                    .text('MARKS:', contentX, marksAreaY + 3);
 
-                doc.text('MARKS:', contentX, marksLabelY);
+                // Big Digit Boxes
+                const marksTextWidth = doc.widthOfString('MARKS:') + 2;
+                const boxStartX = contentX + marksTextWidth;
 
-                // Underline/Box for marks
-                const marksTextWidth = doc.widthOfString('MARKS:');
-                const lineStartX = contentX + marksTextWidth + 2;
-                const lineEndX = x + labelWidth - 4;
-                const lineY = marksLabelY + 6; // Baseline
+                // Calculate box size to fill remaining width
+                // Available width for boxes = total content width - label width - right padding
+                const availableWidthForBoxes = contentWidth - marksTextWidth - 7; // -7 for "OCR" text space (increased from -5)
+                const numDigits = 3;
+                const boxSpacing = 2; // Increased spacing for clarity
+                const boxWidth = (availableWidthForBoxes - (boxSpacing * (numDigits - 1))) / numDigits;
 
-                doc.moveTo(lineStartX, lineY)
-                    .lineTo(lineEndX, lineY)
-                    .lineWidth(0.5)
-                    .strokeColor('#000000')
-                    .stroke();
+                // Ensure boxes are square-ish or rectangular but constrained by height
+                // We want them as big as possible
+                const boxHeight = availableHeight;
+
+                // Draw digit boxes
+                for (let i = 0; i < numDigits; i++) {
+                    const boxX = boxStartX + (i * (boxWidth + boxSpacing));
+
+                    // Draw box
+                    doc.roundedRect(boxX, marksAreaY, boxWidth, boxHeight, 2)
+                        .lineWidth(0.5) // Thicker border
+                        .strokeColor('#9CA3AF') // Gray-400 border
+                        .stroke();
+
+                    // Add guideline at bottom (dashed or solid)
+                    // Solid line at bottom 20%
+                    const lineY = marksAreaY + boxHeight - 3;
+                    doc.moveTo(boxX + 2, lineY)
+                        .lineTo(boxX + boxWidth - 2, lineY)
+                        .lineWidth(0.3)
+                        .strokeColor('#E5E7EB') // Very light gray guide
+                        .stroke();
+                }
+
+                // OCR Marker (Vertical at end)
+                doc.save();
+                // Move text 4pts from edge instead of 2pts to avoid border overlap
+                const ocrX = x + labelWidth - 4;
+                doc.rotate(-90, { origin: [ocrX, marksAreaY + boxHeight] });
+                doc.font('Helvetica')
+                    .fontSize(3)
+                    .fillColor('#D1D5DB')
+                    .text('OCR', ocrX, marksAreaY + boxHeight);
+                doc.restore();
             }
 
             col++;

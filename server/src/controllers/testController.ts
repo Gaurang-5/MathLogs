@@ -287,3 +287,60 @@ export const downloadTestReport = async (req: Request, res: Response) => {
         res.status(500).send('Error generating report');
     }
 };
+
+export const getTestEligibleStudents = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const teacherId = (req as any).user?.id;
+    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
+
+    try {
+        // Fetch test details (lightweight query)
+        const test = await prisma.test.findUnique({
+            where: { id: String(id) },
+            select: { teacherId: true, className: true } // Only fetch what's needed
+        });
+
+        if (!test) return res.status(404).json({ error: 'Test not found' });
+        // Basic permission check
+        if (test.teacherId && test.teacherId !== teacherId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        // Find students:
+        // 1. Same Academic Year
+        // 2. Matching Class Name (via Batch)
+        // 3. Approved status
+        // 4. NO existing mark for this test (DB-level filtering)
+        const students = await prisma.student.findMany({
+            where: {
+                academicYearId: currentAcademicYearId,
+                batch: {
+                    className: test.className || undefined
+                },
+                status: 'APPROVED',
+                marks: {
+                    none: {
+                        testId: String(id)
+                    }
+                }
+            },
+            include: {
+                batch: {
+                    select: { name: true }
+                }
+            },
+            orderBy: { name: 'asc' }
+        });
+
+        const eligibleStudents = students.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            batchName: s.batch?.name
+        }));
+
+        res.json(eligibleStudents);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch eligible students' });
+    }
+}

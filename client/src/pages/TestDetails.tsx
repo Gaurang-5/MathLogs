@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download } from 'lucide-react';
+import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function TestDetails() {
@@ -21,6 +21,17 @@ export default function TestDetails() {
 
     // Delete State
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Edit Mark State
+    const [editingMarkId, setEditingMarkId] = useState<string | null>(null);
+    const [editScore, setEditScore] = useState('');
+
+    // Add Result State
+    const [showAddResult, setShowAddResult] = useState(false);
+    const [eligibleStudents, setEligibleStudents] = useState<any[]>([]);
+    const [selectedStudentId, setSelectedStudentId] = useState('');
+    const [newScore, setNewScore] = useState('');
+    const [loadingStudents, setLoadingStudents] = useState(false);
 
     useEffect(() => {
         fetchTest();
@@ -96,6 +107,69 @@ export default function TestDetails() {
                 toast.success('Report downloaded', { id: toastId });
             })
             .catch(() => toast.error("Failed to download report", { id: toastId }));
+    };
+
+    // --- Mark Editing Logic ---
+    const handleEditClick = (mark: any) => {
+        setEditingMarkId(mark.id);
+        setEditScore(mark.score.toString());
+    };
+
+    const handleCancelEdit = () => {
+        setEditingMarkId(null);
+        setEditScore('');
+    };
+
+    const handleSaveMark = async (studentId: string) => {
+        try {
+            await apiRequest('/marks', 'POST', {
+                testId: id,
+                studentId,
+                score: editScore
+            });
+            toast.success('Mark updated');
+            setEditingMarkId(null);
+            fetchTest();
+        } catch (e: any) {
+            toast.error(e.message || 'Failed to update mark');
+        }
+    };
+
+    // --- Add Result Logic ---
+    const handleOpenAddResult = async () => {
+        setShowAddResult(true);
+        setLoadingStudents(true);
+        try {
+            const students = await apiRequest(`/tests/${id}/eligible-students`);
+            setEligibleStudents(students);
+        } catch (e) {
+            toast.error('Failed to load students');
+        } finally {
+            setLoadingStudents(false);
+        }
+    };
+
+    const handleSubmitNewResult = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedStudentId) {
+            toast.error('Please select a student');
+            return;
+        }
+
+        try {
+            await apiRequest('/marks', 'POST', {
+                testId: id,
+                studentId: selectedStudentId,
+                score: newScore
+            });
+            toast.success('Result added successfully');
+            setShowAddResult(false);
+            setSelectedStudentId('');
+            setNewScore('');
+            fetchTest();
+        } catch (e: any) {
+            toast.error(e.message || 'Failed to add result');
+        }
     };
 
     if (loading) {
@@ -198,7 +272,15 @@ export default function TestDetails() {
                 <div className="bg-white rounded-[24px] border border-slate-200 shadow-sm overflow-hidden">
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                         <h3 className="font-bold text-lg text-slate-800">Student Results</h3>
-                        <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">{test.marks.length} Records</span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">{test.marks.length} Records</span>
+                            <button
+                                onClick={handleOpenAddResult}
+                                className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border border-app-border bg-slate-50 flex items-center gap-2 text-sm font-bold"
+                            >
+                                <Plus className="w-4 h-4" /> Add Manual
+                            </button>
+                        </div>
                     </div>
 
                     {test.marks.length === 0 ? (
@@ -216,9 +298,37 @@ export default function TestDetails() {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {test.marks.map((mark: any) => (
-                                    <tr key={mark.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <tr key={mark.id} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="px-6 py-4 font-medium text-slate-800">{mark.student?.name || 'Unknown Student'}</td>
-                                        <td className="px-6 py-4 font-bold text-slate-800">{mark.score}</td>
+                                        <td className="px-6 py-4 font-bold text-slate-800">
+                                            {editingMarkId === mark.id ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        value={editScore}
+                                                        onChange={(e) => setEditScore(e.target.value)}
+                                                        className="w-20 p-1 border border-blue-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        autoFocus
+                                                    />
+                                                    <button onClick={() => handleSaveMark(mark.studentId)} className="p-1 text-black hover:bg-slate-100 rounded">
+                                                        <Save className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={handleCancelEdit} className="p-1 text-red-600 hover:bg-red-50 rounded">
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    {mark.score}
+                                                    <button
+                                                        onClick={() => handleEditClick(mark)}
+                                                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 transition-all"
+                                                    >
+                                                        <Pencil className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 text-right font-mono text-slate-600">
                                             {((mark.score / test.maxMarks) * 100).toFixed(1)}%
                                         </td>
@@ -271,7 +381,7 @@ export default function TestDetails() {
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Max Marks</label>
                                         <input
                                             type="number"
-                                    inputMode="numeric"
+                                            inputMode="numeric"
                                             value={editMaxMarks}
                                             onChange={(e) => setEditMaxMarks(e.target.value)}
                                             className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
@@ -355,7 +465,95 @@ export default function TestDetails() {
                     </div>
                 )
                 }
-            </AnimatePresence >
+            </AnimatePresence>
+
+            {/* Add Result Modal */}
+            <AnimatePresence>
+                {showAddResult && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                            onClick={() => setShowAddResult(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                            className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 overflow-hidden"
+                        >
+                            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                                <h3 className="font-bold text-lg text-gray-800">Add Manual Result</h3>
+                                <button onClick={() => setShowAddResult(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+                                    <X className="w-5 h-5 text-gray-500" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSubmitNewResult} className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Select Student</label>
+                                    {loadingStudents ? (
+                                        <div className="text-sm text-gray-400">Loading students...</div>
+                                    ) : eligibleStudents.length === 0 ? (
+                                        <div className="text-sm text-orange-500 bg-orange-50 p-3 rounded-lg border border-orange-100">
+                                            No eligible students found. All students in this class/year might already have marks.
+                                        </div>
+                                    ) : (
+                                        <select
+                                            value={selectedStudentId}
+                                            onChange={(e) => setSelectedStudentId(e.target.value)}
+                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium appearance-none"
+                                            required
+                                        >
+                                            <option value="">-- Select Student --</option>
+                                            {eligibleStudents.map((s) => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name} ({s.batchName || 'No Batch'})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Score</label>
+                                    <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        value={newScore}
+                                        onChange={(e) => setNewScore(e.target.value)}
+                                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
+                                        required
+                                        placeholder={`Max: ${test.maxMarks}`}
+                                        min="0"
+                                        max={test.maxMarks}
+                                        step="0.5"
+                                    />
+                                </div>
+
+                                <div className="pt-2 flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddResult(false)}
+                                        className="flex-1 py-3 rounded-xl font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={!selectedStudentId || !newScore}
+                                        className="flex-1 py-3 rounded-xl font-bold bg-gray-900 text-white hover:bg-black shadow-lg shadow-gray-200 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Add Result
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
         </Layout >
     )
 }
