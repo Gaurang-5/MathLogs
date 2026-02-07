@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save, Mail } from 'lucide-react';
+import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save, Mail, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function TestDetails() {
@@ -33,6 +33,7 @@ export default function TestDetails() {
     const [newScore, setNewScore] = useState('');
     const [loadingStudents, setLoadingStudents] = useState(false);
     const [sendingResults, setSendingResults] = useState(false);
+    const [showEmailConfirm, setShowEmailConfirm] = useState(false);
 
     useEffect(() => {
         fetchTest();
@@ -110,11 +111,11 @@ export default function TestDetails() {
             .catch(() => toast.error("Failed to download report", { id: toastId }));
     };
 
-    const handleSendResults = async () => {
-        if (!window.confirm(`Are you sure you want to send email results to all parents?`)) {
-            return;
-        }
+    const handleSendResults = () => {
+        setShowEmailConfirm(true);
+    };
 
+    const executeSendEmails = async () => {
         const toastId = toast.loading('Sending emails...');
         setSendingResults(true);
         try {
@@ -124,6 +125,7 @@ export default function TestDetails() {
             } else {
                 toast.success('Emails queued successfully', { id: toastId });
             }
+            setShowEmailConfirm(false);
         } catch (e: any) {
             toast.error(e.message || 'Failed to send emails', { id: toastId });
         } finally {
@@ -579,6 +581,60 @@ export default function TestDetails() {
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Email Confirmation Modal */}
+            <AnimatePresence>
+                {showEmailConfirm && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                            onClick={() => !sendingResults && setShowEmailConfirm(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-[24px] shadow-2xl w-full max-w-sm relative z-10 overflow-hidden text-center p-8"
+                        >
+                            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <Send className="w-8 h-8 ml-1" />
+                            </div>
+
+                            <h3 className="text-xl font-bold text-app-text mb-2">Send Results?</h3>
+                            <p className="text-app-text-secondary mb-8">
+                                This will send email reports to all parents of students in this batch.
+                            </p>
+
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={executeSendEmails}
+                                    disabled={sendingResults}
+                                    className="w-full py-3.5 rounded-xl font-bold bg-blue-600 text-white shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {sendingResults ? (
+                                        <>
+                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                            Sending...
+                                        </>
+                                    ) : (
+                                        'Yes, Send Emails'
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setShowEmailConfirm(false)}
+                                    disabled={sendingResults}
+                                    className="w-full py-3.5 rounded-xl font-bold bg-transparent text-app-text-secondary hover:bg-black/5 transition-colors disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </motion.div>
                     </div>
                 )}
