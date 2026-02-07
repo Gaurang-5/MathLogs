@@ -76,6 +76,24 @@ export const submitMark = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Score cannot be negative' });
         }
 
+        // Verify Student Eligibility (Security Check)
+        const student = await prisma.student.findUnique({
+            where: { id: studentId },
+            select: { academicYearId: true, instituteId: true }
+        });
+
+        if (!student) return res.status(404).json({ error: 'Student not found' });
+
+        // Ensure student belongs to same academic year as test
+        if (student.academicYearId && test.academicYearId && student.academicYearId !== test.academicYearId) {
+            return res.status(400).json({ error: 'Student belongs to a different academic year' });
+        }
+
+        // Ensure student belongs to same institute (redundant but safe)
+        if (student.instituteId && test.instituteId && student.instituteId !== test.instituteId) {
+            return res.status(403).json({ error: 'Student belongs to a different institute' });
+        }
+
         // Upsert allows updating if already exists
         const mark = await prisma.mark.upsert({
             where: {
@@ -344,3 +362,122 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to fetch eligible students' });
     }
 }
+
+export const sendTestResultsEmail = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const teacherId = (req as any).user?.id;
+    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
+
+    try {
+        // 1. Fetch Test Details
+        const test = await prisma.test.findUnique({
+            where: { id: String(id) },
+            select: {
+                id: true,
+                name: true,
+                subject: true,
+                date: true,
+                maxMarks: true,
+                className: true,
+                teacherId: true,
+                instituteId: true
+            }
+        });
+
+        if (!test) return res.status(404).json({ error: 'Test not found' });
+        if (test.teacherId && test.teacherId !== teacherId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        // 2. Fetch All Relevant Students (Same Class & Academic Year)
+        // We need students who are APPROVED
+        const students = await prisma.student.findMany({
+            where: {
+                academicYearId: currentAcademicYearId,
+                batch: {
+                    className: test.className || undefined
+                },
+                status: 'APPROVED'
+            },
+            include: {
+                marks: {
+                    where: { testId: test.id },
+                    select: { score: true }
+                }
+            }
+        });
+
+        if (students.length === 0) {
+            return res.status(400).json({ error: 'No students found for this test.' });
+        }
+
+        // 3. Prepare Email Jobs
+        const emailJobs = students
+            .filter(student => student.parentEmail) // Only those with email
+            .map(student => {
+                const mark = student.marks[0]; // Can be undefined if absent
+                const isAbsent = !mark;
+
+                const subjectLine = `Test Result: ${test.name} (${test.subject})`;
+
+                let body = `Dear Parent,\n\n`;
+                body += `Here is the result for the test conducted on ${new Date(test.date).toLocaleDateString()}.\n\n`;
+                body += `Test Name: ${test.name}\n`;
+                body += `Subject: ${test.subject}\n`;
+                body += `Student Name: ${student.name}\n`;
+
+                if (isAbsent) {
+                    body += `Status: ABSENT\n\n`;
+                    body += `Your child was marked absent for this test. Please contact the teacher if this is an error.\n`;
+                } else {
+                    body += `Status: PRESENT\n`;
+                    body += `Score: ${mark.score} / ${test.maxMarks}\n`;
+                    const percentage = ((mark.score / test.maxMarks) * 100).toFixed(1);
+                    body += `Percentage: ${percentage}%\n\n`;
+                    body += `Great effort! Encourage them to keep improving.\n`;
+                }
+
+                body += `\nRegards,\nMathLogs Team`;
+
+                return {
+                    recipient: student.parentEmail!,
+                    subject: subjectLine,
+                    body: body,
+                    status: 'PENDING',
+                    instituteId: test.instituteId,
+                    options: {
+                        senderType: 'NOREPLY' // Use Notification sender
+                    }
+                };
+            });
+
+        if (emailJobs.length === 0) {
+            return res.status(200).json({ message: 'No students had valid email addresses to send results to.' });
+        }
+
+        // 4. Batch Insert Jobs
+        // Prisma createMany is only supported for some DBs, but Postgres supports it.
+        // However, Prisma schema might have issues if options is Json. Let's check.
+        // 'options' is Json? so it should be fine.
+
+        // Note: createMany with 'any' cast to bypass strict typing if needed, 
+        // but let's try to match the type.
+        // JobStatus is an enum 'PENDING'.
+
+        await prisma.emailJob.createMany({
+            data: emailJobs.map(job => ({
+                ...job,
+                status: 'PENDING'
+            })) as any
+        });
+
+        res.json({
+            success: true,
+            message: `Queued ${emailJobs.length} emails for sending.`
+        });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to send results' });
+    }
+};

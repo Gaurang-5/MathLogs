@@ -8,7 +8,7 @@ import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatch
 import { registerStudent, getPendingStudents, approveStudent, rejectStudent, updateStudent, addStudentManually, getStudentGrowthStats } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
-import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents } from '../controllers/testController';
+import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail } from '../controllers/testController';
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
 
@@ -68,6 +68,7 @@ router.post('/tests', authenticateToken as any, validateRequest(createTestSchema
 router.get('/tests/:id', authenticateToken as any, getTestDetails as any);
 router.put('/tests/:id', authenticateToken as any, validateRequest(updateTestSchema), updateTest as any);
 router.delete('/tests/:id', authenticateToken as any, deleteTest as any);
+router.post('/tests/:id/send-results', authenticateToken as any, sendTestResultsEmail as any);
 router.get('/tests/:id/download', authenticateToken as any, downloadTestReport as any);
 router.get('/tests/:id/eligible-students', authenticateToken as any, getTestEligibleStudents as any);
 router.post('/marks', authenticateToken as any, validateRequest(submitMarkSchema), submitMark as any);

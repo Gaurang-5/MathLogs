@@ -43,15 +43,32 @@ export default function ScanMarks() {
         };
     }, []);
 
+    // Use a unique ID to prevent collisions
+    const READER_ID = "reader-scan-marks";
+
+
+
     // Effect to start scanner when 'scanning' state becomes true
     useEffect(() => {
         if (scanning && mountedRef.current) {
-            // Slight delay to ensure DOM is ready
+            // Slight delay to ensure DOM is ready and previous instance is cleaned
             const timer = setTimeout(async () => {
+                // Double check if element exists
+                if (!document.getElementById(READER_ID)) {
+                    console.error("Reader element not found");
+                    setScanning(false);
+                    return;
+                }
+
                 // Prevent multiple initializations
                 if (scannerRef.current?.isScanning) return;
 
-                const html5QrCode = new Html5Qrcode("reader");
+                // Cleanup any existing instance
+                if (scannerRef.current) {
+                    await scannerRef.current.clear();
+                }
+
+                const html5QrCode = new Html5Qrcode(READER_ID);
                 scannerRef.current = html5QrCode;
 
                 try {
@@ -64,14 +81,11 @@ export default function ScanMarks() {
                         async (decodedText) => {
                             // Success callback
                             console.log("Matched: " + decodedText);
-
-                            // Pause scanning
                             html5QrCode.pause();
 
                             // Lookup Student
                             try {
                                 const studentData = await apiRequest('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
-
                                 const existing = studentData.marks?.find((m: any) => m.testId === selectedTestId);
 
                                 if (existing) {
@@ -85,18 +99,21 @@ export default function ScanMarks() {
                                 html5QrCode.resume();
                             }
                         },
-                        (_errorMessage: any) => {
-                            // ignore
-                        }
+                        (_errorMessage: any) => { /* ignore */ }
                     );
                 } catch (err) {
                     console.error("Error starting scanner:", err);
                     setScanning(false);
                     alert('Failed to start camera. Ensure permission is granted.');
                 }
-            }, 100); // 100ms delay to ensure DOM paint
+            }, 300); // Increased delay for safety
 
-            return () => clearTimeout(timer);
+            return () => {
+                clearTimeout(timer);
+                if (scannerRef.current && scannerRef.current.isScanning) {
+                    scannerRef.current.stop().catch(console.error);
+                }
+            };
         }
     }, [scanning, selectedTestId]);
 
@@ -220,7 +237,7 @@ export default function ScanMarks() {
                     <div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100">
                         {/* Scanner Preview */}
                         <div className="relative w-full rounded-2xl overflow-hidden shadow-inner bg-black" style={{ aspectRatio: '4/3' }}>
-                            <div id="reader" className="w-full h-full"></div>
+                            <div id={READER_ID} className="w-full h-full"></div>
 
                             {/* Scanner Overlay */}
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -232,11 +249,11 @@ export default function ScanMarks() {
                                     </div>
 
                                     {/* Right: Marks Section Guide */}
-                                    <div className="absolute top-0 right-0 bottom-0 left-24 flex items-center justify-end pr-4 gap-2">
+                                    <div className="absolute top-0 right-0 bottom-0 left-24 flex items-center justify-end pr-6 gap-3">
                                         {/* 3 Ghost Boxes for Marks */}
-                                        <div className="w-8 h-10 border border-white/20 rounded bg-white/5"></div>
-                                        <div className="w-8 h-10 border border-white/20 rounded bg-white/5"></div>
-                                        <div className="w-8 h-10 border border-white/20 rounded bg-white/5"></div>
+                                        <div className="w-12 h-12 border-2 border-white/30 rounded-lg bg-white/5"></div>
+                                        <div className="w-12 h-12 border-2 border-white/30 rounded-lg bg-white/5"></div>
+                                        <div className="w-12 h-12 border-2 border-white/30 rounded-lg bg-white/5"></div>
                                     </div>
 
                                     {/* Center Scan Line */}
@@ -252,7 +269,7 @@ export default function ScanMarks() {
                                 {/* Instruction Text */}
                                 <div className="absolute bottom-4 left-0 right-0 flex justify-center">
                                     <div className="text-white text-xs font-semibold bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
-                                        Align entire sticker within box
+                                        Align Sticker (UPDATED)
                                     </div>
                                 </div>
                             </div>

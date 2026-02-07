@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save } from 'lucide-react';
+import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function TestDetails() {
@@ -32,6 +32,7 @@ export default function TestDetails() {
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [newScore, setNewScore] = useState('');
     const [loadingStudents, setLoadingStudents] = useState(false);
+    const [sendingResults, setSendingResults] = useState(false);
 
     useEffect(() => {
         fetchTest();
@@ -107,6 +108,27 @@ export default function TestDetails() {
                 toast.success('Report downloaded', { id: toastId });
             })
             .catch(() => toast.error("Failed to download report", { id: toastId }));
+    };
+
+    const handleSendResults = async () => {
+        if (!window.confirm(`Are you sure you want to send email results to all parents?`)) {
+            return;
+        }
+
+        const toastId = toast.loading('Sending emails...');
+        setSendingResults(true);
+        try {
+            const res = await apiRequest(`/tests/${id}/send-results`, 'POST');
+            if (res.message) {
+                toast.success(res.message, { id: toastId });
+            } else {
+                toast.success('Emails queued successfully', { id: toastId });
+            }
+        } catch (e: any) {
+            toast.error(e.message || 'Failed to send emails', { id: toastId });
+        } finally {
+            setSendingResults(false);
+        }
     };
 
     // --- Mark Editing Logic ---
@@ -217,6 +239,14 @@ export default function TestDetails() {
                             title="Download Report"
                         >
                             <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={handleSendResults}
+                            disabled={sendingResults}
+                            className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border border-app-border bg-white shadow-sm disabled:opacity-50"
+                            title="Send Results via Email"
+                        >
+                            <Mail className="w-4 h-4" />
                         </button>
                         <button
                             onClick={handleOpenEdit}
