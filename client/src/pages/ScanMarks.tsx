@@ -328,15 +328,15 @@ export default function ScanMarks() {
 
             {/* Scanner Active - Immersive Fullscreen Mobile UI */}
             {scanning && (
-                <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center overflow-hidden">
+                <div className="fixed inset-0 z-[100] bg-black overflow-hidden">
                     {/* Camera Viewfinder */}
                     <div id={READER_ID} className="w-full h-full absolute inset-0 [&>video]:object-cover [&>video]:w-full [&>video]:h-full"></div>
 
                     {/* Dark Backdrop for non-scanned area */}
                     <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
-                    {/* Scanner Overlay - Centered & Responsive */}
-                    <div className="relative z-10 w-[95vw] max-w-md aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
+                    {/* Scanner Overlay - Absolute Center Force */}
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[95vw] max-w-md aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
 
                         {/* Scanner Logic UI Components */}
                         {/* Left: QR Code Area */}
