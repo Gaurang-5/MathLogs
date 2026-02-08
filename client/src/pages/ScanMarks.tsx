@@ -89,7 +89,7 @@ export default function ScanMarks() {
                 try {
                     await html5QrCode.start(
                         {
-                            facingMode: { exact: "environment" }
+                            facingMode: "environment"
                         },
                         {
                             fps: 10,
