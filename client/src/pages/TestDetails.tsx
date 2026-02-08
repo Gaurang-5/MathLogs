@@ -354,7 +354,8 @@ export default function TestDetails() {
                                                     {mark.score}
                                                     <button
                                                         onClick={() => handleEditClick(mark)}
-                                                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 transition-all"
+                                                        className="md:opacity-0 md:group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 transition-all"
+                                                        title="Edit mark"
                                                     >
                                                         <Pencil className="w-3 h-3" />
                                                     </button>
