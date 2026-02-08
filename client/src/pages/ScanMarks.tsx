@@ -88,10 +88,11 @@ export default function ScanMarks() {
 
                 try {
                     await html5QrCode.start(
-                        { facingMode: "environment" },
+                        {
+                            facingMode: { exact: "environment" }
+                        },
                         {
                             fps: 10,
-                            // Match overlay dimensions: w-[20rem] (320px) x h-[4.75rem] (~76px)
                             // Dynamic scan box matching the UI overlay
                             qrbox: (viewfinderWidth, _viewfinderHeight) => {
                                 // Match the w-[90vw] max-w-[24rem] logic
@@ -100,7 +101,10 @@ export default function ScanMarks() {
                                 const width = Math.min(maxWidth, viewfinderWidth * 0.9);
                                 const height = width / 4.2; // 4.2:1 Aspect Ratio
                                 return { width, height };
-                            }
+                            },
+                            // Request high resolution for better focus
+                            aspectRatio: 4 / 3,
+                            disableFlip: false
                         },
                         async (decodedText) => {
                             // Success callback
@@ -193,6 +197,29 @@ export default function ScanMarks() {
                         },
                         (_errorMessage: any) => { /* ignore */ }
                     );
+
+                    // Enable tap-to-focus on the video element
+                    setTimeout(() => {
+                        const videoElement = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement;
+                        if (videoElement && videoElement.srcObject) {
+                            const stream = videoElement.srcObject as MediaStream;
+                            const track = stream.getVideoTracks()[0];
+
+                            videoElement.addEventListener('click', async () => {
+                                try {
+                                    const capabilities = track.getCapabilities() as any;
+                                    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                                        await track.applyConstraints({
+                                            advanced: [{ focusMode: 'continuous' } as any]
+                                        });
+                                        console.log('📷 Autofocus enabled');
+                                    }
+                                } catch (e) {
+                                    console.warn('Tap-to-focus not supported:', e);
+                                }
+                            });
+                        }
+                    }, 1000);
                 } catch (err) {
                     console.error("Error starting scanner:", err);
                     setScanning(false);
@@ -390,8 +417,9 @@ export default function ScanMarks() {
                                 <span className="font-bold text-slate-800">Processing Scan...</span>
                             </div>
                         ) : (
-                            <div className="bg-black/60 backdrop-blur-md text-white text-xs font-medium px-4 py-2 rounded-full border border-white/10">
-                                Align sticker within the frame
+                            <div className="bg-black/60 backdrop-blur-md text-white text-center px-4 py-2 rounded-full border border-white/10 max-w-xs">
+                                <p className="text-xs font-medium">Hold 10-15cm from sticker</p>
+                                <p className="text-[10px] text-white/70 mt-0.5">Tap screen to focus if blurry</p>
                             </div>
                         )}
 
