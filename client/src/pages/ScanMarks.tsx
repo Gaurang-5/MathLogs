@@ -403,57 +403,46 @@ export default function ScanMarks() {
                 <div className="fixed inset-0 z-[200] bg-black overflow-hidden">
                     {/* Camera Viewfinder */}
                     {/* Hide bottom navigation */}
-                    <style>{`nav.fixed.bottom-6 { display: none !important; }`}</style>
+                    <style>{`
+                        nav.fixed.bottom-6 { display: none !important; }
+                        
+                        /* Hide html5-qrcode's default qrbox border AND background */
+                        #${READER_ID} #qr-shaded-region { 
+                            border: none !important; 
+                            box-shadow: none !important;
+                            background: transparent !important;
+                        }
+                        #${READER_ID} div[style*="border"] { 
+                            border: none !important; 
+                        }
+                        /* Hide the gray rectangle background */
+                        #${READER_ID} > div:not(video) {
+                            background: transparent !important;
+                        }
+                    `}</style>
                     <div id={READER_ID} className="w-full h-full absolute inset-0 [&>video]:object-cover [&>video]:w-full [&>video]:h-full"></div>
 
                     {/* Dark Backdrop for non-scanned area */}
                     <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
-                    {/* Scanner Overlay - Large for visibility, qrbox is smaller inside */}
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[65vw] max-w-md aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
+                    {/* Minimal Corner Guides - No rectangle, just corners */}
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[75vw] max-w-lg aspect-[4.2/1] pointer-events-none">
+                        {/* Top-left corner */}
+                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 rounded-tl-lg shadow-[0_0_20px_rgba(74,222,128,0.6)]"></div>
 
-                        {/* Scanner Logic UI Components */}
-                        {/* Left: QR Code Area */}
-                        <div className="w-[25.5%] h-full border-r-2 border-white/50 relative flex items-center justify-center bg-green-500/10">
-                            <div className="w-[85%] aspect-square border-2 border-green-400 rounded-sm relative shadow-[0_0_15px_rgba(74,222,128,0.5)]">
-                                <div className="absolute inset-0 bg-green-400/10 animate-pulse"></div>
-                                {/* Corner markers */}
-                                <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-green-400"></div>
-                                <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-green-400"></div>
-                                <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-green-400"></div>
-                                <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-green-400"></div>
-                            </div>
-                            <span className="absolute bottom-1 text-[8px] font-bold text-green-400 tracking-wider shadow-black drop-shadow-md">QR</span>
+                        {/* Top-right corner */}
+                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 rounded-tr-lg shadow-[0_0_20px_rgba(74,222,128,0.6)]"></div>
+
+                        {/* Bottom-left corner */}
+                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 rounded-bl-lg shadow-[0_0_20px_rgba(74,222,128,0.6)]"></div>
+
+                        {/* Bottom-right corner */}
+                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 rounded-br-lg shadow-[0_0_20px_rgba(74,222,128,0.6)]"></div>
+
+                        {/* Subtle center guide text */}
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/70 text-sm font-medium bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm">
+                            Align sticker here
                         </div>
-
-                        {/* Right: Info Area */}
-                        <div className="flex-1 flex flex-col relative bg-white/5 backdrop-blur-[2px]">
-                            {/* Top: Name Area */}
-                            <div className="h-[45%] flex items-center pl-3 pt-1 border-b border-white/20">
-                                <div className="w-3/4 h-2.5 bg-white/20 rounded-sm"></div>
-                            </div>
-
-                            {/* Bottom: Marks Section */}
-                            <div className="h-[55%] flex items-center pl-3 pr-4 pb-1 gap-2 relative">
-                                <span className="text-white/90 text-[8px] font-bold tracking-wider uppercase min-w-fit mt-1 drop-shadow-md">MARKS:</span>
-                                <div className="flex-1 flex gap-1 h-full items-end justify-start pb-1">
-                                    {[1, 2, 3].map((i) => (
-                                        <div key={i} className="flex-1 h-[85%] border border-white/50 rounded-[1px] bg-white/10 relative">
-                                            <div className="absolute bottom-[20%] left-0.5 right-0.5 h-px bg-white/40"></div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="absolute right-0.5 bottom-1 top-1 w-2 flex items-end justify-center pointer-events-none">
-                                    <span className="text-[5px] text-white/50 font-mono -rotate-90 origin-bottom whitespace-nowrap mb-1">OCR</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Guide Corners for entire sticker */}
-                        <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-white/80 rounded-tl-sm"></div>
-                        <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-white/80 rounded-tr-sm"></div>
-                        <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-white/80 rounded-br-sm"></div>
-                        <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-white/80 rounded-bl-sm"></div>
                     </div>
 
                     {/* Bottom Controls */}
@@ -482,105 +471,109 @@ export default function ScanMarks() {
 
 
             {/* Warning Modal */}
-            {pendingStudent && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center">
-                        <div className="w-16 h-16 bg-yellow-50 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold shadow-sm">!</div>
-                        <h2 className="text-xl font-bold text-slate-800 mb-2">Marks Already Exist</h2>
-                        <p className="text-slate-600 mb-4">
-                            <span className="font-bold">{pendingStudent.name}</span> has already scored <span className="font-bold">{existingMark}</span> in this test.
-                        </p>
-                        <p className="text-sm text-slate-500 mb-6">Do you want to overwrite the score?</p>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <button
-                                onClick={() => {
-                                    setPendingStudent(null);
-                                    setExistingMark(null);
-                                    if (scannerRef.current) {
-                                        scannerRef.current.resume();
-                                        processingRef.current = false;
-                                    }
-                                    setScanning(true); // Show scanner overlay again
-                                }}
-                                className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl transition"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setStudent(pendingStudent);
-                                    setPendingStudent(null);
-                                    setExistingMark(null);
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition"
-                            >
-                                Overwrite
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Mark Entry Modal */}
-            {student && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[150] animate-fadeIn">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 transform transition-all scale-100 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-
-                        <div className="text-center mb-8">
-                            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold shadow-sm">
-                                {student.name.charAt(0)}
-                            </div>
-                            <h2 className="text-2xl font-bold text-slate-800">{student.name}</h2>
-                            <p className="text-slate-500 text-sm mt-1">{student.batch?.name}</p>
-                            <div className="inline-block bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded mt-2 font-mono">
-                                {student.humanId}
-                            </div>
-                        </div>
-
-                        {/* Debug Image Preview */}
-                        {debugImage && (
-                            <div className="mb-4">
-                                <p className="text-xs text-slate-400 mb-1 text-center">AI Vision Capture:</p>
-                                <img src={debugImage} alt="OCR Debug" className="w-full h-auto rounded-lg border border-slate-200" />
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmitMark}>
-                            <div className="mb-8">
-                                <label className="block text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Obtained Marks</label>
-                                <input
-                                    type="number"
-                                    inputMode="numeric"
-                                    className="w-full text-center text-5xl font-black text-slate-800 bg-transparent border-none focus:ring-0 placeholder-slate-200 outline-none"
-                                    placeholder="00"
-                                    autoFocus
-                                    value={score}
-                                    onChange={e => setScore(e.target.value)}
-                                    required
-                                />
-                            </div>
+            {
+                pendingStudent && (
+                    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center">
+                            <div className="w-16 h-16 bg-yellow-50 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold shadow-sm">!</div>
+                            <h2 className="text-xl font-bold text-slate-800 mb-2">Marks Already Exist</h2>
+                            <p className="text-slate-600 mb-4">
+                                <span className="font-bold">{pendingStudent.name}</span> has already scored <span className="font-bold">{existingMark}</span> in this test.
+                            </p>
+                            <p className="text-sm text-slate-500 mb-6">Do you want to overwrite the score?</p>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <button
-                                    type="button"
-                                    onClick={handleCancelInput}
-                                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3.5 rounded-xl transition"
+                                    onClick={() => {
+                                        setPendingStudent(null);
+                                        setExistingMark(null);
+                                        if (scannerRef.current) {
+                                            scannerRef.current.resume();
+                                            processingRef.current = false;
+                                        }
+                                        setScanning(true); // Show scanner overlay again
+                                    }}
+                                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl transition"
                                 >
                                     Cancel
                                 </button>
                                 <button
-                                    type="submit"
-                                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-green-200 transition"
+                                    onClick={() => {
+                                        setStudent(pendingStudent);
+                                        setPendingStudent(null);
+                                        setExistingMark(null);
+                                    }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition"
                                 >
-                                    Save
+                                    Overwrite
                                 </button>
                             </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
-            )}
-        </Layout>
+                )
+            }
+
+            {/* Mark Entry Modal */}
+            {
+                student && (
+                    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[150] animate-fadeIn">
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 transform transition-all scale-100 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+
+                            <div className="text-center mb-8">
+                                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold shadow-sm">
+                                    {student.name.charAt(0)}
+                                </div>
+                                <h2 className="text-2xl font-bold text-slate-800">{student.name}</h2>
+                                <p className="text-slate-500 text-sm mt-1">{student.batch?.name}</p>
+                                <div className="inline-block bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded mt-2 font-mono">
+                                    {student.humanId}
+                                </div>
+                            </div>
+
+                            {/* Debug Image Preview */}
+                            {debugImage && (
+                                <div className="mb-4">
+                                    <p className="text-xs text-slate-400 mb-1 text-center">AI Vision Capture:</p>
+                                    <img src={debugImage} alt="OCR Debug" className="w-full h-auto rounded-lg border border-slate-200" />
+                                </div>
+                            )}
+
+                            <form onSubmit={handleSubmitMark}>
+                                <div className="mb-8">
+                                    <label className="block text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Obtained Marks</label>
+                                    <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        className="w-full text-center text-5xl font-black text-slate-800 bg-transparent border-none focus:ring-0 placeholder-slate-200 outline-none"
+                                        placeholder="00"
+                                        autoFocus
+                                        value={score}
+                                        onChange={e => setScore(e.target.value)}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={handleCancelInput}
+                                        className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3.5 rounded-xl transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-green-200 transition"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+        </Layout >
     );
 }
