@@ -73,30 +73,40 @@ export default function ScanMarks() {
     // Effect to start scanner when 'scanning' state becomes true
     useEffect(() => {
         if (scanning && mountedRef.current) {
+            console.log("🎬 Scanner initialization triggered");
             // Slight delay to ensure DOM is ready and previous instance is cleaned
             const timer = setTimeout(async () => {
+                console.log("⏰ Timer executed, checking DOM...");
                 // Double check if element exists
-                if (!document.getElementById(READER_ID)) {
-                    console.error("Reader element not found");
+                const readerElement = document.getElementById(READER_ID);
+                if (!readerElement) {
+                    console.error("❌ Reader element not found!");
                     setScanning(false);
                     return;
                 }
+                console.log("✅ Reader element found:", readerElement);
 
                 // Reset processing lock
                 processingRef.current = false;
 
                 // Prevent multiple initializations
-                if (scannerRef.current?.isScanning) return;
+                if (scannerRef.current?.isScanning) {
+                    console.log("⚠️ Scanner already running, skipping init");
+                    return;
+                }
 
                 // Cleanup any existing instance
                 if (scannerRef.current) {
+                    console.log("🧹 Cleaning up existing scanner...");
                     await scannerRef.current.clear();
                 }
 
+                console.log("🚀 Creating new Html5Qrcode instance...");
                 const html5QrCode = new Html5Qrcode(READER_ID);
                 scannerRef.current = html5QrCode;
 
                 try {
+                    console.log("📸 Starting camera with config...");
                     await html5QrCode.start(
                         {
                             facingMode: "environment"
@@ -243,10 +253,17 @@ export default function ScanMarks() {
                             });
                         }
                     }, 1000);
-                } catch (err) {
-                    console.error("Error starting scanner:", err);
+
+                    console.log("✅ Scanner started successfully!");
+                } catch (err: any) {
+                    console.error("❌ Error starting scanner:", err);
+                    console.error("Error details:", {
+                        message: err.message,
+                        name: err.name,
+                        stack: err.stack
+                    });
                     setScanning(false);
-                    alert('Failed to start camera. Ensure permission is granted.');
+                    showToast('Failed to start camera: ' + (err.message || 'Unknown error'), 'error');
                 }
             }, 300); // Increased delay for safety
 
