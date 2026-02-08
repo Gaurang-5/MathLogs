@@ -292,7 +292,7 @@ export default function ScanMarks() {
                 score
             });
 
-            showToast(`✓ Saved ${student.name}: ${score}`, 'success');
+            showToast(`✓ Saved ${student.name}: ${score} - Ready for next`, 'success');
 
             // Reset for next scan
             setStudent(null);
@@ -301,12 +301,14 @@ export default function ScanMarks() {
             setPendingStudent(null);
             setDebugImage(null);
 
-            // CONTINUOUS SCANNING: Auto-resume for batch processing
-            if (scannerRef.current) {
-                scannerRef.current.resume();
-                processingRef.current = false;
-            }
-            setScanning(true); // Show scanner overlay again - ready for next sticker!
+            // CONTINUOUS SCANNING: Auto-resume for batch processing (silent)
+            setTimeout(() => {
+                if (scannerRef.current) {
+                    scannerRef.current.resume();
+                    processingRef.current = false;
+                }
+                setScanning(true); // Show scanner overlay again - ready for next sticker!
+            }, 800); // Small delay for smooth transition
         } catch (e: any) {
             console.error('Save mark error:', e);
             // Extract error message from backend response
