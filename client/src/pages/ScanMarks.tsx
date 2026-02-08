@@ -113,16 +113,13 @@ export default function ScanMarks() {
                         },
                         {
                             fps: 15,
-                            // Precise scan box - respecting 50px minimum requirement
-                            qrbox: (viewfinderWidth, _viewfinderHeight) => {
-                                // Calculate width (min 50px for library requirement)
-                                const calculatedWidth = Math.min(250, viewfinderWidth * 0.55);
-                                const width = Math.max(50, calculatedWidth);
+                            // DIAGNOSTIC: Very large qrbox to test detection
+                            qrbox: (viewfinderWidth, viewfinderHeight) => {
+                                // Use 80% of screen for testing
+                                const width = Math.max(250, viewfinderWidth * 0.8);
+                                const height = Math.max(250, viewfinderHeight * 0.8);
 
-                                // Calculate height with 4.2:1 aspect ratio (min 50px)
-                                const calculatedHeight = width / 4.2;
-                                const height = Math.max(50, calculatedHeight);
-
+                                console.log("📐 qrbox dimensions:", { width, height });
                                 return { width, height };
                             },
                             // Request high resolution for better focus
