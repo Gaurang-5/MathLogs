@@ -30,6 +30,16 @@ export default function ScanMarks() {
     const mountedRef = useRef(true);
     const processingRef = useRef(false);
 
+    // Helper function for toast notifications
+    const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+        const toast = document.createElement('div');
+        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-yellow-500';
+        toast.className = `fixed top-20 left-1/2 -translate-x-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-[300] animate-fadeIn max-w-md text-center`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    };
+
     useEffect(() => {
         mountedRef.current = true;
         // Fetch available tests
@@ -162,6 +172,19 @@ export default function ScanMarks() {
                                 if (ocrResult.debugImage) setDebugImage(ocrResult.debugImage);
                                 setIsProcessingOCR(false);
 
+                                // Check if student belongs to the selected test's batch
+                                const selectedTest = tests.find(t => t.id === selectedTestId);
+                                if (selectedTest && studentData.batch) {
+                                    // Check if className matches (if test has className)
+                                    if (selectedTest.className && studentData.batch.className !== selectedTest.className) {
+                                        setScanning(false);
+                                        showToast(`⚠️ Wrong Batch! ${studentData.name} is in ${studentData.batch.className}, but test is for ${selectedTest.className}`, 'warning');
+                                        processingRef.current = false;
+                                        setTimeout(() => setScanning(true), 3000); // Auto-resume after 3s
+                                        return;
+                                    }
+                                }
+
                                 const existing = studentData.marks?.find((m: any) => m.testId === selectedTestId);
 
                                 // Hide scanner overlay so modal can appear
@@ -182,12 +205,13 @@ export default function ScanMarks() {
                                 // Reset processing flag so modal can appear and next scan can work
                                 processingRef.current = false;
                                 console.log("✅ Modal should appear now!");
-                            } catch (e) {
+                            } catch (e: any) {
                                 console.error("❌ Error in scan processing:", e);
                                 setIsProcessingOCR(false);
-                                setScanning(false); // Hide scanner on error too
-                                alert('Student not found or Invalid QR Code');
+                                setScanning(false);
+                                showToast(e.message || 'Student not found or Invalid QR Code', 'error');
                                 processingRef.current = false;
+                                setTimeout(() => setScanning(true), 2000); // Auto-resume after 2s
                             }
                         },
                         (_errorMessage: any) => { /* ignore */ }
@@ -250,12 +274,7 @@ export default function ScanMarks() {
                 score
             });
 
-            // Show success toast
-            const toast = document.createElement('div');
-            toast.className = 'fixed top-20 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-[300] animate-fadeIn';
-            toast.textContent = `✓ Saved ${student.name}: ${score}`;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2000);
+            showToast(`✓ Saved ${student.name}: ${score}`, 'success');
 
             // Reset for next scan
             setStudent(null);
@@ -270,8 +289,12 @@ export default function ScanMarks() {
                 processingRef.current = false;
             }
             setScanning(true); // Show scanner overlay again - ready for next sticker!
-        } catch (e) {
-            alert('Failed to save mark');
+        } catch (e: any) {
+            console.error('Save mark error:', e);
+            // Extract error message from backend response
+            const errorMsg = e.error || e.message || 'Failed to save mark';
+            showToast(errorMsg, 'error');
+            // Don't resume scanning on error - let user fix the issue
         }
     };
 
