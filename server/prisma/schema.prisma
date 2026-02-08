@@ -197,8 +197,8 @@ model Mark {
   score     Float
   studentId String
   testId    String
-  test      Test    @relation(fields: [testId], references: [id])
-  student   Student @relation(fields: [studentId], references: [id])
+  test      Test    @relation(fields: [testId], references: [id], onDelete: Cascade)
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, testId])
   @@index([testId])
