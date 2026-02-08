@@ -355,8 +355,10 @@ export default function ScanMarks() {
 
             {/* Scanner Active - Immersive Fullscreen Mobile UI */}
             {scanning && (
-                <div className="fixed inset-0 z-[100] bg-black overflow-hidden">
+                <div className="fixed inset-0 z-[200] bg-black overflow-hidden">
                     {/* Camera Viewfinder */}
+                    {/* Hide bottom navigation */}
+                    <style>{`nav.fixed.bottom-6 { display: none !important; }`}</style>
                     <div id={READER_ID} className="w-full h-full absolute inset-0 [&>video]:object-cover [&>video]:w-full [&>video]:h-full"></div>
 
                     {/* Dark Backdrop for non-scanned area */}
