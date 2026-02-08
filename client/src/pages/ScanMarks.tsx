@@ -103,12 +103,16 @@ export default function ScanMarks() {
                         },
                         {
                             fps: 15,
-                            // Precise scan box - small to capture only one sticker
+                            // Precise scan box - respecting 50px minimum requirement
                             qrbox: (viewfinderWidth, _viewfinderHeight) => {
-                                // Small internal capture area (prevents adjacent scans)
-                                const maxWidth = 200;
-                                const width = Math.min(maxWidth, viewfinderWidth * 0.45);
-                                const height = width / 4.2; // 4.2:1 Aspect Ratio
+                                // Calculate width (min 50px for library requirement)
+                                const calculatedWidth = Math.min(250, viewfinderWidth * 0.55);
+                                const width = Math.max(50, calculatedWidth);
+
+                                // Calculate height with 4.2:1 aspect ratio (min 50px)
+                                const calculatedHeight = width / 4.2;
+                                const height = Math.max(50, calculatedHeight);
+
                                 return { width, height };
                             },
                             // Request high resolution for better focus
