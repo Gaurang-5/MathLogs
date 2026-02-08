@@ -95,10 +95,9 @@ export default function ScanMarks() {
                             fps: 15,
                             // Dynamic scan box matching the UI overlay
                             qrbox: (viewfinderWidth, _viewfinderHeight) => {
-                                // Smaller scan area to avoid scanning adjacent QR codes
-                                // 24rem = 384px (max width)
-                                const maxWidth = 300;
-                                const width = Math.min(maxWidth, viewfinderWidth * 0.6);
+                                // MUCH smaller scan area - only one sticker at a time
+                                const maxWidth = 200; // Reduced from 300 to prevent adjacent scans
+                                const width = Math.min(maxWidth, viewfinderWidth * 0.45); // Reduced from 0.6
                                 const height = width / 4.2; // 4.2:1 Aspect Ratio
                                 return { width, height };
                             },
@@ -251,19 +250,26 @@ export default function ScanMarks() {
                 score
             });
 
-            // Reset
+            // Show success toast
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-20 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-[300] animate-fadeIn';
+            toast.textContent = `✓ Saved ${student.name}: ${score}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+
+            // Reset for next scan
             setStudent(null);
             setScore('');
             setExistingMark(null);
             setPendingStudent(null);
             setDebugImage(null);
 
-            // Resume scanning
+            // CONTINUOUS SCANNING: Auto-resume for batch processing
             if (scannerRef.current) {
                 scannerRef.current.resume();
                 processingRef.current = false;
             }
-            setScanning(true); // Show scanner overlay again
+            setScanning(true); // Show scanner overlay again - ready for next sticker!
         } catch (e) {
             alert('Failed to save mark');
         }
@@ -362,8 +368,8 @@ export default function ScanMarks() {
                     {/* Dark Backdrop for non-scanned area */}
                     <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
-                    {/* Scanner Overlay - Absolute Center Force */}
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[70vw] max-w-sm aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
+                    {/* Scanner Overlay - Smaller to prevent adjacent scans */}
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[50vw] max-w-xs aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
 
                         {/* Scanner Logic UI Components */}
                         {/* Left: QR Code Area */}
