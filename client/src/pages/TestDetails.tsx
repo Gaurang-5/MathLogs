@@ -83,8 +83,11 @@ export default function TestDetails() {
             await apiRequest(`/tests/${id}`, 'DELETE');
             toast.success('Test deleted successfully');
             navigate('/tests');
-        } catch (e) {
-            toast.error('Failed to delete test');
+        } catch (e: any) {
+            // Show the actual backend error message
+            const errorMsg = e.error || e.message || 'Failed to delete test';
+            toast.error(errorMsg);
+            console.error('Delete test error:', e);
         }
     };
 

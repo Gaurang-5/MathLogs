@@ -292,7 +292,8 @@ export default function ScanMarks() {
                 score
             });
 
-            showToast(`✓ Saved ${student.name}: ${score} - Ready for next`, 'success');
+            // Single success toast
+            showToast(`✓ ${student.name}: ${score} marks saved`, 'success');
 
             // Reset for next scan
             setStudent(null);
@@ -301,14 +302,28 @@ export default function ScanMarks() {
             setPendingStudent(null);
             setDebugImage(null);
 
-            // CONTINUOUS SCANNING: Auto-resume for batch processing (silent)
-            setTimeout(() => {
-                if (scannerRef.current) {
-                    scannerRef.current.resume();
-                    processingRef.current = false;
+            // CONTINUOUS SCANNING: Immediately resume scanner
+            processingRef.current = false;
+
+            // Resume the scanner if it exists and is paused
+            if (scannerRef.current) {
+                try {
+                    // Check if scanner is in a paused state
+                    if (scannerRef.current.getState() === 2) { // State 2 = PAUSED
+                        await scannerRef.current.resume();
+                        console.log('✅ Scanner resumed for next scan');
+                    }
+                } catch (resumeError) {
+                    console.warn('Could not resume scanner, will restart:', resumeError);
+                    // If resume fails, restart the scanner
+                    setScanning(false);
+                    setTimeout(() => setScanning(true), 100);
+                    return;
                 }
-                setScanning(true); // Show scanner overlay again - ready for next sticker!
-            }, 800); // Small delay for smooth transition
+            }
+
+            // Keep scanning overlay visible
+            setScanning(true);
         } catch (e: any) {
             console.error('Save mark error:', e);
             // Extract error message from backend response
@@ -322,9 +337,17 @@ export default function ScanMarks() {
         setStudent(null);
         setScore('');
         setDebugImage(null);
+        processingRef.current = false;
+
+        // Resume scanner
         if (scannerRef.current) {
-            scannerRef.current.resume();
-            processingRef.current = false;
+            try {
+                if (scannerRef.current.getState() === 2) { // State 2 = PAUSED
+                    scannerRef.current.resume();
+                }
+            } catch (e) {
+                console.warn('Could not resume scanner on cancel:', e);
+            }
         }
         setScanning(true); // Show scanner overlay again
     };
