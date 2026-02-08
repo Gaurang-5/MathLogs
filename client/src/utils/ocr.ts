@@ -11,7 +11,7 @@ async function preprocessImage(imageBase64: string): Promise<string> {
         const img = new Image();
         img.onload = () => {
             // Cap max dimension to 1500px for optimal upload speed
-            const MAX_DIMENSION = 1500;
+            const MAX_DIMENSION = 1024;
             let width = img.width;
             let height = img.height;
 
@@ -62,11 +62,7 @@ export async function extractMarksFromSticker(
     videoElement: HTMLVideoElement,
     imageOverride?: string | null
 ): Promise<OCRResult> {
-    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-    if (!geminiKey) {
-        throw new Error("Gemini API key not configured. Please add VITE_GEMINI_API_KEY to your .env file.");
-    }
 
     let imageBase64 = "";
 
