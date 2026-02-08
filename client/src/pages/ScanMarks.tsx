@@ -103,11 +103,11 @@ export default function ScanMarks() {
                         },
                         {
                             fps: 15,
-                            // Dynamic scan box matching the UI overlay
+                            // Precise scan box - small to capture only one sticker
                             qrbox: (viewfinderWidth, _viewfinderHeight) => {
-                                // MUCH smaller scan area - only one sticker at a time
-                                const maxWidth = 200; // Reduced from 300 to prevent adjacent scans
-                                const width = Math.min(maxWidth, viewfinderWidth * 0.45); // Reduced from 0.6
+                                // Small internal capture area (prevents adjacent scans)
+                                const maxWidth = 200;
+                                const width = Math.min(maxWidth, viewfinderWidth * 0.45);
                                 const height = width / 4.2; // 4.2:1 Aspect Ratio
                                 return { width, height };
                             },
@@ -391,8 +391,8 @@ export default function ScanMarks() {
                     {/* Dark Backdrop for non-scanned area */}
                     <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
-                    {/* Scanner Overlay - Smaller to prevent adjacent scans */}
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[50vw] max-w-xs aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
+                    {/* Scanner Overlay - Large for visibility, qrbox is smaller inside */}
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[65vw] max-w-md aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
 
                         {/* Scanner Logic UI Components */}
                         {/* Left: QR Code Area */}
