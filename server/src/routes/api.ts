@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
-import { authLimiter, publicLimiter, paymentLimiter } from '../middleware/security';
+import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
 import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
 import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF } from '../controllers/batchController';
@@ -15,8 +15,85 @@ import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcadem
 import { getDashboardSummary } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
 import { getPaymentHistory } from '../controllers/feeController';
+import multer from 'multer';
+import { processOCR } from '../utils/ocr';
 
 const router = Router();
+
+// Configure multer for memory storage
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only JPEG, PNG and WebP are allowed.'));
+        }
+    }
+});
+
+import crypto from 'crypto';
+
+// ✅ HIGH-3: Image Deduplication Cache
+// Prevents replay billing attacks (same image sent multiple times)
+const recentScans = new Map<string, { result: any, timestamp: number }>();
+
+// Purge cache every minute
+setInterval(() => {
+    const now = Date.now();
+    for (const [hash, entry] of recentScans.entries()) {
+        if (now - entry.timestamp > 60000) { // 1 minute TTL
+            recentScans.delete(hash);
+        }
+    }
+}, 60000);
+
+// OCR Scan Endpoint
+router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('image'), async (req, res) => {
+    try {
+        console.log("📥 Received OCR Request", (req as any).user?.username);
+
+        let imageBuffer: Buffer | string | undefined;
+
+        if (req.file) {
+            console.log(`📎 File received: ${req.file.originalname} (${req.file.size} bytes)`);
+            imageBuffer = req.file.buffer;
+        } else if (req.body.image) {
+            // Fallback for JSON Base64 (Legacy/Dev)
+            console.log("⚠️ Legacy Base64 JSON received");
+            imageBuffer = req.body.image;
+        }
+
+        if (!imageBuffer) {
+            console.error("❌ No image data found in request");
+            return res.status(400).json({ error: "Missing image data" });
+        }
+
+        // Generate Hash for Deduplication
+        const hash = crypto.createHash('sha256').update(req.file ? req.file.buffer : imageBuffer.toString()).digest('hex');
+
+        if (recentScans.has(hash)) {
+            console.log("♻️ Duplicate Scan Detected - Returning Cached Result");
+            return res.json(recentScans.get(hash)!.result);
+        }
+
+        const result = await processOCR(imageBuffer);
+
+        // Cache result for 60s
+        recentScans.set(hash, { result, timestamp: Date.now() });
+
+        console.log("✅ OCR Success:", result);
+        res.json(result);
+
+    } catch (error: any) {
+        console.error("❌ OCR Proxy Error:", error);
+        res.status(500).json({ error: "OCR Processing Failed", details: error.message });
+    }
+});
 
 // Dashboard (Optimized endpoint)
 router.get('/dashboard/summary', authenticateToken as any, getDashboardSummary as any);

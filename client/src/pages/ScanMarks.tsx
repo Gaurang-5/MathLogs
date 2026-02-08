@@ -5,7 +5,9 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Loader2 } from 'lucide-react';
+import { extractMarksFromSticker } from '../utils/ocr';
+import { loadOpenCV, detectAndWarpSticker } from '../utils/cv';
 
 export default function ScanMarks() {
     const [searchParams] = useSearchParams();
@@ -14,12 +16,19 @@ export default function ScanMarks() {
     const [score, setScore] = useState('');
     const [tests, setTests] = useState<any[]>([]);
     const [selectedTestId, setSelectedTestId] = useState(searchParams.get('testId') || '');
+
+    // Restored State Variables
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [existingMark, setExistingMark] = useState<number | null>(null);
     const [pendingStudent, setPendingStudent] = useState<any>(null);
 
+    // OCR State
+    const [isProcessingOCR, setIsProcessingOCR] = useState(false);
+    const [debugImage, setDebugImage] = useState<string | null>(null);
+
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const mountedRef = useRef(true);
+    const processingRef = useRef(false);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -43,10 +52,13 @@ export default function ScanMarks() {
         };
     }, []);
 
+    // Load OpenCV on mount
+    useEffect(() => {
+        loadOpenCV().then(() => console.log("OpenCV Loaded")).catch(console.error);
+    }, []);
+
     // Use a unique ID to prevent collisions
     const READER_ID = "reader-scan-marks";
-
-
 
     // Effect to start scanner when 'scanning' state becomes true
     useEffect(() => {
@@ -59,6 +71,9 @@ export default function ScanMarks() {
                     setScanning(false);
                     return;
                 }
+
+                // Reset processing lock
+                processingRef.current = false;
 
                 // Prevent multiple initializations
                 if (scannerRef.current?.isScanning) return;
@@ -76,12 +91,74 @@ export default function ScanMarks() {
                         { facingMode: "environment" },
                         {
                             fps: 10,
-                            qrbox: { width: 300, height: 90 }
+                            // Match overlay dimensions: w-[20rem] (320px) x h-[4.75rem] (~76px)
+                            qrbox: { width: 320, height: 76 }
                         },
                         async (decodedText) => {
                             // Success callback
+                            if (processingRef.current) return; // Prevent multiple triggers
+                            processingRef.current = true;
+
                             console.log("Matched: " + decodedText);
-                            html5QrCode.pause();
+                            // Do NOT pause immediately so video keeps playing for CV detection
+                            // html5QrCode.pause(); 
+
+                            // Set processing state
+                            setIsProcessingOCR(true);
+                            setDebugImage(null); // Clear previous
+                            let extractedMark = "";
+
+                            try {
+                                const videoElement = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement;
+                                if (videoElement) {
+                                    console.log("🎥 Starting OCR processing...");
+
+                                    // 1. Try OpenCV Smart Detection (Dewarping) - Burst Mode
+                                    // Try 5 times over 500ms to get a good lock
+                                    let smartImage = null;
+                                    try {
+                                        if (window.cv) {
+                                            const cvCanvas = document.createElement('canvas'); // Not used by worker but kept for signature
+                                            for (let i = 0; i < 5; i++) {
+                                                smartImage = await detectAndWarpSticker(videoElement, cvCanvas);
+                                                if (smartImage) break; // Found it!
+                                                await new Promise(r => setTimeout(r, 100)); // Wait 100ms
+                                            }
+                                        }
+                                    } catch (cvErr) {
+                                        console.warn("CV Detection failed:", cvErr);
+                                    }
+
+                                    // NOW pause the scanner to save resources while we process OCR and show the modal
+                                    html5QrCode.pause();
+
+                                    let ocrResult;
+
+                                    if (smartImage) {
+                                        console.log("✨ Smart Detection Success! Sending dewarped image to AI.");
+                                        ocrResult = await extractMarksFromSticker(videoElement, smartImage);
+                                    } else {
+                                        console.log("⚠️ Smart Detection Failed - Falling back to simple center crop.");
+                                        ocrResult = await extractMarksFromSticker(videoElement);
+                                    }
+
+                                    extractedMark = ocrResult.score;
+                                    if (ocrResult.debugImage) setDebugImage(ocrResult.debugImage);
+
+                                    console.log("✅ OCR Complete!");
+                                    console.log("   - Raw Score:", ocrResult.score);
+                                    console.log("   - Confidence:", ocrResult.confidence);
+                                    console.log("   - Has Debug Image:", !!ocrResult.debugImage);
+
+                                    if (ocrResult.debugImage) {
+                                        setDebugImage(ocrResult.debugImage);
+                                    }
+                                }
+                            } catch (ocrErr) {
+                                console.error("❌ OCR Error:", ocrErr);
+                            } finally {
+                                setIsProcessingOCR(false);
+                            }
 
                             // Lookup Student
                             try {
@@ -93,6 +170,13 @@ export default function ScanMarks() {
                                     setPendingStudent(studentData);
                                 } else {
                                     setStudent(studentData);
+                                    // Pre-fill score if OCR detected anything (including "0")
+                                    if (extractedMark && extractedMark.trim() !== "") {
+                                        console.log("📝 Auto-filling score field with:", extractedMark);
+                                        setScore(extractedMark);
+                                    } else {
+                                        console.log("⚠️ No marks detected by OCR - manual entry required");
+                                    }
                                 }
                             } catch (e) {
                                 alert('Student not found or Invalid QR Code');
@@ -136,16 +220,17 @@ export default function ScanMarks() {
                 score
             });
 
-            // Success feedback
-            // alert('Marks saved for ' + student.name);
-
             // Reset
             setStudent(null);
             setScore('');
+            setExistingMark(null);
+            setPendingStudent(null);
+            setDebugImage(null);
 
             // Resume scanning
             if (scannerRef.current) {
                 scannerRef.current.resume();
+                processingRef.current = false;
             }
         } catch (e) {
             alert('Failed to save mark');
@@ -155,8 +240,10 @@ export default function ScanMarks() {
     const handleCancelInput = () => {
         setStudent(null);
         setScore('');
+        setDebugImage(null);
         if (scannerRef.current) {
             scannerRef.current.resume();
+            processingRef.current = false;
         }
     };
 
@@ -241,35 +328,75 @@ export default function ScanMarks() {
 
                             {/* Scanner Overlay */}
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                {/* Scan Frame - Wide Rectangle for Sticker */}
-                                <div className="relative w-80 h-24 border-2 border-white/50 rounded-xl overflow-hidden">
-                                    {/* Left: QR Section Guide */}
-                                    <div className="absolute top-0 left-0 bottom-0 w-24 border-r border-white/30 bg-white/5 flex items-center justify-center">
-                                        <div className="w-16 h-16 border-2 border-green-400/50 rounded-lg animate-pulse"></div>
+                                {/* Scan Frame - Precision Layout (Matches 46mm x 11mm Sticker) */}
+                                {/* Width 320px x Height 76px - Aspect Ratio 4.21 matches 46/11 closely */}
+                                <div className="relative w-[20rem] h-[4.75rem] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] rounded-sm overflow-hidden">
+
+                                    {/* Left: QR Code Area */}
+                                    {/* Calculated from PDF: QR area is ~25.5% of total width */}
+                                    <div className="w-[25.5%] h-full border-r-2 border-white/50 relative flex items-center justify-center bg-green-500/10">
+                                        {/* Green guide box for QR */}
+                                        <div className="w-[85%] aspect-square border-2 border-green-400 rounded-sm relative">
+                                            <div className="absolute inset-0 bg-green-400/5 animate-pulse"></div>
+                                            {/* Corner markers */}
+                                            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-green-400"></div>
+                                            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-green-400"></div>
+                                            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-green-400"></div>
+                                            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-green-400"></div>
+                                        </div>
+                                        <span className="absolute bottom-1 text-[8px] font-bold text-green-400 tracking-wider">QR</span>
                                     </div>
 
-                                    {/* Right: Marks Section Guide */}
-                                    <div className="absolute top-0 right-0 bottom-0 left-24 flex items-center justify-end pr-6 gap-3">
-                                        {/* 3 Ghost Boxes for Marks */}
-                                        <div className="w-12 h-12 border-2 border-white/30 rounded-lg bg-white/5"></div>
-                                        <div className="w-12 h-12 border-2 border-white/30 rounded-lg bg-white/5"></div>
-                                        <div className="w-12 h-12 border-2 border-white/30 rounded-lg bg-white/5"></div>
+                                    {/* Right: Info Area (Remaining 74.5%) */}
+                                    <div className="flex-1 flex flex-col relative">
+
+                                        {/* Top: Name Area (PDF: 2pt to 14pt = ~12pt height -> ~45%) */}
+                                        <div className="h-[45%] flex items-center pl-3 pt-1 border-b border-white/20">
+                                            {/* Name Placeholder */}
+                                            <div className="w-3/4 h-2.5 bg-white/20 rounded-sm"></div>
+                                        </div>
+
+                                        {/* Bottom: Marks Section (PDF: 14pt to end -> ~55%) */}
+                                        <div className="h-[55%] flex items-center pl-3 pr-4 pb-1 gap-2 relative">
+                                            {/* "MARKS:" Label */}
+                                            <span className="text-white/80 text-[8px] font-bold tracking-wider uppercase min-w-fit mt-1">MARKS:</span>
+
+                                            {/* Digit Boxes - Filling remaining width */}
+                                            <div className="flex-1 flex gap-1 h-full items-end justify-start pb-1">
+                                                {/* Three boxes matching PDF layout */}
+                                                {[1, 2, 3].map((i) => (
+                                                    <div key={i} className="flex-1 h-[85%] border border-white/50 rounded-[1px] bg-white/5 relative group">
+                                                        {/* Bottom dashed guide line like in PDF */}
+                                                        <div className="absolute bottom-[20%] left-0.5 right-0.5 h-px bg-white/30"></div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Vertical OCR Text (Matches PDF) */}
+                                            <div className="absolute right-0.5 bottom-1 top-1 w-2 flex items-end justify-center overflow-visible pointer-events-none">
+                                                <span className="text-[5px] text-white/30 font-mono -rotate-90 origin-bottom whitespace-nowrap mb-1 select-none">OCR</span>
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    {/* Center Scan Line */}
-                                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500/50 w-full shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+                                    {/* Outer White Border for the whole sticker shape */}
+                                    <div className="absolute inset-0 pointer-events-none rounded-sm border border-white/30"></div>
 
-                                    {/* Corner Accents */}
-                                    <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-white rounded-tl-lg"></div>
-                                    <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-white rounded-tr-lg"></div>
-                                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-white rounded-bl-lg"></div>
-                                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-white rounded-br-lg"></div>
+                                    {/* Fiducial Guide Markers (Corners) */}
+                                    {/* Top-Left */}
+                                    <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-white rounded-tl-sm shadow-sm"></div>
+                                    {/* Top-Right */}
+                                    <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-white rounded-tr-sm shadow-sm"></div>
+                                    {/* Bottom-Right */}
+                                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-white rounded-br-sm shadow-sm"></div>
+                                    {/* Bottom-Left */}
+                                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-white rounded-bl-sm shadow-sm"></div>
                                 </div>
 
                                 {/* Instruction Text */}
                                 <div className="absolute bottom-4 left-0 right-0 flex justify-center">
                                     <div className="text-white text-xs font-semibold bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
-                                        Align Sticker (UPDATED)
+                                        Align QR in green box
                                     </div>
                                 </div>
                             </div>
@@ -287,10 +414,21 @@ export default function ScanMarks() {
                             >
                                 Stop Scanner
                             </button>
+
+                            {/* OCR Status Indicator */}
+                            {isProcessingOCR && (
+                                <div className="mt-4 animate-in fade-in slide-in-from-bottom-2">
+                                    <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-full border border-indigo-100 shadow-sm">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span className="text-sm font-bold">Extracting Marks (AI)...</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             )}
+
 
             {/* Warning Modal */}
             {pendingStudent && (
@@ -345,6 +483,14 @@ export default function ScanMarks() {
                                 {student.humanId}
                             </div>
                         </div>
+
+                        {/* Debug Image Preview */}
+                        {debugImage && (
+                            <div className="mb-4">
+                                <p className="text-xs text-slate-400 mb-1 text-center">AI Vision Capture:</p>
+                                <img src={debugImage} alt="OCR Debug" className="w-full h-auto rounded-lg border border-slate-200" />
+                            </div>
+                        )}
 
                         <form onSubmit={handleSubmitMark}>
                             <div className="mb-8">

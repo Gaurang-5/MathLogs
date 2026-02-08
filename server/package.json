@@ -17,6 +17,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "5.22.0",
     "@sentry/node": "^10.38.0",
     "@sentry/profiling-node": "^10.38.0",
@@ -37,6 +38,7 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "2.0.2",
     "nodemailer": "^7.0.12",
     "pdfkit": "^0.17.2",
     "pg": "^8.17.2",

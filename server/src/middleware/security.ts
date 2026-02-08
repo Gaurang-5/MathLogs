@@ -128,3 +128,33 @@ export const paymentLimiter = rateLimit({
     }
 });
 
+// ✅ HIGH-1: Per-User OCR Rate Limiter
+// Protects against Gemini quota drain and cost spikes
+export const ocrLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 15, // Limit each user to 15 scans per minute
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Scanning too fast. Please wait a moment.' },
+    keyGenerator: (req) => {
+        // Use User ID if available (authenticated), otherwise fallback to IP
+        const user = (req as any).user;
+        return user?.id || req.ip;
+    },
+    handler: (req: Request, res: Response) => {
+        const user = (req as any).user;
+        console.warn('[RATE_LIMIT_EXCEEDED]', {
+            type: 'ocr',
+            userId: user?.id || 'unknown',
+            username: user?.username || 'unknown',
+            ip: req.ip,
+            path: req.path,
+            timestamp: new Date().toISOString(),
+            severity: 'HIGH',
+            message: 'OCR limiter hit - potential cost abuse'
+        });
+        res.status(429).json({
+            error: 'Scanning too fast. Please wait a moment.'
+        });
+    }
+});

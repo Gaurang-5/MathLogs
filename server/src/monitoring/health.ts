@@ -1,8 +1,4 @@
-/**
- * Application Health Monitoring
- * Provides health checks, metrics, and system status
- */
-
+import v8 from 'v8';
 import { prisma } from '../prisma';
 
 export interface HealthStatus {
@@ -44,7 +40,11 @@ const checkDatabase = async (): Promise<{ status: string; latency?: number; erro
 const checkMemory = (): { status: string; usage: number; limit: number } => {
     const usage = process.memoryUsage();
     const usedMB = Math.round(usage.heapUsed / 1024 / 1024);
-    const limitMB = Math.round(usage.heapTotal / 1024 / 1024);
+
+    // Use actual V8 heap limit, not current allocation size
+    const stats = v8.getHeapStatistics();
+    const limitMB = Math.round(stats.heap_size_limit / 1024 / 1024);
+
     const usagePercent = (usedMB / limitMB) * 100;
 
     return {

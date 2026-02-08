@@ -62,6 +62,7 @@ const allowedOrigins = [
     'http://localhost:5183', // Vite default retry
     'http://localhost:5184', // Vite default retry
     'http://localhost:5185', // Vite default retry
+    'http://localhost:3001', // Allow self-referential requests (e.g. from server itself)
 ];
 
 app.use(cors({

@@ -66,6 +66,21 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
                 .strokeColor('#9CA3AF') // Gray-400
                 .stroke();
 
+            // --- Fiducial Markers for CV (L-shapes at corners) ---
+            const markerLen = 3 * mmToPt; // 3mm length
+            const markerWidth = 1.5; // Thicker line for visibility
+
+            doc.lineWidth(markerWidth).strokeColor('#000000');
+
+            // Top-Left
+            doc.moveTo(x, y + markerLen).lineTo(x, y).lineTo(x + markerLen, y).stroke();
+            // Top-Right
+            doc.moveTo(x + labelWidth - markerLen, y).lineTo(x + labelWidth, y).lineTo(x + labelWidth, y + markerLen).stroke();
+            // Bottom-Right
+            doc.moveTo(x + labelWidth, y + labelHeight - markerLen).lineTo(x + labelWidth, y + labelHeight).lineTo(x + labelWidth - markerLen, y + labelHeight).stroke();
+            // Bottom-Left
+            doc.moveTo(x + markerLen, y + labelHeight).lineTo(x, y + labelHeight).lineTo(x, y + labelHeight - markerLen).stroke();
+
             if (student.humanId) {
                 // --- LEFT: QR Code ---
                 // Maximize QR size for scannability
