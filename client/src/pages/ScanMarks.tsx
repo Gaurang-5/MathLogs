@@ -153,7 +153,11 @@ export default function ScanMarks() {
 
                             // Wait for both in parallel
                             try {
+                                console.log("⏳ Waiting for student lookup and OCR...");
                                 const [studentData, ocrResult] = await Promise.all([studentLookupPromise, ocrPromise]);
+
+                                console.log("✅ Student Data:", studentData);
+                                console.log("✅ OCR Result:", ocrResult);
 
                                 extractedMark = ocrResult.score;
                                 if (ocrResult.debugImage) setDebugImage(ocrResult.debugImage);
@@ -162,9 +166,11 @@ export default function ScanMarks() {
                                 const existing = studentData.marks?.find((m: any) => m.testId === selectedTestId);
 
                                 if (existing) {
+                                    console.log("⚠️ Student already has marks:", existing.score);
                                     setExistingMark(existing.score);
                                     setPendingStudent(studentData);
                                 } else {
+                                    console.log("✅ Setting student and score:", extractedMark);
                                     setStudent(studentData);
                                     if (extractedMark && extractedMark.trim() !== "") {
                                         setScore(extractedMark);
@@ -173,7 +179,9 @@ export default function ScanMarks() {
 
                                 // Reset processing flag so modal can appear and next scan can work
                                 processingRef.current = false;
+                                console.log("✅ Modal should appear now!");
                             } catch (e) {
+                                console.error("❌ Error in scan processing:", e);
                                 setIsProcessingOCR(false);
                                 alert('Student not found or Invalid QR Code');
                                 html5QrCode.resume();
