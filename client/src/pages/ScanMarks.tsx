@@ -112,7 +112,7 @@ export default function ScanMarks() {
                             processingRef.current = true;
 
                             console.log("Matched: " + decodedText);
-                            
+
                             // Pause scanner immediately
                             html5QrCode.pause();
 
@@ -139,7 +139,7 @@ export default function ScanMarks() {
                                                 if (smartImage) break;
                                                 if (i < 1) await new Promise(r => setTimeout(r, 30));
                                             }
-                                        } catch {}
+                                        } catch { }
                                     }
 
                                     return smartImage
@@ -154,7 +154,7 @@ export default function ScanMarks() {
                             // Wait for both in parallel
                             try {
                                 const [studentData, ocrResult] = await Promise.all([studentLookupPromise, ocrPromise]);
-                                
+
                                 extractedMark = ocrResult.score;
                                 if (ocrResult.debugImage) setDebugImage(ocrResult.debugImage);
                                 setIsProcessingOCR(false);
@@ -170,6 +170,9 @@ export default function ScanMarks() {
                                         setScore(extractedMark);
                                     }
                                 }
+
+                                // Reset processing flag so modal can appear and next scan can work
+                                processingRef.current = false;
                             } catch (e) {
                                 setIsProcessingOCR(false);
                                 alert('Student not found or Invalid QR Code');
