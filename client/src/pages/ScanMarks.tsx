@@ -326,113 +326,81 @@ export default function ScanMarks() {
                 </div>
             )}
 
-            {/* Scanner Active */}
+            {/* Scanner Active - Immersive Fullscreen Mobile UI */}
             {scanning && (
-                <div className="w-full max-w-md mx-auto px-4 pt-safe" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-                    <div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100">
-                        {/* Scanner Preview */}
-                        <div className="relative w-full rounded-2xl overflow-hidden shadow-inner bg-black" style={{ aspectRatio: '4/3' }}>
-                            <div id={READER_ID} className="w-full h-full"></div>
+                <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center overflow-hidden">
+                    {/* Camera Viewfinder */}
+                    <div id={READER_ID} className="w-full h-full absolute inset-0 [&>video]:object-cover [&>video]:w-full [&>video]:h-full"></div>
 
-                            {/* Scanner Overlay */}
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                {/* Scan Frame - Precision Layout (Matches 46mm x 11mm Sticker) */}
-                                {/* Responsive Width: 90% on mobile, max 24rem on desktop. Aspect Ratio fixed at 4.2:1 */}
-                                <div className="relative w-[90vw] max-w-[24rem] aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] rounded-sm overflow-hidden border border-white/30">
+                    {/* Dark Backdrop for non-scanned area */}
+                    <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
-                                    {/* Left: QR Code Area */}
-                                    {/* Calculated from PDF: QR area is ~25.5% of total width */}
-                                    <div className="w-[25.5%] h-full border-r-2 border-white/50 relative flex items-center justify-center bg-green-500/10">
-                                        {/* Green guide box for QR */}
-                                        <div className="w-[85%] aspect-square border-2 border-green-400 rounded-sm relative">
-                                            <div className="absolute inset-0 bg-green-400/5 animate-pulse"></div>
-                                            {/* Corner markers */}
-                                            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-green-400"></div>
-                                            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-green-400"></div>
-                                            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-green-400"></div>
-                                            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-green-400"></div>
+                    {/* Scanner Overlay - Centered & Responsive */}
+                    <div className="relative z-10 w-[95vw] max-w-md aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
+
+                        {/* Scanner Logic UI Components */}
+                        {/* Left: QR Code Area */}
+                        <div className="w-[25.5%] h-full border-r-2 border-white/50 relative flex items-center justify-center bg-green-500/10">
+                            <div className="w-[85%] aspect-square border-2 border-green-400 rounded-sm relative shadow-[0_0_15px_rgba(74,222,128,0.5)]">
+                                <div className="absolute inset-0 bg-green-400/10 animate-pulse"></div>
+                                {/* Corner markers */}
+                                <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-green-400"></div>
+                                <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-green-400"></div>
+                                <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-green-400"></div>
+                                <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-green-400"></div>
+                            </div>
+                            <span className="absolute bottom-1 text-[8px] font-bold text-green-400 tracking-wider shadow-black drop-shadow-md">QR</span>
+                        </div>
+
+                        {/* Right: Info Area */}
+                        <div className="flex-1 flex flex-col relative bg-white/5 backdrop-blur-[2px]">
+                            {/* Top: Name Area */}
+                            <div className="h-[45%] flex items-center pl-3 pt-1 border-b border-white/20">
+                                <div className="w-3/4 h-2.5 bg-white/20 rounded-sm"></div>
+                            </div>
+
+                            {/* Bottom: Marks Section */}
+                            <div className="h-[55%] flex items-center pl-3 pr-4 pb-1 gap-2 relative">
+                                <span className="text-white/90 text-[8px] font-bold tracking-wider uppercase min-w-fit mt-1 drop-shadow-md">MARKS:</span>
+                                <div className="flex-1 flex gap-1 h-full items-end justify-start pb-1">
+                                    {[1, 2, 3].map((i) => (
+                                        <div key={i} className="flex-1 h-[85%] border border-white/50 rounded-[1px] bg-white/10 relative">
+                                            <div className="absolute bottom-[20%] left-0.5 right-0.5 h-px bg-white/40"></div>
                                         </div>
-                                        <span className="absolute bottom-1 text-[8px] font-bold text-green-400 tracking-wider">QR</span>
-                                    </div>
-
-                                    {/* Right: Info Area (Remaining 74.5%) */}
-                                    <div className="flex-1 flex flex-col relative">
-
-                                        {/* Top: Name Area (PDF: 2pt to 14pt = ~12pt height -> ~45%) */}
-                                        <div className="h-[45%] flex items-center pl-3 pt-1 border-b border-white/20">
-                                            {/* Name Placeholder */}
-                                            <div className="w-3/4 h-2.5 bg-white/20 rounded-sm"></div>
-                                        </div>
-
-                                        {/* Bottom: Marks Section (PDF: 14pt to end -> ~55%) */}
-                                        <div className="h-[55%] flex items-center pl-3 pr-4 pb-1 gap-2 relative">
-                                            {/* "MARKS:" Label */}
-                                            <span className="text-white/80 text-[8px] font-bold tracking-wider uppercase min-w-fit mt-1">MARKS:</span>
-
-                                            {/* Digit Boxes - Filling remaining width */}
-                                            <div className="flex-1 flex gap-1 h-full items-end justify-start pb-1">
-                                                {/* Three boxes matching PDF layout */}
-                                                {[1, 2, 3].map((i) => (
-                                                    <div key={i} className="flex-1 h-[85%] border border-white/50 rounded-[1px] bg-white/5 relative group">
-                                                        {/* Bottom dashed guide line like in PDF */}
-                                                        <div className="absolute bottom-[20%] left-0.5 right-0.5 h-px bg-white/30"></div>
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            {/* Vertical OCR Text (Matches PDF) */}
-                                            <div className="absolute right-0.5 bottom-1 top-1 w-2 flex items-end justify-center overflow-visible pointer-events-none">
-                                                <span className="text-[5px] text-white/30 font-mono -rotate-90 origin-bottom whitespace-nowrap mb-1 select-none">OCR</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Outer White Border for the whole sticker shape */}
-                                    {/* <div className="absolute inset-0 pointer-events-none rounded-sm border border-white/30"></div> */}
-
-                                    {/* Fiducial Guide Markers (Corners) */}
-                                    {/* Top-Left */}
-                                    <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-white rounded-tl-sm shadow-sm"></div>
-                                    {/* Top-Right */}
-                                    <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-white rounded-tr-sm shadow-sm"></div>
-                                    {/* Bottom-Right */}
-                                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-white rounded-br-sm shadow-sm"></div>
-                                    {/* Bottom-Left */}
-                                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-white rounded-bl-sm shadow-sm"></div>
+                                    ))}
                                 </div>
-
-                                {/* Instruction Text */}
-                                <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                                    <div className="text-white text-xs font-semibold bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
-                                        Align QR in green box
-                                    </div>
+                                <div className="absolute right-0.5 bottom-1 top-1 w-2 flex items-end justify-center pointer-events-none">
+                                    <span className="text-[5px] text-white/50 font-mono -rotate-90 origin-bottom whitespace-nowrap mb-1">OCR</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Status and Stop Button */}
-                        <div className="mt-6 text-center space-y-4">
-                            <p className="text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
-                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                Scanning for QR codes...
-                            </p>
-                            <button
-                                onClick={() => window.location.reload()}
-                                className="text-sm font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-4 py-2 rounded-lg transition-all active:scale-95"
-                            >
-                                Stop Scanner
-                            </button>
+                        {/* Guide Corners for entire sticker */}
+                        <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-white/80 rounded-tl-sm"></div>
+                        <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-white/80 rounded-tr-sm"></div>
+                        <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-white/80 rounded-br-sm"></div>
+                        <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-white/80 rounded-bl-sm"></div>
+                    </div>
 
-                            {/* OCR Status Indicator */}
-                            {isProcessingOCR && (
-                                <div className="mt-4 animate-in fade-in slide-in-from-bottom-2">
-                                    <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-full border border-indigo-100 shadow-sm">
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span className="text-sm font-bold">Extracting Marks (AI)...</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                    {/* Bottom Controls */}
+                    <div className="absolute bottom-10 left-0 right-0 z-20 flex flex-col items-center gap-4 px-6">
+                        {isProcessingOCR ? (
+                            <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl animate-in slide-in-from-bottom-4">
+                                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                                <span className="font-bold text-slate-800">Processing Scan...</span>
+                            </div>
+                        ) : (
+                            <div className="bg-black/60 backdrop-blur-md text-white text-xs font-medium px-4 py-2 rounded-full border border-white/10">
+                                Align sticker within the frame
+                            </div>
+                        )}
+
+                        <button
+                            onClick={() => window.location.reload()} // Reload is safest way to cleanly kill camera stream
+                            className="mt-4 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/50 px-8 py-3 rounded-xl font-bold transition active:scale-95 backdrop-blur-sm"
+                        >
+                            Cancel Scan
+                        </button>
                     </div>
                 </div>
             )}
