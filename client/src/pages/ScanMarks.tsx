@@ -92,7 +92,15 @@ export default function ScanMarks() {
                         {
                             fps: 10,
                             // Match overlay dimensions: w-[20rem] (320px) x h-[4.75rem] (~76px)
-                            qrbox: { width: 320, height: 76 }
+                            // Dynamic scan box matching the UI overlay
+                            qrbox: (viewfinderWidth, _viewfinderHeight) => {
+                                // Match the w-[90vw] max-w-[24rem] logic
+                                // 24rem = 384px
+                                const maxWidth = 384;
+                                const width = Math.min(maxWidth, viewfinderWidth * 0.9);
+                                const height = width / 4.2; // 4.2:1 Aspect Ratio
+                                return { width, height };
+                            }
                         },
                         async (decodedText) => {
                             // Success callback
@@ -329,8 +337,8 @@ export default function ScanMarks() {
                             {/* Scanner Overlay */}
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                 {/* Scan Frame - Precision Layout (Matches 46mm x 11mm Sticker) */}
-                                {/* Width 320px x Height 76px - Aspect Ratio 4.21 matches 46/11 closely */}
-                                <div className="relative w-[20rem] h-[4.75rem] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] rounded-sm overflow-hidden">
+                                {/* Responsive Width: 90% on mobile, max 24rem on desktop. Aspect Ratio fixed at 4.2:1 */}
+                                <div className="relative w-[90vw] max-w-[24rem] aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] rounded-sm overflow-hidden border border-white/30">
 
                                     {/* Left: QR Code Area */}
                                     {/* Calculated from PDF: QR area is ~25.5% of total width */}
@@ -380,7 +388,7 @@ export default function ScanMarks() {
                                     </div>
 
                                     {/* Outer White Border for the whole sticker shape */}
-                                    <div className="absolute inset-0 pointer-events-none rounded-sm border border-white/30"></div>
+                                    {/* <div className="absolute inset-0 pointer-events-none rounded-sm border border-white/30"></div> */}
 
                                     {/* Fiducial Guide Markers (Corners) */}
                                     {/* Top-Left */}

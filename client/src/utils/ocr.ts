@@ -80,7 +80,7 @@ export async function extractMarksFromSticker(
         // The UI shows a scan guide of roughly 288x72 pixels (4:1 ratio for 46x11mm sticker)
         // We want to crop the center of the video feed to match this area
         // Sticker is ~4:1 ratio (width:height)
-        const cropWidth = sourceWidth * 0.75; // Capture 75% of width
+        const cropWidth = sourceWidth * 0.9; // Capture 90% of width (Matches mobile UI)
         const cropHeight = cropWidth / 4; // 4:1 ratio like the sticker
 
         const startX = (sourceWidth - cropWidth) / 2;

@@ -58,6 +58,7 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
         console.log("📥 Received OCR Request", (req as any).user?.username);
 
         let imageBuffer: Buffer | string | undefined;
+        console.log("🔄 Refreshed OCR Endpoint Hit");
 
         if ((req as any).file) {
             console.log(`📎 File received: ${(req as any).file.originalname} (${(req as any).file.size} bytes)`);
