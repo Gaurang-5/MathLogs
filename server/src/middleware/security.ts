@@ -9,24 +9,25 @@ export const configureSecurityHeaders = (app: Express) => {
             directives: {
                 defaultSrc: ["'self'"],
                 styleSrc: [
-                    "'self'",
+                    "'self'", 
                     "'unsafe-inline'", // Allow inline styles for React
                     "https://fonts.googleapis.com" // Google Fonts
                 ],
                 scriptSrc: [
-                    "'self'",
+                    "'self'", 
                     "'unsafe-inline'", // Allow inline scripts for React
                     "'unsafe-eval'" // Required for some bundlers/dev tools
                 ],
                 imgSrc: ["'self'", "data:", "blob:"],
                 connectSrc: [
                     "'self'",
+                    "data:", // Allow base64 encoded data for OCR images
                     "https://fonts.googleapis.com",
                     "https://fonts.gstatic.com",
                     "https://o4510811766718464.ingest.us.sentry.io" // Sentry error monitoring
                 ],
                 fontSrc: [
-                    "'self'",
+                    "'self'", 
                     "data:",
                     "https://fonts.googleapis.com",
                     "https://fonts.gstatic.com"
