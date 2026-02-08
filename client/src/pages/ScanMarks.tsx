@@ -92,7 +92,7 @@ export default function ScanMarks() {
                             facingMode: "environment"
                         },
                         {
-                            fps: 10,
+                            fps: 15,
                             // Dynamic scan box matching the UI overlay
                             qrbox: (viewfinderWidth, _viewfinderHeight) => {
                                 // Smaller scan area to avoid scanning adjacent QR codes
@@ -107,74 +107,58 @@ export default function ScanMarks() {
                             disableFlip: false
                         },
                         async (decodedText) => {
-                            // Success callback
-                            if (processingRef.current) return; // Prevent multiple triggers
+                            // Success callback - OPTIMIZED FOR SPEED
+                            if (processingRef.current) return;
                             processingRef.current = true;
 
                             console.log("Matched: " + decodedText);
-                            // Do NOT pause immediately so video keeps playing for CV detection
-                            // html5QrCode.pause(); 
+                            
+                            // Pause scanner immediately
+                            html5QrCode.pause();
 
-                            // Set processing state
+                            // Start student lookup immediately (parallel with OCR)
+                            const studentLookupPromise = apiRequest('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
+
                             setIsProcessingOCR(true);
-                            setDebugImage(null); // Clear previous
+                            setDebugImage(null);
                             let extractedMark = "";
 
-                            try {
-                                const videoElement = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement;
-                                if (videoElement) {
-                                    console.log("🎥 Starting OCR processing...");
+                            // Parallel OCR processing
+                            const ocrPromise = (async () => {
+                                try {
+                                    const videoElement = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement;
+                                    if (!videoElement) return { score: "", confidence: 0, debugImage: null };
 
-                                    // 1. Try OpenCV Smart Detection (Dewarping) - Burst Mode
-                                    // Try 5 times over 500ms to get a good lock
+                                    // Fast CV detection: 2 attempts, 30ms delay
                                     let smartImage = null;
-                                    try {
-                                        if (window.cv) {
-                                            const cvCanvas = document.createElement('canvas'); // Not used by worker but kept for signature
-                                            for (let i = 0; i < 5; i++) {
+                                    if (window.cv) {
+                                        try {
+                                            const cvCanvas = document.createElement('canvas');
+                                            for (let i = 0; i < 2; i++) {
                                                 smartImage = await detectAndWarpSticker(videoElement, cvCanvas);
-                                                if (smartImage) break; // Found it!
-                                                await new Promise(r => setTimeout(r, 100)); // Wait 100ms
+                                                if (smartImage) break;
+                                                if (i < 1) await new Promise(r => setTimeout(r, 30));
                                             }
-                                        }
-                                    } catch (cvErr) {
-                                        console.warn("CV Detection failed:", cvErr);
+                                        } catch {}
                                     }
 
-                                    // NOW pause the scanner to save resources while we process OCR and show the modal
-                                    html5QrCode.pause();
-
-                                    let ocrResult;
-
-                                    if (smartImage) {
-                                        console.log("✨ Smart Detection Success! Sending dewarped image to AI.");
-                                        ocrResult = await extractMarksFromSticker(videoElement, smartImage);
-                                    } else {
-                                        console.log("⚠️ Smart Detection Failed - Falling back to simple center crop.");
-                                        ocrResult = await extractMarksFromSticker(videoElement);
-                                    }
-
-                                    extractedMark = ocrResult.score;
-                                    if (ocrResult.debugImage) setDebugImage(ocrResult.debugImage);
-
-                                    console.log("✅ OCR Complete!");
-                                    console.log("   - Raw Score:", ocrResult.score);
-                                    console.log("   - Confidence:", ocrResult.confidence);
-                                    console.log("   - Has Debug Image:", !!ocrResult.debugImage);
-
-                                    if (ocrResult.debugImage) {
-                                        setDebugImage(ocrResult.debugImage);
-                                    }
+                                    return smartImage
+                                        ? await extractMarksFromSticker(videoElement, smartImage)
+                                        : await extractMarksFromSticker(videoElement);
+                                } catch (ocrErr) {
+                                    console.error("❌ OCR Error:", ocrErr);
+                                    return { score: "", confidence: 0, debugImage: null };
                                 }
-                            } catch (ocrErr) {
-                                console.error("❌ OCR Error:", ocrErr);
-                            } finally {
-                                setIsProcessingOCR(false);
-                            }
+                            })();
 
-                            // Lookup Student
+                            // Wait for both in parallel
                             try {
-                                const studentData = await apiRequest('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
+                                const [studentData, ocrResult] = await Promise.all([studentLookupPromise, ocrPromise]);
+                                
+                                extractedMark = ocrResult.score;
+                                if (ocrResult.debugImage) setDebugImage(ocrResult.debugImage);
+                                setIsProcessingOCR(false);
+
                                 const existing = studentData.marks?.find((m: any) => m.testId === selectedTestId);
 
                                 if (existing) {
@@ -182,17 +166,15 @@ export default function ScanMarks() {
                                     setPendingStudent(studentData);
                                 } else {
                                     setStudent(studentData);
-                                    // Pre-fill score if OCR detected anything (including "0")
                                     if (extractedMark && extractedMark.trim() !== "") {
-                                        console.log("📝 Auto-filling score field with:", extractedMark);
                                         setScore(extractedMark);
-                                    } else {
-                                        console.log("⚠️ No marks detected by OCR - manual entry required");
                                     }
                                 }
                             } catch (e) {
+                                setIsProcessingOCR(false);
                                 alert('Student not found or Invalid QR Code');
                                 html5QrCode.resume();
+                                processingRef.current = false;
                             }
                         },
                         (_errorMessage: any) => { /* ignore */ }

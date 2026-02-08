@@ -10,8 +10,8 @@ async function preprocessImage(imageBase64: string): Promise<string> {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
-            // Cap max dimension to 1500px for optimal upload speed
-            const MAX_DIMENSION = 1024;
+            // Optimized for speed: smaller size, faster upload
+            const MAX_DIMENSION = 800; // Reduced from 1024
             let width = img.width;
             let height = img.height;
 
@@ -42,8 +42,8 @@ async function preprocessImage(imageBase64: string): Promise<string> {
             // Draw image
             ctx.drawImage(img, 0, 0, width, height);
 
-            // Return as high-quality JPEG
-            resolve(canvas.toDataURL('image/jpeg', 0.9));
+            // Return as JPEG (0.85 quality for speed)
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
         };
         img.onerror = (e) => {
             console.warn("Image load error in preprocess, using original", e);
@@ -102,7 +102,7 @@ export async function extractMarksFromSticker(
             0, 0, cropWidth, cropHeight            // Destination
         );
 
-        imageBase64 = canvas.toDataURL('image/jpeg', 0.9);
+        imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
         console.log(`Captured Image Length: ${imageBase64.length}`);
     }
 
