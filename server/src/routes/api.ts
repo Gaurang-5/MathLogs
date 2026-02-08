@@ -59,9 +59,9 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
 
         let imageBuffer: Buffer | string | undefined;
 
-        if (req.file) {
-            console.log(`📎 File received: ${req.file.originalname} (${req.file.size} bytes)`);
-            imageBuffer = req.file.buffer;
+        if ((req as any).file) {
+            console.log(`📎 File received: ${(req as any).file.originalname} (${(req as any).file.size} bytes)`);
+            imageBuffer = (req as any).file.buffer;
         } else if (req.body.image) {
             // Fallback for JSON Base64 (Legacy/Dev)
             console.log("⚠️ Legacy Base64 JSON received");
@@ -74,7 +74,7 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
         }
 
         // Generate Hash for Deduplication
-        const hash = crypto.createHash('sha256').update(req.file ? req.file.buffer : imageBuffer.toString()).digest('hex');
+        const hash = crypto.createHash('sha256').update((req as any).file ? (req as any).file.buffer : imageBuffer.toString()).digest('hex');
 
         if (recentScans.has(hash)) {
             console.log("♻️ Duplicate Scan Detected - Returning Cached Result");
