@@ -95,10 +95,10 @@ export default function ScanMarks() {
                             fps: 10,
                             // Dynamic scan box matching the UI overlay
                             qrbox: (viewfinderWidth, _viewfinderHeight) => {
-                                // Match the w-[90vw] max-w-[24rem] logic
-                                // 24rem = 384px
-                                const maxWidth = 384;
-                                const width = Math.min(maxWidth, viewfinderWidth * 0.9);
+                                // Smaller scan area to avoid scanning adjacent QR codes
+                                // 24rem = 384px (max width)
+                                const maxWidth = 300;
+                                const width = Math.min(maxWidth, viewfinderWidth * 0.6);
                                 const height = width / 4.2; // 4.2:1 Aspect Ratio
                                 return { width, height };
                             },
@@ -363,7 +363,7 @@ export default function ScanMarks() {
                     <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
                     {/* Scanner Overlay - Absolute Center Force */}
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[95vw] max-w-md aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[70vw] max-w-sm aspect-[4.2/1] flex bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border-2 border-white/50 ring-1 ring-black/20">
 
                         {/* Scanner Logic UI Components */}
                         {/* Left: QR Code Area */}
