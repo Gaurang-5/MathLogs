@@ -165,6 +165,9 @@ export default function ScanMarks() {
 
                                 const existing = studentData.marks?.find((m: any) => m.testId === selectedTestId);
 
+                                // Hide scanner overlay so modal can appear
+                                setScanning(false);
+
                                 if (existing) {
                                     console.log("⚠️ Student already has marks:", existing.score);
                                     setExistingMark(existing.score);
@@ -183,8 +186,8 @@ export default function ScanMarks() {
                             } catch (e) {
                                 console.error("❌ Error in scan processing:", e);
                                 setIsProcessingOCR(false);
+                                setScanning(false); // Hide scanner on error too
                                 alert('Student not found or Invalid QR Code');
-                                html5QrCode.resume();
                                 processingRef.current = false;
                             }
                         },
@@ -260,6 +263,7 @@ export default function ScanMarks() {
                 scannerRef.current.resume();
                 processingRef.current = false;
             }
+            setScanning(true); // Show scanner overlay again
         } catch (e) {
             alert('Failed to save mark');
         }
@@ -273,6 +277,7 @@ export default function ScanMarks() {
             scannerRef.current.resume();
             processingRef.current = false;
         }
+        setScanning(true); // Show scanner overlay again
     };
 
     return (
@@ -445,7 +450,11 @@ export default function ScanMarks() {
                                 onClick={() => {
                                     setPendingStudent(null);
                                     setExistingMark(null);
-                                    if (scannerRef.current) scannerRef.current.resume();
+                                    if (scannerRef.current) {
+                                        scannerRef.current.resume();
+                                        processingRef.current = false;
+                                    }
+                                    setScanning(true); // Show scanner overlay again
                                 }}
                                 className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl transition"
                             >
