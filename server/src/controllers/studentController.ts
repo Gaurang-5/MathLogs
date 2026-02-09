@@ -41,8 +41,17 @@ const generateHumanId = async (batch: any) => {
     }
     const yy = year.toString().slice(-2);
 
-    // Prefix example: MTH26
-    const prefix = `${courseCode}${yy}`;
+    // MULTI-TENANT FIX: Include instituteId in prefix to prevent collisions
+    // Use first 6 chars of instituteId for shorter, more readable IDs
+    // Format: {shortInstId}-{courseCode}{year}
+    // Example: a1b2c3-MTH26 (for Institute a1b2c3..., Math 2026)
+    const instituteId = batch.instituteId;
+    if (!instituteId) {
+        throw new Error('Batch must have an instituteId for student ID generation');
+    }
+
+    const shortInstId = instituteId.substring(0, 6);
+    const prefix = `${shortInstId}-${courseCode}${yy}`;
 
     // Atomic Upsert: Increment if exists, create if not
     // This relies on the database to handle concurrency locks
@@ -52,7 +61,9 @@ const generateHumanId = async (batch: any) => {
         create: { prefix, seq: 1 },
     });
 
-    return `${prefix}${counter.seq.toString().padStart(3, '0')}`;
+    // Final ID format: {shortInstId}-{courseCode}{year}-{seq}
+    // Example: a1b2c3-MTH26-001
+    return `${shortInstId}-${courseCode}${yy}-${counter.seq.toString().padStart(3, '0')}`;
 };
 
 const MAX_RETRIES = 15;
