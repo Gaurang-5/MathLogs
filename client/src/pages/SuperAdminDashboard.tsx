@@ -155,8 +155,13 @@ export default function SuperAdminDashboard() {
             });
             fetchData();
             setSelectedInstitute(null);
-        } catch (e) {
-            alert('Invalid JSON or Save Failed');
+        } catch (e: any) {
+            if (e instanceof SyntaxError) {
+                alert('Invalid JSON Syntax: Please check for missing commas or braces.');
+            } else {
+                console.error(e);
+                alert(`Save Failed: ${e.response?.data?.error || e.message || 'Unknown Error'}`);
+            }
         } finally {
             setIsSavingConfig(false);
         }
