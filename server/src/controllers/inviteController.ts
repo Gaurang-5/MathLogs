@@ -18,7 +18,8 @@ export const generateInvite = async (req: Request, res: Response) => {
         totalClasses,
         batchesPerClass,
         subjects,
-        allowedClasses
+        allowedClasses,
+        requiresGrades = true // Default to true if not provided
     } = req.body;
     const user = (req as any).user;
 
@@ -62,7 +63,7 @@ export const generateInvite = async (req: Request, res: Response) => {
                 phoneNumber,
                 email,
                 config: {
-                    requiresGrades: true, // Default to true, can be changed during setup
+                    requiresGrades: requiresGrades,
                     maxClasses: Number(totalClasses) || 12,
                     maxBatchesPerClass: Number(batchesPerClass) || 5,
                     allowedClasses: classList,

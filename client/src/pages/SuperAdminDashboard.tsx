@@ -61,6 +61,7 @@ export default function SuperAdminDashboard() {
     const [batchesPerClass, setBatchesPerClass] = useState('5');
     const [subjects, setSubjects] = useState('Math, Science, English');
     const [allowedClassesString, setAllowedClassesString] = useState('Class 9, Class 10');
+    const [requiresGrades, setRequiresGrades] = useState(true);
 
     // Loading State
     const [isCreating, setIsCreating] = useState(false);
@@ -202,7 +203,8 @@ export default function SuperAdminDashboard() {
                 totalClasses,
                 batchesPerClass,
                 subjects,
-                allowedClasses: allowedClassesString
+                allowedClasses: allowedClassesString,
+                requiresGrades
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -482,14 +484,14 @@ export default function SuperAdminDashboard() {
                         <ShieldCheck className="w-6 h-6" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Super Admin Dashboard <span className="text-sm font-normal opacity-50">v1.3</span></h1>
+                        <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Super Admin Dashboard</h1>
                         <p className="text-blue-100"> Manage institutes and oversee platform activity.</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full border border-green-100">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-xs font-bold uppercase tracking-wide">System Online</span>
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <span className="text-xs font-medium">System Operational</span>
                     </div>
                     <button
                         onClick={handleLogout}
@@ -502,168 +504,71 @@ export default function SuperAdminDashboard() {
             </nav>
 
             <div className="max-w-6xl mx-auto px-6 py-10">
-                {/* Analytics Section */}
+                {/* Error Message */}
+                {error && (
+                    <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-8 flex items-center gap-3 border border-red-100">
+                        <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                        <p>{error}</p>
+                    </div>
+                )}
+
+                {/* Stats Overview */}
                 {analytics && (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 text-black">
-                        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                            <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Total Institutes</div>
-                            <div className="text-2xl font-bold flex items-center gap-2">
-                                {analytics.totalInstitutes}
-                                <School className="w-4 h-4 text-blue-500" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                                    <Building2 className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Total Institutes</div>
+                                    <div className="text-2xl font-bold">{analytics.totalInstitutes}</div>
+                                </div>
                             </div>
                         </div>
-                        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                            <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Active Students</div>
-                            <div className="text-2xl font-bold flex items-center gap-2">
-                                {analytics.totalStudents}
-                                <Users className="w-4 h-4 text-green-500" />
+
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+                                    <Users className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Active Students</div>
+                                    <div className="text-2xl font-bold">{analytics.totalStudents}</div>
+                                </div>
                             </div>
                         </div>
-                        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                            <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Total Batches</div>
-                            <div className="text-2xl font-bold flex items-center gap-2">
-                                {analytics.totalBatches}
-                                <Building2 className="w-4 h-4 text-purple-500" />
+
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+                                    <GraduationCap className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Total Batches</div>
+                                    <div className="text-2xl font-bold">{analytics.totalBatches}</div>
+                                </div>
                             </div>
                         </div>
-                        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                            <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Platform Revenue</div>
-                            <div className="text-2xl font-bold flex items-center gap-2">
-                                ₹{(analytics.totalRevenue || 0).toLocaleString()}
-                                <span className="text-xs font-normal text-gray-400">Lifetime</span>
+
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
+                                    <IndianRupee className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Platform Revenue</div>
+                                    <div className="text-2xl font-bold flex items-center gap-2">
+                                        ₹{(analytics.totalRevenue || 0).toLocaleString()}
+                                        <span className="text-xs font-normal text-gray-400">Lifetime</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
 
                 <div className="grid grid-cols-1 gap-8">
-                    {/* Create Invite Section - Now hidden, moved to modal */}
-                    {false && (
-                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 h-fit lg:sticky lg:top-24">
-                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-black">
-                                <UserPlus className="w-5 h-5" />
-                                Onboard Institute
-                            </h2>
-                            <p className="text-gray-500 text-sm mb-6">Create a secure invite link to onboard a new institute to the platform.</p>
-
-                            <form onSubmit={handleGenerateInvite} className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Institute Details</label>
-                                    <input
-                                        type="text"
-                                        value={newInstituteName}
-                                        onChange={(e) => setNewInstituteName(e.target.value)}
-                                        placeholder="Institute Name (e.g. Apex Academy)"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                        required
-                                    />
-                                    <input
-                                        type="text"
-                                        value={teacherName}
-                                        onChange={(e) => setTeacherName(e.target.value)}
-                                        placeholder="Teacher Name (e.g. Rajesh Kumar)"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Contact</label>
-                                        <input
-                                            type="tel"
-                                            value={phoneNumber}
-                                            onChange={(e) => setPhoneNumber(e.target.value)}
-                                            placeholder="Phone"
-                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Email</label>
-                                        <input
-                                            type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            placeholder="Email ID"
-                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Configured Classes</label>
-                                        <input
-                                            type="text"
-                                            value={allowedClassesString}
-                                            onChange={(e) => setAllowedClassesString(e.target.value)}
-                                            placeholder="e.g. Class 9, Class 10"
-                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                        />
-                                        <p className="text-[10px] text-gray-400 pl-1">Pre-set classes for teacher</p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Batches</label>
-                                        <input
-                                            type="number"
-                                            inputMode="numeric"
-                                            value={batchesPerClass}
-                                            onChange={(e) => setBatchesPerClass(e.target.value)}
-                                            placeholder="Batches/Class"
-                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                        />
-                                        <p className="text-[10px] text-gray-400 pl-1">Max Batches per Class</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Subjects Offered</label>
-                                    <input
-                                        type="text"
-                                        value={subjects}
-                                        onChange={(e) => setSubjects(e.target.value)}
-                                        placeholder="e.g. Math, Physics, Chemistry"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                    />
-                                    <p className="text-[10px] text-gray-400 pl-1">Comma separated list</p>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={isCreating}
-                                    className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-black/5 hover:shadow-black/10 transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2"
-                                >
-                                    {isCreating ? (
-                                        'Generating Link...'
-                                    ) : (
-                                        <>Generate Invite Link <ArrowRight className="w-4 h-4" /></>
-                                    )}
-                                </button>
-                            </form>
-
-                            {inviteLink && (
-                                <div className="mt-6 p-4 bg-green-50 border border-green-100 rounded-2xl animate-in fade-in slide-in-from-top-2">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Invite Generated</span>
-                                        {copied ? (
-                                            <CheckCircle className="w-5 h-5 text-green-600" />
-                                        ) : (
-                                            <Copy
-                                                className="w-5 h-5 text-green-600 cursor-pointer hover:scale-110 transition-transform"
-                                                onClick={copyToClipboard}
-                                            />
-                                        )}
-                                    </div>
-                                    <code className="block w-full bg-white border border-green-200 p-3 rounded-xl text-xs text-green-800 break-all font-mono select-all">
-                                        {inviteLink}
-                                    </code>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
                     {/* Institute List */}
                     <div className="lg:col-span-2 space-y-6">
                         <div className="flex justify-between items-center">
@@ -767,247 +672,290 @@ export default function SuperAdminDashboard() {
                             )}
                         </div>
                     </div>
-                </div>
-            </div>
+                </div >
+            </div >
 
             {/* Suspension Modal */}
-            {suspendModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Suspend Institute</h3>
-                        <p className="text-sm text-gray-500 mb-4">
-                            Suspending <strong>{suspendModal.instituteName}</strong>. Teachers won't be able to log in.
-                        </p>
+            {
+                suspendModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Suspend Institute</h3>
+                            <p className="text-sm text-gray-500 mb-4">
+                                Suspending <strong>{suspendModal.instituteName}</strong>. Teachers won't be able to log in.
+                            </p>
 
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Reason for Suspension *</label>
-                        <textarea
-                            value={suspensionReason}
-                            onChange={(e) => setSuspensionReason(e.target.value)}
-                            placeholder="e.g., Payment overdue, Terms violation..."
-                            className="w-full border border-gray-300 rounded-xl p-3 mb-4 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
-                            rows={3}
-                            required
-                        />
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Reason for Suspension *</label>
+                            <textarea
+                                value={suspensionReason}
+                                onChange={(e) => setSuspensionReason(e.target.value)}
+                                placeholder="e.g., Payment overdue, Terms violation..."
+                                className="w-full border border-gray-300 rounded-xl p-3 mb-4 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                                rows={3}
+                                required
+                            />
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setSuspendModal(null);
-                                    setSuspensionReason('');
-                                }}
-                                className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
-                                disabled={isSuspending}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => handleSuspendInstitute('SUSPEND')}
-                                className="flex-1 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
-                                disabled={isSuspending}
-                            >
-                                {isSuspending ? 'Suspending...' : 'Suspend'}
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setSuspendModal(null);
+                                        setSuspensionReason('');
+                                    }}
+                                    className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+                                    disabled={isSuspending}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleSuspendInstitute('SUSPEND')}
+                                    className="flex-1 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
+                                    disabled={isSuspending}
+                                >
+                                    {isSuspending ? 'Suspending...' : 'Suspend'}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Delete Confirmation Modal */}
-            {deleteModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border-2 border-red-200">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center">
-                                <span className="text-2xl">⚠️</span>
+            {
+                deleteModal && (
+                    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border-2 border-red-200">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center">
+                                    <span className="text-2xl">⚠️</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-red-600">Permanent Deletion</h3>
+                                    <p className="text-sm text-gray-500">This action cannot be undone</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-red-600">Permanent Deletion</h3>
-                                <p className="text-sm text-gray-500">This action cannot be undone</p>
+
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                                <p className="text-sm text-gray-700 mb-3">
+                                    You are about to permanently delete <strong className="text-red-700">{deleteModal.instituteName}</strong>.
+                                </p>
+                                <p className="text-sm font-semibold text-red-700 mb-2">This will remove ALL:</p>
+                                <ul className="text-sm text-gray-700 space-y-1 ml-4">
+                                    <li>• All students and their records</li>
+                                    <li>• All batches and tests</li>
+                                    <li>• All fee payments and transactions</li>
+                                    <li>• All admin accounts</li>
+                                    <li>• All academic year data</li>
+                                </ul>
                             </div>
-                        </div>
 
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-                            <p className="text-sm text-gray-700 mb-3">
-                                You are about to permanently delete <strong className="text-red-700">{deleteModal.instituteName}</strong>.
-                            </p>
-                            <p className="text-sm font-semibold text-red-700 mb-2">This will remove ALL:</p>
-                            <ul className="text-sm text-gray-700 space-y-1 ml-4">
-                                <li>• All students and their records</li>
-                                <li>• All batches and tests</li>
-                                <li>• All fee payments and transactions</li>
-                                <li>• All admin accounts</li>
-                                <li>• All academic year data</li>
-                            </ul>
-                        </div>
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
+                                <p className="text-xs text-yellow-800 font-medium">
+                                    💡 <strong>Tip:</strong> Consider using "Suspend" instead if you want to temporarily disable access without losing data.
+                                </p>
+                            </div>
 
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
-                            <p className="text-xs text-yellow-800 font-medium">
-                                💡 <strong>Tip:</strong> Consider using "Suspend" instead if you want to temporarily disable access without losing data.
-                            </p>
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setDeleteModal(null)}
-                                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
-                                disabled={isDeleting}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleDeleteInstitute}
-                                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                disabled={isDeleting}
-                            >
-                                {isDeleting ? (
-                                    <>
-                                        <span className="animate-spin">⏳</span>
-                                        Deleting...
-                                    </>
-                                ) : (
-                                    <>
-                                        🗑 Delete Permanently
-                                    </>
-                                )}
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setDeleteModal(null)}
+                                    className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+                                    disabled={isDeleting}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDeleteInstitute}
+                                    className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                    disabled={isDeleting}
+                                >
+                                    {isDeleting ? (
+                                        <>
+                                            <span className="animate-spin">⏳</span>
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            🗑 Delete Permanently
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Onboard Institute Modal */}
-            {showOnboardForm && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowOnboardForm(false)}>
-                    <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold flex items-center gap-2 text-black">
-                                <UserPlus className="w-5 h-5" />
-                                Onboard Institute
-                            </h2>
-                            <button onClick={() => setShowOnboardForm(false)} className="text-gray-400 hover:text-gray-600">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <p className="text-gray-500 text-sm mb-6">Create a secure invite link to onboard a new institute to the platform.</p>
-
-                        <form onSubmit={handleGenerateInvite} className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Institute Details</label>
-                                <input
-                                    type="text"
-                                    value={newInstituteName}
-                                    onChange={(e) => setNewInstituteName(e.target.value)}
-                                    placeholder="Institute Name (e.g. Apex Academy)"
-                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                    required
-                                />
-                                <input
-                                    type="text"
-                                    value={teacherName}
-                                    onChange={(e) => setTeacherName(e.target.value)}
-                                    placeholder="Teacher Name (e.g. Rajesh Kumar)"
-                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                    required
-                                />
+            {
+                showOnboardForm && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowOnboardForm(false)}>
+                        <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold flex items-center gap-2 text-black">
+                                    <UserPlus className="w-5 h-5" />
+                                    Onboard Institute
+                                </h2>
+                                <button onClick={() => setShowOnboardForm(false)} className="text-gray-400 hover:text-gray-600">
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
+                            <p className="text-gray-500 text-sm mb-6">Create a secure invite link to onboard a new institute to the platform.</p>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <form onSubmit={handleGenerateInvite} className="space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Contact</label>
-                                    <input
-                                        type="tel"
-                                        value={phoneNumber}
-                                        onChange={(e) => setPhoneNumber(e.target.value)}
-                                        placeholder="Phone"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Email</label>
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="Email ID"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Configured Classes</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Institute Details</label>
                                     <input
                                         type="text"
-                                        value={allowedClassesString}
-                                        onChange={(e) => setAllowedClassesString(e.target.value)}
-                                        placeholder="e.g. Class 9, Class 10"
+                                        value={newInstituteName}
+                                        onChange={(e) => setNewInstituteName(e.target.value)}
+                                        placeholder="Institute Name (e.g. Apex Academy)"
                                         className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                        required
                                     />
-                                    <p className="text-[10px] text-gray-400 pl-1">Pre-set classes for teacher</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Batches</label>
                                     <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        value={batchesPerClass}
-                                        onChange={(e) => setBatchesPerClass(e.target.value)}
-                                        placeholder="Batches/Class"
+                                        type="text"
+                                        value={teacherName}
+                                        onChange={(e) => setTeacherName(e.target.value)}
+                                        placeholder="Teacher Name (e.g. Rajesh Kumar)"
+                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Contact</label>
+                                        <input
+                                            type="tel"
+                                            value={phoneNumber}
+                                            onChange={(e) => setPhoneNumber(e.target.value)}
+                                            placeholder="Phone"
+                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Email</label>
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="Email ID"
+                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-4 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <label className="text-sm font-bold text-gray-700">Require Grades/Classes?</label>
+                                            <p className="text-xs text-gray-500">Enable if this institute organizes students by Class/Grade.</p>
+                                        </div>
+                                        <div className="flex bg-gray-200 p-1 rounded-lg">
+                                            <button
+                                                type="button"
+                                                onClick={() => setRequiresGrades(true)}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${requiresGrades ? 'bg-white shadow-sm text-black' : 'text-gray-500 hover:text-gray-700'}`}
+                                            >
+                                                Yes
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setRequiresGrades(false)}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${!requiresGrades ? 'bg-white shadow-sm text-black' : 'text-gray-500 hover:text-gray-700'}`}
+                                            >
+                                                No
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {requiresGrades ? (
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Configured Classes</label>
+                                                <input
+                                                    type="text"
+                                                    value={allowedClassesString}
+                                                    onChange={(e) => setAllowedClassesString(e.target.value)}
+                                                    placeholder="e.g. Class 9, Class 10"
+                                                    className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2 opacity-50 pointer-events-none">
+                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Configured Classes</label>
+                                                <input
+                                                    type="text"
+                                                    value="Not Applicable"
+                                                    readOnly
+                                                    className="w-full bg-gray-100 text-gray-500 border border-gray-200 rounded-xl px-4 py-3 font-medium cursor-not-allowed"
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">
+                                                {requiresGrades ? 'Batches per Class' : 'Batches per Subject'}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                value={batchesPerClass}
+                                                onChange={(e) => setBatchesPerClass(e.target.value)}
+                                                placeholder="Max Batches"
+                                                className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Subjects Offered</label>
+                                    <input
+                                        type="text"
+                                        value={subjects}
+                                        onChange={(e) => setSubjects(e.target.value)}
+                                        placeholder="e.g. Math, Physics, Chemistry"
                                         className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
                                     />
-                                    <p className="text-[10px] text-gray-400 pl-1">Max Batches per Class</p>
+                                    <p className="text-[10px] text-gray-400 pl-1">Comma separated list</p>
                                 </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Subjects Offered</label>
-                                <input
-                                    type="text"
-                                    value={subjects}
-                                    onChange={(e) => setSubjects(e.target.value)}
-                                    placeholder="e.g. Math, Physics, Chemistry"
-                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                />
-                                <p className="text-[10px] text-gray-400 pl-1">Comma separated list</p>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isCreating}
-                                className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-black/5 hover:shadow-black/10 transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2"
-                            >
-                                {isCreating ? (
-                                    'Generating Link...'
-                                ) : (
-                                    <>Generate Invite Link <ArrowRight className="w-4 h-4" /></>
-                                )}
-                            </button>
-                        </form>
-
-                        {inviteLink && (
-                            <div className="mt-6 p-4 bg-green-50 border border-green-100 rounded-2xl animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Invite Generated</span>
-                                    {copied ? (
-                                        <CheckCircle className="w-5 h-5 text-green-600" />
+                                <button
+                                    type="submit"
+                                    disabled={isCreating}
+                                    className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-black/5 hover:shadow-black/10 transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2"
+                                >
+                                    {isCreating ? (
+                                        'Generating Link...'
                                     ) : (
-                                        <Copy
-                                            className="w-5 h-5 text-green-600 cursor-pointer hover:scale-110 transition-transform"
-                                            onClick={copyToClipboard}
-                                        />
+                                        <>Generate Invite Link <ArrowRight className="w-4 h-4" /></>
                                     )}
+                                </button>
+                            </form>
+
+                            {inviteLink && (
+                                <div className="mt-6 p-4 bg-green-50 border border-green-100 rounded-2xl animate-in fade-in slide-in-from-top-2">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Invite Generated</span>
+                                        {copied ? (
+                                            <CheckCircle className="w-5 h-5 text-green-600" />
+                                        ) : (
+                                            <Copy
+                                                className="w-5 h-5 text-green-600 cursor-pointer hover:scale-110 transition-transform"
+                                                onClick={copyToClipboard}
+                                            />
+                                        )}
+                                    </div>
+                                    <code className="block w-full bg-white border border-green-200 p-3 rounded-xl text-xs text-green-800 break-all font-mono select-all">
+                                        {inviteLink}
+                                    </code>
                                 </div>
-                                <code className="block w-full bg-white border border-green-200 p-3 rounded-xl text-xs text-green-800 break-all font-mono select-all">
-                                    {inviteLink}
-                                </code>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
