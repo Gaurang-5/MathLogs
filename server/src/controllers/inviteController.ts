@@ -51,9 +51,10 @@ export const generateInvite = async (req: Request, res: Response) => {
                 phoneNumber,
                 email,
                 config: {
+                    requiresGrades: true, // Default to true, can be changed during setup
                     maxClasses: Number(totalClasses) || 12,
                     maxBatchesPerClass: Number(batchesPerClass) || 5,
-                    allowedClasses: [], // Default empty
+                    allowedClasses: [], // Will be populated during setup if requiresGrades is true
                     subjects: subjectList
                 }
             }
