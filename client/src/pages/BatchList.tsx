@@ -125,12 +125,12 @@ export default function BatchList() {
             <AnimatePresence>
                 {showForm && (
                     <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden mb-8"
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="mb-8"
                     >
-                        <div className="bg-app-surface border border-app-border p-5 md:p-8 rounded-[24px] shadow-xl">
+                        <div className="bg-app-surface-opaque border border-app-border p-8 rounded-[24px] shadow-sm">
                             <h3 className="font-semibold text-lg mb-8 text-app-text flex items-center">
                                 <span className="w-8 h-8 rounded-full bg-accent-subtle flex items-center justify-center mr-3 text-accent text-sm font-bold">01</span>
                                 Create New Batch
@@ -223,95 +223,75 @@ export default function BatchList() {
                 <div className="text-center text-app-text-secondary py-20 animate-pulse">Loading batches...</div>
             ) : (
                 <div className="space-y-12 pb-20">
-                    {['Class 10', 'Class 9'].map(cls => {
-                        const classBatches = batches.filter(b => b.className === cls);
+                    {/* Dynamic Sections */}
+                    {(() => {
+                        let sections: string[] = [];
+                        if (!requiresGrades) {
+                            sections = ['Course Batches'];
+                        } else if (allowedClasses.length > 0) {
+                            sections = allowedClasses;
+                        } else {
+                            // Fallback: unique classes from batches or defaults
+                            const unique = Array.from(new Set(batches.map(b => b.className).filter(Boolean))) as string[];
+                            sections = unique.length > 0 ? unique.sort() : ['Class 10', 'Class 9', 'Class 11', 'Class 12'];
+                        }
 
-                        // If we have batches in this class, show them
-                        if (classBatches.length === 0) return null;
+                        return sections.map(section => {
+                            let classBatches;
+                            if (!requiresGrades) {
+                                classBatches = batches;
+                            } else {
+                                classBatches = batches.filter(b => b.className === section);
+                            }
 
-                        return (
-                            <div key={cls}>
-                                <h2 className="text-xl font-bold text-app-text mb-5 pl-1 flex items-center gap-3">
-                                    <span className="w-1.5 h-6 rounded-full bg-accent"></span>
-                                    {cls} Batches
-                                </h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                    {classBatches.map((batch, index) => (
-                                        <motion.div
-                                            key={batch.id}
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: index * 0.05 }}
-                                            onClick={() => window.location.href = `/batches/${batch.id}`}
-                                            className="bg-app-surface-opaque hover:bg-app-surface border border-app-border p-6 rounded-[24px] shadow-sm hover:shadow-xl transition-all group flex flex-col relative overflow-hidden cursor-pointer hover:-translate-y-1"
-                                        >
-                                            <div className="flex justify-between items-start mb-6 relative z-10">
-                                                <div>
-                                                    <h3 className="font-semibold text-xl text-app-text group-hover:text-accent transition-colors">{batch.name}</h3>
-                                                    <div className="flex items-center text-sm font-medium text-app-text-secondary mt-1">
-                                                        <GraduationCap className="w-4 h-4 mr-1.5 text-accent" />
-                                                        {batch.subject}
+                            // If we have batches in this class, show them
+                            if (classBatches.length === 0) return null;
+
+                            return (
+                                <div key={section}>
+                                    <h2 className="text-xl font-bold text-app-text mb-5 pl-1 flex items-center gap-3">
+                                        <span className="w-1.5 h-6 rounded-full bg-accent"></span>
+                                        {section}
+                                    </h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                        {classBatches.map((batch, index) => (
+                                            <motion.div
+                                                key={batch.id}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.05 }}
+                                                onClick={() => window.location.href = `/batches/${batch.id}`}
+                                                className="bg-app-surface-opaque hover:bg-app-surface border border-app-border p-6 rounded-[24px] shadow-sm hover:shadow-xl transition-all group flex flex-col relative overflow-hidden cursor-pointer hover:-translate-y-1"
+                                            >
+                                                <div className="flex justify-between items-start mb-6 relative z-10">
+                                                    <div>
+                                                        <h3 className="font-semibold text-xl text-app-text group-hover:text-accent transition-colors">{batch.name}</h3>
+                                                        <div className="flex items-center text-sm font-medium text-app-text-secondary mt-1">
+                                                            <GraduationCap className="w-4 h-4 mr-1.5 text-accent" />
+                                                            {batch.subject}
+                                                        </div>
+                                                    </div>
+                                                    <span className="bg-app-surface text-app-text-secondary text-xs px-3 py-1.5 rounded-full font-bold border border-app-border flex items-center">
+                                                        <Users className="w-3 h-3 mr-1.5" />
+                                                        {batch._count?.students || 0}
+                                                    </span>
+                                                </div>
+
+                                                <div className="relative z-10 mt-auto">
+                                                    <div className="flex items-center text-sm text-app-text-secondary bg-app-bg p-3 rounded-xl border border-app-border/50">
+                                                        <Clock className="w-4 h-4 mr-3 text-app-text-tertiary" />
+                                                        {batch.timeSlot}
                                                     </div>
                                                 </div>
-                                                <span className="bg-app-surface text-app-text-secondary text-xs px-3 py-1.5 rounded-full font-bold border border-app-border flex items-center">
-                                                    <Users className="w-3 h-3 mr-1.5" />
-                                                    {batch._count?.students || 0}
-                                                </span>
-                                            </div>
-
-                                            <div className="relative z-10 mt-auto">
-                                                <div className="flex items-center text-sm text-app-text-secondary bg-app-bg p-3 rounded-xl border border-app-border/50">
-                                                    <Clock className="w-4 h-4 mr-3 text-app-text-tertiary" />
-                                                    {batch.timeSlot}
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    ))}
+                                            </motion.div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })
+                    })()}
 
-                    {batches.some(b => b.className !== 'Class 10' && b.className !== 'Class 9') && (
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-900  mb-5 pl-1 flex items-center gap-3">
-                                <span className="w-1.5 h-6 rounded-full bg-neutral-400"></span>
-                                Other Batches
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {batches.filter(b => b.className !== 'Class 10' && b.className !== 'Class 9').map((batch) => (
-                                    <motion.div
-                                        key={batch.id}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        onClick={() => window.location.href = `/batches/${batch.id}`}
-                                        className="bg-app-surface-opaque hover:bg-app-surface border border-app-border p-6 rounded-[24px] shadow-sm hover:shadow-xl transition-all group flex flex-col relative overflow-hidden cursor-pointer hover:-translate-y-1"
-                                    >
-                                        <div className="flex justify-between items-start mb-6 relative z-10">
-                                            <div>
-                                                <h3 className="font-semibold text-xl text-app-text group-hover:text-accent transition-colors">{batch.name}</h3>
-                                                <div className="flex items-center text-sm font-medium text-app-text-secondary mt-1">
-                                                    <GraduationCap className="w-4 h-4 mr-1.5 text-accent" />
-                                                    {batch.subject}
-                                                </div>
-                                            </div>
-                                            <span className="bg-app-surface text-app-text-secondary text-xs px-3 py-1.5 rounded-full font-bold border border-app-border flex items-center">
-                                                <Users className="w-3 h-3 mr-1.5" />
-                                                {batch._count?.students || 0}
-                                            </span>
-                                        </div>
-                                        <div className="relative z-10 mt-auto">
-                                            <div className="flex items-center text-sm text-app-text-secondary bg-app-bg p-3 rounded-xl border border-app-border/50">
-                                                <Clock className="w-4 h-4 mr-3 text-app-text-tertiary" />
-                                                {batch.timeSlot}
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
+                    {/* Empty State */}
                     {batches.length === 0 && !showForm && (
                         <div className="col-span-full py-20 text-center flex flex-col items-center justify-center bg-app-surface border border-dashed border-app-border rounded-[24px]">
                             <div className="w-16 h-16 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center mb-4 text-app-text-secondary">
