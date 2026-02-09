@@ -49,6 +49,25 @@ export const createBatch = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Invalid Batch Number' });
         }
 
+        // Check Max Batches per Subject Limit
+        const maxBatchesPerSubject = config.maxBatchesPerClass || 5;
+        const currentSubject = subject || 'General';
+
+        const existingBatchesCount = await prisma.batch.count({
+            where: {
+                instituteId: user.instituteId,
+                academicYearId: academicYearId,
+                className: null,
+                subject: currentSubject
+            }
+        });
+
+        if (existingBatchesCount >= maxBatchesPerSubject) {
+            return res.status(400).json({
+                error: `Max limit of ${maxBatchesPerSubject} batches reached for subject: ${currentSubject}`
+            });
+        }
+
         try {
             // Check for duplicate batch number in the current academic year
             const existing = await prisma.batch.findFirst({
@@ -60,7 +79,7 @@ export const createBatch = async (req: Request, res: Response) => {
             });
 
             if (existing) {
-                return res.status(400).json({ error: `Batch ${num} already exists` });
+                return res.status(400).json({ error: `Batch ${num} already exists (Batches must have unique numbers across all subjects)` });
             }
 
             const batch = await prisma.batch.create({
