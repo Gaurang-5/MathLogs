@@ -110,7 +110,7 @@ export const validateInvite = async (req: Request, res: Response) => {
 
 // PUBLIC
 export const setupAccount = async (req: Request, res: Response) => {
-    const { token, username, password } = req.body;
+    const { token, username, password, requiresGrades, allowedClasses } = req.body;
 
     if (!username || !password || !token) {
         return res.status(400).json({ error: 'All fields required' });
@@ -118,7 +118,8 @@ export const setupAccount = async (req: Request, res: Response) => {
 
     try {
         const invite = await prisma.inviteToken.findUnique({
-            where: { token: String(token) }
+            where: { token: String(token) },
+            include: { institute: true }
         });
 
         if (!invite || invite.isUsed || new Date() > invite.expiresAt) {
@@ -133,9 +134,24 @@ export const setupAccount = async (req: Request, res: Response) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Transaction: Create Admin + Invalidate Token + Create Default Year
+        // Transaction: Create Admin + Invalidate Token + Create Default Year + Update Institute Config
         const result = await prisma.$transaction(async (tx) => {
-            // 1. Create Admin
+            // 1. Update Institute Config with grade settings
+            if (requiresGrades !== undefined && allowedClasses !== undefined) {
+                const currentConfig = (invite.institute.config as any) || {};
+                await tx.institute.update({
+                    where: { id: invite.instituteId },
+                    data: {
+                        config: {
+                            ...currentConfig,
+                            requiresGrades: requiresGrades,
+                            allowedClasses: allowedClasses
+                        }
+                    }
+                });
+            }
+
+            // 2. Create Admin
             const admin = await tx.admin.create({
                 data: {
                     username,
@@ -145,7 +161,7 @@ export const setupAccount = async (req: Request, res: Response) => {
                 }
             });
 
-            // 2. Create Default Academic Year for them
+            // 3. Create Default Academic Year for them
             const currentYear = new Date().getFullYear();
             const yearName = `${currentYear}-${currentYear + 1}`;
 
@@ -160,13 +176,13 @@ export const setupAccount = async (req: Request, res: Response) => {
                 }
             });
 
-            // 3. Link Admin to Year
+            // 4. Link Admin to Year
             await tx.admin.update({
                 where: { id: admin.id },
                 data: { currentAcademicYearId: academicYear.id }
             });
 
-            // 4. Invalidate Token
+            // 5. Invalidate Token
             await tx.inviteToken.update({
                 where: { id: invite.id },
                 data: { isUsed: true }

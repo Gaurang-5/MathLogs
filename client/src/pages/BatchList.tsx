@@ -30,6 +30,10 @@ export default function BatchList() {
     // Fee is removed from creation
     const [className, setClassName] = useState('');
 
+    // Institute Config
+    const [requiresGrades, setRequiresGrades] = useState(true);
+    const [allowedClasses, setAllowedClasses] = useState<string[]>([]);
+
     const fetchBatches = async () => {
         try {
             const data = await apiRequest('/batches');
@@ -46,14 +50,25 @@ export default function BatchList() {
             // Fetch Batches
             fetchBatches();
 
-            // Fetch Institute Config for Subjects
+            // Fetch Institute Config for Subjects and Grades
             try {
                 const institute = await apiRequest('/institute/me');
-                if (institute?.config?.subjects && Array.isArray(institute.config.subjects)) {
-                    setAllowedSubjects(institute.config.subjects);
+                const config = institute?.config || {};
+
+                // Set requiresGrades (default to true if not specified)
+                setRequiresGrades(config.requiresGrades !== false);
+
+                // Set allowed classes
+                if (Array.isArray(config.allowedClasses)) {
+                    setAllowedClasses(config.allowedClasses);
+                }
+
+                // Set allowed subjects
+                if (config.subjects && Array.isArray(config.subjects)) {
+                    setAllowedSubjects(config.subjects);
                     // Default to first subject if available
-                    if (institute.config.subjects.length > 0) {
-                        setSubject(institute.config.subjects[0]);
+                    if (config.subjects.length > 0) {
+                        setSubject(config.subjects[0]);
                     }
                 }
             } catch (e) {
@@ -68,13 +83,17 @@ export default function BatchList() {
         const toastId = toast.loading('Creating batch...');
 
         try {
-            const payload = {
+            const payload: any = {
                 batchNumber,
                 subject,
                 timeSlot,
-                className,
                 feeAmount: 0
             };
+
+            // Only include className if grades are required
+            if (requiresGrades) {
+                payload.className = className;
+            }
 
             await apiRequest('/batches', 'POST', payload);
             setShowForm(false);
@@ -116,39 +135,49 @@ export default function BatchList() {
                                 Create New Batch
                             </h3>
                             <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Dropdown
-                                    label="Class / Grade"
-                                    value={className}
-                                    onChange={setClassName}
-                                    options={[
-                                        { value: 'Class 9', label: 'Class 9' },
-                                        { value: 'Class 10', label: 'Class 10' }
-                                    ]}
-                                    placeholder="Select Class"
-                                    required
-                                />
-                                <Dropdown
-                                    label="Batch Number"
-                                    value={batchNumber}
-                                    onChange={setBatchNumber}
-                                    options={
-                                        className === 'Class 9'
-                                            ? [
+                                {requiresGrades && (
+                                    <>
+                                        <Dropdown
+                                            label="Class / Grade"
+                                            value={className}
+                                            onChange={setClassName}
+                                            options={allowedClasses.map(cls => ({ value: cls, label: cls }))}
+                                            placeholder="Select Class"
+                                            required
+                                        />
+                                        <Dropdown
+                                            label="Batch Number"
+                                            value={batchNumber}
+                                            onChange={setBatchNumber}
+                                            options={[
                                                 { value: '1', label: 'Batch 1' },
-                                                { value: '2', label: 'Batch 2' }
-                                            ]
-                                            : className === 'Class 10'
-                                                ? [
-                                                    { value: '1', label: 'Batch 1' },
-                                                    { value: '2', label: 'Batch 2' },
-                                                    { value: '3', label: 'Batch 3' }
-                                                ]
-                                                : []
-                                    }
-                                    placeholder="Select Number"
-                                    disabled={!className}
-                                    required
-                                />
+                                                { value: '2', label: 'Batch 2' },
+                                                { value: '3', label: 'Batch 3' },
+                                                { value: '4', label: 'Batch 4' },
+                                                { value: '5', label: 'Batch 5' }
+                                            ]}
+                                            placeholder="Select Number"
+                                            disabled={!className}
+                                            required
+                                        />
+                                    </>
+                                )}
+
+                                {!requiresGrades && (
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Batch Number</label>
+                                        <input
+                                            className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
+                                            type="number"
+                                            min="1"
+                                            placeholder="e.g. 1, 2, 3"
+                                            value={batchNumber}
+                                            onChange={e => setBatchNumber(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                )}
+
                                 {allowedSubjects.length > 0 ? (
                                     <Dropdown
                                         label="Subject"

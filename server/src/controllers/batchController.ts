@@ -18,15 +18,7 @@ export const createBatch = async (req: Request, res: Response) => {
     if (!user.instituteId) return res.status(401).json({ error: 'Unauthorized: No institute assigned' });
     if (!academicYearId) return res.status(400).json({ error: 'No academic year selected' });
 
-    if (!className || !batchNumber) {
-        return res.status(400).json({ error: 'Class and Batch Number are required' });
-    }
-
-    // Validation
-    const num = parseInt(batchNumber);
-    if (isNaN(num)) return res.status(400).json({ error: 'Invalid Batch Number' });
-
-    // Dynamic Validation based on Institute Config
+    // Fetch Institute Config
     const institute = await prisma.institute.findUnique({
         where: { id: user.instituteId },
         select: { config: true }
@@ -36,12 +28,71 @@ export const createBatch = async (req: Request, res: Response) => {
 
     // Default Config if none exists
     const config = (institute.config as any) || {
+        requiresGrades: true,
         classes: [
             { name: 'Class 9', maxBatches: 2 },
             { name: 'Class 10', maxBatches: 3 }
         ]
     };
 
+    const requiresGrades = config.requiresGrades !== false; // Default to true if not specified
+
+    // If institute doesn't require grades, skip className validation
+    if (!requiresGrades) {
+        // For non-grade-based institutes, just validate batch number
+        if (!batchNumber) {
+            return res.status(400).json({ error: 'Batch Number is required' });
+        }
+
+        const num = parseInt(batchNumber);
+        if (isNaN(num) || num < 1) {
+            return res.status(400).json({ error: 'Invalid Batch Number' });
+        }
+
+        try {
+            // Check for duplicate batch number in the current academic year
+            const existing = await prisma.batch.findFirst({
+                where: {
+                    batchNumber: num,
+                    academicYearId: academicYearId,
+                    className: null // For non-grade institutes, className is null
+                }
+            });
+
+            if (existing) {
+                return res.status(400).json({ error: `Batch ${num} already exists` });
+            }
+
+            const batch = await prisma.batch.create({
+                data: {
+                    name: `${subject || 'Course'} - Batch ${num}`,
+                    subject: subject || 'General',
+                    timeSlot,
+                    className: null, // No class/grade for this type of institute
+                    batchNumber: num,
+                    feeAmount: feeAmount ? parseFloat(feeAmount) : 0,
+                    teacherId,
+                    academicYearId,
+                    instituteId: user.instituteId
+                }
+            });
+            return res.json(batch);
+        } catch (error) {
+            console.error('Error creating batch:', error);
+            return res.status(500).json({ error: 'Failed to create batch' });
+        }
+    }
+
+    // For grade-based institutes, validate className
+    if (!className || !batchNumber) {
+        return res.status(400).json({ error: 'Class and Batch Number are required' });
+    }
+
+    // Validation
+    const num = parseInt(batchNumber);
+    if (isNaN(num)) return res.status(400).json({ error: 'Invalid Batch Number' });
+
+    // Dynamic Validation based on Institute Config
     // Simplify parsing if config is old format vs new format
     // Normalize config to array of objects
     let classConfig;

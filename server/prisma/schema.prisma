@@ -18,7 +18,7 @@ model Institute {
   teacherName   String?
   phoneNumber   String?
   email         String?
-  config        Json?          @default("{\"allowedClasses\": [\"9\", \"10\"], \"subjects\": [\"Math\", \"Science\"]}")
+  config        Json?          @default("{\"requiresGrades\": true, \"allowedClasses\": [\"9\", \"10\"], \"subjects\": [\"Math\", \"Science\"]}")
   plan          Tier           @default(FREE)
   
   // Status
