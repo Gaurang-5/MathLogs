@@ -60,8 +60,13 @@ export default function SuperAdminDashboard() {
     const [totalClasses, setTotalClasses] = useState('12');
     const [batchesPerClass, setBatchesPerClass] = useState('5');
     const [subjects, setSubjects] = useState('Math, Science, English');
+    const [allowedClassesString, setAllowedClassesString] = useState('Class 9, Class 10');
 
+    // Loading State
     const [isCreating, setIsCreating] = useState(false);
+
+    // Edit Institute State
+    const [editInstituteId, setEditInstituteId] = useState<string | null>(null);
     const [inviteLink, setInviteLink] = useState('');
     const [copied, setCopied] = useState(false);
 
@@ -196,7 +201,8 @@ export default function SuperAdminDashboard() {
                 email,
                 totalClasses,
                 batchesPerClass,
-                subjects
+                subjects,
+                allowedClasses: allowedClassesString
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -588,19 +594,18 @@ export default function SuperAdminDashboard() {
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Config Limits</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Configured Classes</label>
                                         <input
-                                            type="number"
-                                            inputMode="numeric"
-                                            value={totalClasses}
-                                            onChange={(e) => setTotalClasses(e.target.value)}
-                                            placeholder="Max Classes"
+                                            type="text"
+                                            value={allowedClassesString}
+                                            onChange={(e) => setAllowedClassesString(e.target.value)}
+                                            placeholder="e.g. Class 9, Class 10"
                                             className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
                                         />
-                                        <p className="text-[10px] text-gray-400 pl-1">Allowed Classes</p>
+                                        <p className="text-[10px] text-gray-400 pl-1">Pre-set classes for teacher</p>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Batches</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Batches</label>
                                         <input
                                             type="number"
                                             inputMode="numeric"

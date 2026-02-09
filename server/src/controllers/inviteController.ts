@@ -17,7 +17,8 @@ export const generateInvite = async (req: Request, res: Response) => {
         email,
         totalClasses,
         batchesPerClass,
-        subjects
+        subjects,
+        allowedClasses
     } = req.body;
     const user = (req as any).user;
 
@@ -40,6 +41,16 @@ export const generateInvite = async (req: Request, res: Response) => {
         }
     }
 
+    // Process Allowed Classes
+    let classList: string[] = [];
+    if (allowedClasses) {
+        if (Array.isArray(allowedClasses)) {
+            classList = allowedClasses;
+        } else if (typeof allowedClasses === 'string') {
+            classList = allowedClasses.split(',').map((s: string) => s.trim()).filter(Boolean);
+        }
+    }
+
     try {
         secureLogger.debug('Generating invite', { instituteName, teacherName });
 
@@ -54,7 +65,7 @@ export const generateInvite = async (req: Request, res: Response) => {
                     requiresGrades: true, // Default to true, can be changed during setup
                     maxClasses: Number(totalClasses) || 12,
                     maxBatchesPerClass: Number(batchesPerClass) || 5,
-                    allowedClasses: [], // Will be populated during setup if requiresGrades is true
+                    allowedClasses: classList,
                     subjects: subjectList
                 }
             }
