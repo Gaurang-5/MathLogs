@@ -31,6 +31,28 @@ const getCourseCode = (subject: string | null) => {
     return cleanSubject.substring(0, 3) || 'GEN';
 };
 
+// Helper to generate Institute Code from name
+// Takes first letter of first two words
+// Examples: "IT SKILLS MZN" → "IS", "MANOJ BHATIA COACHING" → "MB"
+const getInstituteCode = (instituteName: string) => {
+    if (!instituteName) return 'XX';
+
+    // Split by spaces and filter out empty strings
+    const words = instituteName.trim().split(/\s+/).filter(Boolean);
+
+    if (words.length === 0) return 'XX';
+    if (words.length === 1) {
+        // Single word: take first 2 chars
+        return words[0].substring(0, 2).toUpperCase();
+    }
+
+    // Take first letter of first two words
+    const firstLetter = words[0][0] || 'X';
+    const secondLetter = words[1][0] || 'X';
+
+    return (firstLetter + secondLetter).toUpperCase();
+};
+
 const generateHumanId = async (batch: any) => {
     const courseCode = getCourseCode(batch.subject || '');
 
@@ -41,17 +63,27 @@ const generateHumanId = async (batch: any) => {
     }
     const yy = year.toString().slice(-2);
 
-    // MULTI-TENANT FIX: Include instituteId in prefix to prevent collisions
-    // Use first 6 chars of instituteId for shorter, more readable IDs
-    // Format: {shortInstId}-{courseCode}{year}
-    // Example: a1b2c3-MTH26 (for Institute a1b2c3..., Math 2026)
+    // MULTI-TENANT FIX: Include institute code in prefix to prevent collisions
+    // Use institute name initials for human-readable IDs
+    // Format: {instCode}-{courseCode}{year}
+    // Example: IS-MTH26 (for "IT SKILLS MZN", Math 2026)
     const instituteId = batch.instituteId;
     if (!instituteId) {
         throw new Error('Batch must have an instituteId for student ID generation');
     }
 
-    const shortInstId = instituteId.substring(0, 6);
-    const prefix = `${shortInstId}-${courseCode}${yy}`;
+    // Fetch institute to get name
+    const institute = await prisma.institute.findUnique({
+        where: { id: instituteId },
+        select: { name: true }
+    });
+
+    if (!institute) {
+        throw new Error('Institute not found for student ID generation');
+    }
+
+    const instCode = getInstituteCode(institute.name);
+    const prefix = `${instCode}-${courseCode}${yy}`;
 
     // Atomic Upsert: Increment if exists, create if not
     // This relies on the database to handle concurrency locks
@@ -61,9 +93,9 @@ const generateHumanId = async (batch: any) => {
         create: { prefix, seq: 1 },
     });
 
-    // Final ID format: {shortInstId}-{courseCode}{year}-{seq}
-    // Example: a1b2c3-MTH26-001
-    return `${shortInstId}-${courseCode}${yy}-${counter.seq.toString().padStart(3, '0')}`;
+    // Final ID format: {instCode}-{courseCode}{year}-{seq}
+    // Example: IS-MTH26-001 (IT Skills, Math 2026, student #1)
+    return `${instCode}-${courseCode}${yy}-${counter.seq.toString().padStart(3, '0')}`;
 };
 
 const MAX_RETRIES = 15;
