@@ -120,7 +120,7 @@ export const createBatch = async (req: Request, res: Response) => {
         if (!config.allowedClasses.includes(className)) {
             return res.status(400).json({ error: `Class "${className}" is not allowed for this institute` });
         }
-        classConfig = { maxBatches: 5 }; // Default limit for simple array
+        classConfig = { maxBatches: config.maxBatchesPerClass || 5 }; // Use configured limit or default to 5
     } else if (config.classes) {
         // Robust object format
         classConfig = config.classes.find((c: any) => c.name === className);
