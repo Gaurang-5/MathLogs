@@ -52,6 +52,7 @@ export default function SuperAdminDashboard() {
     const [isLoading, setIsLoading] = useState(true);
 
     // Create Institute State
+    const [showOnboardForm, setShowOnboardForm] = useState(false);
     const [newInstituteName, setNewInstituteName] = useState('');
     const [teacherName, setTeacherName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
