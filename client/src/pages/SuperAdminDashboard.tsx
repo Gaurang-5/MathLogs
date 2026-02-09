@@ -530,139 +530,150 @@ export default function SuperAdminDashboard() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Create Invite Section */}
-                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 h-fit lg:sticky lg:top-24">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-black">
-                            <UserPlus className="w-5 h-5" />
-                            Onboard Institute
-                        </h2>
-                        <p className="text-gray-500 text-sm mb-6">Create a secure invite link to onboard a new institute to the platform.</p>
+                <div className="grid grid-cols-1 gap-8">
+                    {/* Create Invite Section - Now hidden, moved to modal */}
+                    {false && (
+                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 h-fit lg:sticky lg:top-24">
+                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-black">
+                                <UserPlus className="w-5 h-5" />
+                                Onboard Institute
+                            </h2>
+                            <p className="text-gray-500 text-sm mb-6">Create a secure invite link to onboard a new institute to the platform.</p>
 
-                        <form onSubmit={handleGenerateInvite} className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Institute Details</label>
-                                <input
-                                    type="text"
-                                    value={newInstituteName}
-                                    onChange={(e) => setNewInstituteName(e.target.value)}
-                                    placeholder="Institute Name (e.g. Apex Academy)"
-                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                    required
-                                />
-                                <input
-                                    type="text"
-                                    value={teacherName}
-                                    onChange={(e) => setTeacherName(e.target.value)}
-                                    placeholder="Teacher Name (e.g. Rajesh Kumar)"
-                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                    required
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
+                            <form onSubmit={handleGenerateInvite} className="space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Contact</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Institute Details</label>
                                     <input
-                                        type="tel"
-                                        value={phoneNumber}
-                                        onChange={(e) => setPhoneNumber(e.target.value)}
-                                        placeholder="Phone"
+                                        type="text"
+                                        value={newInstituteName}
+                                        onChange={(e) => setNewInstituteName(e.target.value)}
+                                        placeholder="Institute Name (e.g. Apex Academy)"
+                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                        required
+                                    />
+                                    <input
+                                        type="text"
+                                        value={teacherName}
+                                        onChange={(e) => setTeacherName(e.target.value)}
+                                        placeholder="Teacher Name (e.g. Rajesh Kumar)"
                                         className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
                                         required
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Email</label>
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="Email ID"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                        required
-                                    />
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Config Limits</label>
-                                    <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        value={totalClasses}
-                                        onChange={(e) => setTotalClasses(e.target.value)}
-                                        placeholder="Max Classes"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                    />
-                                    <p className="text-[10px] text-gray-400 pl-1">Allowed Classes</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Batches</label>
-                                    <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        value={batchesPerClass}
-                                        onChange={(e) => setBatchesPerClass(e.target.value)}
-                                        placeholder="Batches/Class"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                    />
-                                    <p className="text-[10px] text-gray-400 pl-1">Max Batches per Class</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Subjects Offered</label>
-                                <input
-                                    type="text"
-                                    value={subjects}
-                                    onChange={(e) => setSubjects(e.target.value)}
-                                    placeholder="e.g. Math, Physics, Chemistry"
-                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                />
-                                <p className="text-[10px] text-gray-400 pl-1">Comma separated list</p>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isCreating}
-                                className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-black/5 hover:shadow-black/10 transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2"
-                            >
-                                {isCreating ? (
-                                    'Generating Link...'
-                                ) : (
-                                    <>Generate Invite Link <ArrowRight className="w-4 h-4" /></>
-                                )}
-                            </button>
-                        </form>
-
-                        {inviteLink && (
-                            <div className="mt-6 p-4 bg-green-50 border border-green-100 rounded-2xl animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Invite Generated</span>
-                                    {copied ? (
-                                        <CheckCircle className="w-5 h-5 text-green-600" />
-                                    ) : (
-                                        <Copy
-                                            className="w-5 h-5 text-green-600 cursor-pointer hover:scale-110 transition-transform"
-                                            onClick={copyToClipboard}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Contact</label>
+                                        <input
+                                            type="tel"
+                                            value={phoneNumber}
+                                            onChange={(e) => setPhoneNumber(e.target.value)}
+                                            placeholder="Phone"
+                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                            required
                                         />
-                                    )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Email</label>
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="Email ID"
+                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                            required
+                                        />
+                                    </div>
                                 </div>
-                                <code className="block w-full bg-white border border-green-200 p-3 rounded-xl text-xs text-green-800 break-all font-mono select-all">
-                                    {inviteLink}
-                                </code>
-                            </div>
-                        )}
-                    </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Config Limits</label>
+                                        <input
+                                            type="number"
+                                            inputMode="numeric"
+                                            value={totalClasses}
+                                            onChange={(e) => setTotalClasses(e.target.value)}
+                                            placeholder="Max Classes"
+                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                        />
+                                        <p className="text-[10px] text-gray-400 pl-1">Allowed Classes</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Batches</label>
+                                        <input
+                                            type="number"
+                                            inputMode="numeric"
+                                            value={batchesPerClass}
+                                            onChange={(e) => setBatchesPerClass(e.target.value)}
+                                            placeholder="Batches/Class"
+                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                        />
+                                        <p className="text-[10px] text-gray-400 pl-1">Max Batches per Class</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Subjects Offered</label>
+                                    <input
+                                        type="text"
+                                        value={subjects}
+                                        onChange={(e) => setSubjects(e.target.value)}
+                                        placeholder="e.g. Math, Physics, Chemistry"
+                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                    />
+                                    <p className="text-[10px] text-gray-400 pl-1">Comma separated list</p>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isCreating}
+                                    className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-black/5 hover:shadow-black/10 transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2"
+                                >
+                                    {isCreating ? (
+                                        'Generating Link...'
+                                    ) : (
+                                        <>Generate Invite Link <ArrowRight className="w-4 h-4" /></>
+                                    )}
+                                </button>
+                            </form>
+
+                            {inviteLink && (
+                                <div className="mt-6 p-4 bg-green-50 border border-green-100 rounded-2xl animate-in fade-in slide-in-from-top-2">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Invite Generated</span>
+                                        {copied ? (
+                                            <CheckCircle className="w-5 h-5 text-green-600" />
+                                        ) : (
+                                            <Copy
+                                                className="w-5 h-5 text-green-600 cursor-pointer hover:scale-110 transition-transform"
+                                                onClick={copyToClipboard}
+                                            />
+                                        )}
+                                    </div>
+                                    <code className="block w-full bg-white border border-green-200 p-3 rounded-xl text-xs text-green-800 break-all font-mono select-all">
+                                        {inviteLink}
+                                    </code>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Institute List */}
                     <div className="lg:col-span-2 space-y-6">
-                        <h2 className="text-xl font-bold flex items-center gap-2 text-black">
-                            <School className="w-5 h-5" />
-                            Active Institutes
-                        </h2>
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-black">
+                                <School className="w-5 h-5" />
+                                Active Institutes
+                            </h2>
+                            <button
+                                onClick={() => setShowOnboardForm(true)}
+                                className="bg-black hover:bg-gray-800 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-black/5 hover:shadow-black/10 transition-all active:scale-[0.98] flex items-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Onboard Institute
+                            </button>
+                        </div>
 
                         <div className="grid gap-4">
                             {institutes.length === 0 ? (
@@ -855,6 +866,141 @@ export default function SuperAdminDashboard() {
                                 )}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Onboard Institute Modal */}
+            {showOnboardForm && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowOnboardForm(false)}>
+                    <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-black">
+                                <UserPlus className="w-5 h-5" />
+                                Onboard Institute
+                            </h2>
+                            <button onClick={() => setShowOnboardForm(false)} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <p className="text-gray-500 text-sm mb-6">Create a secure invite link to onboard a new institute to the platform.</p>
+
+                        <form onSubmit={handleGenerateInvite} className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Institute Details</label>
+                                <input
+                                    type="text"
+                                    value={newInstituteName}
+                                    onChange={(e) => setNewInstituteName(e.target.value)}
+                                    placeholder="Institute Name (e.g. Apex Academy)"
+                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                    required
+                                />
+                                <input
+                                    type="text"
+                                    value={teacherName}
+                                    onChange={(e) => setTeacherName(e.target.value)}
+                                    placeholder="Teacher Name (e.g. Rajesh Kumar)"
+                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Contact</label>
+                                    <input
+                                        type="tel"
+                                        value={phoneNumber}
+                                        onChange={(e) => setPhoneNumber(e.target.value)}
+                                        placeholder="Phone"
+                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Email</label>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder="Email ID"
+                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Config Limits</label>
+                                    <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={totalClasses}
+                                        onChange={(e) => setTotalClasses(e.target.value)}
+                                        placeholder="Max Classes"
+                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                    />
+                                    <p className="text-[10px] text-gray-400 pl-1">Allowed Classes</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Batches</label>
+                                    <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={batchesPerClass}
+                                        onChange={(e) => setBatchesPerClass(e.target.value)}
+                                        placeholder="Batches/Class"
+                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                    />
+                                    <p className="text-[10px] text-gray-400 pl-1">Max Batches per Class</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Subjects Offered</label>
+                                <input
+                                    type="text"
+                                    value={subjects}
+                                    onChange={(e) => setSubjects(e.target.value)}
+                                    placeholder="e.g. Math, Physics, Chemistry"
+                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                />
+                                <p className="text-[10px] text-gray-400 pl-1">Comma separated list</p>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isCreating}
+                                className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-black/5 hover:shadow-black/10 transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2"
+                            >
+                                {isCreating ? (
+                                    'Generating Link...'
+                                ) : (
+                                    <>Generate Invite Link <ArrowRight className="w-4 h-4" /></>
+                                )}
+                            </button>
+                        </form>
+
+                        {inviteLink && (
+                            <div className="mt-6 p-4 bg-green-50 border border-green-100 rounded-2xl animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Invite Generated</span>
+                                    {copied ? (
+                                        <CheckCircle className="w-5 h-5 text-green-600" />
+                                    ) : (
+                                        <Copy
+                                            className="w-5 h-5 text-green-600 cursor-pointer hover:scale-110 transition-transform"
+                                            onClick={copyToClipboard}
+                                        />
+                                    )}
+                                </div>
+                                <code className="block w-full bg-white border border-green-200 p-3 rounded-xl text-xs text-green-800 break-all font-mono select-all">
+                                    {inviteLink}
+                                </code>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
