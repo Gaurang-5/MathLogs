@@ -20,7 +20,10 @@ import {
     X,
     CheckCircle,
     Database,
-    Edit2
+    Edit2,
+    AlertTriangle,
+    GraduationCap,
+    IndianRupee
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -50,6 +53,7 @@ export default function SuperAdminDashboard() {
     const [institutes, setInstitutes] = useState<Institute[]>([]);
     const [analytics, setAnalytics] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     // Create Institute State
     const [showOnboardForm, setShowOnboardForm] = useState(false);

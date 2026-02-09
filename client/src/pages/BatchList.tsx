@@ -228,12 +228,16 @@ export default function BatchList() {
                         let sections: string[] = [];
                         if (!requiresGrades) {
                             sections = ['Course Batches'];
-                        } else if (allowedClasses.length > 0) {
-                            sections = allowedClasses;
                         } else {
-                            // Fallback: unique classes from batches or defaults
-                            const unique = Array.from(new Set(batches.map(b => b.className).filter(Boolean))) as string[];
-                            sections = unique.length > 0 ? unique.sort() : ['Class 10', 'Class 9', 'Class 11', 'Class 12'];
+                            // Combine allowedClasses with actual classes from existing batches to ensure nothing is hidden
+                            const existingClasses = batches.map(b => b.className).filter(Boolean) as string[];
+                            const allUnique = new Set([...allowedClasses, ...existingClasses]);
+                            sections = Array.from(allUnique).sort();
+
+                            // Fallback defaults if absolutely empty
+                            if (sections.length === 0) {
+                                sections = ['Class 9', 'Class 10', 'Class 11', 'Class 12'];
+                            }
                         }
 
                         return sections.map(section => {
