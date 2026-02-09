@@ -899,16 +899,17 @@ export default function SuperAdminDashboard() {
 
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">
-                                                {requiresGrades ? 'Batches per Class' : 'Batches per Subject'}
+                                                Total Batches Allowed
                                             </label>
                                             <input
                                                 type="number"
                                                 inputMode="numeric"
                                                 value={batchesPerClass}
                                                 onChange={(e) => setBatchesPerClass(e.target.value)}
-                                                placeholder="Max Batches"
+                                                placeholder="e.g. 10"
                                                 className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
                                             />
+                                            <p className="text-[10px] text-gray-400 pl-1">Total combined limit across all classes/subjects.</p>
                                         </div>
                                     </div>
                                 </div>

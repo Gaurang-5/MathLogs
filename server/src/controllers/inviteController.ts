@@ -65,7 +65,8 @@ export const generateInvite = async (req: Request, res: Response) => {
                 config: {
                     requiresGrades: requiresGrades,
                     maxClasses: Number(totalClasses) || 12,
-                    maxBatchesPerClass: Number(batchesPerClass) || 5,
+                    maxBatches: Number(batchesPerClass) || 10, // Global Limit
+                    maxBatchesPerClass: 100, // Deprecated: Set high to avoid per-class Limits blocking global limit
                     allowedClasses: classList,
                     subjects: subjectList
                 }

@@ -37,6 +37,19 @@ export const createBatch = async (req: Request, res: Response) => {
 
     const requiresGrades = config.requiresGrades !== false; // Default to true if not specified
 
+    // Validate Global Limit (New Requirement)
+    if (config.maxBatches) {
+        const totalBatches = await prisma.batch.count({
+            where: {
+                instituteId: user.instituteId,
+                academicYearId
+            }
+        });
+        if (totalBatches >= config.maxBatches) {
+            return res.status(400).json({ error: `Max total batches limit reached (${config.maxBatches}).` });
+        }
+    }
+
     // If institute doesn't require grades, skip className validation
     if (!requiresGrades) {
         // For non-grade-based institutes, just validate batch number
@@ -53,6 +66,7 @@ export const createBatch = async (req: Request, res: Response) => {
         const maxBatchesPerSubject = config.maxBatchesPerClass || 5;
         const currentSubject = subject || 'General';
 
+
         const existingBatchesCount = await prisma.batch.count({
             where: {
                 instituteId: user.instituteId,
@@ -62,7 +76,8 @@ export const createBatch = async (req: Request, res: Response) => {
             }
         });
 
-        if (existingBatchesCount >= maxBatchesPerSubject) {
+        // Only enforce subject limit if Global Limit is NOT active
+        if (!config.maxBatches && existingBatchesCount >= maxBatchesPerSubject) {
             return res.status(400).json({
                 error: `Max limit of ${maxBatchesPerSubject} batches reached for subject: ${currentSubject}`
             });
@@ -135,7 +150,12 @@ export const createBatch = async (req: Request, res: Response) => {
         classConfig = { maxBatches: className === 'Class 9' ? 2 : 3 };
     }
 
-    if (num < 1 || num > classConfig.maxBatches) {
+    if (num < 1) {
+        return res.status(400).json({ error: 'Batch Number must be greater than 0' });
+    }
+
+    // Only enforce class limit if Global Limit is NOT active
+    if (!config.maxBatches && num > classConfig.maxBatches) {
         return res.status(400).json({
             error: `${className} can only have up to ${classConfig.maxBatches} batches`
         });

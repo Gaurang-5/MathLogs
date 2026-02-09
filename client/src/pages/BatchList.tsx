@@ -137,47 +137,28 @@ export default function BatchList() {
                             </h3>
                             <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {requiresGrades && (
-                                    <>
-                                        <Dropdown
-                                            label="Class / Grade"
-                                            value={className}
-                                            onChange={setClassName}
-                                            options={allowedClasses.map(cls => ({ value: cls, label: cls }))}
-                                            placeholder="Select Class"
-                                            required
-                                        />
-                                        <Dropdown
-                                            label="Batch Number"
-                                            value={batchNumber}
-                                            onChange={setBatchNumber}
-                                            options={[
-                                                { value: '1', label: 'Batch 1' },
-                                                { value: '2', label: 'Batch 2' },
-                                                { value: '3', label: 'Batch 3' },
-                                                { value: '4', label: 'Batch 4' },
-                                                { value: '5', label: 'Batch 5' }
-                                            ]}
-                                            placeholder="Select Number"
-                                            disabled={!className}
-                                            required
-                                        />
-                                    </>
+                                    <Dropdown
+                                        label="Class / Grade"
+                                        value={className}
+                                        onChange={setClassName}
+                                        options={allowedClasses.map(cls => ({ value: cls, label: cls }))}
+                                        placeholder="Select Class"
+                                        required
+                                    />
                                 )}
 
-                                {!requiresGrades && (
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Batch Number</label>
-                                        <input
-                                            className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
-                                            type="number"
-                                            min="1"
-                                            placeholder="e.g. 1, 2, 3"
-                                            value={batchNumber}
-                                            onChange={e => setBatchNumber(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                )}
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Batch Number</label>
+                                    <input
+                                        className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
+                                        type="number"
+                                        min="1"
+                                        placeholder="e.g. 1"
+                                        value={batchNumber}
+                                        onChange={e => setBatchNumber(e.target.value)}
+                                        required
+                                    />
+                                </div>
 
                                 {allowedSubjects.length > 0 ? (
                                     <Dropdown
