@@ -102,8 +102,9 @@ export default function BatchList() {
             fetchBatches();
             toast.success('Batch created successfully!', { id: toastId });
         } catch (e: any) {
-            console.error(e);
-            toast.error(e.message || 'Failed to create batch', { id: toastId });
+            console.error('❌ Batch creation failed:', e);
+            const errorMsg = e.response?.data?.error || e.message || 'Failed to create batch';
+            toast.error(errorMsg, { id: toastId });
         }
     };
 
