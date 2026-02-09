@@ -482,8 +482,8 @@ export default function SuperAdminDashboard() {
                         <ShieldCheck className="w-6 h-6" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-gray-900 tracking-tight">MathLogs Admin</h1>
-                        <p className="text-xs text-gray-500 font-medium">Platform Management</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Super Admin Dashboard <span className="text-sm font-normal opacity-50">v1.2</span></h1>
+                        <p className="text-blue-100"> Manage institutes and oversee platform activity.</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
