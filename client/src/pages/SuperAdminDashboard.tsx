@@ -19,7 +19,8 @@ import {
     Settings,
     X,
     CheckCircle,
-    Database
+    Database,
+    Edit2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,6 +29,9 @@ const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL ||
 interface Institute {
     id: string;
     name: string;
+    teacherName?: string;
+    phoneNumber?: string;
+    email?: string;
     createdAt: string;
     status: string; // ACTIVE or SUSPENDED
     suspensionReason?: string;
@@ -76,6 +80,14 @@ export default function SuperAdminDashboard() {
     const [selectedInstitute, setSelectedInstitute] = useState<Institute | null>(null);
     const [configJson, setConfigJson] = useState('');
     const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+    // Edit Details Modal State
+    const [editDetailsModal, setEditDetailsModal] = useState<Institute | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editTeacherName, setEditTeacherName] = useState('');
+    const [editPhone, setEditPhone] = useState('');
+    const [editEmail, setEditEmail] = useState('');
+    const [isSavingDetails, setIsSavingDetails] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -136,6 +148,36 @@ export default function SuperAdminDashboard() {
             alert('Invalid JSON or Save Failed');
         } finally {
             setIsSavingConfig(false);
+        }
+    };
+
+    const handleOpenEditDetails = (inst: Institute) => {
+        setEditDetailsModal(inst);
+        setEditName(inst.name || '');
+        setEditTeacherName(inst.teacherName || '');
+        setEditPhone(inst.phoneNumber || '');
+        setEditEmail(inst.email || '');
+    };
+
+    const handleSaveDetails = async () => {
+        if (!editDetailsModal) return;
+        setIsSavingDetails(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`${API_URL}/institutes/${editDetailsModal.id}/details`, {
+                name: editName,
+                teacherName: editTeacherName,
+                phoneNumber: editPhone,
+                email: editEmail
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchData();
+            setEditDetailsModal(null);
+        } catch (e) {
+            alert('Failed to save details');
+        } finally {
+            setIsSavingDetails(false);
         }
     };
 
@@ -352,6 +394,81 @@ export default function SuperAdminDashboard() {
                 </div>
             )}
 
+            {/* Edit Details Modal */}
+            {editDetailsModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Edit Institute Details</h3>
+                                <p className="text-sm text-gray-500">Update coaching center information</p>
+                            </div>
+                            <button onClick={() => setEditDetailsModal(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Institute Name</label>
+                                <input
+                                    type="text"
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    placeholder="e.g. Apex Academy"
+                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Teacher Name</label>
+                                <input
+                                    type="text"
+                                    value={editTeacherName}
+                                    onChange={(e) => setEditTeacherName(e.target.value)}
+                                    placeholder="e.g. Rajesh Kumar"
+                                    className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Phone</label>
+                                    <input
+                                        type="tel"
+                                        value={editPhone}
+                                        onChange={(e) => setEditPhone(e.target.value)}
+                                        placeholder="Phone Number"
+                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Email</label>
+                                    <input
+                                        type="email"
+                                        value={editEmail}
+                                        onChange={(e) => setEditEmail(e.target.value)}
+                                        placeholder="Email ID"
+                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                            <button onClick={() => setEditDetailsModal(null)} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancel</button>
+                            <button
+                                onClick={handleSaveDetails}
+                                disabled={isSavingDetails}
+                                className="px-4 py-2 bg-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                            >
+                                {isSavingDetails ? 'Saving...' : 'Save Changes'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <nav className="bg-white border-b border-gray-200 sticky top-0 z-10 px-6 py-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     <div className="bg-black text-white p-2 rounded-lg">
@@ -472,7 +589,7 @@ export default function SuperAdminDashboard() {
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Config Limits</label>
                                     <input
                                         type="number"
-                                    inputMode="numeric"
+                                        inputMode="numeric"
                                         value={totalClasses}
                                         onChange={(e) => setTotalClasses(e.target.value)}
                                         placeholder="Max Classes"
@@ -484,7 +601,7 @@ export default function SuperAdminDashboard() {
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Batches</label>
                                     <input
                                         type="number"
-                                    inputMode="numeric"
+                                        inputMode="numeric"
                                         value={batchesPerClass}
                                         onChange={(e) => setBatchesPerClass(e.target.value)}
                                         placeholder="Batches/Class"
@@ -587,6 +704,14 @@ export default function SuperAdminDashboard() {
                                             >
                                                 <FileText className="w-4 h-4" />
                                                 Details
+                                            </button>
+                                            <button
+                                                onClick={() => handleOpenEditDetails(inst)}
+                                                className="p-3 bg-purple-50/50 hover:bg-purple-50 text-purple-600 hover:text-purple-700 rounded-xl transition-all border border-purple-100 hover:border-purple-200 font-medium text-sm flex items-center gap-2"
+                                                title="Edit Institute Details"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                                Edit
                                             </button>
                                             <button
                                                 onClick={() => handleOpenConfig(inst)}

@@ -54,6 +54,32 @@ export const updateInstituteConfig = async (req: Request, res: Response) => {
     }
 };
 
+export const updateInstituteDetails = async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const { name, teacherName, phoneNumber, email } = req.body;
+    const user = (req as any).user;
+
+    if (user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const updated = await prisma.institute.update({
+            where: { id },
+            data: {
+                name,
+                teacherName,
+                phoneNumber,
+                email
+            }
+        });
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update institute details' });
+    }
+};
+
+
 export const getInstituteDetails = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const user = (req as any).user;

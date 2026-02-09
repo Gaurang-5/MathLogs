@@ -170,9 +170,10 @@ router.post('/invites', authenticateToken as any, generateInvite as any);
 router.get('/institutes', authenticateToken as any, getInstitutes as any);
 // New Analytics & Config Routes
 // New Analytics & Config Routes
-import { getGlobalAnalytics, updateInstituteConfig, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute } from '../controllers/instituteController';
+import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute } from '../controllers/instituteController';
 router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
 router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
+router.put('/institutes/:id/details', authenticateToken as any, updateInstituteDetails as any);
 router.get('/institute/me', authenticateToken as any, getMyInstitute as any);
 router.get('/institute/:id/details', authenticateToken as any, getInstituteDetails as any);
 router.put('/institutes/:id/suspend', authenticateToken as any, suspendInstitute as any);
