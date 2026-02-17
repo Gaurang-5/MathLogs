@@ -168,6 +168,12 @@ app.listen(PORT, () => {
     // Initialize background workers
     emailWorker.start();
 
+    // Start WhatsApp Worker (every 5 seconds)
+    import('./utils/whatsappWorker').then(({ processWhatsappQueue }) => {
+        console.log('✅ WhatsApp Worker Initialized');
+        setInterval(processWhatsappQueue, 5000);
+    });
+
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Health check: http://localhost:${PORT}/health`);

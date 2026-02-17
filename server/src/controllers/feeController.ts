@@ -599,7 +599,28 @@ ${senderName}`;
                 instituteId: student.batch?.instituteId
             } as any
         });
-        res.json({ success: true, message: 'Reminder queued successfully' });
+
+        // WhatsApp Integration (Option A)
+        if (student.parentWhatsapp) {
+            // Clean number: remove spaces, dashes, ensure country code (default to +91 if missing)
+            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
+            if (!phone.startsWith('+')) {
+                if (phone.length === 10) phone = '+91' + phone; // India default
+            }
+
+            // Queue WhatsApp
+            import('../utils/whatsappService').then(({ sendFeeReminderWhatsapp }) => {
+                sendFeeReminderWhatsapp(
+                    student.name,
+                    totalPendingCalc,
+                    phone,
+                    new Date().toLocaleDateString(), // Due date (today/immediate)
+                    student.batch?.instituteId || undefined
+                );
+            });
+        }
+
+        res.json({ success: true, message: 'Reminder queued successfully (Email + WhatsApp)' });
 
     } catch (e) {
         console.error(e);

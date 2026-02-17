@@ -282,6 +282,26 @@ model EmailJob {
   @@index([createdAt]) // FIFO processing
 }
 
+model WhatsappJob {
+  id          String    @id @default(uuid())
+  recipient   String    // Phone number (E.164 format: +91...)
+  templateId  String    // e.g., "fee_reminder"
+  data        Json      // Variables: ["Rahul", "5000"]
+  status      JobStatus @default(PENDING) // PENDING, PROCESSING, COMPLETED, FAILED
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  error       String?
+  messageId   String?   // External ID from provider
+  
+  instituteId String?   // For usage tracking/billing per institute
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
 enum JobStatus {
   PENDING
   PROCESSING

@@ -464,6 +464,41 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
         // but let's try to match the type.
         // JobStatus is an enum 'PENDING'.
 
+
+
+        // WhatsApp Integration (Option A)
+        const whatsappPromises: Promise<any>[] = [];
+        const { sendExamResultWhatsapp } = await import('../utils/whatsappService');
+
+        students.forEach(student => {
+            if (student.parentWhatsapp) {
+                // Clean number
+                let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
+                if (!phone.startsWith('+')) {
+                    if (phone.length === 10) phone = '+91' + phone;
+                }
+
+                const mark = student.marks[0];
+                const score = mark ? mark.score : 0; // Default to 0 if absent (or handle absence differently)
+
+                // Only send if present? Or template supports "Absent"?
+                // Standard template sends score. If absent, maybe skip or send 0.
+                if (mark) {
+                    whatsappPromises.push(sendExamResultWhatsapp(
+                        student.name,
+                        test.name,
+                        score,
+                        test.maxMarks,
+                        phone,
+                        test.instituteId || undefined
+                    ));
+                }
+            }
+        });
+
+        // Fire and forget WhatsApp (or await if critical)
+        Promise.all(whatsappPromises).catch(err => console.error('WhatsApp Queue Error:', err));
+
         await prisma.emailJob.createMany({
             data: emailJobs.map(job => ({
                 ...job,
