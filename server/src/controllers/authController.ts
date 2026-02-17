@@ -145,7 +145,7 @@ export const getProfile = async (req: Request, res: Response) => {
         if (!admin) return res.status(404).json({ error: 'User not found' });
 
         res.json({
-            username: admin.username,
+            username: admin.institute?.teacherName || admin.username,
             email: admin.institute?.email || '',
             phone: admin.institute?.phoneNumber || '',
             instituteName: admin.institute?.name || ''
