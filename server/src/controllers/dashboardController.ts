@@ -23,7 +23,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
 
         // PERF OPTIMIZATION: Execute all queries in parallel using database aggregations
         // This reduces payload from ~500KB to ~5KB and query time from 2.5s to ~200ms
-        const [batches, students, monthlyCollected, totalCollected, totalPending, batchDefaulters] = await Promise.all([
+        const [batches, students, monthlyCollected, totalCollected, totalPending, batchDefaulters, institute] = await Promise.all([
             // Query 1: Get batch count with instituteId filter (defense-in-depth)
             prisma.batch.count({
                 where: {
@@ -167,7 +167,13 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 GROUP BY batch_name
                 ORDER BY amount DESC
                 LIMIT 5
-            `
+            `,
+
+            // Query 7: Get teacher name from institute settings
+            user.instituteId ? prisma.institute.findUnique({
+                where: { id: user.instituteId },
+                select: { teacherName: true }
+            }) : Promise.resolve(null)
         ]);
 
         // Convert batchDefaulters to expected format
@@ -187,7 +193,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 pending: totalPending
             },
             defaulters,
-            userName: user.username
+            userName: institute?.teacherName || user.username
         });
 
     } catch (error) {
