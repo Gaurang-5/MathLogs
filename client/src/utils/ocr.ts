@@ -77,11 +77,11 @@ export async function extractMarksFromSticker(
         const sourceHeight = videoElement.videoHeight;
         console.log(`Video Dimensions: ${sourceWidth}x${sourceHeight}`);
 
-        // The UI shows a scan guide of roughly 288x72 pixels (4:1 ratio for 46x11mm sticker)
+        // The UI shows a scan guide for a 42x23mm sticker
         // We want to crop the center of the video feed to match this area
-        // Sticker is ~4:1 ratio (width:height)
+        // Sticker is ~1.826:1 ratio (width:height)
         const cropWidth = sourceWidth * 0.9; // Capture 90% of width (Matches mobile UI)
-        const cropHeight = cropWidth / 4; // 4:1 ratio like the sticker
+        const cropHeight = cropWidth / (42 / 23); // Matches the new sticker ratio
 
         const startX = (sourceWidth - cropWidth) / 2;
         const startY = (sourceHeight - cropHeight) / 2;
