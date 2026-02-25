@@ -24,6 +24,7 @@ export default function BatchList() {
 
     // Form State
     const [batchNumber, setBatchNumber] = useState('');
+    const [customName, setCustomName] = useState('');
     const [subject, setSubject] = useState('Mathematics');
     const [allowedSubjects, setAllowedSubjects] = useState<string[]>([]);
     const [timeSlot, setTimeSlot] = useState('');
@@ -85,6 +86,7 @@ export default function BatchList() {
         try {
             const payload: any = {
                 batchNumber,
+                customName,
                 subject,
                 timeSlot,
                 feeAmount: 0
@@ -98,7 +100,7 @@ export default function BatchList() {
             await apiRequest('/batches', 'POST', payload);
             setShowForm(false);
             // Reset
-            setBatchNumber(''); setTimeSlot(''); setClassName('');
+            setBatchNumber(''); setCustomName(''); setTimeSlot(''); setClassName('');
             fetchBatches();
             toast.success('Batch created successfully!', { id: toastId });
         } catch (e: any) {
@@ -157,6 +159,17 @@ export default function BatchList() {
                                         value={batchNumber}
                                         onChange={e => setBatchNumber(e.target.value)}
                                         required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Batch Name (Optional)</label>
+                                    <input
+                                        className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
+                                        type="text"
+                                        placeholder="e.g. Target 2026 Batch"
+                                        value={customName}
+                                        onChange={e => setCustomName(e.target.value)}
                                     />
                                 </div>
 

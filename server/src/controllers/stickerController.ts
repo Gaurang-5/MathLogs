@@ -35,17 +35,17 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
         doc.pipe(res);
 
         // A4: 210 x 297 mm
-        // 84 Labels: 4 columns x 21 rows
-        // Label size: 46 x 11 mm
-        const cols = 4;
-        const rows = 21;
+        // 65 Labels: 5 columns x 13 rows
+        // Label size: 42 x 23 mm (based on user's VGR sticker paper)
+        const cols = 5;
+        const rows = 13;
         const mmToPt = 2.83465;
-        const labelWidth = 46 * mmToPt;
-        const labelHeight = 11 * mmToPt;
-        const startX = 10 * mmToPt;
-        const startY = 15 * mmToPt;
-        const gapX = 2 * mmToPt;
-        const gapY = 1 * mmToPt;
+        const labelWidth = 42 * mmToPt;
+        const labelHeight = 23 * mmToPt;
+        const startX = 0;
+        const startY = 0;
+        const gapX = 0;
+        const gapY = 0;
 
         let col = 0;
         let row = 0;
@@ -83,9 +83,10 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
 
             if (student.humanId) {
                 // --- LEFT: QR Code ---
-                // Maximize QR size for scannability
+                // Keeping QR code sized appropriately (~14mm = 40pts) for easy scanning
                 const padding = 2; // pts
-                const qrSize = labelHeight - (padding * 2);
+                const qrSize = 40;
+                const qrY = y + (labelHeight - qrSize) / 2; // vertically centered
 
                 try {
                     const png = await bwipjs.toBuffer({
@@ -95,7 +96,7 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
                     });
 
                     // Cast to any/Buffer to avoid TS issues with bwip-js types
-                    doc.image(png as any, x + padding, y + padding, {
+                    doc.image(png as any, x + padding, qrY, {
                         width: qrSize,
                         height: qrSize
                     });
@@ -117,53 +118,52 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
 
                 // 1. Student Name (Larger & Bolder)
                 doc.font('Helvetica-Bold')
-                    .fontSize(9) // Increased from 6
+                    .fontSize(10) // Size 10 for better readability
                     .fillColor('#000000') // Black for better contrast
-                    .text(student.name, contentX, y + 2, {
+                    .text(student.name, contentX, y + 4, {
                         width: contentWidth,
-                        height: 10,
+                        height: 20,
                         ellipsis: true,
-                        align: 'left'
+                        align: 'center'
                     });
 
                 // 2. Marks Field - Maximized for Easy Writing
-                const marksAreaY = y + 14; // Push down below name
-                const availableHeight = (y + labelHeight) - marksAreaY - 2;
+                // Because we have 23mm height, we can stack MARKS above the boxes
+                const labelY = y + 26; // Below the name
 
-                // Label (Small but clear)
                 doc.font('Helvetica-Bold')
-                    .fontSize(5)
+                    .fontSize(6)
                     .fillColor('#4B5563') // Gray-600
-                    .text('MARKS:', contentX, marksAreaY + 3);
+                    .text('MARKS:', contentX, labelY);
+
+                const marksAreaY = labelY + 8; // Push down below label
+                const availableHeight = (y + labelHeight) - marksAreaY - 4; // Padding to bottom
 
                 // Big Digit Boxes
-                const marksTextWidth = doc.widthOfString('MARKS:') + 2;
-                const boxStartX = contentX + marksTextWidth;
-
-                // Calculate box size to fill remaining width
-                // Available width for boxes = total content width - label width - right padding
-                const availableWidthForBoxes = contentWidth - marksTextWidth - 7; // -7 for "OCR" text space (increased from -5)
+                // Fill the row
+                const availableWidthForBoxes = contentWidth - 10; // -10 for "OCR" text on the right edge
+                const boxStartX = contentX + 2;
                 const numDigits = 3;
-                const boxSpacing = 2; // Increased spacing for clarity
+                const boxSpacing = 3;
                 const boxWidth = (availableWidthForBoxes - (boxSpacing * (numDigits - 1))) / numDigits;
 
-                // Ensure boxes are square-ish or rectangular but constrained by height
-                // We want them as big as possible
-                const boxHeight = availableHeight;
+                // Box height up to 1.5x width to avoid weird slim shapes
+                const boxHeight = Math.min(availableHeight, boxWidth * 1.5);
+                const actualMarksY = marksAreaY + (availableHeight - boxHeight) / 2; // Center vertically in space
 
                 // Draw digit boxes
                 for (let i = 0; i < numDigits; i++) {
                     const boxX = boxStartX + (i * (boxWidth + boxSpacing));
 
                     // Draw box
-                    doc.roundedRect(boxX, marksAreaY, boxWidth, boxHeight, 2)
+                    doc.roundedRect(boxX, actualMarksY, boxWidth, boxHeight, 2)
                         .lineWidth(0.5) // Thicker border
                         .strokeColor('#9CA3AF') // Gray-400 border
                         .stroke();
 
                     // Add guideline at bottom (dashed or solid)
                     // Solid line at bottom 20%
-                    const lineY = marksAreaY + boxHeight - 3;
+                    const lineY = actualMarksY + boxHeight - 3;
                     doc.moveTo(boxX + 2, lineY)
                         .lineTo(boxX + boxWidth - 2, lineY)
                         .lineWidth(0.3)
@@ -173,13 +173,13 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
 
                 // OCR Marker (Vertical at end)
                 doc.save();
-                // Move text 4pts from edge instead of 2pts to avoid border overlap
+                // Move text 4pts from edge to avoid border overlap
                 const ocrX = x + labelWidth - 4;
-                doc.rotate(-90, { origin: [ocrX, marksAreaY + boxHeight] });
+                doc.rotate(-90, { origin: [ocrX, actualMarksY + boxHeight] });
                 doc.font('Helvetica')
                     .fontSize(3)
                     .fillColor('#D1D5DB')
-                    .text('OCR', ocrX, marksAreaY + boxHeight);
+                    .text('OCR', ocrX, actualMarksY + boxHeight);
                 doc.restore();
             }
 

@@ -38,6 +38,7 @@ export const registerStudentSchema = z.object({
 export const createBatchSchema = z.object({
     body: z.object({
         batchNumber: z.union([z.string(), z.number()]),
+        customName: z.string().max(200).optional(),
         subject: z.string().min(1, "Subject is required").max(100),
         className: z.string().min(1, "Class is required").max(100).optional(), // Optional for non-grade institutes
         feeAmount: z.number().min(0).optional(),

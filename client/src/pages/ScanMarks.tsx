@@ -451,7 +451,7 @@ export default function ScanMarks() {
                     <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
                     {/* Minimal Corner Guides - No rectangle, just corners */}
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[75vw] max-w-lg aspect-[4.2/1] pointer-events-none">
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[75vw] max-w-lg aspect-[42/23] pointer-events-none">
                         {/* Top-left corner */}
                         <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 rounded-tl-lg shadow-[0_0_20px_rgba(74,222,128,0.6)]"></div>
 

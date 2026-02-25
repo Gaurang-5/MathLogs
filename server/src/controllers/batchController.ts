@@ -10,7 +10,7 @@ import { addMathLogsHeader } from '../utils/pdfUtils';
 import { getClientUrl } from '../utils/urlConfig';
 
 export const createBatch = async (req: Request, res: Response) => {
-    const { timeSlot, feeAmount, className, batchNumber, subject } = req.body;
+    const { timeSlot, feeAmount, className, batchNumber, subject, customName } = req.body;
     const teacherId = (req as any).user?.id;
     const user = (req as any).user;
     const academicYearId = (req as any).user?.currentAcademicYearId;
@@ -99,7 +99,7 @@ export const createBatch = async (req: Request, res: Response) => {
 
             const batch = await prisma.batch.create({
                 data: {
-                    name: `${subject || 'Course'} - Batch ${num}`,
+                    name: customName || `${subject || 'Course'} - Batch ${num}`,
                     subject: subject || 'General',
                     timeSlot,
                     className: null, // No class/grade for this type of institute
@@ -177,7 +177,7 @@ export const createBatch = async (req: Request, res: Response) => {
 
         const batch = await prisma.batch.create({
             data: {
-                name: `${className} - Batch ${num}`,
+                name: customName || `${className} - Batch ${num}`,
                 subject: subject || 'Mathematics',
                 timeSlot,
                 className,

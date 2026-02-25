@@ -735,10 +735,10 @@ export default function BatchDetails() {
                                     <p className="text-xs text-app-text-tertiary mb-2 px-2 uppercase font-bold tracking-wider">Actions</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
                                         <button
-                                            onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/kiosk/register/${batch.id}`); toast.success('Kiosk Link Copied'); }}
+                                            onClick={() => window.open(`/kiosk/register/${batch.id}`, '_blank')}
                                             className="py-3.5 rounded-xl bg-app-surface hover:bg-app-surface-hover text-app-text border border-app-border text-xs font-bold transition-all w-full"
                                         >
-                                            Copy Kiosk Link
+                                            Kiosk Invite
                                         </button>
                                         <button
                                             onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`); toast.success('Invite Link Copied'); }}
