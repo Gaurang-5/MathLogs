@@ -118,18 +118,18 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
 
                 // 1. Student Name (Larger & Bolder)
                 doc.font('Helvetica-Bold')
-                    .fontSize(10) // Size 10 for better readability
+                    .fontSize(9) // Size 9 to fit 2 lines if needed
                     .fillColor('#000000') // Black for better contrast
-                    .text(student.name, contentX, y + 4, {
+                    .text(student.name, contentX, y + 3, {
                         width: contentWidth,
-                        height: 20,
+                        height: 22,
                         ellipsis: true,
                         align: 'center'
                     });
 
                 // 2. Marks Field - Maximized for Easy Writing
                 // Because we have 23mm height, we can stack MARKS above the boxes
-                const labelY = y + 26; // Below the name
+                const labelY = y + 25; // Below the name
 
                 doc.font('Helvetica-Bold')
                     .fontSize(6)
