@@ -1,7 +1,14 @@
-export const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
+const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor?.isNative;
+export const API_URL = isCapacitor
+    ? 'https://mathlogs.app/api'
+    : (import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api'));
 
 async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?: number) {
-    const headers: any = { 'Content-Type': 'application/json' };
+    const headers: any = {};
+    if (method !== 'GET' && method !== 'DELETE') {
+        headers['Content-Type'] = 'application/json';
+    }
+
     const token = localStorage.getItem('token');
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -14,12 +21,39 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-        const res = await fetch(`${API_URL}${endpoint}`, {
-            method,
-            headers,
-            body: body ? JSON.stringify(body) : undefined,
-            signal: controller.signal,
-        });
+        let res;
+
+        if (isCapacitor) {
+            // Use native Capacitor HTTP plugin to bypass iOS strict URL/CORS policies
+            const { CapacitorHttp } = await import('@capacitor/core');
+            const options = {
+                url: `${API_URL}${endpoint}`,
+                headers,
+                // CapacitorHttp automatically serializes the data object to JSON
+                data: body,
+            };
+
+            // Map Capacitor HTTP methods
+            const nativeResponse = await (method === 'GET' ? CapacitorHttp.get(options) :
+                method === 'POST' ? CapacitorHttp.post(options) :
+                    method === 'PUT' ? CapacitorHttp.put(options) :
+                        CapacitorHttp.delete(options));
+
+            // Create a pseudo-fetch response object for downstream logic
+            res = {
+                ok: nativeResponse.status >= 200 && nativeResponse.status < 300,
+                status: nativeResponse.status,
+                json: async () => nativeResponse.data,
+            };
+        } else {
+            // Standard web fetch
+            res = await fetch(`${API_URL}${endpoint}`, {
+                method,
+                headers,
+                body: body ? JSON.stringify(body) : undefined,
+                signal: controller.signal,
+            });
+        }
 
         clearTimeout(timeoutId);
 
