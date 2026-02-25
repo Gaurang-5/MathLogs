@@ -21,39 +21,12 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-        let res;
-
-        if (isCapacitor) {
-            // Use native Capacitor HTTP plugin to bypass iOS strict URL/CORS policies
-            const { CapacitorHttp } = await import('@capacitor/core');
-            const options = {
-                url: `${API_URL}${endpoint}`,
-                headers,
-                // CapacitorHttp automatically serializes the data object to JSON
-                data: body,
-            };
-
-            // Map Capacitor HTTP methods
-            const nativeResponse = await (method === 'GET' ? CapacitorHttp.get(options) :
-                method === 'POST' ? CapacitorHttp.post(options) :
-                    method === 'PUT' ? CapacitorHttp.put(options) :
-                        CapacitorHttp.delete(options));
-
-            // Create a pseudo-fetch response object for downstream logic
-            res = {
-                ok: nativeResponse.status >= 200 && nativeResponse.status < 300,
-                status: nativeResponse.status,
-                json: async () => nativeResponse.data,
-            };
-        } else {
-            // Standard web fetch
-            res = await fetch(`${API_URL}${endpoint}`, {
-                method,
-                headers,
-                body: body ? JSON.stringify(body) : undefined,
-                signal: controller.signal,
-            });
-        }
+        const res = await fetch(`${API_URL}${endpoint}`, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined,
+            signal: controller.signal,
+        });
 
         clearTimeout(timeoutId);
 

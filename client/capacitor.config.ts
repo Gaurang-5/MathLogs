@@ -4,15 +4,11 @@ const config: CapacitorConfig = {
   appId: 'com.mathlogs.app',
   appName: 'MathLogs',
   webDir: 'dist',
-  plugins: {
-    CapacitorHttp: {
-      enabled: true,
-    },
-  },
   server: {
     androidScheme: 'https',
+    iosScheme: 'https',
+    hostname: 'mathlogs.app',
     cleartext: true,
-    hostname: 'mathlogs.app'
   }
 };
 
