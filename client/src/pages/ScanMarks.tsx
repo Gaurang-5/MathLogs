@@ -112,14 +112,11 @@ export default function ScanMarks() {
                             facingMode: "environment"
                         },
                         {
-                            fps: 15,
-                            // DIAGNOSTIC: Very large qrbox to test detection
+                            fps: 25, // Increased FPS for faster reaction time
+                            // Optimized: Wide scanning area matching new sticker layout
                             qrbox: (viewfinderWidth, viewfinderHeight) => {
-                                // Use 80% of screen for testing
-                                const width = Math.max(250, viewfinderWidth * 0.8);
-                                const height = Math.max(250, viewfinderHeight * 0.8);
-
-                                console.log("📐 qrbox dimensions:", { width, height });
+                                const width = viewfinderWidth * 0.9;
+                                const height = Math.min(viewfinderHeight * 0.5, 400); // Narrower height means less pixels to search
                                 return { width, height };
                             },
                             // Request high resolution for better focus

@@ -44,7 +44,7 @@ class CVWorkerManager {
                 if (ctx) {
                     const imgData = new ImageData(new Uint8ClampedArray(data), width, height);
                     ctx.putImageData(imgData, 0, 0);
-                    task.resolve(canvas.toDataURL('image/jpeg', 0.9));
+                    task.resolve(canvas.toDataURL('image/jpeg', 0.7));
                 } else {
                     task.reject(new Error("Failed to create canvas context"));
                 }

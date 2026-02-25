@@ -181,9 +181,9 @@ function detectAndWarp(imageData: ImageData): { success: boolean, data?: Uint8Ar
 
             const orderedPoints = sortedPoints;
 
-            // Destination coordinates (1260x690 matches ~1.826 ratio)
-            const dstWidth = 1260;
-            const dstHeight = 690;
+            // Destination coordinates (600x328 matches ~1.826 ratio, shrunk for speed)
+            const dstWidth = 600;
+            const dstHeight = 328;
 
             const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
                 orderedPoints[0].x, orderedPoints[0].y,
