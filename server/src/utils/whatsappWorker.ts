@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { prisma } from '../prisma';
 
-const META_API_VERSION = 'v17.0'; // Or latest version
+const META_API_VERSION = 'v22.0'; // Or latest version
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID; // Your Meta Phone ID
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN; // Your System User Token
 

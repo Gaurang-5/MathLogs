@@ -9,12 +9,12 @@ export const configureSecurityHeaders = (app: Express) => {
             directives: {
                 defaultSrc: ["'self'"],
                 styleSrc: [
-                    "'self'", 
+                    "'self'",
                     "'unsafe-inline'", // Allow inline styles for React
                     "https://fonts.googleapis.com" // Google Fonts
                 ],
                 scriptSrc: [
-                    "'self'", 
+                    "'self'",
                     "'unsafe-inline'", // Allow inline scripts for React
                     "'unsafe-eval'" // Required for some bundlers/dev tools
                 ],
@@ -27,7 +27,7 @@ export const configureSecurityHeaders = (app: Express) => {
                     "https://o4510811766718464.ingest.us.sentry.io" // Sentry error monitoring
                 ],
                 fontSrc: [
-                    "'self'", 
+                    "'self'",
                     "data:",
                     "https://fonts.googleapis.com",
                     "https://fonts.gstatic.com"
@@ -157,10 +157,11 @@ export const ocrLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Scanning too fast. Please wait a moment.' },
+    validate: { ip: false },
     keyGenerator: (req) => {
         // Use User ID if available (authenticated), otherwise fallback to IP
         const user = (req as any).user;
-        return user?.id || req.ip;
+        return user?.id || req.ip || 'unknown';
     },
     handler: (req: Request, res: Response) => {
         const user = (req as any).user;
