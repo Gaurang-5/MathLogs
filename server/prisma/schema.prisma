@@ -300,6 +300,7 @@ model WhatsappJob {
 
   @@index([status])
   @@index([createdAt])
+  @@index([status, attempts, createdAt], name: "idx_whatsapp_queue")
 }
 
 enum JobStatus {

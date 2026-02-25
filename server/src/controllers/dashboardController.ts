@@ -98,73 +98,28 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 ) as total
             `.then(result => Number(result[0]?.total || 0)),
 
-            // Query 5: Total pending fees (aggregated at DB level)
+            // Query 5: Total pending fees (Using Materialized StudentBalance!)
             prisma.$queryRaw<[{ pending: number }]>`
-                WITH student_fees AS (
-                    SELECT 
-                        s.id,
-                        s."batchId",
-                        b."feeAmount" as batch_fee,
-                        COALESCE(
-                            (SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id),
-                            0
-                        ) as installments_fee,
-                        COALESCE(
-                            (SELECT SUM(fr.amount) FROM "FeeRecord" fr WHERE fr."studentId" = s.id AND fr.status = 'PAID'),
-                            0
-                        ) as fees_paid,
-                        COALESCE(
-                            (SELECT SUM(fp."amountPaid") FROM "FeePayment" fp WHERE fp."studentId" = s.id),
-                            0
-                        ) as payments_paid
-                    FROM "Student" s
-                    JOIN "Batch" b ON b.id = s."batchId"
-                    WHERE s.status = 'APPROVED'
-                        AND b."teacherId" = ${teacherId}
-                        AND s."academicYearId" = ${academicYearId}
-                )
-                SELECT COALESCE(
-                    SUM(
-                        GREATEST(
-                            0,
-                            CASE 
-                                WHEN installments_fee > 0 THEN installments_fee
-                                ELSE batch_fee
-                            END - (fees_paid + payments_paid)
-                        )
-                    ),
-                    0
-                ) as pending
-                FROM student_fees
+                SELECT COALESCE(SUM(sb.balance), 0) as pending
+                FROM "StudentBalance" sb
+                JOIN "Student" s ON s.id = sb."studentId"
+                JOIN "Batch" b ON b.id = s."batchId"
+                WHERE s.status = 'APPROVED'
+                    AND b."teacherId" = ${teacherId}
+                    AND s."academicYearId" = ${academicYearId}
             `.then(result => Number(result[0]?.pending || 0)),
 
-            // Query 6: Top 5 defaulting batches (aggregated at DB level)
+            // Query 6: Top 5 defaulting batches (Using Materialized StudentBalance!)
             prisma.$queryRaw<Array<{ name: string; amount: number }>>`
-                WITH student_balances AS (
-                    SELECT 
-                        b.name as batch_name,
-                        GREATEST(
-                            0,
-                            CASE 
-                                WHEN COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id), 0) > 0
-                                THEN COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id), 0)
-                                ELSE b."feeAmount"
-                            END - 
-                            (
-                                COALESCE((SELECT SUM(fr.amount) FROM "FeeRecord" fr WHERE fr."studentId" = s.id AND fr.status = 'PAID'), 0) +
-                                COALESCE((SELECT SUM(fp."amountPaid") FROM "FeePayment" fp WHERE fp."studentId" = s.id), 0)
-                            )
-                        ) as balance
-                    FROM "Student" s
-                    JOIN "Batch" b ON b.id = s."batchId"
-                    WHERE s.status = 'APPROVED'
-                        AND b."teacherId" = ${teacherId}
-                        AND s."academicYearId" = ${academicYearId}
-                )
-                SELECT batch_name as name, SUM(balance) as amount
-                FROM student_balances
-                WHERE balance > 0
-                GROUP BY batch_name
+                SELECT b.name as name, SUM(sb.balance) as amount
+                FROM "StudentBalance" sb
+                JOIN "Student" s ON s.id = sb."studentId"
+                JOIN "Batch" b ON b.id = s."batchId"
+                WHERE s.status = 'APPROVED'
+                    AND b."teacherId" = ${teacherId}
+                    AND s."academicYearId" = ${academicYearId}
+                    AND sb.balance > 0
+                GROUP BY b.id, b.name
                 ORDER BY amount DESC
                 LIMIT 5
             `,
