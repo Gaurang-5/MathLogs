@@ -79,6 +79,12 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
     } catch (error: any) {
         clearTimeout(timeoutId);
 
+        // --- MOBILE DIAGNOSTICS ---
+        if (isCapacitor) {
+            alert(`NATIVE FETCH ERROR:\nURL: ${API_URL}${endpoint}\nMSG: ${error.message}\nNAME: ${error.name}`);
+        }
+        // --------------------------
+
         // Handle timeout
         if (error.name === 'AbortError') {
             throw new Error('Request timeout. Please check your connection and try again.');
