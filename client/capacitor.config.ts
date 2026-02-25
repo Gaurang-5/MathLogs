@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     iosScheme: 'https',
-    hostname: 'mathlogs.app',
+    hostname: 'app.mathlogs.app',
     cleartext: true,
   }
 };
