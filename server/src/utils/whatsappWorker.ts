@@ -63,7 +63,7 @@ const processJob = async (job: any) => {
             type: 'template',
             template: {
                 name: job.templateId,
-                language: { code: 'en_US' }, // Default language
+                language: { code: 'en' }, // Changed from en_US to en to match your screenshot
                 components: [
                     {
                         type: 'body',
