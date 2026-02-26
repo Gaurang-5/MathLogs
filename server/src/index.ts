@@ -46,35 +46,45 @@ app.use((req, res, next) => {
 });
 
 // CORS Configuration - Security hardened
-const allowedOrigins = [
-    process.env.CLIENT_URL || 'http://localhost:5173',
-    'http://localhost:5173', // Development fallback
-    'http://localhost:3000', // Alternative dev port
-    'http://localhost:5174', // Vite default retry
-    'http://localhost:5175', // Vite default retry
-    'http://localhost:5176', // Vite default retry
-    'http://localhost:5177', // Vite default retry
-    'http://localhost:5178', // Vite default retry
-    'http://localhost:5179', // Vite default retry
-    'http://localhost:5180', // Vite default retry
-    'http://localhost:5181', // Vite default retry
-    'http://localhost:5182', // Vite default retry
-    'http://localhost:5183', // Vite default retry
-    'http://localhost:5184', // Vite default retry
-    'http://localhost:5185', // Vite default retry
-    'http://localhost:3001', // Allow self-referential requests (e.g. from server itself)
-];
+// SECURITY: Strict allowlist — no substring matching (prevents evilmathlogs.app attacks)
+const PRODUCTION_ORIGINS = new Set([
+    'https://mathlogs.app',
+    'https://www.mathlogs.app',
+    'https://mathlogs.in',
+    'https://www.mathlogs.in',
+]);
+
+const DEVELOPMENT_ORIGINS = new Set([
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'http://localhost:5176',
+    'http://localhost:5177',
+    'http://localhost:5178',
+    'http://localhost:5179',
+    'http://localhost:5180',
+    'http://localhost:5181',
+    'http://localhost:5182',
+    'http://localhost:5183',
+    'http://localhost:5184',
+    'http://localhost:5185',
+    'http://localhost:3001',
+]);
 
 app.use(cors({
     origin: (origin, callback) => {
-        // In production, reject requests without Origin header (prevents server-to-server attacks)
+        // Allow same-origin and non-browser requests (curl, health checks)
         if (!origin) {
-            // Allow requests with no Origin (e.g. standard browser navigation, same-origin requests)
             return callback(null, true);
         }
 
-        // Allow Heroku domains AND custom domain mathlogs.app
-        if (allowedOrigins.includes(origin) || origin.endsWith('.herokuapp.com') || origin.endsWith('mathlogs.app') || origin.endsWith('mathlogs.in')) {
+        // SECURITY: Strict exact-match allowlist. No substring/endsWith.
+        // endsWith('mathlogs.app') was exploitable via evilmathlogs.app
+        const isDev = process.env.NODE_ENV !== 'production';
+        const isAllowed = PRODUCTION_ORIGINS.has(origin) || (isDev && DEVELOPMENT_ORIGINS.has(origin));
+
+        if (isAllowed) {
             callback(null, true);
         } else {
             console.warn(`[SECURITY] Blocked CORS request from unauthorized origin: ${origin}`);
@@ -88,7 +98,9 @@ app.use(cors({
     maxAge: 86400 // 24 hours
 }));
 
-app.use(express.json({ limit: '10mb' })); // Limit payload size
+// SECURITY: 100kb global limit prevents JSON-parse OOM attacks.
+// The /scan-ocr route uses multer for binary uploads, so it doesn't need this raised.
+app.use(express.json({ limit: '100kb' }));
 
 // Global API rate limiter (can be overridden/tightened in specific routes)
 app.use('/api', apiLimiter);

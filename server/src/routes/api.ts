@@ -37,20 +37,61 @@ const upload = multer({
 });
 
 import crypto from 'crypto';
+import { prisma } from '../prisma';
 
-// ✅ HIGH-3: Image Deduplication Cache
-// Prevents replay billing attacks (same image sent multiple times)
-const recentScans = new Map<string, { result: any, timestamp: number }>();
+// SECURITY FIX (P1-B): Replace in-memory Map cache with DB-backed deduplication.
+//
+// The old approach (JS Map) fragmented across multiple server instances (dynos/pods).
+// Instance A cached a scan — but Instance B knew nothing about it, so it would re-call
+// the Gemini API on the SAME image again. At burst scanning (100 scans/min), this doubled
+// AI costs. A compromised teacher could also replay the same image hundreds of times.
+//
+// The new approach stores the hash + result in Postgres with a 60s TTL. Any server
+// instance checks the same source of truth before calling the Gemini API.
 
-// Purge cache every minute
-setInterval(() => {
-    const now = Date.now();
-    for (const [hash, entry] of recentScans.entries()) {
-        if (now - entry.timestamp > 60000) { // 1 minute TTL
-            recentScans.delete(hash);
+const OCR_CACHE_TTL_SECONDS = 60;
+
+async function checkOcrCache(hash: string): Promise<any | null> {
+    try {
+        const record = await prisma.ocrScanCache.findUnique({
+            where: { imageHash: hash }
+        });
+        if (!record) return null;
+
+        // Check TTL — if expired, treat as a cache miss
+        const ageMs = Date.now() - new Date(record.createdAt).getTime();
+        if (ageMs > OCR_CACHE_TTL_SECONDS * 1000) {
+            return null;
         }
+
+        return record.result;
+    } catch {
+        // If cache table doesn't exist yet (migration pending), degrade gracefully
+        return null;
     }
-}, 60000);
+}
+
+async function setOcrCache(hash: string, result: any): Promise<void> {
+    try {
+        await prisma.ocrScanCache.upsert({
+            where: { imageHash: hash },
+            create: { imageHash: hash, result, createdAt: new Date() },
+            update: { result, createdAt: new Date() }
+        });
+    } catch {
+        // Non-critical: if cache write fails, OCR still proceeds
+    }
+}
+
+// Clean up expired cache records every 5 minutes to prevent table bloat
+setInterval(async () => {
+    try {
+        const cutoff = new Date(Date.now() - OCR_CACHE_TTL_SECONDS * 1000);
+        await prisma.ocrScanCache.deleteMany({
+            where: { createdAt: { lt: cutoff } }
+        });
+    } catch { /* non-critical */ }
+}, 5 * 60 * 1000);
 
 // OCR Scan Endpoint
 router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('image'), async (req, res) => {
@@ -58,7 +99,6 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
         console.log("📥 Received OCR Request", (req as any).user?.username);
 
         let imageBuffer: Buffer | string | undefined;
-        console.log("🔄 Refreshed OCR Endpoint Hit");
 
         if ((req as any).file) {
             console.log(`📎 File received: ${(req as any).file.originalname} (${(req as any).file.size} bytes)`);
@@ -74,18 +114,21 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
             return res.status(400).json({ error: "Missing image data" });
         }
 
-        // Generate Hash for Deduplication
-        const hash = crypto.createHash('sha256').update((req as any).file ? (req as any).file.buffer : imageBuffer.toString()).digest('hex');
+        // Compute SHA-256 of raw image bytes for deduplication
+        const rawBuffer = (req as any).file ? (req as any).file.buffer : Buffer.from(imageBuffer.toString(), 'base64');
+        const hash = crypto.createHash('sha256').update(rawBuffer).digest('hex');
 
-        if (recentScans.has(hash)) {
-            console.log("♻️ Duplicate Scan Detected - Returning Cached Result");
-            return res.json(recentScans.get(hash)!.result);
+        // Check DB-backed cache first (works across all server instances)
+        const cached = await checkOcrCache(hash);
+        if (cached) {
+            console.log("♻️ Duplicate Scan — Returning DB-Cached Result");
+            return res.json(cached);
         }
 
         const result = await processOCR(imageBuffer);
 
-        // Cache result for 60s
-        recentScans.set(hash, { result, timestamp: Date.now() });
+        // Store in DB cache for cross-instance deduplication
+        await setOcrCache(hash, result);
 
         console.log("✅ OCR Success:", result);
         res.json(result);

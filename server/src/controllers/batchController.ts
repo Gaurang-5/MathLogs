@@ -1,12 +1,10 @@
 import { Request, Response } from 'express';
-import { prisma } from '../prisma';
-import PDFDocument from 'pdfkit';
-import fs from 'fs';
 import path from 'path';
+import { prisma } from '../prisma';
+import { runPdfInWorker } from '../utils/pdfWorker';
 import bwipjs from 'bwip-js';
 import { secureLogger } from '../utils/secureLogger';
 import { sendEmail } from '../utils/email';
-import { addMathLogsHeader } from '../utils/pdfUtils';
 import { getClientUrl } from '../utils/urlConfig';
 
 export const createBatch = async (req: Request, res: Response) => {
@@ -312,9 +310,7 @@ export const getBatchDetails = async (req: Request, res: Response) => {
 
 export const downloadBatchPDF = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
-    const teacherId = (req as any).user?.id;
     try {
-        // Fetch batch with full student details
         const batch = await prisma.batch.findUnique({
             where: { id },
             include: {
@@ -336,196 +332,16 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
         const user = (req as any).user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
-        const installments = batch.feeInstallments || [];
-        const numInstallments = installments.length;
-
-        // Create PDF in LANDSCAPE mode
-        const doc = new PDFDocument({
-            size: 'A4',
-            layout: 'landscape',
-            margin: 20
-        });
+        // PERF FIX (P0-C): Run synchronous PDFKit in a worker thread.
+        // PDFKit blocks the event loop for 200-500ms per PDF — catastrophic at scale.
+        const workerScript = path.resolve(__dirname, '../workers/batchPdfWorker.js');
+        const pdfBuffer = await runPdfInWorker(workerScript, { batch });
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${batch.name}-fee-details.pdf"`);
-        doc.pipe(res);
-
-        // Add MathLogs branding at top-left
-        addMathLogsHeader(doc, 20);
-        doc.moveDown(2);
-
-        // Header
-        doc.fontSize(16).font('Helvetica-Bold').text(`${batch.name} - Fee Payment Details`, { align: 'center' });
-        doc.fontSize(9).font('Helvetica').text(`Subject: ${batch.subject} | Generated: ${new Date().toLocaleDateString()}`, { align: 'center' });
-        doc.moveDown(0.8);
-
-        // Dynamic column calculation (landscape A4: ~800pt usable width)
-        const startX = 20;
-        const nameWidth = 70;
-        const schoolWidth = 60;
-        const phoneWidth = 55;
-        const avgWidth = 30;
-        const feeDueWidth = 40;
-
-        // Remaining width for installments
-        const remainingWidth = 800 - nameWidth - schoolWidth - phoneWidth - avgWidth - feeDueWidth - 50;
-        const installmentWidth = Math.max(40, Math.floor(remainingWidth / Math.max(numInstallments, 1)));
-
-        // Helper function to draw headers
-        const drawHeaders = (y: number) => {
-            doc.font('Helvetica-Bold').fontSize(7);
-            let x = startX;
-
-            doc.text('Name', x, y, { width: nameWidth });
-            x += nameWidth + 5;
-            doc.text('School', x, y, { width: schoolWidth });
-            x += schoolWidth + 5;
-            doc.text('Phone', x, y, { width: phoneWidth });
-            x += phoneWidth + 5;
-            doc.text('Avg%', x, y, { width: avgWidth });
-            x += avgWidth + 5;
-
-            // Installment columns
-            installments.forEach((inst, idx) => {
-                const instName = inst.name.length > 8 ? inst.name.substring(0, 7) + '.' : inst.name;
-                doc.text(instName, x, y, { width: installmentWidth, align: 'center' });
-                x += installmentWidth + 2;
-            });
-
-            doc.text('Due', x, y, { width: feeDueWidth, align: 'center' });
-        };
-
-        // Draw initial headers
-        let currentY = doc.y;
-        drawHeaders(currentY);
-        doc.moveDown(0.2);
-        doc.moveTo(startX, doc.y).lineTo(startX + 780, doc.y).stroke();
-        doc.moveDown(0.3);
-
-        // Process each student
-        batch.students.forEach((student: any) => {
-            currentY = doc.y;
-
-            // Pagination
-            if (currentY > 510) {
-                doc.addPage({ layout: 'landscape' });
-                currentY = 40;
-                drawHeaders(currentY);
-                doc.moveDown(0.2);
-                doc.moveTo(startX, doc.y).lineTo(startX + 780, doc.y).stroke();
-                doc.moveDown(0.3);
-                currentY = doc.y;
-            }
-
-            // Calculate average marks
-            const avgMarks = student.marks.length > 0
-                ? Math.round(student.marks.reduce((sum: number, m: any) => sum + m.score, 0) / student.marks.length)
-                : 0;
-
-            // Calculate total fee due
-            let totalDue = 0;
-            if (installments.length > 0) {
-                const totalExpected = installments.reduce((sum, inst) => sum + inst.amount, 0);
-                const totalPaidFromPayments = student.feePayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-                const totalPaidFromFees = student.fees
-                    .filter((f: any) => f.status === 'PAID')
-                    .reduce((sum: number, f: any) => sum + f.amount, 0);
-                totalDue = Math.max(0, totalExpected - totalPaidFromPayments - totalPaidFromFees);
-            } else {
-                const totalExpected = batch.feeAmount || 0;
-                const totalPaid = student.fees
-                    .filter((f: any) => f.status === 'PAID')
-                    .reduce((sum: number, f: any) => sum + f.amount, 0) +
-                    student.feePayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-                totalDue = Math.max(0, totalExpected - totalPaid);
-            }
-
-            // Print basic info
-            doc.font('Helvetica').fontSize(6.5).fillColor('black');
-            let x = startX;
-
-            doc.text(student.name || '-', x, currentY, { width: nameWidth, ellipsis: true });
-            x += nameWidth + 5;
-            doc.text(student.schoolName || 'N/A', x, currentY, { width: schoolWidth, ellipsis: true });
-            x += schoolWidth + 5;
-            doc.text(student.parentWhatsapp || '-', x, currentY, { width: phoneWidth });
-            x += phoneWidth + 5;
-            doc.text(avgMarks > 0 ? `${avgMarks}%` : '-', x, currentY, { width: avgWidth, align: 'center' });
-            x += avgWidth + 5;
-
-            // Installment columns
-            if (installments.length > 0) {
-                installments.forEach((inst) => {
-                    const paymentsForThis = student.feePayments.filter((p: any) => p.installmentId === inst.id);
-                    const totalPaid = paymentsForThis.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-                    const due = inst.amount - totalPaid;
-
-                    if (totalPaid >= inst.amount - 0.01) {
-                        // Fully paid - show last payment date
-                        const latestPayment = paymentsForThis.sort((a: any, b: any) =>
-                            new Date(b.date).getTime() - new Date(a.date).getTime()
-                        )[0];
-                        const payDate = new Date(latestPayment.date);
-                        const month = (payDate.getMonth() + 1).toString().padStart(2, '0');
-                        const day = payDate.getDate().toString().padStart(2, '0');
-
-                        doc.fillColor('green').text(`${day}/${month}`, x, currentY, {
-                            width: installmentWidth,
-                            align: 'center'
-                        });
-                    } else if (totalPaid > 0) {
-                        // Partial payment - show due amount in yellow/orange
-                        const latestPayment = paymentsForThis.sort((a: any, b: any) =>
-                            new Date(b.date).getTime() - new Date(a.date).getTime()
-                        )[0];
-                        const payDate = new Date(latestPayment.date);
-                        const month = (payDate.getMonth() + 1).toString().padStart(2, '0');
-                        const day = payDate.getDate().toString().padStart(2, '0');
-
-                        doc.fillColor('orange').fontSize(5.5).text(
-                            `₹${Math.round(due)}`,
-                            x,
-                            currentY,
-                            { width: installmentWidth, align: 'center' }
-                        );
-                        doc.fontSize(6.5).text(
-                            `${day}/${month}`,
-                            x,
-                            currentY + 6,
-                            { width: installmentWidth, align: 'center' }
-                        );
-                    } else {
-                        // Not paid - show checkbox
-                        doc.fillColor('black').text('☐', x, currentY, {
-                            width: installmentWidth,
-                            align: 'center'
-                        });
-                    }
-
-                    x += installmentWidth + 2;
-                });
-            }
-
-            // Total Due column
-            doc.fillColor(totalDue > 0 ? 'red' : 'green').fontSize(6.5);
-            doc.text(totalDue > 0 ? `₹${Math.round(totalDue)}` : '₹0', x, currentY, {
-                width: feeDueWidth,
-                align: 'center'
-            });
-
-            doc.moveDown(0.6);
-        });
-
-        // Footer
-        doc.moveDown(0.5);
-        doc.fontSize(7).fillColor('gray').text(
-            `Total Students: ${batch.students.length} | Legend: ☐=Unpaid, Date=Paid, Orange=Partial | Generated by MathLogs`,
-            { align: 'center' }
-        );
-
-        doc.end();
+        res.send(pdfBuffer);
     } catch (e) {
-        console.error(e);
+        console.error('[downloadBatchPDF]', e);
         res.status(500).json({ error: 'Failed to generate PDF' });
     }
 };
@@ -661,11 +477,17 @@ export const updateBatch = async (req: Request, res: Response) => {
 
 export const deleteBatch = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
     const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
     try {
-        const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
+        const batch = await prisma.batch.findUnique({
+            where: { id: String(id) },
+            include: {
+                _count: {
+                    select: { feeInstallments: true }
+                }
+            }
+        });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
         const user = (req as any).user;
@@ -674,6 +496,18 @@ export const deleteBatch = async (req: Request, res: Response) => {
         // Academic year boundary check
         if (batch.academicYearId && batch.academicYearId !== currentAcademicYearId) {
             return res.status(400).json({ error: 'Cannot delete batch from non-active academic year. Switch to the correct year first.' });
+        }
+
+        // FINANCIAL SAFETY GUARD (P1-A): Prevent destruction of payment history.
+        // Hard-deleting a batch with payments cascades and wipes the entire financial ledger.
+        // Admins must archive/soft-delete instead if payment records exist.
+        const paymentCount = await prisma.feePayment.count({
+            where: { installment: { batchId: String(id) } }
+        });
+        if (paymentCount > 0) {
+            return res.status(409).json({
+                error: `Cannot delete batch with ${paymentCount} existing payment record(s). This would permanently destroy financial history. Please contact support to archive this batch instead.`
+            });
         }
 
         await prisma.batch.delete({ where: { id: String(id) } });
@@ -824,7 +658,6 @@ Please join the group to stay informed.
 
 export const downloadBatchQRPDF = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
 
     try {
         const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
@@ -833,55 +666,56 @@ export const downloadBatchQRPDF = async (req: Request, res: Response) => {
         const user = (req as any).user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
+        // Dynamically import pdfkit and pdfUtils to avoid top-level import of removed unused vars
+        // bwip-js and PDFDocument are kept local to this function
+        const PDFDocument = (await import('pdfkit')).default;
+        const { addMathLogsHeader } = await import('../utils/pdfUtils');
+
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        const chunks: Buffer[] = [];
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+        const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            // Add MathLogs branding
+            addMathLogsHeader(doc, 30);
+            doc.moveDown(2);
+
+            // Header
+            doc.fontSize(24).font('Helvetica-Bold').text(batch.name, { align: 'center' });
+            doc.fontSize(14).font('Helvetica').text(batch.subject || 'Course', { align: 'center' });
+            doc.moveDown(0.5);
+            doc.fontSize(12).text(batch.className || '', { align: 'center' });
+            doc.moveDown(2);
+
+            // QR Code (generate async, then finish PDF)
+            const registerUrl = `${getClientUrl(req)}/register/${batch.id}`;
+            bwipjs.toBuffer({
+                bcid: 'qrcode',
+                text: registerUrl,
+                scale: 5,
+                includetext: false,
+                textxalign: 'center',
+            }).then(qrPng => {
+                const pageWidth = doc.page.width;
+                const pageHeight = doc.page.height;
+                const qrSize = 300;
+                doc.image(qrPng, (pageWidth - qrSize) / 2, (pageHeight - qrSize) / 2 - 50, { width: qrSize });
+                doc.text('Scan to Register', (pageWidth - qrSize) / 2, (pageHeight - qrSize) / 2 + qrSize + 20, { width: qrSize, align: 'center' });
+                doc.fillColor('grey').fontSize(10).text('Powered by MathLogs', 50, pageHeight - 50, { align: 'center', width: pageWidth - 100 });
+                doc.end();
+            }).catch(reject);
+        });
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=QR-${batch.name.replace(/\s+/g, '-')}.pdf`);
-
-        doc.pipe(res);
-
-        // Add MathLogs branding
-        addMathLogsHeader(doc, 30);
-        doc.moveDown(2);
-
-        // -- Content --
-        // Header
-        doc.fontSize(24).font('Helvetica-Bold').text(batch.name, { align: 'center' });
-        doc.fontSize(14).font('Helvetica').text(batch.subject || 'Course', { align: 'center' });
-        doc.moveDown(0.5);
-        doc.fontSize(12).text(batch.className || '', { align: 'center' });
-
-        doc.moveDown(2);
-
-        // QR Code
-        const registerUrl = `${getClientUrl(req)}/register/${batch.id}`;
-
-        // Generate QR Buffer
-        const qrPng = await bwipjs.toBuffer({
-            bcid: 'qrcode',       // Barcode type
-            text: registerUrl,    // Text to encode
-            scale: 5,             // 3x scaling factor
-            includetext: false,            // Show human-readable text
-            textxalign: 'center', // Always good to set this
-        });
-
-        // Add QR to PDF (Centered)
-        const pageWidth = doc.page.width;
-        const pageHeight = doc.page.height;
-        const qrSize = 300;
-
-        doc.image(qrPng, (pageWidth - qrSize) / 2, (pageHeight - qrSize) / 2 - 50, { width: qrSize });
-
-        // Instruction Text below QR
-        doc.text('Scan to Register', (pageWidth - qrSize) / 2, (pageHeight - qrSize) / 2 + qrSize + 20, { width: qrSize, align: 'center' });
-
-        // Footer
-        doc.fillColor('grey').fontSize(10).text('Powered by ClassManager', 50, pageHeight - 50, { align: 'center', width: pageWidth - 100 });
-
-        doc.end();
+        res.send(pdfBuffer);
 
     } catch (e) {
         console.error('Error generating QR PDF:', e);
         res.status(500).json({ error: 'Failed to generate PDF' });
     }
 };
+

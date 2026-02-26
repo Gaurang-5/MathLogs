@@ -117,6 +117,7 @@ model Batch {
   students            Student[]
 
   @@index([teacherId, academicYearId, className])  // PERF: Common filter combination
+  @@index([instituteId, academicYearId])            // PERF: Tenant-scoped batch listing at scale
 }
 
 model Student {
@@ -150,6 +151,8 @@ model Student {
   @@index([status, academicYearId])  // PERF: For approved student listings
   @@index([batchId, status])          // PERF: For batch details queries
   @@index([createdAt])                // PERF: For growth stats chronological queries
+  @@index([instituteId, status])      // PERF: Tenant-scoped status filters (prevents full table scans)
+  @@index([instituteId, createdAt])   // PERF: Tenant-scoped chronological queries at 1M+ rows
   @@unique([humanId, academicYearId])
   @@unique([name, parentWhatsapp, batchId], name: "student_natural_key")
 }
@@ -190,6 +193,7 @@ model Test {
 
   @@index([teacherId, academicYearId])  // PERF: For teacher test lookups
   @@index([date])                       // PERF: For chronological test lists
+  @@index([instituteId, academicYearId]) // PERF: Tenant + year scoped test queries
 }
 
 model Mark {
@@ -309,3 +313,15 @@ enum JobStatus {
   COMPLETED
   FAILED
 }
+
+// PERF: DB-backed OCR scan dedup cache.
+// Replaces the in-memory Map that didn't work across multiple server instances.
+// TTL cleanup runs in-process every 5 minutes via setInterval in api.ts.
+model OcrScanCache {
+  imageHash String   @id                  // SHA-256 of raw image bytes
+  result    Json                           // OCR result to return on cache hit
+  createdAt DateTime @default(now())
+
+  @@index([createdAt]) // For TTL cleanup queries
+}
+
