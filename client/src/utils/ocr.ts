@@ -84,11 +84,13 @@ export async function extractMarksFromSticker(
 
 
     let imageBase64 = "";
+    let processedImage = "";
 
     if (imageOverride) {
         // Warp succeeded — crop just the marks region (right 58% of the warped sticker)
         // This gives Gemini a much larger, focused view of the 3 digit boxes
-        imageBase64 = await cropMarksRegion(imageOverride);
+        imageBase64 = imageOverride;
+        processedImage = await cropMarksRegion(imageBase64);
         console.log("📸 Using CV-warped → marks-region crop for OCR");
     } else {
         // Fallback: capture raw video frame cropped to sticker area
@@ -111,17 +113,18 @@ export async function extractMarksFromSticker(
         if (!ctx) throw new Error("Failed to create canvas context");
 
         ctx.drawImage(videoElement, startX, startY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-        imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
-        console.log(`Captured Image Length: ${imageBase64.length}`);
-    }
 
-    // Preprocess only for raw video fallback (marks crop is already sharp)
-    let processedImage = imageBase64;
-    if (!imageOverride) {
+        imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        console.log(`Captured Raw Snippet Length: ${imageBase64.length}`);
+
+        // Preprocess raw capture, THEN crop marks region so it behaves identically to warped version
         try {
-            processedImage = await preprocessImage(imageBase64);
+            let prepped = await preprocessImage(imageBase64);
+            processedImage = await cropMarksRegion(prepped);
+            console.log("📸 Using raw fallback → preprocessed → marks-region crop for OCR");
         } catch (e) {
-            console.warn("Preprocessing failed, using raw image", e);
+            console.warn("Preprocessing failed, using raw fallback image", e);
+            processedImage = await cropMarksRegion(imageBase64);
         }
     }
 
