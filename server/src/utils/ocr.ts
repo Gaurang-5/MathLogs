@@ -59,34 +59,46 @@ export async function processOCR(input: Buffer | string): Promise<{ score: strin
                 model: modelName,
                 generationConfig: {
                     temperature: 0.1,
-                    maxOutputTokens: 50,
                 }
             });
 
+            const prompt = `You are an AI reading handwritten exam marks from a student sticker.
+The image shows the MARKS section: a label "MARKS:" and below it, 3 small boxes in a row.
+Each box may contain ONE handwritten digit.
+The boxes have a horizontal underline at the bottom for writing guidance — ignore these underlines, they are not digits.
 
-            const prompt = `You are reading handwritten exam marks from a student sticker.
-The image shows the MARKS section of the sticker: a label "MARKS:" and below it, 3 small boxes arranged in a row.
-Each box may contain ONE handwritten digit written by a teacher.
-The boxes have a horizontal underline at the bottom for writing guidance — do NOT read underlines as digits.
-
-Task: Read the handwritten digits in the boxes left to right and combine them into a single score number.
+Task: Read the handwriting in the boxes from left to right to form a single score number.
 
 Rules:
-1. Combine all digit boxes that have a handwritten number. Example: box1="7", box2="0" → return "70".
+1. Combine all digit boxes that have a number. Example: box1="7", box2="0" → return "70".
 2. If only one box is filled, return just that digit. Example: box1="5" → return "5".
-3. Completely empty boxes (only underline, no digit) = ignore.
-4. If boxes clearly show a score out of total like "45" with "/50" visible → return "45/50".
-5. If you cannot confidently read any digit, return "ERROR_UNCERTAIN".
+3. Empty boxes = ignore.
+4. If you clearly see a score format like "45/50", return "45/50".
 
-Return ONLY the score. No explanation. Examples: "70", "5", "100", "45/50", "ERROR_UNCERTAIN".`.trim();
+Return ONLY the final string. No explanation. Examples: "70", "5", "100", "45/50".
+If the image is completely unreadable or has no numbers, return "ERROR_UNCERTAIN".`.trim();
 
             const result = await model.generateContent([
                 prompt,
                 { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } }
             ]);
 
+            // Safely get text, handling cases where it was blocked or returned empty
+            let responseText = "";
+            const response = result.response;
 
-            const responseText = result.response.text();
+            if (response.promptFeedback && response.promptFeedback.blockReason) {
+                console.warn(`⚠️ Gemini prompt blocked: ${response.promptFeedback.blockReason}`);
+                continue;
+            }
+
+            try {
+                responseText = response.text();
+            } catch (e: any) {
+                console.warn(`⚠️ Gemini could not read text from ${modelName}:`, e.message);
+                continue;
+            }
+
             const cleanScore = cleanExtractedScore(responseText);
 
             if (cleanScore && cleanScore !== "ERROR_UNCERTAIN") {
