@@ -16,11 +16,10 @@ export interface FeeReminderWAData {
 }
 
 export interface TestMarksWAData {
-    testName: string;
     studentName: string;
+    testName: string;
     marksObtained: string;
     totalMarks: string;
-    averageMarks: string;
     instituteName: string;
 }
 
@@ -182,47 +181,42 @@ export const sendFeeReminderWhatsApp = async (mobileNumber: string, data: FeeRem
  * Specifically sends the Test Marks WhatsApp Message
  */
 export const sendTestMarksWhatsApp = async (mobileNumber: string, data: TestMarksWAData) => {
-    // The name of the template in MSG91 (e.g., "test_marks_update_1")
-    const MARKS_TEMPLATE_NAME = process.env.MSG91_WA_TEMPLATE_MARKS;
+    // The name of the template in MSG91 (e.g., "test_marks_update")
+    const TEST_TEMPLATE_NAME = process.env.MSG91_WA_TEMPLATE_TEST;
 
-    if (!MARKS_TEMPLATE_NAME) {
-        console.warn('⚠️ Missing MSG91_WA_TEMPLATE_MARKS in .env. Skipping marks WhatsApp.');
+    if (!TEST_TEMPLATE_NAME) {
+        console.warn('⚠️ Missing MSG91_WA_TEMPLATE_TEST in .env. Skipping test marks WhatsApp.');
         return false;
     }
 
-    // MSG91 WhatsApp API format
+    // MSG91 WhatsApp API format based on user's exact test marks cURL example
     const components = {
-        body_test_name: {
-            type: "text",
-            value: data.testName || "Recent Test",
-            parameter_name: "test_name"
-        },
         body_student_name: {
             type: "text",
             value: data.studentName || "Student",
             parameter_name: "student_name"
         },
-        body_marks_obtained: {
-            type: "text",
-            value: data.marksObtained || "0",
-            parameter_name: "marks_obtained"
-        },
-        body_total_marks: {
-            type: "text",
-            value: data.totalMarks || "0",
-            parameter_name: "total_marks"
-        },
-        body_average_marks: {
-            type: "text",
-            value: data.averageMarks || "0",
-            parameter_name: "average_marks"
-        },
         body_institute_name: {
             type: "text",
             value: data.instituteName || "our institute",
             parameter_name: "institute_name"
+        },
+        body_test_name: {
+            type: "text",
+            value: data.testName || "a test",
+            parameter_name: "test_name"
+        },
+        body_total_marks: {
+            type: "text",
+            value: data.totalMarks || "100",
+            parameter_name: "total_marks"
+        },
+        body_marks_obtained: {
+            type: "text",
+            value: data.marksObtained || "0",
+            parameter_name: "marks_obtained"
         }
     };
 
-    return await sendMsg91WhatsApp(mobileNumber, MARKS_TEMPLATE_NAME, components);
+    return await sendMsg91WhatsApp(mobileNumber, TEST_TEMPLATE_NAME, components);
 };
