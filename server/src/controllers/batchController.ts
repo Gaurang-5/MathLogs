@@ -87,7 +87,8 @@ export const createBatch = async (req: Request, res: Response) => {
                 where: {
                     batchNumber: num,
                     academicYearId: academicYearId,
-                    className: null // For non-grade institutes, className is null
+                    className: null, // For non-grade institutes, className is null
+                    instituteId: user.instituteId // Scoped to tenant!
                 }
             });
 
@@ -166,7 +167,8 @@ export const createBatch = async (req: Request, res: Response) => {
             where: {
                 className,
                 batchNumber: num,
-                academicYearId: academicYearId
+                academicYearId: academicYearId,
+                instituteId: user.instituteId // Scoped to tenant!
             }
         });
         if (existing) {
