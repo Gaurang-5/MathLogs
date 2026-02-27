@@ -141,23 +141,29 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
                     .stroke();
 
                 // --- RIGHT: Info & Marks ---
-                const contentX = dividerX + 3; // Reduced padding
+                const contentX = dividerX + 3;
                 const contentWidth = (x + labelWidth) - contentX - 2;
 
-                // 1. Student Name (Larger & Bolder)
+                // 1. Student Name
+                // Font 7 → avg ~4pt/char → 62pt width fits ~15 chars (covers "Gaurang Bhatia" in 1 line)
+                // Height capped to 12pt (1 line) with ellipsis for very long names
+                const nameFontSize = 7;
+                const nameLineHeight = 12; // pts — 1 line cap, ellipsis if overflow
+                const nameTopPad = 3;
+
                 doc.font('Helvetica-Bold')
-                    .fontSize(9) // Size 9 to fit 2 lines if needed
-                    .fillColor('#000000') // Black for better contrast
-                    .text(student.name, contentX, y + 3, {
+                    .fontSize(nameFontSize)
+                    .fillColor('#000000')
+                    .text(student.name, contentX, y + nameTopPad, {
                         width: contentWidth,
-                        height: 22,
+                        height: nameLineHeight,
                         ellipsis: true,
                         align: 'center'
                     });
 
-                // 2. Marks Field - Maximized for Easy Writing
-                // Because we have 23mm height, we can stack MARKS above the boxes
-                const labelY = y + 25; // Below the name
+                // 2. MARKS — positioned dynamically below the name
+                const labelY = y + nameTopPad + nameLineHeight + 2;
+
 
                 doc.font('Helvetica-Bold')
                     .fontSize(6)
