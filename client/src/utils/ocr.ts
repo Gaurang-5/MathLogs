@@ -10,7 +10,8 @@ async function preprocessImage(imageBase64: string): Promise<string> {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
-            const MAX_DIMENSION = 600;
+            // Double the resolution limit so the handwriting remains crisp
+            const MAX_DIMENSION = 1200;
             let width = img.width;
             let height = img.height;
 
@@ -37,7 +38,8 @@ async function preprocessImage(imageBase64: string): Promise<string> {
             ctx.fillStyle = "#FFFFFF";
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.6));
+            // High quality JPEG to avoid compression artifacts around handwritten lines
+            resolve(canvas.toDataURL('image/jpeg', 0.95));
         };
         img.onerror = () => resolve(imageBase64);
         img.src = imageBase64;
@@ -114,7 +116,7 @@ export async function extractMarksFromSticker(
 
         ctx.drawImage(videoElement, startX, startY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
 
-        imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        imageBase64 = canvas.toDataURL('image/jpeg', 0.95);
         console.log(`Captured Raw Snippet Length: ${imageBase64.length}`);
 
         // Preprocess raw capture, THEN crop marks region so it behaves identically to warped version

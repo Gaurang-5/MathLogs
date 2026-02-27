@@ -109,18 +109,19 @@ export default function ScanMarks() {
                     console.log("📸 Starting camera with config...");
                     await html5QrCode.start(
                         {
-                            facingMode: "environment"
+                            facingMode: "environment",
+                            advanced: [{ focusMode: "continuous" }] as any,
                         },
                         {
-                            fps: 25, // Increased FPS for faster reaction time
+                            fps: 25,
                             // Optimized: Wide scanning area matching new sticker layout
                             qrbox: (viewfinderWidth, viewfinderHeight) => {
                                 const width = viewfinderWidth * 0.9;
                                 const height = Math.min(viewfinderHeight * 0.5, 400); // Narrower height means less pixels to search
                                 return { width, height };
                             },
-                            // Request high resolution for better focus
-                            aspectRatio: 4 / 3,
+                            // Request high resolution for sharp handwriting OCR
+                            aspectRatio: 16 / 9,
                             disableFlip: false
                         },
                         async (decodedText) => {
