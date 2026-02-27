@@ -34,18 +34,33 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
         res.setHeader('Content-Disposition', 'attachment; filename=stickers.pdf');
         doc.pipe(res);
 
-        // A4: 210 x 297 mm
-        // 65 Labels: 5 columns x 13 rows
-        // Label size: 42 x 23 mm (based on user's VGR sticker paper)
+        // A4: 210 x 297 mm → 595.28 x 841.89 pts
+        // Physical sheet layout (measured from delivered sticker sheet):
+        //   Top margin:    1.2 cm = 12 mm
+        //   Bottom margin: 1.2 cm = 12 mm
+        //   Column gap:    0.2 cm =  2 mm  (between columns)
+        //   Row gap:       0      (rows are continuous, no gap)
+        //   Columns: 5, Rows: 13  → 65 labels per sheet
+        //
+        // Derived label dimensions:
+        //   Width:  (210 - 4 × 2) / 5  = 202 / 5  = 40.4 mm
+        //   Height: (297 - 12 - 12) / 13 = 273 / 13 ≈ 21.0 mm
         const cols = 5;
         const rows = 13;
         const mmToPt = 2.83465;
-        const labelWidth = 42 * mmToPt;
-        const labelHeight = 23 * mmToPt;
-        const startX = 0;
-        const startY = 0;
-        const gapX = 0;
-        const gapY = 0;
+
+        const topMargin = 12 * mmToPt;   // 1.2 cm
+        const gapX = 2 * mmToPt;   // 0.2 cm column gap
+        const gapY = 0;             // no row gap
+
+        const pageWidth = 210 * mmToPt;    // A4 width  in pts
+        const pageHeight = 297 * mmToPt;    // A4 height in pts
+
+        const labelWidth = (pageWidth - (cols - 1) * gapX) / cols;
+        const labelHeight = (pageHeight - 2 * topMargin) / rows;  // top + bottom = 1.2cm each
+
+        const startX = 0;           // labels start at left edge (no left margin on this sheet)
+        const startY = topMargin;   // labels start after the 1.2cm top margin
 
         let col = 0;
         let row = 0;

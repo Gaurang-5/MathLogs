@@ -90,7 +90,13 @@ setInterval(async () => {
         await prisma.ocrScanCache.deleteMany({
             where: { createdAt: { lt: cutoff } }
         });
-    } catch { /* non-critical */ }
+    } catch (err: any) {
+        // Non-critical — OCR works without the cache table.
+        // Log in dev to surface migration drift; suppress in prod to avoid Sentry noise.
+        if (process.env.NODE_ENV !== 'production') {
+            console.warn('[OcrScanCache] TTL cleanup failed (migration pending?):', err?.message);
+        }
+    }
 }, 5 * 60 * 1000);
 
 // OCR Scan Endpoint

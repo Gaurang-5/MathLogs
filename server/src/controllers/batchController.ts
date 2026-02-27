@@ -528,7 +528,6 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
-        const teacherId = (req as any).user?.id;
         const batch = await prisma.batch.findUnique({
             where: { id: String(id) },
             include: {
@@ -548,23 +547,14 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Invalid WhatsApp Group Link' });
         }
 
-        let sentCount = 0;
-
-        // Process in background (conceptually) or await for small batches
-        // For safely, we'll await sequentially or parallel with limit. 
-        // Given constraint "Asynchronous sending (non-blocking)", we can respond early?
-        // But for UI feedback "Invites sent to 58 students", we need to wait or return a "Processing" status.
-        // The prompt says "UI feedback after sending: 'Invites sent to 58 students'". So we should await it.
-
         const senderName = batch.institute?.name || 'Coaching Centre';
         const replyTo = batch.institute?.email || undefined;
 
-        // Queue emails asynchronously
-        const jobs = batch.students
+        // 1. Queue email invites for students who have an email
+        const emailJobs = batch.students
             .filter(student => student.parentEmail)
             .map(student => {
                 const body = `Hello ${student.name},\n\nWelcome to ${batch.name} (${batch.subject || 'Course'}).\n\nBatch Details:\n• Class: ${batch.className || 'N/A'}\n• Time: ${batch.timeSlot || 'N/A'}\n• Student ID: ${student.humanId || 'N/A'}\n\nJoin the official WhatsApp group for announcements and updates:\n👉 ${link}\n\nPlease join the group to stay informed.\n\n– ${senderName}`;
-
                 return {
                     recipient: student.parentEmail!,
                     subject: `Welcome to ${batch.name} – ${batch.subject}`,
@@ -575,11 +565,39 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
                 };
             });
 
-        if (jobs.length > 0) {
-            await prisma.emailJob.createMany({ data: jobs as any });
+        if (emailJobs.length > 0) {
+            await prisma.emailJob.createMany({ data: emailJobs as any });
         }
 
-        res.json({ success: true, count: jobs.length, message: `Invites queued for ${jobs.length} students` });
+        // 2. Queue WhatsApp invites for students who have a parent phone number
+        // Template: batch_whatsapp_invite_v1
+        // Body: "Hello {{1}}, you have been enrolled in {{2}} at {{3}}. Join the WhatsApp group here: {{4}}"
+        const { queueWhatsappMessage } = await import('../utils/whatsappService');
+        let whatsappCount = 0;
+
+        for (const student of batch.students) {
+            if (!student.parentWhatsapp) continue;
+
+            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
+            if (!phone.startsWith('+')) {
+                if (phone.length === 10) phone = '+91' + phone;
+            }
+
+            await queueWhatsappMessage(
+                phone,
+                'batch_whatsapp_invite_v1',
+                [student.name, batch.name, senderName, link],
+                batch.instituteId || undefined
+            );
+            whatsappCount++;
+        }
+
+        res.json({
+            success: true,
+            emailCount: emailJobs.length,
+            whatsappCount,
+            message: `Invites queued — ${emailJobs.length} email(s) + ${whatsappCount} WhatsApp message(s)`
+        });
 
     } catch (e) {
         console.error('Error sending invites:', e);

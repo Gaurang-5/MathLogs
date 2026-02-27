@@ -74,6 +74,10 @@ export const initializeSentry = () => {
             'Network request failed',
             'Load failed',
             'QuotaExceededError', // LocalStorage quota issues
+            // Stale chunk hashes after a deploy — handled by ChunkErrorBoundary (forced reload)
+            'Failed to fetch dynamically imported module',
+            'Importing a module script failed',
+            'error loading dynamically imported module',
         ],
     });
 
