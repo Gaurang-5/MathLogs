@@ -64,22 +64,21 @@ export async function processOCR(input: Buffer | string): Promise<{ score: strin
             });
 
 
-            const prompt = `
-            Analyze this sticker image.
-            On the RIGHT side, there are 3 distinct boxes for marks.
-            
-            Task: Read the handwritten digits inside these boxes effectively as a single number.
-            
-            Rules:
-            1. If you see "7" in the first box and "0" in the second, the score is "70".
-            2. If you see "0" then "5", the score is "05" (or just 5).
-            3. Ignore the empty boxes.
-            4. If there is a fraction like "45" in boxes and "/50" printed or written, return "45/50".
-            
-            Output strictly: The final number only. 
-            Examples: "70", "05", "100", "9".
-            If you are unsure or see nothing, return "ERROR_UNCERTAIN".
-            `.trim();
+            const prompt = `You are reading handwritten exam marks from a student sticker.
+The image shows the MARKS section of the sticker: a label "MARKS:" and below it, 3 small boxes arranged in a row.
+Each box may contain ONE handwritten digit written by a teacher.
+The boxes have a horizontal underline at the bottom for writing guidance — do NOT read underlines as digits.
+
+Task: Read the handwritten digits in the boxes left to right and combine them into a single score number.
+
+Rules:
+1. Combine all digit boxes that have a handwritten number. Example: box1="7", box2="0" → return "70".
+2. If only one box is filled, return just that digit. Example: box1="5" → return "5".
+3. Completely empty boxes (only underline, no digit) = ignore.
+4. If boxes clearly show a score out of total like "45" with "/50" visible → return "45/50".
+5. If you cannot confidently read any digit, return "ERROR_UNCERTAIN".
+
+Return ONLY the score. No explanation. Examples: "70", "5", "100", "45/50", "ERROR_UNCERTAIN".`.trim();
 
             const result = await model.generateContent([
                 prompt,

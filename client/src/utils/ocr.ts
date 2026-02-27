@@ -10,8 +10,7 @@ async function preprocessImage(imageBase64: string): Promise<string> {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
-            // Optimized for speed: smaller size, faster upload (600 avoids large payloads)
-            const MAX_DIMENSION = 600; // Reduced from 800
+            const MAX_DIMENSION = 600;
             let width = img.width;
             let height = img.height;
 
@@ -35,21 +34,41 @@ async function preprocessImage(imageBase64: string): Promise<string> {
                 return;
             }
 
-            // Fill with white background
             ctx.fillStyle = "#FFFFFF";
             ctx.fillRect(0, 0, width, height);
-
-            // Draw image
             ctx.drawImage(img, 0, 0, width, height);
-
-            // Return as JPEG (0.6 quality for speed)
             resolve(canvas.toDataURL('image/jpeg', 0.6));
         };
-        img.onerror = (e) => {
-            console.warn("Image load error in preprocess, using original", e);
-            resolve(imageBase64);
-        };
+        img.onerror = () => resolve(imageBase64);
         img.src = imageBase64;
+    });
+}
+
+/**
+ * Crops just the marks region from the CV-warped sticker image.
+ * QR code + divider occupy the left ~42% of the warped image.
+ * The marks boxes (name + MARKS label + 3 digit boxes) are in the right 58%.
+ * Sending a tight crop gives Gemini a much larger, more readable view of the boxes.
+ */
+async function cropMarksRegion(warpedBase64: string): Promise<string> {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            // Marks area starts at ~42% from the left of the warped sticker
+            const marksStartX = Math.floor(img.width * 0.42);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width - marksStartX;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { resolve(warpedBase64); return; }
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, marksStartX, 0, canvas.width, img.height, 0, 0, canvas.width, img.height);
+            // Higher quality JPEG since this is now small and focused
+            resolve(canvas.toDataURL('image/jpeg', 0.9));
+        };
+        img.onerror = () => resolve(warpedBase64);
+        img.src = warpedBase64;
     });
 }
 
@@ -67,19 +86,20 @@ export async function extractMarksFromSticker(
     let imageBase64 = "";
 
     if (imageOverride) {
-        // Use the smart CV detected image
-        imageBase64 = imageOverride;
-        console.log("📸 Using provided CV-dewarped image");
+        // Warp succeeded — crop just the marks region (right 58% of the warped sticker)
+        // This gives Gemini a much larger, focused view of the 3 digit boxes
+        imageBase64 = await cropMarksRegion(imageOverride);
+        console.log("📸 Using CV-warped → marks-region crop for OCR");
     } else {
-        // Capture frame from video (Fallback)
+        // Fallback: capture raw video frame cropped to sticker area
         const canvas = document.createElement('canvas');
         const sourceWidth = videoElement.videoWidth;
         const sourceHeight = videoElement.videoHeight;
         console.log(`Video Dimensions: ${sourceWidth}x${sourceHeight}`);
 
-        // The UI shows a scan guide for a 3.9×2.0cm sticker — ratio 39/20 = 1.95
+        // Crop center of frame to sticker aspect ratio (3.9cm × 2.1cm = 39/21)
         const cropWidth = sourceWidth * 0.9;
-        const cropHeight = cropWidth / (39 / 21); // 3.9cm × 2.1cm sticker ratio
+        const cropHeight = cropWidth / (39 / 21);
 
         const startX = (sourceWidth - cropWidth) / 2;
         const startY = (sourceHeight - cropHeight) / 2;
@@ -88,23 +108,14 @@ export async function extractMarksFromSticker(
         canvas.height = cropHeight;
 
         const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error("Failed to create canvas context");
 
-        if (!ctx) {
-            throw new Error("Failed to create canvas context");
-        }
-
-        // Draw crop of video frame to canvas
-        ctx.drawImage(
-            videoElement,
-            startX, startY, cropWidth, cropHeight, // Source crop
-            0, 0, cropWidth, cropHeight            // Destination
-        );
-
+        ctx.drawImage(videoElement, startX, startY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
         imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
         console.log(`Captured Image Length: ${imageBase64.length}`);
     }
 
-    // Preprocess image (only if capturing from video, CV image is already good)
+    // Preprocess only for raw video fallback (marks crop is already sharp)
     let processedImage = imageBase64;
     if (!imageOverride) {
         try {
@@ -113,7 +124,6 @@ export async function extractMarksFromSticker(
             console.warn("Preprocessing failed, using raw image", e);
         }
     }
-
 
 
     // 🚀 SECURITY: Use Backend Proxy with Multipart Upload
