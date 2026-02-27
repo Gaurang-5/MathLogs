@@ -144,11 +144,11 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
                 const contentX = dividerX + 3;
                 const contentWidth = (x + labelWidth) - contentX - 2;
 
-                // 1. Student Name
-                // Font 7 → avg ~4pt/char → 62pt width fits ~15 chars (covers "Gaurang Bhatia" in 1 line)
-                // Height capped to 12pt (1 line) with ellipsis for very long names
-                const nameFontSize = 7;
-                const nameLineHeight = 12; // pts — 1 line cap, ellipsis if overflow
+                // 1. Student Name — single line, ellipsis if too long
+                // lineBreak:false forces PDFKit to clip at width boundary with ellipsis
+                // Font 6.5 → ~3.8pt/char → 62pt content area fits ~16 chars cleanly
+                const nameFontSize = 6.5;
+                const nameLineHeight = 11; // pts — single line cap
                 const nameTopPad = 3;
 
                 doc.font('Helvetica-Bold')
@@ -158,11 +158,13 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
                         width: contentWidth,
                         height: nameLineHeight,
                         ellipsis: true,
-                        align: 'center'
+                        lineBreak: false,
+                        align: 'left'
                     });
 
-                // 2. MARKS — positioned dynamically below the name
+                // MARKS — positioned dynamically below the name (never overlaps)
                 const labelY = y + nameTopPad + nameLineHeight + 2;
+
 
 
                 doc.font('Helvetica-Bold')
