@@ -83,22 +83,21 @@ export const sendWelcomeWhatsApp = async (mobileNumber: string, data: WelcomeWAD
         return false;
     }
 
-    // MSG91 WhatsApp API requires mapping variables exactly to {{1}}, {{2}}, etc. 
-    // using body_1, body_2 keys.
+    // MSG91 WhatsApp API requires mapping variables exactly to {{variable_name}}
     const components = {
-        body_1: {
+        student_name: {
             type: "text",
             value: data.studentName || "Student"
         },
-        body_2: {
+        batch_name: {
             type: "text",
             value: data.batchName || "the batch"
         },
-        body_3: {
+        institute_name: {
             type: "text",
             value: data.instituteName || "our institute"
         },
-        body_4: {
+        group_link: {
             type: "text",
             value: data.whatsappLink || "Contact admin for group link"
         }
