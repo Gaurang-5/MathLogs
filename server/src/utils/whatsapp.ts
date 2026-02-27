@@ -85,19 +85,19 @@ export const sendWelcomeWhatsApp = async (mobileNumber: string, data: WelcomeWAD
 
     // MSG91 WhatsApp API requires mapping variables exactly to {{variable_name}}
     const components = {
-        student_name: {
+        var_1: {
             type: "text",
             value: data.studentName || "Student"
         },
-        batch_name: {
+        var_2: {
             type: "text",
             value: data.batchName || "the batch"
         },
-        institute_name: {
+        var_3: {
             type: "text",
             value: data.instituteName || "our institute"
         },
-        group_link: {
+        var_4: {
             type: "text",
             value: data.whatsappLink || "Contact admin for group link"
         }
