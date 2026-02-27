@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import logger from '../utils/logger';
+import { sendWelcomeSMS } from '../utils/sms';
 
 // Helper to generate Course Code
 const getCourseCode = (subject: string | null) => {
@@ -110,7 +111,10 @@ export const registerStudent = async (req: Request, res: Response) => {
 
         const batch = await prisma.batch.findUnique({
             where: { id: batchId },
-            include: { academicYearRef: true }
+            include: {
+                academicYearRef: true,
+                institute: { select: { name: true } } // Fetch institute name for SMS
+            }
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
         if (!batch.isRegistrationOpen || batch.isRegistrationEnded) {
@@ -193,6 +197,16 @@ export const registerStudent = async (req: Request, res: Response) => {
         // Log slow registrations
         if (latencyMs > 3000) {
             logger.performance.slow('student_registration', latencyMs, 3000, { batchId, studentId: student!.id });
+        }
+
+        // Fire asynchronous Welcome SMS (Fire & Forget, handles its own errors silently so it doesn't block the UI)
+        if (student && batch.institute) {
+            sendWelcomeSMS(student.parentWhatsapp, {
+                studentName: student.name,
+                batchName: batch.name,
+                whatsappLink: batch.whatsappGroupLink || "",
+                instituteName: batch.institute.name
+            }).catch(e => console.error("Unhandled SMS error", e));
         }
 
         res.json(student);
