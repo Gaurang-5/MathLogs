@@ -69,26 +69,45 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
             const x = startX + (col * (labelWidth + gapX));
             const y = startY + (row * (labelHeight + gapY));
 
-            // Draw Label Container
-            doc.roundedRect(x, y, labelWidth, labelHeight, 2)
+            // Draw Label Container — corner radius matches physical sticker curve (~2mm)
+            const cornerR = 2 * mmToPt; // 2mm corner radius
+            doc.roundedRect(x, y, labelWidth, labelHeight, cornerR)
                 .lineWidth(0.5)
                 .strokeColor('#9CA3AF') // Gray-400
                 .stroke();
 
             // --- Fiducial Markers for CV (L-shapes at corners) ---
-            const markerLen = 3 * mmToPt; // 3mm length
-            const markerWidth = 1.5; // Thicker line for visibility
+            // IMPORTANT: Sticker has rounded corners. L-markers are inset by `cornerR`
+            // so their reference points sit on FLAT straight edges, not inside the curve.
+            // OCR detects the inner corner of each L as the sticker corner reference.
+            const markerLen = 3 * mmToPt; // 3mm leg length
+            const markerWidth = 1.5;      // line thickness (pts)
 
             doc.lineWidth(markerWidth).strokeColor('#000000');
 
-            // Top-Left
-            doc.moveTo(x, y + markerLen).lineTo(x, y).lineTo(x + markerLen, y).stroke();
-            // Top-Right
-            doc.moveTo(x + labelWidth - markerLen, y).lineTo(x + labelWidth, y).lineTo(x + labelWidth, y + markerLen).stroke();
-            // Bottom-Right
-            doc.moveTo(x + labelWidth, y + labelHeight - markerLen).lineTo(x + labelWidth, y + labelHeight).lineTo(x + labelWidth - markerLen, y + labelHeight).stroke();
-            // Bottom-Left
-            doc.moveTo(x + markerLen, y + labelHeight).lineTo(x, y + labelHeight).lineTo(x, y + labelHeight - markerLen).stroke();
+            // Top-Left:    L corner at (x+cornerR, y+cornerR)
+            doc.moveTo(x + cornerR + markerLen, y + cornerR)
+                .lineTo(x + cornerR, y + cornerR)
+                .lineTo(x + cornerR, y + cornerR + markerLen)
+                .stroke();
+
+            // Top-Right:   L corner at (x+w-cornerR, y+cornerR)
+            doc.moveTo(x + labelWidth - cornerR - markerLen, y + cornerR)
+                .lineTo(x + labelWidth - cornerR, y + cornerR)
+                .lineTo(x + labelWidth - cornerR, y + cornerR + markerLen)
+                .stroke();
+
+            // Bottom-Right: L corner at (x+w-cornerR, y+h-cornerR)
+            doc.moveTo(x + labelWidth - cornerR, y + labelHeight - cornerR - markerLen)
+                .lineTo(x + labelWidth - cornerR, y + labelHeight - cornerR)
+                .lineTo(x + labelWidth - cornerR - markerLen, y + labelHeight - cornerR)
+                .stroke();
+
+            // Bottom-Left: L corner at (x+cornerR, y+h-cornerR)
+            doc.moveTo(x + cornerR, y + labelHeight - cornerR - markerLen)
+                .lineTo(x + cornerR, y + labelHeight - cornerR)
+                .lineTo(x + cornerR + markerLen, y + labelHeight - cornerR)
+                .stroke();
 
             if (student.humanId) {
                 // --- LEFT: QR Code ---
