@@ -124,40 +124,50 @@ export default function ScanMarks() {
                             disableFlip: false
                         },
                         async (decodedText) => {
-                            // Success callback - OPTIMIZED FOR SPEED
                             if (processingRef.current) return;
                             processingRef.current = true;
 
-                            console.log("Matched: " + decodedText);
+                            console.log("✅ QR Matched: " + decodedText);
 
-                            // Pause scanner immediately
-                            html5QrCode.pause();
-
-                            // Start student lookup immediately (parallel with OCR)
+                            // Start student lookup immediately (doesn't need the frame)
                             const studentLookupPromise = apiRequest('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
 
                             setIsProcessingOCR(true);
                             setDebugImage(null);
                             let extractedMark = "";
 
-                            // Parallel OCR processing
+                            // OCR processing — deliberately delayed to let camera settle
                             const ocrPromise = (async () => {
                                 try {
+                                    // ⏳ Wait for camera to settle BEFORE pausing.
+                                    // QR fires the instant the code enters the frame, but the
+                                    // sticker may still be moving. 500ms gives the user time to
+                                    // hold still and gives the camera a chance to focus.
+                                    await new Promise(r => setTimeout(r, 500));
+
+                                    // NOW pause (video still had live frames during the wait)
+                                    html5QrCode.pause();
+
                                     const videoElement = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement;
                                     if (!videoElement) return { score: "", confidence: 0, debugImage: null };
 
-                                    // Fast CV detection: 2 attempts, 30ms delay
+                                    // CV detection: 5 attempts × 300ms = up to 1.5s of active detection
                                     let smartImage = null;
                                     if (window.cv) {
                                         try {
                                             const cvCanvas = document.createElement('canvas');
-                                            for (let i = 0; i < 2; i++) {
+                                            for (let i = 0; i < 5; i++) {
                                                 smartImage = await detectAndWarpSticker(videoElement, cvCanvas);
-                                                if (smartImage) break;
-                                                if (i < 1) await new Promise(r => setTimeout(r, 30));
+                                                if (smartImage) {
+                                                    console.log(`✅ CV warp succeeded on attempt ${i + 1}`);
+                                                    break;
+                                                }
+                                                if (i < 4) await new Promise(r => setTimeout(r, 300));
                                             }
                                         } catch { }
                                     }
+
+                                    if (!smartImage) console.warn("⚠️ CV warp failed — using raw video fallback");
 
                                     return smartImage
                                         ? await extractMarksFromSticker(videoElement, smartImage)
@@ -167,6 +177,7 @@ export default function ScanMarks() {
                                     return { score: "", confidence: 0, debugImage: null };
                                 }
                             })();
+
 
                             // Wait for both in parallel
                             try {
@@ -472,7 +483,7 @@ export default function ScanMarks() {
                         {isProcessingOCR ? (
                             <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl animate-in slide-in-from-bottom-4">
                                 <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                                <span className="font-bold text-slate-800">Processing Scan...</span>
+                                <span className="font-bold text-slate-800">Hold steady — reading marks...</span>
                             </div>
                         ) : (
                             <div className="bg-black/60 backdrop-blur-md text-white text-center px-4 py-2 rounded-full border border-white/10 max-w-xs">
