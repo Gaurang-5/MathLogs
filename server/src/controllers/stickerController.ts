@@ -54,7 +54,7 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
 
         const pageWidth = 210 * mmToPt;
         const startX = 3 * mmToPt;   // 0.3cm left margin (physical sheet measurement)
-        const startY = 12 * mmToPt;  // 1.2cm top margin
+        const startY = 13 * mmToPt;  // 1.3cm top margin
 
         let col = 0;
         let row = 0;
