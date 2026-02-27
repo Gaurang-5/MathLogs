@@ -50,8 +50,12 @@ export async function processOCR(input: Buffer | string): Promise<{ score: strin
         cleanBase64 = input.replace(/^data:image\/(png|jpeg|webp);base64,/, "");
     }
 
-    // Prioritize 1.5-flash for speed, fallback to others if 429 rate limits hit
-    const models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b", "gemini-2.0-flash", "gemini-1.0-pro"];
+    // Prioritize 1.5-flash. If rate limited (429), fall back to exact correct model versions for v1beta tier.
+    const models = [
+        "gemini-1.5-flash",
+        "gemini-1.5-pro-latest",
+        "gemini-2.0-flash-exp"
+    ];
 
     for (const modelName of models) {
         try {
