@@ -68,9 +68,9 @@ function detectAndWarp(imageData: ImageData): { success: boolean, data?: Uint8Ar
         let bestContour = null;
         let maxArea = 0;
 
-        // sticker aspect ratio = 39mm / 20mm = 1.95  (physical size: 3.9cm × 2.0cm)
-        const TARGET_RATIO = 1.95;
-        const RATIO_TOLERANCE = 0.4; // ±0.4 handles handheld angle variance
+        // sticker aspect ratio = 39mm / 21mm ≈ 1.857  (physical size: 3.9cm × 2.1cm)
+        const TARGET_RATIO = 39 / 21; // ≈ 1.857
+        const RATIO_TOLERANCE = 0.4;
 
         for (let i = 0; i < contours.size(); ++i) {
             const cnt = contours.get(i);
@@ -181,10 +181,10 @@ function detectAndWarp(imageData: ImageData): { success: boolean, data?: Uint8Ar
 
             const orderedPoints = sortedPoints;
 
-            // Destination coordinates match 3.9cm × 2.0cm sticker ratio (1.95:1)
-            // 600px wide → height = 600 / 1.95 ≈ 308px
+            // Destination coordinates match 3.9cm × 2.1cm sticker ratio (39/21 ≈ 1.857)
+            // 600px wide → height = 600 / (39/21) ≈ 323px
             const dstWidth = 600;
-            const dstHeight = 308;
+            const dstHeight = 323;
 
             const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
                 orderedPoints[0].x, orderedPoints[0].y,

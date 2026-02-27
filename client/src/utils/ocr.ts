@@ -79,7 +79,7 @@ export async function extractMarksFromSticker(
 
         // The UI shows a scan guide for a 3.9×2.0cm sticker — ratio 39/20 = 1.95
         const cropWidth = sourceWidth * 0.9;
-        const cropHeight = cropWidth / (39 / 20); // Updated ratio for new sticker size
+        const cropHeight = cropWidth / (39 / 21); // 3.9cm × 2.1cm sticker ratio
 
         const startX = (sourceWidth - cropWidth) / 2;
         const startY = (sourceHeight - cropHeight) / 2;

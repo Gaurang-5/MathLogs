@@ -48,7 +48,7 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
         const mmToPt = 2.83465;
 
         const labelWidth = 39 * mmToPt;   // 3.9 cm exact
-        const labelHeight = 20 * mmToPt;   // 2.0 cm exact
+        const labelHeight = 21 * mmToPt;   // 2.1 cm exact
         const gapX = 2 * mmToPt;   // 0.2 cm column gap
         const gapY = 0;             // no row gap
 
