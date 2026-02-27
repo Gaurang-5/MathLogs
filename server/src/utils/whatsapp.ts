@@ -15,6 +15,15 @@ export interface FeeReminderWAData {
     instituteName: string;
 }
 
+export interface TestMarksWAData {
+    testName: string;
+    studentName: string;
+    marksObtained: string;
+    totalMarks: string;
+    averageMarks: string;
+    instituteName: string;
+}
+
 /**
  * Sends a WhatsApp message using the MSG91 WhatsApp API.
  * 
@@ -167,4 +176,53 @@ export const sendFeeReminderWhatsApp = async (mobileNumber: string, data: FeeRem
     };
 
     return await sendMsg91WhatsApp(mobileNumber, FEE_TEMPLATE_NAME, components);
+};
+
+/**
+ * Specifically sends the Test Marks WhatsApp Message
+ */
+export const sendTestMarksWhatsApp = async (mobileNumber: string, data: TestMarksWAData) => {
+    // The name of the template in MSG91 (e.g., "test_marks_update_1")
+    const MARKS_TEMPLATE_NAME = process.env.MSG91_WA_TEMPLATE_MARKS;
+
+    if (!MARKS_TEMPLATE_NAME) {
+        console.warn('⚠️ Missing MSG91_WA_TEMPLATE_MARKS in .env. Skipping marks WhatsApp.');
+        return false;
+    }
+
+    // MSG91 WhatsApp API format
+    const components = {
+        body_test_name: {
+            type: "text",
+            value: data.testName || "Recent Test",
+            parameter_name: "test_name"
+        },
+        body_student_name: {
+            type: "text",
+            value: data.studentName || "Student",
+            parameter_name: "student_name"
+        },
+        body_marks_obtained: {
+            type: "text",
+            value: data.marksObtained || "0",
+            parameter_name: "marks_obtained"
+        },
+        body_total_marks: {
+            type: "text",
+            value: data.totalMarks || "0",
+            parameter_name: "total_marks"
+        },
+        body_average_marks: {
+            type: "text",
+            value: data.averageMarks || "0",
+            parameter_name: "average_marks"
+        },
+        body_institute_name: {
+            type: "text",
+            value: data.instituteName || "our institute",
+            parameter_name: "institute_name"
+        }
+    };
+
+    return await sendMsg91WhatsApp(mobileNumber, MARKS_TEMPLATE_NAME, components);
 };
