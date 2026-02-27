@@ -600,23 +600,24 @@ ${senderName}`;
             } as any
         });
 
-        // WhatsApp Integration (Option A)
+        // WhatsApp Integration (MSG91)
         if (student.parentWhatsapp) {
-            // Clean number: remove spaces, dashes, ensure country code (default to +91 if missing)
             let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
-            if (!phone.startsWith('+')) {
-                if (phone.length === 10) phone = '+91' + phone; // India default
-            }
+            if (phone.length === 10) phone = '+91' + phone;
 
-            // Queue WhatsApp
-            import('../utils/whatsappService').then(({ sendFeeReminderWhatsapp }) => {
-                sendFeeReminderWhatsapp(
-                    student.name,
-                    totalPendingCalc,
+            import('../utils/whatsapp').then(({ sendFeeReminderWhatsApp }) => {
+                const feeBreakupText = breakdownLines.join('\n');
+
+                sendFeeReminderWhatsApp(
                     phone,
-                    new Date().toLocaleDateString(), // Due date (today/immediate)
-                    student.batch?.instituteId || undefined
-                );
+                    {
+                        studentName: student.name,
+                        batchName: student.batch?.name || "the batch",
+                        feeBreakup: feeBreakupText,
+                        totalAmount: totalPendingCalc.toLocaleString(),
+                        instituteName: student.batch?.institute?.name || "our institute"
+                    }
+                ).catch(err => console.error("WhatsApp Fee Update Error:", err));
             });
         }
 
