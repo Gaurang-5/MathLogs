@@ -109,8 +109,7 @@ export default function ScanMarks() {
                     console.log("📸 Starting camera with config...");
                     await html5QrCode.start(
                         {
-                            facingMode: "environment",
-                            advanced: [{ focusMode: "continuous" }] as any,
+                            facingMode: "environment"
                         },
                         {
                             fps: 25,
