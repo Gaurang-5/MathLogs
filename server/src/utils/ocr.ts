@@ -50,11 +50,11 @@ export async function processOCR(input: Buffer | string): Promise<{ score: strin
         cleanBase64 = input.replace(/^data:image\/(png|jpeg|webp);base64,/, "");
     }
 
-    // Prioritize 2.0-flash (new default). Fallbacks included for rate limits.
+    // Primary choice is Flash (fast/cheap). Backup choices use Pro tier (separate quota) to bypass 429 errors.
     const models = [
         "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-flash-latest"
+        "gemini-2.5-pro",
+        "gemini-pro-latest"
     ];
 
     for (const modelName of models) {
