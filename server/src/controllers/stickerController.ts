@@ -53,8 +53,8 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
         const gapY = 0;             // no row gap
 
         const pageWidth = 210 * mmToPt;
-        const startX = (pageWidth - (cols * labelWidth + (cols - 1) * gapX)) / 2; // center horizontally (3.5mm each side)
-        const startY = 12 * mmToPt;        // 1.2 cm top margin
+        const startX = 3 * mmToPt;   // 0.3cm left margin (physical sheet measurement)
+        const startY = 12 * mmToPt;  // 1.2cm top margin
 
         let col = 0;
         let row = 0;
