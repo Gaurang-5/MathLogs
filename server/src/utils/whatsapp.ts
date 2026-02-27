@@ -34,6 +34,12 @@ export const sendMsg91WhatsApp = async (mobileNumber: string, templateName: stri
             formattedMobile = `91${formattedMobile}`;
         }
 
+        const namespace = process.env.MSG91_WA_NAMESPACE;
+        if (!namespace) {
+            console.error('MSG91_WA_NAMESPACE is missing.');
+            return false;
+        }
+
         const payload = {
             integrated_number: integratedNumber,
             content_type: "template",
@@ -43,9 +49,10 @@ export const sendMsg91WhatsApp = async (mobileNumber: string, templateName: stri
                 template: {
                     name: templateName,
                     language: {
-                        code: "en", // matching the language you setup in MSG91 (en, en_US, en_GB)
+                        code: "en",
                         policy: "deterministic"
                     },
+                    namespace: namespace,
                     to_and_components: [
                         {
                             to: [formattedMobile],
@@ -56,7 +63,7 @@ export const sendMsg91WhatsApp = async (mobileNumber: string, templateName: stri
             }
         };
 
-        const response = await axios.post('https://control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/', payload, {
+        const response = await axios.post('https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/', payload, {
             headers: {
                 'authkey': authKey,
                 'Content-Type': 'application/json'
@@ -83,23 +90,27 @@ export const sendWelcomeWhatsApp = async (mobileNumber: string, data: WelcomeWAD
         return false;
     }
 
-    // MSG91 WhatsApp API requires mapping variables exactly to {{variable_name}}
+    // MSG91 WhatsApp API format based on cURL example
     const components = {
-        var_1: {
+        body_var_1: {
             type: "text",
-            value: data.studentName || "Student"
+            value: data.studentName || "Student",
+            parameter_name: "var_1"
         },
-        var_2: {
+        body_var_2: {
             type: "text",
-            value: data.batchName || "the batch"
+            value: data.batchName || "the batch",
+            parameter_name: "var_2"
         },
-        var_3: {
+        body_var_3: {
             type: "text",
-            value: data.instituteName || "our institute"
+            value: data.instituteName || "our institute",
+            parameter_name: "var_3"
         },
-        var_4: {
+        body_var_4: {
             type: "text",
-            value: data.whatsappLink || "Contact admin for group link"
+            value: data.whatsappLink || "Contact admin for group link",
+            parameter_name: "var_4"
         }
     };
 
