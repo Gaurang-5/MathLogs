@@ -111,19 +111,19 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
 
             if (student.humanId) {
                 // --- LEFT: QR Code ---
-                // Keeping QR code sized appropriately (~14mm = 40pts) for easy scanning
-                const padding = 2; // pts
-                const qrSize = 40;
+                // Inset by cornerR so QR stays clear of the rounded-corner curved region.
+                // Label height = 20mm = 56.7pt. qrSize=34pt → 11pt margin top/bottom (3.9mm).
+                const padding = cornerR + 2; // start past the rounded corner
+                const qrSize = 34;           // 12mm — comfortably fits 20mm label height
                 const qrY = y + (labelHeight - qrSize) / 2; // vertically centered
 
                 try {
                     const png = await bwipjs.toBuffer({
                         bcid: 'qrcode',
                         text: student.humanId,
-                        scale: 4,
+                        scale: 3,
                     });
 
-                    // Cast to any/Buffer to avoid TS issues with bwip-js types
                     doc.image(png as any, x + padding, qrY, {
                         width: qrSize,
                         height: qrSize
@@ -133,7 +133,7 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
                 }
 
                 // --- DIVIDER ---
-                const dividerX = x + qrSize + (padding * 2);
+                const dividerX = x + padding + qrSize + 2;
                 doc.moveTo(dividerX, y + 2)
                     .lineTo(dividerX, y + labelHeight - 2)
                     .lineWidth(0.5)
