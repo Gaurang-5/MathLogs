@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import logger from '../utils/logger';
-import { sendWelcomeSMS } from '../utils/sms';
+import { sendWelcomeWhatsApp } from '../utils/whatsapp';
 
 // Helper to generate Course Code
 const getCourseCode = (subject: string | null) => {
@@ -199,14 +199,14 @@ export const registerStudent = async (req: Request, res: Response) => {
             logger.performance.slow('student_registration', latencyMs, 3000, { batchId, studentId: student!.id });
         }
 
-        // Fire asynchronous Welcome SMS (Fire & Forget, handles its own errors silently so it doesn't block the UI)
+        // Fire asynchronous Welcome WhatsApp message
         if (student && batch.institute) {
-            sendWelcomeSMS(student.parentWhatsapp, {
+            sendWelcomeWhatsApp(student.parentWhatsapp, {
                 studentName: student.name,
                 batchName: batch.name,
                 whatsappLink: batch.whatsappGroupLink || "",
                 instituteName: batch.institute.name
-            }).catch(e => console.error("Unhandled SMS error", e));
+            }).catch(e => console.error("Unhandled WhatsApp error", e));
         }
 
         res.json(student);
