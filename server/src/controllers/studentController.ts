@@ -126,7 +126,8 @@ export const registerStudent = async (req: Request, res: Response) => {
             where: {
                 batchId,
                 name,
-                parentWhatsapp
+                parentWhatsapp,
+                instituteId: batch.instituteId
             }
         });
 
@@ -163,7 +164,7 @@ export const registerStudent = async (req: Request, res: Response) => {
                     if (target?.includes('student_natural_key') || target?.includes('name_parentWhatsapp_batchId')) {
                         logger.registration.naturalKeyCollision(batchId, name, 'fetching_existing');
                         const existing = await prisma.student.findFirst({
-                            where: { batchId, name, parentWhatsapp }
+                            where: { batchId, name, parentWhatsapp, instituteId: batch.instituteId }
                         });
                         if (!existing) {
                             // Rare: Student was deleted between constraint violation and query
@@ -218,7 +219,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
 
         // Idempotency Check
         const existingStudent = await prisma.student.findFirst({
-            where: { batchId, name, parentWhatsapp }
+            where: { batchId, name, parentWhatsapp, instituteId: user.instituteId }
         });
         if (existingStudent) return res.json(existingStudent);
 
@@ -250,7 +251,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
                     if (target?.includes('student_natural_key') || target?.includes('name_parentWhatsapp_batchId')) {
                         // Natural key collision - fetch existing student
                         const existing = await prisma.student.findFirst({
-                            where: { batchId, name, parentWhatsapp }
+                            where: { batchId, name, parentWhatsapp, instituteId: user.instituteId }
                         });
                         if (!existing) {
                             console.error('[Idempotency] Natural key collision but student not found - concurrent deletion');
