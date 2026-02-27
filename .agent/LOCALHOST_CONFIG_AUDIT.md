@@ -22,7 +22,7 @@ The production frontend was making API requests to `http://localhost:3001` inste
 #### Created `.env.production`
 ```bash
 # Production Environment Variables
-VITE_GEMINI_API_KEY=AIzaSyAgpV-js5fYcNVqSmXm1x2i2b2X1EdPpEw
+VITE_GEMINI_API_KEY=REDACTED_API_KEY_OR_NEW_KEY
 VITE_API_URL=/api  # Uses relative path for same-domain requests
 ```
 
