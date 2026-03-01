@@ -380,7 +380,8 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                 maxMarks: true,
                 className: true,
                 teacherId: true,
-                instituteId: true
+                instituteId: true,
+                institute: { select: { name: true } }
             }
         });
 
@@ -466,9 +467,9 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
 
 
 
-        // WhatsApp Integration (Option A)
+        // WhatsApp Integration (MSG91)
         const whatsappPromises: Promise<any>[] = [];
-        const { sendExamResultWhatsapp } = await import('../utils/whatsappService');
+        const { sendTestMarksWhatsApp } = await import('../utils/whatsapp');
 
         students.forEach(student => {
             if (student.parentWhatsapp) {
@@ -481,16 +482,17 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                 const mark = student.marks[0];
                 const score = mark ? mark.score : 0; // Default to 0 if absent (or handle absence differently)
 
-                // Only send if present? Or template supports "Absent"?
                 // Standard template sends score. If absent, maybe skip or send 0.
                 if (mark) {
-                    whatsappPromises.push(sendExamResultWhatsapp(
-                        student.name,
-                        test.name,
-                        score,
-                        test.maxMarks,
+                    whatsappPromises.push(sendTestMarksWhatsApp(
                         phone,
-                        test.instituteId || undefined
+                        {
+                            studentName: student.name,
+                            instituteName: (test as any).institute?.name || "our institute", // Typecasting to any safely if missing
+                            testName: test.name,
+                            totalMarks: String(test.maxMarks),
+                            marksObtained: String(score)
+                        }
                     ));
                 }
             }
