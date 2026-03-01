@@ -606,7 +606,8 @@ ${senderName}`;
             if (phone.length === 10) phone = '+91' + phone;
 
             import('../utils/whatsapp').then(({ sendFeeReminderWhatsApp }) => {
-                const feeBreakupText = breakdownLines.join('\n');
+                // MSG91 WhatsApp templates reject newline (\n) characters inside variables.
+                const feeBreakupText = breakdownLines.join(' | ');
 
                 sendFeeReminderWhatsApp(
                     phone,
