@@ -51,10 +51,6 @@ export const sendMsg91WhatsApp = async (mobileNumber: string, templateName: stri
         }
 
         const namespace = process.env.MSG91_WA_NAMESPACE;
-        if (!namespace) {
-            console.error('MSG91_WA_NAMESPACE is missing.');
-            return false;
-        }
 
         const payload = {
             integrated_number: integratedNumber,
@@ -68,7 +64,7 @@ export const sendMsg91WhatsApp = async (mobileNumber: string, templateName: stri
                         code: "en",
                         policy: "deterministic"
                     },
-                    namespace: namespace,
+                    ...(namespace ? { namespace } : {}),
                     to_and_components: [
                         {
                             to: [formattedMobile],
