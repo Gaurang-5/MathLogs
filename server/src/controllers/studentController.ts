@@ -199,16 +199,6 @@ export const registerStudent = async (req: Request, res: Response) => {
             logger.performance.slow('student_registration', latencyMs, 3000, { batchId, studentId: student!.id });
         }
 
-        // Fire asynchronous Welcome WhatsApp message
-        if (student && batch.institute) {
-            sendWelcomeWhatsApp(student.parentWhatsapp, {
-                studentName: student.name,
-                batchName: batch.name,
-                whatsappLink: batch.whatsappGroupLink || "",
-                instituteName: batch.institute.name
-            }).catch(e => console.error("Unhandled WhatsApp error", e));
-        }
-
         res.json(student);
     } catch (e: any) {
         const latencyMs = Date.now() - startTime;
@@ -223,7 +213,10 @@ export const addStudentManually = async (req: Request, res: Response) => {
         const teacherId = (req as any).user?.id;
         const batch = await prisma.batch.findUnique({
             where: { id: batchId },
-            include: { academicYearRef: true }
+            include: {
+                academicYearRef: true,
+                institute: { select: { name: true } }
+            }
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
@@ -284,6 +277,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
         }
 
         if (!success) throw new Error('Failed to generate unique ID');
+
         res.json(student);
     } catch (e) {
         console.error("Manual add error", e);
@@ -340,7 +334,10 @@ export const approveStudent = async (req: Request, res: Response) => {
             where: { id: String(id) },
             include: {
                 batch: {
-                    include: { academicYearRef: true }
+                    include: {
+                        academicYearRef: true,
+                        institute: { select: { name: true } }
+                    }
                 }
             }
         });
@@ -386,6 +383,7 @@ export const approveStudent = async (req: Request, res: Response) => {
         }
 
         if (!success) throw new Error('Collision');
+
         res.json(student);
     } catch (e: any) {
         res.status(500).json({ error: 'Approval failed' });

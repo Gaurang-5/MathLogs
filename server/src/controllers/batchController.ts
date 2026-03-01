@@ -91,7 +91,6 @@ export const createBatch = async (req: Request, res: Response) => {
                     instituteId: user.instituteId // Scoped to tenant!
                 }
             });
-
             if (existing) {
                 return res.status(400).json({ error: `Batch ${num} already exists (Batches must have unique numbers across all subjects)` });
             }
@@ -571,10 +570,8 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
             await prisma.emailJob.createMany({ data: emailJobs as any });
         }
 
-        // 2. Queue WhatsApp invites for students who have a parent phone number
-        // Template: batch_whatsapp_invite_v1
-        // Body: "Hello {{1}}, you have been enrolled in {{2}} at {{3}}. Join the WhatsApp group here: {{4}}"
-        const { queueWhatsappMessage } = await import('../utils/whatsappService');
+        // 2. Send Welcome WhatsApp API via MSG91 directly for students with phone numbers
+        const { sendWelcomeWhatsApp } = await import('../utils/whatsapp');
         let whatsappCount = 0;
 
         for (const student of batch.students) {
@@ -585,20 +582,25 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
                 if (phone.length === 10) phone = '+91' + phone;
             }
 
-            await queueWhatsappMessage(
-                phone,
-                'batch_whatsapp_invite_v1',
-                [student.name, batch.name, senderName, link],
-                batch.instituteId || undefined
-            );
-            whatsappCount++;
+            try {
+                // Wait for the promise to resolve so we don't spam the MSG91 API too quickly
+                await sendWelcomeWhatsApp(phone, {
+                    studentName: student.name,
+                    batchName: batch.name,
+                    instituteName: senderName,
+                    whatsappLink: link
+                });
+                whatsappCount++;
+            } catch (err) {
+                console.error(`Failed to send Welcome WhatsApp to ${phone}`, err);
+            }
         }
 
         res.json({
             success: true,
             emailCount: emailJobs.length,
             whatsappCount,
-            message: `Invites queued — ${emailJobs.length} email(s) + ${whatsappCount} WhatsApp message(s)`
+            message: `Invites processed — ${emailJobs.length} email(s) + ${whatsappCount} WhatsApp message(s) sent`
         });
 
     } catch (e) {
