@@ -480,21 +480,18 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                 }
 
                 const mark = student.marks[0];
-                const score = mark ? mark.score : 0; // Default to 0 if absent (or handle absence differently)
+                const scoreValue = mark ? String(mark.score) : "ABSENT";
 
-                // Standard template sends score. If absent, maybe skip or send 0.
-                if (mark) {
-                    whatsappPromises.push(sendTestMarksWhatsApp(
-                        phone,
-                        {
-                            studentName: student.name,
-                            instituteName: (test as any).institute?.name || "our institute", // Typecasting to any safely if missing
-                            testName: test.name,
-                            totalMarks: String(test.maxMarks),
-                            marksObtained: String(score)
-                        }
-                    ));
-                }
+                whatsappPromises.push(sendTestMarksWhatsApp(
+                    phone,
+                    {
+                        studentName: student.name,
+                        instituteName: (test as any).institute?.name || "our institute",
+                        testName: test.name,
+                        totalMarks: String(test.maxMarks),
+                        marksObtained: scoreValue
+                    }
+                ));
             }
         });
 
