@@ -670,7 +670,22 @@ Please join the group to stay informed.
             } as any
         });
 
-        res.json({ success: true, message: 'Invite queued successfully' });
+        // Also send WhatsApp via MSG91 if parent has a phone number
+        if (student.parentWhatsapp) {
+            const { sendWelcomeWhatsApp } = await import('../utils/whatsapp');
+            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
+            if (!phone.startsWith('+')) {
+                if (phone.length === 10) phone = '+91' + phone;
+            }
+            sendWelcomeWhatsApp(phone, {
+                studentName: student.name,
+                batchName: batch.name,
+                instituteName: senderName,
+                whatsappLink: link || ''
+            }).catch(err => console.error(`WhatsApp invite failed for ${phone}:`, err));
+        }
+
+        res.json({ success: true, message: 'Invite sent (Email + WhatsApp)' });
 
     } catch (e) {
         console.error('Error sending invite:', e);
