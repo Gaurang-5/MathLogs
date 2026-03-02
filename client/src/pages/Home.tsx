@@ -509,8 +509,6 @@ export default function Home() {
                             <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
                             <a href="#faq" className="hover:text-gray-900 transition-colors">FAQ</a>
                             <Link to="/about" className="hover:text-gray-900 transition-colors">About Us</Link>
-                            <Link to="/login" className="hover:text-gray-900 transition-colors">Sign In</Link>
-                            <Link to="/login" className="hover:text-gray-900 transition-colors opacity-50 text-xs">Admin</Link>
                         </div>
                     </div>
                     <div className="mt-8 pt-8 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-500">
