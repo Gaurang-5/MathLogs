@@ -397,12 +397,14 @@ export default function Home() {
                             </div>
                         </div>
 
-                        <Link
-                            to="/login"
+                        <a
+                            href="https://docs.google.com/forms/d/e/1FAIpQLSf_iZpFA8pDCv5ESQ8OwESB7YzlMjWETwwRirk-MV6LddQBeQ/viewform?usp=publish-editor"
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="block w-full px-8 py-4 bg-gray-900 text-white font-semibold rounded-lg hover:bg-black transition-all text-center"
                         >
                             Join Waitlist – Get Early Access
-                        </Link>
+                        </a>
 
                         <p className="text-sm text-gray-500 mt-6">
                             Be among the first to experience simplified coaching management. <span className="font-semibold">Price reveal coming soon!</span>
@@ -468,16 +470,16 @@ export default function Home() {
                         Still have questions?
                     </h2>
                     <p className="text-lg text-gray-600 mb-8">
-                        Directly chat with us on WhatsApp. We usually reply within minutes.
+                        Fill out our contact form and we will get back to you shortly.
                     </p>
                     <a
-                        href="https://wa.me/918439245302?text=Hi%2C%20I%20have%20a%20question%20about%20MathLogs"
+                        href="https://docs.google.com/forms/d/e/1FAIpQLSf_iZpFA8pDCv5ESQ8OwESB7YzlMjWETwwRirk-MV6LddQBeQ/viewform?usp=publish-editor"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center px-8 py-4 bg-gray-900 text-white font-bold rounded-full hover:bg-black transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
                     >
                         <MessageCircle className="w-6 h-6 mr-3" />
-                        Chat on WhatsApp
+                        Contact Us
                     </a>
                 </div>
             </section>
