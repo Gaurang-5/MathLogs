@@ -19,6 +19,10 @@ const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
+const AboutUs = lazy(() => import('./pages/AboutUs'));
+
 // Protected Route Component
 function PrivateRoute({ children }: { children: any }) {
   const token = localStorage.getItem('token');
@@ -82,6 +86,11 @@ function App() {
             <Route path="/register/:batchId" element={<Register />} />
             <Route path="/kiosk/register/:batchId" element={<Register mode="kiosk" />} />
             <Route path="/check-status/:batchId" element={<CheckStatus />} />
+
+            {/* Legal / Info Pages */}
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsAndConditions />} />
+            <Route path="/about" element={<AboutUs />} />
           </Routes>
         </Suspense>
       </BrowserRouter>

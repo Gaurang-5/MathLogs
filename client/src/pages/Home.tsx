@@ -26,6 +26,11 @@ export default function Home() {
             icon: BarChart3,
             title: "Barcode-Based Test Management",
             description: "Generate unique barcodes for tests. Scan to record marks instantly."
+        },
+        {
+            icon: MessageCircle,
+            title: "Automated WhatsApp Alerts",
+            description: "Send fee reminders, test marks, and welcome messages to parents instantly via WhatsApp."
         }
     ];
 
@@ -503,12 +508,17 @@ export default function Home() {
                             <a href="#features" className="hover:text-gray-900 transition-colors">Features</a>
                             <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
                             <a href="#faq" className="hover:text-gray-900 transition-colors">FAQ</a>
+                            <Link to="/about" className="hover:text-gray-900 transition-colors">About Us</Link>
                             <Link to="/login" className="hover:text-gray-900 transition-colors">Sign In</Link>
-                            <Link to="/login" className="hover:text-gray-900 transition-colors opacity-50 text-xs">Admin Login</Link>
+                            <Link to="/login" className="hover:text-gray-900 transition-colors opacity-50 text-xs">Admin</Link>
                         </div>
                     </div>
-                    <div className="mt-8 pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
-                        © 2026 MathLogs. Built for teachers, by teachers.
+                    <div className="mt-8 pt-8 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-500">
+                        <div>© 2026 MathLogs. Built for teachers, by teachers.</div>
+                        <div className="flex gap-6 text-xs mt-4 md:mt-0">
+                            <Link to="/privacy-policy" className="hover:text-gray-900 transition-colors">Privacy Policy</Link>
+                            <Link to="/terms" className="hover:text-gray-900 transition-colors">Terms & Conditions</Link>
+                        </div>
                     </div>
                 </div>
             </footer>
