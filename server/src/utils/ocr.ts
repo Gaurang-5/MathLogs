@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 const geminiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
@@ -63,6 +63,17 @@ export async function processOCR(input: Buffer | string): Promise<{ score: strin
                 model: modelName,
                 generationConfig: {
                     temperature: 0.1,
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: SchemaType.OBJECT,
+                        properties: {
+                            score: {
+                                type: SchemaType.STRING,
+                                description: "The extracted numerical marks. Strictly numbers only (e.g. '70', '5') or a fraction (e.g. '45/50'). Limit to numbers only. If unreadable, return 'ERROR_UNCERTAIN'."
+                            }
+                        },
+                        required: ["score"]
+                    }
                 }
             });
 
@@ -79,7 +90,7 @@ Rules:
 3. Empty boxes = ignore.
 4. If you clearly see a score format like "45/50", return "45/50".
 
-Return ONLY the final string. No explanation. Examples: "70", "5", "100", "45/50".
+LIMIT TO NUMBERS ONLY. Assign the exact numerical score to the "score" field in the JSON response.
 If the image is completely unreadable or has no numbers, return "ERROR_UNCERTAIN".`.trim();
 
             const result = await model.generateContent([
@@ -103,7 +114,17 @@ If the image is completely unreadable or has no numbers, return "ERROR_UNCERTAIN
                 continue;
             }
 
-            const cleanScore = cleanExtractedScore(responseText);
+            let extractedScore = responseText;
+            try {
+                const parsed = JSON.parse(responseText);
+                if (parsed.score) {
+                    extractedScore = parsed.score;
+                }
+            } catch (e) {
+                // fall back to raw responseText if JSON parse fails
+            }
+
+            const cleanScore = cleanExtractedScore(extractedScore);
 
             if (cleanScore && cleanScore !== "ERROR_UNCERTAIN") {
                 return { score: cleanScore, confidence: 0.95, raw: responseText };

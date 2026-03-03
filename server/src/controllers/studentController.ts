@@ -278,6 +278,47 @@ export const addStudentManually = async (req: Request, res: Response) => {
 
         if (!success) throw new Error('Failed to generate unique ID');
 
+        // Auto-send invite if batch registration is closed
+        if (student && (!batch.isRegistrationOpen || batch.isRegistrationEnded) && batch.whatsappGroupLink) {
+            try {
+                const link = batch.whatsappGroupLink;
+                const senderName = batch.institute?.name || 'Coaching Centre';
+
+                const body = `Hello ${student.name},\n\nWelcome to ${batch.name} (${batch.subject || 'Course'}).\n\nBatch Details:\n• Class: ${batch.className || 'N/A'}\n• Time: ${batch.timeSlot || 'N/A'}\n• Student ID: ${student.humanId || 'N/A'}\n\nJoin the official WhatsApp group for announcements and updates:\n👉 ${link}\n\nPlease join the group to stay informed.\n\n– ${senderName}`;
+
+                // Queue Email Invite
+                if (student.parentEmail) {
+                    await prisma.emailJob.create({
+                        data: {
+                            recipient: student.parentEmail,
+                            subject: `Welcome to ${batch.name} – ${batch.subject}`,
+                            body,
+                            status: 'PENDING',
+                            options: { senderName, senderType: 'WELCOME' },
+                            instituteId: batch.instituteId
+                        } as any
+                    });
+                }
+
+                // Send WhatsApp Invite
+                if (student.parentWhatsapp) {
+                    const { sendWelcomeWhatsApp } = await import('../utils/whatsapp');
+                    let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
+                    if (!phone.startsWith('+')) {
+                        if (phone.length === 10) phone = '+91' + phone;
+                    }
+                    sendWelcomeWhatsApp(phone, {
+                        studentName: student.name,
+                        batchName: batch.name,
+                        instituteName: senderName,
+                        whatsappLink: link
+                    }).catch(err => console.error(`WhatsApp auto-invite failed for ${phone}:`, err));
+                }
+            } catch (inviteErr) {
+                console.error("Auto-invite error on manual add:", inviteErr);
+            }
+        }
+
         res.json(student);
     } catch (e) {
         console.error("Manual add error", e);

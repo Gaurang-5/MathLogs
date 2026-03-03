@@ -399,6 +399,59 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
     }
 };
 
+export const updateFeeInstallment = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { name, amount } = req.body;
+
+    try {
+        const installment = await prisma.feeInstallment.findUnique({
+            where: { id: String(id) },
+            include: { batch: true }
+        });
+        if (!installment) return res.status(404).json({ error: 'Installment not found' });
+
+        const user = (req as any).user;
+        if (installment.batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const updated = await prisma.feeInstallment.update({
+            where: { id: String(id) },
+            data: {
+                name: name !== undefined ? name : undefined,
+                amount: amount !== undefined ? parseFloat(amount) : undefined,
+            }
+        });
+        res.json(updated);
+    } catch (e) {
+        console.error('Error updating installment:', e);
+        res.status(500).json({ error: 'Failed to update fee installment' });
+    }
+};
+
+export const deleteFeeInstallment = async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        const installment = await prisma.feeInstallment.findUnique({
+            where: { id: String(id) },
+            include: { batch: true, _count: { select: { payments: true } } }
+        });
+        if (!installment) return res.status(404).json({ error: 'Installment not found' });
+
+        const user = (req as any).user;
+        if (installment.batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+
+        if (installment._count.payments > 0) {
+            return res.status(400).json({ error: `Cannot delete fee column: ${installment._count.payments} payment(s) have already been made.` });
+        }
+
+        await prisma.feeInstallment.delete({ where: { id: String(id) } });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Error deleting installment:', e);
+        res.status(500).json({ error: 'Failed to delete fee installment' });
+    }
+};
+
 export const getBatchPublicStatus = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
     try {

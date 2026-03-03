@@ -98,8 +98,8 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] w-full max-w-md p-4"
                     >
-                        <div className="bg-white rounded-[24px] shadow-2xl overflow-hidden">
-                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <div className="bg-white rounded-[24px] shadow-2xl">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-[24px]">
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-900">Log Fee Payment</h2>
                                     <p className="text-sm text-gray-500">Quickly record a payment</p>
@@ -133,7 +133,7 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
 
                                             {/* Dropdown Results */}
                                             {search && filteredStudents.length > 0 && (
-                                                <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-10">
+                                                <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-xl border border-gray-100 overflow-y-auto max-h-56 z-50">
                                                     {filteredStudents.map(student => (
                                                         <button
                                                             key={student.id}

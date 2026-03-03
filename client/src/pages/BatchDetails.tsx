@@ -102,7 +102,10 @@ export default function BatchDetails() {
 
     // Fee Installment State
     const [showAddInstallment, setShowAddInstallment] = useState(false);
+    const [showManageInstallments, setShowManageInstallments] = useState(false);
     const [newInstallment, setNewInstallment] = useState({ name: '', amount: '' });
+    const [editingInstallment, setEditingInstallment] = useState<FeeInstallment | null>(null);
+    const [installmentToDelete, setInstallmentToDelete] = useState<FeeInstallment | null>(null);
 
     // Payment Modal State
     const [paymentModal, setPaymentModal] = useState<{ student: Student, installment: FeeInstallment, date: string } | null>(null);
@@ -484,6 +487,36 @@ export default function BatchDetails() {
         }
     };
 
+    const handleUpdateInstallment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingInstallment) return;
+        const toastId = toast.loading('Updating fee column...');
+        try {
+            await apiRequest(`/installments/${editingInstallment.id}`, 'PUT', {
+                name: editingInstallment.name,
+                amount: Number(editingInstallment.amount)
+            });
+            toast.success('Fee column updated', { id: toastId });
+            setEditingInstallment(null);
+            fetchDetails();
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to update fee column', { id: toastId });
+        }
+    };
+
+    const handleDeleteInstallment = async () => {
+        if (!installmentToDelete) return;
+        const toastId = toast.loading('Deleting fee column...');
+        try {
+            await apiRequest(`/installments/${installmentToDelete.id}`, 'DELETE');
+            toast.success('Fee column deleted', { id: toastId });
+            setInstallmentToDelete(null);
+            fetchDetails();
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to delete fee column. Maybe payments exist?', { id: toastId });
+        }
+    };
+
     const handleMarkPaid = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!paymentModal || isSubmitting) return;
@@ -624,10 +657,29 @@ export default function BatchDetails() {
                                 <Plus className="w-5 h-5 mr-2" /> Add Student
                             </button>
                             <button
-                                onClick={() => setShowAddInstallment(true)}
+                                onClick={() => setShowManageInstallments(true)}
                                 className="bg-app-surface hover:bg-app-surface-hover text-app-text px-6 py-3.5 rounded-xl font-bold flex items-center justify-center border border-app-border transition-all active:scale-95 flex-1"
                             >
-                                <Plus className="w-5 h-5 mr-2" /> Add Fee Column
+                                <Settings className="w-5 h-5 mr-2" /> Fee Columns
+                            </button>
+                            <button
+                                onClick={openWhatsappModal}
+                                className={cn(
+                                    "px-6 py-3.5 rounded-xl font-bold flex items-center justify-center border transition-all active:scale-95 flex-1",
+                                    batch.whatsappGroupLink
+                                        ? "bg-app-surface hover:bg-app-surface-hover text-app-text border-app-border"
+                                        : "bg-app-surface border-dashed border-app-text-tertiary text-app-text hover:border-app-text"
+                                )}
+                            >
+                                <Phone className="w-5 h-5 mr-2" />
+                                {batch.whatsappGroupLink ? 'Edit Group Link' : 'Add Group Link'}
+                            </button>
+                            <button
+                                onClick={handleSendWhatsappInvite}
+                                disabled={!batch.whatsappGroupLink}
+                                className="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-6 py-3.5 rounded-xl font-bold flex items-center justify-center transition-all active:scale-95 flex-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-app-surface disabled:text-app-text-tertiary disabled:border-app-border"
+                            >
+                                <Mail className="w-5 h-5 mr-2" /> Send Invites
                             </button>
                         </div>
                     </div>
@@ -733,7 +785,7 @@ export default function BatchDetails() {
                             <div className="w-full space-y-3">
                                 <div>
                                     <p className="text-xs text-app-text-tertiary mb-2 px-2 uppercase font-bold tracking-wider">Actions</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
+                                    <div className="grid grid-cols-1 gap-3 text-center">
                                         <button
                                             onClick={() => window.open(`/kiosk/register/${batch.id}`, '_blank')}
                                             className="py-3.5 rounded-xl bg-app-surface hover:bg-app-surface-hover text-app-text border border-app-border text-xs font-bold transition-all w-full"
@@ -745,30 +797,6 @@ export default function BatchDetails() {
                                             className="py-3.5 rounded-xl bg-app-surface hover:bg-app-surface-hover text-app-text border border-app-border text-xs font-bold transition-all w-full"
                                         >
                                             Copy Invite Link
-                                        </button>
-
-                                        {/* WhatsApp Actions Row */}
-                                        <button
-                                            onClick={openWhatsappModal}
-                                            className={cn(
-                                                "py-3.5 rounded-xl border text-xs font-bold transition-all w-full flex items-center justify-center gap-2",
-                                                batch.whatsappGroupLink
-                                                    ? "bg-app-surface hover:bg-app-surface-hover text-app-text border-app-border"
-                                                    : "bg-app-surface border-dashed border-app-text-tertiary text-app-text-secondary hover:text-app-text hover:border-app-text"
-                                            )}
-                                        >
-                                            {batch.whatsappGroupLink ? 'Edit Group Link' : 'Add Group Link'}
-                                        </button>
-
-                                        <button
-                                            onClick={handleSendWhatsappInvite}
-                                            disabled={!batch.whatsappGroupLink}
-                                            className="py-3.5 rounded-xl bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 text-xs font-bold transition-all w-full disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-app-surface disabled:text-app-text-tertiary disabled:border-app-border"
-                                        >
-                                            <div className="flex items-center justify-center gap-2">
-                                                <Mail className="w-4 h-4" />
-                                                Send Invites
-                                            </div>
                                         </button>
                                     </div>
                                 </div>
@@ -1640,6 +1668,68 @@ export default function BatchDetails() {
                 }
             </AnimatePresence>
 
+            {/* Manage Installments Modal */}
+            <AnimatePresence>
+                {showManageInstallments && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-md"
+                            onClick={() => setShowManageInstallments(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="!bg-white border border-app-border rounded-[24px] p-6 md:p-8 max-w-md w-full shadow-2xl relative z-10 flex flex-col max-h-[90vh]"
+                        >
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-app-text">Fee Columns</h3>
+                                <button onClick={() => setShowManageInstallments(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                            </div>
+
+                            <div className="overflow-y-auto pr-2 mb-6 flex-1 min-h-[150px]">
+                                {batch?.feeInstallments && batch.feeInstallments.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {[...batch.feeInstallments].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map(inst => (
+                                            <div key={inst.id} className="flex justify-between items-center p-4 rounded-xl border border-app-border bg-app-surface group">
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-app-text">{inst.name}</span>
+                                                    <span className="text-xs text-app-text-tertiary uppercase tracking-wider">Amount: ₹{inst.amount}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => { setShowManageInstallments(false); setEditingInstallment(inst); }} className="p-2 hover:bg-accent/10 text-accent rounded-lg transition-colors" title="Edit">
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => { setShowManageInstallments(false); setInstallmentToDelete(inst); }} className="p-2 hover:bg-danger/10 text-danger rounded-lg transition-colors" title="Delete">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12 text-app-text-tertiary">
+                                        <p>No fee columns created yet.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end pt-4 border-t border-app-border">
+                                <button
+                                    onClick={() => { setShowManageInstallments(false); setShowAddInstallment(true); }}
+                                    className="bg-neutral-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98]"
+                                >
+                                    <Plus className="w-4 h-4 mr-2" /> Add New Column
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             {/* Add Installment Modal */}
             <AnimatePresence>
                 {
@@ -1700,6 +1790,116 @@ export default function BatchDetails() {
                     )
                 }
             </AnimatePresence >
+
+            {/* Edit Installment Modal */}
+            <AnimatePresence>
+                {
+                    editingInstallment && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 bg-black/40 backdrop-blur-md"
+                                onClick={() => setEditingInstallment(null)}
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                className="!bg-white border border-app-border rounded-[24px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
+                            >
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-xl font-bold text-app-text">Edit Fee Column</h3>
+                                    <button onClick={() => setEditingInstallment(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                </div>
+
+                                <form onSubmit={handleUpdateInstallment} className="space-y-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Column Name</label>
+                                        <input
+                                            value={editingInstallment.name}
+                                            onChange={(e) => setEditingInstallment({ ...editingInstallment, name: e.target.value })}
+                                            className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Amount (₹)</label>
+                                        <input
+                                            type="number"
+                                            inputMode="numeric"
+                                            value={editingInstallment.amount}
+                                            onChange={(e) => setEditingInstallment({ ...editingInstallment, amount: Number(e.target.value) })}
+                                            className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-end pt-4">
+                                        <button
+                                            type="submit"
+                                            className="bg-neutral-900 hover:bg-black text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center"
+                                        >
+                                            Save Changes
+                                        </button>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        </div>
+                    )
+                }
+            </AnimatePresence >
+
+            {/* Delete Installment Confirmation Modal */}
+            <AnimatePresence>
+                {installmentToDelete && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-md"
+                            onClick={() => setInstallmentToDelete(null)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="!bg-white border border-app-border rounded-[24px] p-8 max-w-md w-full shadow-2xl relative z-10"
+                        >
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center mb-4">
+                                        <Trash2 className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-app-text">Delete Fee Column?</h3>
+                                    <p className="text-app-text-secondary mt-1 text-sm">
+                                        Are you sure you want to delete <span className="font-bold text-app-text">{installmentToDelete.name}</span>? This will permanently remove it.
+                                    </p>
+                                </div>
+                                <button onClick={() => setInstallmentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setInstallmentToDelete(null)}
+                                    className="flex-1 py-3 rounded-xl font-bold bg-app-surface border border-app-border text-app-text hover:bg-app-surface-hover transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDeleteInstallment}
+                                    className="flex-1 py-3 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all hover:bg-red-700 active:scale-[0.98]"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Payment Confirmation Modal (Menu Style) */}
             <AnimatePresence>

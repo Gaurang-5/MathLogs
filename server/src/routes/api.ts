@@ -4,7 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
 import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
-import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF } from '../controllers/batchController';
+import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, updateFeeInstallment, deleteFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF } from '../controllers/batchController';
 import { registerStudent, getPendingStudents, approveStudent, rejectStudent, updateStudent, addStudentManually, getStudentGrowthStats } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
@@ -172,6 +172,8 @@ router.get('/batches/:id/qr-pdf', authenticateToken as any, downloadBatchQRPDF a
 router.put('/batches/:id/toggle-registration', authenticateToken as any, toggleBatchRegistration as any);
 router.put('/batches/:id/end-registration', authenticateToken as any, endBatchRegistration as any);
 router.post('/batches/:id/installments', authenticateToken as any, validateRequest(createInstallmentSchema), createFeeInstallment as any);
+router.put('/installments/:id', authenticateToken as any, updateFeeInstallment as any);
+router.delete('/installments/:id', authenticateToken as any, deleteFeeInstallment as any);
 router.post('/batches/:id/whatsapp-invite', authenticateToken as any, sendBatchWhatsappInvite as any);
 router.post('/students/:id/whatsapp-invite', authenticateToken as any, sendStudentWhatsappInvite as any);
 
