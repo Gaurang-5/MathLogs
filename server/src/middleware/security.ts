@@ -15,10 +15,9 @@ export const configureSecurityHeaders = (app: Express) => {
                 ],
                 scriptSrc: [
                     "'self'",
-                    "https://checkout.razorpay.com", // Razorpay checkout SDK
-                    "https://*.razorpay.com"          // Razorpay sub-domains
-                    // Note: unsafe-inline and unsafe-eval intentionally removed.
-                    // If Razorpay breaks, add back 'unsafe-inline' only.
+                    "'unsafe-inline'",                // Required: Razorpay injects inline scripts
+                    "https://checkout.razorpay.com",
+                    "https://*.razorpay.com"
                 ],
                 imgSrc: ["'self'", "data:", "blob:", "https://*.razorpay.com"],
                 connectSrc: [
