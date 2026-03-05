@@ -3,28 +3,33 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
 export const configureSecurityHeaders = (app: Express) => {
-    // Enhanced Helmet configuration with CSP
+    // Hardened Helmet configuration with strict CSP
     app.use(helmet({
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
                 styleSrc: [
                     "'self'",
-                    "'unsafe-inline'", // Allow inline styles for React
-                    "https://fonts.googleapis.com" // Google Fonts
+                    "'unsafe-inline'", // Required for React inline styles & Razorpay modal
+                    "https://fonts.googleapis.com"
                 ],
                 scriptSrc: [
                     "'self'",
-                    "'unsafe-inline'", // Allow inline scripts for React
-                    "'unsafe-eval'" // Required for some bundlers/dev tools
+                    "https://checkout.razorpay.com", // Razorpay checkout SDK
+                    "https://*.razorpay.com"          // Razorpay sub-domains
+                    // Note: unsafe-inline and unsafe-eval intentionally removed.
+                    // If Razorpay breaks, add back 'unsafe-inline' only.
                 ],
-                imgSrc: ["'self'", "data:", "blob:"],
+                imgSrc: ["'self'", "data:", "blob:", "https://*.razorpay.com"],
                 connectSrc: [
                     "'self'",
-                    "data:", // Allow base64 encoded data for OCR images
+                    "data:",
                     "https://fonts.googleapis.com",
                     "https://fonts.gstatic.com",
-                    "https://o4510811766718464.ingest.us.sentry.io" // Sentry error monitoring
+                    "https://*.razorpay.com",         // Razorpay API calls
+                    "https://api.razorpay.com",
+                    "https://lumberjack.razorpay.com", // Razorpay analytics
+                    "https://o4510811766718464.ingest.us.sentry.io"
                 ],
                 fontSrc: [
                     "'self'",
@@ -34,13 +39,21 @@ export const configureSecurityHeaders = (app: Express) => {
                 ],
                 objectSrc: ["'none'"],
                 mediaSrc: ["'self'", "blob:"],
-                frameSrc: ["'none'"],
-                workerSrc: ["'self'", "blob:"], // Allow blob workers for image processing
-                childSrc: ["'self'", "blob:"] // Fallback for older browsers
+                frameSrc: [
+                    "https://api.razorpay.com",       // Razorpay payment iframe
+                    "https://*.razorpay.com"
+                ],
+                workerSrc: ["'self'", "blob:"],
+                childSrc: ["'self'", "blob:"],
+                baseUri: ["'self'"],
+                formAction: ["'self'"],
+                frameAncestors: ["'self'"],
+                scriptSrcAttr: ["'none'"],
+                upgradeInsecureRequests: []
             }
         },
         hsts: {
-            maxAge: 31536000, // 1 year
+            maxAge: 31536000,
             includeSubDomains: true,
             preload: true
         },
