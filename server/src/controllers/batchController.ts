@@ -452,9 +452,19 @@ export const deleteFeeInstallment = async (req: Request, res: Response) => {
     }
 };
 
+const publicBatchCache = new Map<string, { data: any, timestamp: number }>();
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds
+
 export const getBatchPublicStatus = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
     try {
+        const now = Date.now();
+        const cached = publicBatchCache.get(id);
+
+        if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+            return res.json(cached.data);
+        }
+
         const batch = await prisma.batch.findUnique({
             where: { id },
             select: {
@@ -465,7 +475,19 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
                 isRegistrationEnded: true
             }
         });
+
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+        // Save to cache
+        publicBatchCache.set(id, { data: batch, timestamp: now });
+
+        // Clean up old cache entries occasionally
+        if (publicBatchCache.size > 100) {
+            for (const [key, value] of publicBatchCache.entries()) {
+                if (now - value.timestamp > CACHE_TTL_MS) publicBatchCache.delete(key);
+            }
+        }
+
         res.json(batch);
     } catch (e) {
         res.status(500).json({ error: 'Failed to fetch status' });
