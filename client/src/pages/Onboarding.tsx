@@ -303,15 +303,15 @@ export default function Onboarding() {
                                 </button>
                             </motion.div>
                         )}
-
-                        {activeStep > 1 && (
-                            <div className="pt-4 flex justify-end">
-                                <button type="button" onClick={() => setActiveStep(1)} className="text-sm font-bold text-accent-primary hover:underline">
-                                    Edit Details
-                                </button>
-                            </div>
-                        )}
                     </form>
+
+                    {activeStep > 1 && (
+                        <div className="pt-4 flex justify-end">
+                            <button type="button" onClick={() => setActiveStep(1)} className="text-sm font-bold text-accent-primary hover:underline cursor-pointer">
+                                Edit Details
+                            </button>
+                        </div>
+                    )}
                 </motion.div>
 
                 {/* STEP 2: PRICING */}
