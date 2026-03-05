@@ -14,6 +14,7 @@ import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcadem
 
 import { getDashboardSummary } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
+import { createOrder, verifyPayment } from '../controllers/onboardingController';
 import { getPaymentHistory } from '../controllers/feeController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
@@ -233,5 +234,9 @@ router.delete('/institutes/:id', authenticateToken as any, deleteInstitute as an
 
 router.get('/invites/:token', publicLimiter, validateInvite as any);
 router.post('/auth/setup-account', publicLimiter, setupAccount as any);
+
+// Onboarding
+router.post('/onboarding/create-order', publicLimiter, createOrder as any);
+router.post('/onboarding/verify-payment', publicLimiter, verifyPayment as any);
 
 export default router;

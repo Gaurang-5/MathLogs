@@ -124,7 +124,7 @@ export const validateInvite = async (req: Request, res: Response) => {
 
 // PUBLIC
 export const setupAccount = async (req: Request, res: Response) => {
-    const { token, username, password, requiresGrades, allowedClasses } = req.body;
+    const { token, username, password, requiresGrades, allowedClasses, subjects } = req.body;
 
     if (!username || !password || !token) {
         return res.status(400).json({ error: 'All fields required' });
@@ -153,13 +153,29 @@ export const setupAccount = async (req: Request, res: Response) => {
             // 1. Update Institute Config with grade settings
             if (requiresGrades !== undefined && allowedClasses !== undefined) {
                 const currentConfig = (invite.institute.config as any) || {};
+
+                // Process Allowed Classes
+                let classList: string[] = [];
+                if (allowedClasses) {
+                    if (Array.isArray(allowedClasses)) classList = allowedClasses;
+                    else if (typeof allowedClasses === 'string') classList = allowedClasses.split(',').map(s => s.trim()).filter(Boolean);
+                }
+
+                // Process Subjects
+                let subjectList: string[] = [];
+                if (subjects) {
+                    if (Array.isArray(subjects)) subjectList = subjects;
+                    else if (typeof subjects === 'string') subjectList = subjects.split(',').map(s => s.trim()).filter(Boolean);
+                }
+
                 await tx.institute.update({
                     where: { id: invite.instituteId },
                     data: {
                         config: {
                             ...currentConfig,
                             requiresGrades: requiresGrades,
-                            allowedClasses: allowedClasses
+                            allowedClasses: classList.length > 0 ? classList : currentConfig.allowedClasses,
+                            subjects: subjectList.length > 0 ? subjectList : currentConfig.subjects
                         }
                     }
                 });

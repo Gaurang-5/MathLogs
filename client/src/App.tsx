@@ -18,6 +18,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
@@ -66,6 +67,7 @@ function App() {
 
             <Route path="/login" element={<AdminLogin />} />
             <Route path="/setup" element={<SetupAccount />} />
+            <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/super-admin" element={
               <RoleRoute allowedRole="SUPER_ADMIN">
                 <SuperAdminDashboard />

@@ -34,24 +34,6 @@ export default function Home() {
         }
     ];
 
-    const steps = [
-        {
-            number: "01",
-            title: "Create batches and share QR code",
-            description: "Set up your batches in seconds. Students scan to register."
-        },
-        {
-            number: "02",
-            title: "Students register instantly",
-            description: "No paperwork. No manual entry. Everything digital."
-        },
-        {
-            number: "03",
-            title: "Manage from one dashboard",
-            description: "Track fees, record marks, and generate reports—all in one place."
-        }
-    ];
-
     const faqs = [
         {
             question: "Is my data safe?",
@@ -120,10 +102,10 @@ export default function Home() {
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4">
                                 <Link
-                                    to="/login"
+                                    to="/onboarding"
                                     className="px-8 py-4 bg-gray-900 text-white font-semibold rounded-lg hover:bg-black transition-all shadow-sm hover:shadow-md text-center"
                                 >
-                                    Get Started Free
+                                    Get Started
                                 </Link>
                                 <a
                                     href="#how-it-works"
@@ -320,96 +302,95 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* 5. How It Works */}
-            <section id="how-it-works" className="py-24 px-6 lg:px-8">
-                <div className="max-w-6xl mx-auto">
-                    <div className="text-center mb-16">
-                        <h2 className="text-4xl font-bold text-gray-900 mb-4">
-                            How it works
-                        </h2>
-                        <p className="text-lg text-gray-600">
-                            Get started in 3 simple steps
-                        </p>
-                    </div>
-
-                    <div className="grid md:grid-cols-3 gap-8">
-                        {steps.map((step, index) => (
-                            <motion.div
-                                key={index}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: index * 0.15 }}
-                                className="relative"
-                            >
-                                <div className="text-7xl font-bold text-gray-200 mb-4">{step.number}</div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-3">{step.title}</h3>
-                                <p className="text-gray-600 leading-relaxed">{step.description}</p>
-
-                                {index < steps.length - 1 && (
-                                    <div className="hidden md:block absolute top-12 -right-4 w-8 h-0.5 bg-gray-200"></div>
-                                )}
-                            </motion.div>
-                        ))}
-                    </div>
-                </div>
-            </section>
 
             {/* 6. Pricing Section */}
             <section id="pricing" className="py-24 bg-gray-900 text-white px-6 lg:px-8">
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-5xl mx-auto text-center">
                     <h2 className="text-4xl font-bold mb-4" style={{ color: '#ffffff' }}>
                         Simple, transparent pricing
                     </h2>
                     <p className="text-xl text-gray-300 mb-12">
-                        Designed specifically for small coaching centres
+                        Designed specifically for coaching centres. Pick the plan that fits.
                     </p>
 
-                    <div className="bg-white text-gray-900 rounded-2xl p-12 max-w-lg mx-auto">
-                        <div className="mb-8">
-                            <div className="text-5xl font-bold mb-2 text-gray-900">₹ XXXX</div>
-                            <div className="text-gray-600">per month</div>
-                            <div className="mt-4 inline-block px-6 py-2 bg-gray-100 text-gray-900 rounded-full text-sm font-semibold">
-                                🚀 Launching Soon
+                    <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+                        {/* Basic Plan */}
+                        <div className="bg-white text-gray-900 rounded-2xl p-10 text-left relative">
+                            <div className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Basic Plan</div>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-5xl font-bold text-gray-900">₹999</span>
+                                <span className="text-gray-500 font-medium">/ month</span>
                             </div>
+                            <p className="text-sm text-gray-500 mb-6">Up to 100 Students</p>
+
+                            <div className="space-y-3 mb-8">
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                                    <span>Unlimited Batches</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                                    <span>Automated Grading</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                                    <span>WhatsApp Alerts</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                                    <span>Lifetime Data Access</span>
+                                </div>
+                            </div>
+
+                            <Link
+                                to="/onboarding"
+                                className="block w-full px-8 py-4 bg-gray-900 text-white font-semibold rounded-lg hover:bg-black transition-all text-center"
+                            >
+                                Get Started
+                            </Link>
                         </div>
 
-                        <div className="space-y-4 mb-10">
-                            <div className="flex items-center gap-3">
-                                <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
-                                <span className="text-left">Unlimited students</span>
+                        {/* Pro Plan */}
+                        <div className="bg-white text-gray-900 rounded-2xl p-10 text-left relative border-2 border-gray-900">
+                            <div className="absolute -top-3 right-6 bg-gray-900 text-white text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full">Most Popular</div>
+                            <div className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Pro Plan</div>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-5xl font-bold text-gray-900">₹1,999</span>
+                                <span className="text-gray-500 font-medium">/ month</span>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
-                                <span className="text-left">Unlimited batches</span>
+                            <p className="text-sm text-gray-500 mb-6">Up to 250 Students</p>
+
+                            <div className="space-y-3 mb-8">
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                                    <span>Unlimited Batches</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                                    <span>Automated Grading</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                                    <span>WhatsApp Alerts</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                                    <span>Lifetime Data Access</span>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
-                                <span className="text-left">All features included</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
-                                <span className="text-left">Lifetime data access</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <CheckCircle2 className="w-5 h-5 text-gray-900 flex-shrink-0" />
-                                <span className="text-left">Priority support</span>
-                            </div>
+
+                            <Link
+                                to="/onboarding"
+                                className="block w-full px-8 py-4 bg-gray-900 text-white font-semibold rounded-lg hover:bg-black transition-all text-center"
+                            >
+                                Get Started
+                            </Link>
                         </div>
-
-                        <a
-                            href="https://docs.google.com/forms/d/e/1FAIpQLSf_iZpFA8pDCv5ESQ8OwESB7YzlMjWETwwRirk-MV6LddQBeQ/viewform?usp=publish-editor"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block w-full px-8 py-4 bg-gray-900 text-white font-semibold rounded-lg hover:bg-black transition-all text-center"
-                        >
-                            Join Waitlist – Get Early Access
-                        </a>
-
-                        <p className="text-sm text-gray-500 mt-6">
-                            Be among the first to experience simplified coaching management. <span className="font-semibold">Price reveal coming soon!</span>
-                        </p>
                     </div>
+
+                    <p className="text-sm text-gray-400 mt-8">
+                        Save ~16% with yearly billing. Monthly autopay available.
+                    </p>
                 </div>
             </section>
 
@@ -455,7 +436,7 @@ export default function Home() {
                         Join teachers who've already simplified their coaching management.
                     </p>
                     <Link
-                        to="/login"
+                        to="/onboarding"
                         className="inline-block px-12 py-5 bg-gray-900 text-white font-semibold rounded-lg hover:bg-black transition-all shadow-sm hover:shadow-md text-lg"
                     >
                         Start Using MathLogs

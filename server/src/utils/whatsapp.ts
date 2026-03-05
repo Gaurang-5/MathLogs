@@ -216,3 +216,22 @@ export const sendTestMarksWhatsApp = async (mobileNumber: string, data: TestMark
 
     return await sendMsg91WhatsApp(mobileNumber, TEST_TEMPLATE_NAME, components);
 };
+
+/**
+ * Specifically sends the Onboarding Setup Link via WhatsApp
+ */
+export const sendSetupLinkWhatsApp = async (mobileNumber: string, data: { ownerName: string, setupLink: string, tuitionName: string }) => {
+    // In a real scenario, use a specific MSG91 template. 
+    // Here we console log as requested until a template is provided.
+    console.log(`\n\n======================================`);
+    console.log(`[WHATSAPP MOCK] To: ${mobileNumber}`);
+    console.log(`Hi ${data.ownerName}, welcome to ${data.tuitionName}!`);
+    console.log(`Please complete your account setup and create your password here:`);
+    console.log(`${data.setupLink}`);
+    console.log(`======================================\n\n`);
+
+    // If a template exists later:
+    // const SETUP_TEMPLATE = process.env.MSG91_WA_TEMPLATE_SETUP;
+    // return await sendMsg91WhatsApp(mobileNumber, SETUP_TEMPLATE, components);
+    return true;
+};
