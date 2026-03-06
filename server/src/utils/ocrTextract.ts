@@ -1,8 +1,7 @@
 import {
     TextractClient,
-    AnalyzeDocumentCommand,
+    DetectDocumentTextCommand,
     Block,
-    BlockType,
 } from "@aws-sdk/client-textract";
 
 const region = process.env.AWS_REGION || "ap-south-1";
@@ -143,8 +142,9 @@ function extractScoreFromBlocks(blocks: Block[]): { score: string; confidence: n
 }
 
 /**
- * Processes an image through Amazon Textract AnalyzeDocument (FORMS).
- * Returns the extracted score, confidence, and raw debug info.
+ * Processes an image through Amazon Textract DetectDocumentText.
+ * Uses the simpler/faster text detection API ($1.50/1K pages vs $50/1K for FORMS).
+ * Sufficient for reading handwritten digits from the tightly-cropped digit box image.
  */
 export async function processOCRTextract(
     input: Buffer | string
@@ -160,11 +160,10 @@ export async function processOCRTextract(
         imageBytes = Buffer.from(cleanBase64, "base64");
     }
 
-    const command = new AnalyzeDocumentCommand({
+    const command = new DetectDocumentTextCommand({
         Document: {
             Bytes: imageBytes,
         },
-        FeatureTypes: ["FORMS"],
     });
 
     const response = await client.send(command);

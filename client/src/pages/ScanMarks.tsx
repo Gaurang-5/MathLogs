@@ -136,14 +136,12 @@ export default function ScanMarks() {
                             setDebugImage(null);
                             let extractedMark = "";
 
-                            // OCR processing — deliberately delayed to let camera settle
+                            // OCR processing — brief settle then capture
                             const ocrPromise = (async () => {
                                 try {
-                                    // ⏳ Wait for camera to settle BEFORE pausing.
-                                    // QR fires the instant the code enters the frame, but the
-                                    // sticker may still be moving. 500ms gives the user time to
-                                    // hold still and gives the camera a chance to focus.
-                                    await new Promise(r => setTimeout(r, 500));
+                                    // ⏳ Brief settle: QR fires instantly but sticker may
+                                    // still be moving. 200ms is enough for camera to lock focus.
+                                    await new Promise(r => setTimeout(r, 200));
 
                                     // NOW pause (video still had live frames during the wait)
                                     html5QrCode.pause();
@@ -151,18 +149,18 @@ export default function ScanMarks() {
                                     const videoElement = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement;
                                     if (!videoElement) return { score: "", confidence: 0, debugImage: null };
 
-                                    // CV detection: 5 attempts × 300ms = up to 1.5s of active detection
+                                    // CV detection: 3 attempts × 100ms = max 300ms
                                     let smartImage = null;
                                     if (window.cv) {
                                         try {
                                             const cvCanvas = document.createElement('canvas');
-                                            for (let i = 0; i < 5; i++) {
+                                            for (let i = 0; i < 3; i++) {
                                                 smartImage = await detectAndWarpSticker(videoElement, cvCanvas);
                                                 if (smartImage) {
                                                     console.log(`✅ CV warp succeeded on attempt ${i + 1}`);
                                                     break;
                                                 }
-                                                if (i < 4) await new Promise(r => setTimeout(r, 300));
+                                                if (i < 2) await new Promise(r => setTimeout(r, 100));
                                             }
                                         } catch { }
                                     }
