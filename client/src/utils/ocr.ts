@@ -47,27 +47,50 @@ async function preprocessImage(imageBase64: string): Promise<string> {
 }
 
 /**
- * Crops just the marks region from the CV-warped sticker image.
- * QR code + divider occupy the left ~42% of the warped image.
- * The marks boxes (name + MARKS label + 3 digit boxes) are in the right 58%.
- * Sending a tight crop gives Gemini a much larger, more readable view of the boxes.
+ * Crops ONLY the 3 digit-box area from the CV-warped sticker image.
+ *
+ * Sticker layout (warped to 1200×646):
+ *   Left 42%  → QR code + divider (excluded)
+ *   Right 58% → Student info area:
+ *     - Top ~45%    → Student name + "MARKS:" label (excluded)
+ *     - Bottom ~55% → The 3 handwritten digit boxes (KEPT)
+ *
+ * By cropping to ONLY the digit boxes we:
+ *   1. Eliminate the student name (may contain numbers like "Class 10")
+ *   2. Eliminate the "MARKS:" label text
+ *   3. Eliminate any writing/numbers outside the sticker borders
+ *   4. Give Textract a tiny, focused image → faster + more accurate
  */
 async function cropMarksRegion(warpedBase64: string): Promise<string> {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
-            // Marks area starts at ~42% from the left of the warped sticker
+            // Horizontal: skip QR + divider (left 42%), keep digit area
             const marksStartX = Math.floor(img.width * 0.42);
+            // Vertical: skip name + "MARKS:" label (top 45%), keep digit boxes
+            const digitBoxStartY = Math.floor(img.height * 0.45);
+
+            const cropWidth = img.width - marksStartX;
+            const cropHeight = img.height - digitBoxStartY;
+
             const canvas = document.createElement('canvas');
-            canvas.width = img.width - marksStartX;
-            canvas.height = img.height;
+            canvas.width = cropWidth;
+            canvas.height = cropHeight;
             const ctx = canvas.getContext('2d');
             if (!ctx) { resolve(warpedBase64); return; }
+
+            // White background to avoid edge artifacts
             ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, marksStartX, 0, canvas.width, img.height, 0, 0, canvas.width, img.height);
-            // Higher quality JPEG since this is now small and focused
-            resolve(canvas.toDataURL('image/jpeg', 0.9));
+            ctx.fillRect(0, 0, cropWidth, cropHeight);
+            ctx.drawImage(
+                img,
+                marksStartX, digitBoxStartY,   // source x, y
+                cropWidth, cropHeight,          // source w, h
+                0, 0,                           // dest x, y
+                cropWidth, cropHeight            // dest w, h
+            );
+
+            resolve(canvas.toDataURL('image/jpeg', 0.92));
         };
         img.onerror = () => resolve(warpedBase64);
         img.src = warpedBase64;

@@ -17,6 +17,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-textract": "^3.1003.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "5.22.0",
     "@sentry/node": "^10.38.0",
