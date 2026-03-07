@@ -390,13 +390,27 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        // 2. Fetch All Relevant Students (Same Class & Academic Year)
+        // Fetch all batch IDs where at least one student took this test
+        const testMarks = await prisma.mark.findMany({
+            where: { testId: test.id },
+            select: { student: { select: { batchId: true } } }
+        });
+
+        const testBatchIds = Array.from(new Set(
+            testMarks.map(m => m.student?.batchId).filter(Boolean)
+        )) as string[];
+
+        if (testBatchIds.length === 0) {
+            return res.status(400).json({ error: 'No marks found for this test. Cannot determine batches.' });
+        }
+
+        // 2. Fetch All Relevant Students (Only matching testBatchIds)
         // We need students who are APPROVED
         const students = await prisma.student.findMany({
             where: {
                 academicYearId: currentAcademicYearId,
-                batch: {
-                    className: test.className || undefined
+                batchId: {
+                    in: testBatchIds
                 },
                 status: 'APPROVED'
             },
