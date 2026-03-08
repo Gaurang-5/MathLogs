@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
+import Onboarding from './pages/Onboarding';
 
 // Lazy Load Pages
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
@@ -18,7 +19,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
-const Onboarding = lazy(() => import('./pages/Onboarding'));
+// Onboarding is eagerly imported above (only 15KB) for instant navigation from Sign Up/Get Started
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));

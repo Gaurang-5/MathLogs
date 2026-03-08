@@ -8,15 +8,6 @@ import {
     Download, FileText, Printer, Wallet, Plus, Minus
 } from 'lucide-react';
 
-// Prefetch the Onboarding chunk during idle time so Sign Up/Get Started navigations are instant
-const prefetchOnboarding = () => import('../pages/Onboarding');
-if (typeof window !== 'undefined') {
-    if ('requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(prefetchOnboarding);
-    } else {
-        setTimeout(prefetchOnboarding, 2000);
-    }
-}
 /** Static data outside components to prevent recreation on every render */
 const ONBOARDING_STEPS = [
     { num: '1', label: 'Kiosk Link', desc: 'Open on a tablet at reception. Students register one after another.' },
