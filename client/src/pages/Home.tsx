@@ -1620,7 +1620,7 @@ export default function Home() {
 // Custom Typewriter Component for Hero Section
 function TypewriterText({ texts }: { texts: string[] }) {
     const [textIndex, setTextIndex] = useState(0);
-    const [charIndex, setCharIndex] = useState(0);
+    const [charIndex, setCharIndex] = useState(texts[0].length); // Start fully typed to prevent CPU thrashing during LCP
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
