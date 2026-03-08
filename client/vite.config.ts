@@ -1,11 +1,29 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// Plugin to make Vite's injected CSS non-render-blocking
+function cssNonBlocking(): Plugin {
+  return {
+    name: 'css-non-blocking',
+    enforce: 'post',
+    transformIndexHtml(html) {
+      // Convert Vite's injected <link rel="stylesheet" crossorigin href="/assets/...css">
+      // into non-render-blocking async loads
+      return html.replace(
+        /<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/g,
+        '<link rel="stylesheet" href="$1" media="print" onload="this.media=\'all\'">' +
+        '<noscript><link rel="stylesheet" href="$1"></noscript>'
+      );
+    }
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    cssNonBlocking(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192x192.png', 'icon-512x512.png', 'apple-touch-icon.png'],
@@ -82,6 +100,7 @@ export default defineConfig({
     })
   ],
   build: {
+    target: 'esnext',
     rollupOptions: {
       output: {
         manualChunks: {

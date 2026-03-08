@@ -261,7 +261,7 @@ export default function Home() {
             {/* NAV BAR */}
             <nav role="navigation" aria-label="Main navigation" className="relative z-50 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
                 <div className="flex items-center gap-2.5">
-                    <img src="/icon-192x192.png" alt="MathLogs Logo" width={36} height={36} fetchPriority="high" className="w-9 h-9 rounded-xl shadow-md border border-neutral-100 object-cover" />
+                    <img src="/logo-64.webp" alt="MathLogs Logo" width={36} height={36} fetchPriority="high" className="w-9 h-9 rounded-xl shadow-md border border-neutral-100 object-cover" />
                     <span className="text-[22px] font-extrabold tracking-tight text-neutral-900">MathLogs</span>
                 </div>
 
