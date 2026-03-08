@@ -397,7 +397,7 @@ export default function Home() {
                                         <img
                                             src="/dashboard.webp"
                                             alt="MathLogs dashboard showing student tracking, fee collection, and growth trends"
-                                            fetchPriority="high"
+                                            loading="lazy"
                                             width={2880}
                                             height={2231}
                                             className="w-full h-auto object-cover pointer-events-none origin-top"
