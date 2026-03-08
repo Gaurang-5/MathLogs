@@ -2,19 +2,18 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Plugin to make Vite's injected CSS non-render-blocking
-function cssNonBlocking(): Plugin {
+// Plugin to defer registerSW.js (it's render-blocking but only runs on window.load anyway)
+function perfOptimizer(): Plugin {
   return {
-    name: 'css-non-blocking',
+    name: 'perf-optimizer',
     enforce: 'post',
     transformIndexHtml(html) {
-      // Convert Vite's injected <link rel="stylesheet" crossorigin href="/assets/...css">
-      // into non-render-blocking async loads
-      return html.replace(
-        /<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/g,
-        '<link rel="stylesheet" href="$1" media="print" onload="this.media=\'all\'">' +
-        '<noscript><link rel="stylesheet" href="$1"></noscript>'
+      // Defer registerSW.js — it only registers SW on window load, no reason to block render
+      html = html.replace(
+        '<script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script>',
+        '<script id="vite-plugin-pwa:register-sw" src="/registerSW.js" defer></script>'
       );
+      return html;
     }
   };
 }
@@ -23,7 +22,7 @@ function cssNonBlocking(): Plugin {
 export default defineConfig({
   plugins: [
     react(),
-    cssNonBlocking(),
+    perfOptimizer(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192x192.png', 'icon-512x512.png', 'apple-touch-icon.png'],
