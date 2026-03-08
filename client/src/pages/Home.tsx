@@ -28,7 +28,7 @@ const OnboardingCard = memo(function OnboardingCard() {
     }, []);
     return (
         <div className="bg-white rounded-[2.5rem] p-8 lg:p-12 shadow-sm border border-neutral-100 flex flex-col lg:col-span-2 hover:shadow-md transition-all overflow-hidden">
-            <div className="w-[52px] h-[52px] rounded-2xl bg-[#eff4ff] border border-[#d6e4ff] flex items-center justify-center text-[#2970ff] mb-8 shadow-sm">
+            <div className="w-[52px] h-[52px] rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-900 mb-8 shadow-sm">
                 <Database className="w-6 h-6" strokeWidth={1.5} />
             </div>
             <h4 className="text-[28px] font-bold text-[#1a1f36] tracking-[-0.03em] mb-4 leading-[1.1]">Flexible Student Onboarding</h4>
@@ -41,9 +41,9 @@ const OnboardingCard = memo(function OnboardingCard() {
                         <button
                             key={i}
                             onClick={() => setActiveStep(i)}
-                            className={`text-left px-4 py-3.5 rounded-2xl transition-all duration-300 cursor-pointer ${activeStep === i ? 'bg-[#eff4ff] border border-[#d6e4ff]' : 'hover:bg-neutral-50 border border-transparent'}`}
+                            className={`text-left px-4 py-3.5 rounded-2xl transition-all duration-300 cursor-pointer ${activeStep === i ? 'bg-neutral-100 border border-neutral-200' : 'hover:bg-neutral-50 border border-transparent'}`}
                         >
-                            <div className={`text-[13px] font-bold mb-0.5 tracking-tight transition-colors ${activeStep === i ? 'text-[#2970ff]' : 'text-[#697386]'}`}>
+                            <div className={`text-[13px] font-bold mb-0.5 tracking-tight transition-colors ${activeStep === i ? 'text-neutral-900' : 'text-[#697386]'}`}>
                                 {s.num}. {s.label}
                             </div>
                             {activeStep === i && (
@@ -60,8 +60,8 @@ const OnboardingCard = memo(function OnboardingCard() {
                     <AnimatePresence mode="wait">
                         {activeStep === 0 && (
                             <motion.div key="kiosk" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.4 }} className="w-full max-w-[280px] bg-white rounded-2xl shadow-[0_8px_40px_-8px_rgba(0,0,0,0.1)] border border-neutral-100 overflow-hidden">
-                                <div className="bg-[#eff4ff] px-5 py-3 flex items-center justify-between border-b border-[#d6e4ff]">
-                                    <span className="text-[11px] font-bold text-[#2970ff] tracking-wider uppercase">Kiosk Mode</span>
+                                <div className="bg-neutral-100 px-5 py-3 flex items-center justify-between border-b border-neutral-200">
+                                    <span className="text-[11px] font-bold text-neutral-900 tracking-wider uppercase">Kiosk Mode</span>
                                     <div className="flex items-center gap-1.5">
                                         <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                                         <span className="text-[10px] text-green-600 font-semibold">LIVE</span>
@@ -71,7 +71,7 @@ const OnboardingCard = memo(function OnboardingCard() {
                                     {KIOSK_STUDENTS.map((name, i) => (
                                         <motion.div key={name} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.25 }} className="flex items-center justify-between bg-neutral-50 rounded-xl px-3 py-2 border border-neutral-100">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-[#eff4ff] text-[#2970ff] flex items-center justify-center text-[9px] font-bold">{name[0]}</div>
+                                                <div className="w-6 h-6 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center text-[9px] font-bold">{name[0]}</div>
                                                 <span className="text-[11px] font-semibold text-neutral-800">{name}</span>
                                             </div>
                                             <CheckCircle className="w-3.5 h-3.5 text-green-500" />
@@ -79,22 +79,22 @@ const OnboardingCard = memo(function OnboardingCard() {
                                     ))}
                                 </div>
                                 <div className="px-4 pb-4">
-                                    <div className="w-full bg-[#2970ff] text-white text-[11px] font-bold rounded-xl py-2 text-center">Next Student →</div>
+                                    <div className="w-full bg-neutral-900 text-white text-[11px] font-bold rounded-xl py-2 text-center">Next Student →</div>
                                 </div>
                             </motion.div>
                         )}
                         {activeStep === 1 && (
                             <motion.div key="qr" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.4 }} className="w-full max-w-[260px] bg-white rounded-2xl shadow-[0_8px_40px_-8px_rgba(0,0,0,0.1)] border border-neutral-100 p-5 flex flex-col items-center">
                                 <div className="text-[11px] font-bold text-[#697386] tracking-wider uppercase mb-4">Scan to Register</div>
-                                <div className="relative w-[120px] h-[120px] bg-white border-2 border-[#2970ff]/30 rounded-xl flex items-center justify-center mb-4 overflow-hidden">
+                                <div className="relative w-[120px] h-[120px] bg-white border-2 border-neutral-300 rounded-xl flex items-center justify-center mb-4 overflow-hidden">
                                     <div className="grid grid-cols-5 gap-[3px] p-2">
                                         {QR_PATTERN.map((v, i) => (
                                             <motion.div key={i} className="w-full aspect-square rounded-[2px]" style={{ backgroundColor: v ? '#1a1f36' : 'transparent' }} animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity, delay: i * 0.04 }} />
                                         ))}
                                     </div>
-                                    <motion.div className="absolute left-0 right-0 h-0.5 bg-[#2970ff]/60 shadow-[0_0_8px_rgba(41,112,255,0.8)]" animate={{ top: ['10%', '90%', '10%'] }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }} />
+                                    <motion.div className="absolute left-0 right-0 h-0.5 bg-neutral-500/60 shadow-[0_0_8px_rgba(0,0,0,0.3)]" animate={{ top: ['10%', '90%', '10%'] }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }} />
                                 </div>
-                                <div className="text-[10px] text-[#697386] text-center leading-relaxed">Class 10 — JEE Batch<br /><span className="text-[#2970ff] font-semibold">45 spots remaining</span></div>
+                                <div className="text-[10px] text-[#697386] text-center leading-relaxed">Class 10 — JEE Batch<br /><span className="text-neutral-900 font-semibold">45 spots remaining</span></div>
                             </motion.div>
                         )}
                         {activeStep === 2 && (
@@ -110,7 +110,7 @@ const OnboardingCard = memo(function OnboardingCard() {
                                         </div>
                                     ))}
                                 </div>
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="mt-4 w-full bg-[#2970ff] text-white text-[11px] font-bold rounded-xl py-2 text-center flex items-center justify-center gap-1.5">
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="mt-4 w-full bg-neutral-900 text-white text-[11px] font-bold rounded-xl py-2 text-center flex items-center justify-center gap-1.5">
                                     <CheckCircle className="w-3 h-3" /> Add to Batch
                                 </motion.div>
                             </motion.div>
@@ -118,7 +118,7 @@ const OnboardingCard = memo(function OnboardingCard() {
                     </AnimatePresence>
                     <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
                         {[0, 1, 2].map(i => (
-                            <button key={i} onClick={() => setActiveStep(i)} aria-label={`Go to step ${i + 1}`} className={`h-1.5 rounded-full transition-all duration-300 ${activeStep === i ? 'bg-[#2970ff] w-4' : 'bg-neutral-300 w-1.5'}`} />
+                            <button key={i} onClick={() => setActiveStep(i)} aria-label={`Go to step ${i + 1}`} className={`h-1.5 rounded-full transition-all duration-300 ${activeStep === i ? 'bg-neutral-900 w-4' : 'bg-neutral-300 w-1.5'}`} />
                         ))}
                     </div>
                 </div>
@@ -147,7 +147,7 @@ function FloatingPaths({ position }: { position: number }) {
                         stroke="currentColor"
                         strokeWidth={path.width}
                         strokeOpacity={0.06 + path.id * 0.018}
-                        className="text-indigo-900"
+                        className="text-slate-800"
                         initial={{ pathLength: 0.3, opacity: 0.4 }}
                         animate={{
                             pathLength: 1,
@@ -202,13 +202,13 @@ export default function Home() {
             {/* Skip to main content — accessibility */}
             <a
                 href="#main-content"
-                className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[200] focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-lg focus:font-semibold"
+                className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[200] focus:px-4 focus:py-2 focus:bg-neutral-900 focus:text-white focus:rounded-lg focus:font-semibold"
             >
                 Skip to main content
             </a>
 
             {/* SOFT AMBIENT ANIMATED BACKGROUND */}
-            <div className="absolute top-0 left-0 w-full min-h-[180vh] md:min-h-[130vh] pointer-events-none overflow-hidden z-0 bg-[#f8faff]">
+            <div className="absolute top-0 left-0 w-full min-h-[180vh] md:min-h-[130vh] pointer-events-none overflow-hidden z-0 bg-neutral-50">
                 {/* Ambient Glowing Orbs — mix-blend-multiply removed for Safari/mobile compat */}
                 <div className="absolute inset-0 w-full h-full">
                     {/* Center Right - Main Indigo/Purple Glow */}
@@ -219,7 +219,7 @@ export default function Home() {
                             scale: [1, 1.1, 1],
                         }}
                         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[-5%] right-[-10%] w-[80vw] h-[80vw] md:w-[65vw] md:h-[65vw] bg-gradient-to-bl from-purple-400 via-indigo-300 to-transparent rounded-full blur-[80px] md:blur-[120px] opacity-50 will-change-transform"
+                        className="absolute top-[-5%] right-[-10%] w-[80vw] h-[80vw] md:w-[65vw] md:h-[65vw] bg-gradient-to-bl from-neutral-300 via-neutral-200 to-transparent rounded-full blur-[80px] md:blur-[120px] opacity-50 will-change-transform"
                     />
                     {/* Bottom Right - Blue Glow */}
                     <motion.div
@@ -229,7 +229,7 @@ export default function Home() {
                             scale: [1.1, 1, 1.1],
                         }}
                         transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[30%] right-[10%] w-[70vw] h-[70vw] md:w-[50vw] md:h-[50vw] bg-gradient-to-tr from-blue-400 via-cyan-200 to-transparent rounded-full blur-[80px] md:blur-[140px] opacity-45 will-change-transform"
+                        className="absolute top-[30%] right-[10%] w-[70vw] h-[70vw] md:w-[50vw] md:h-[50vw] bg-gradient-to-tr from-neutral-300 via-neutral-100 to-transparent rounded-full blur-[80px] md:blur-[140px] opacity-45 will-change-transform"
                     />
                     {/* Left - Soft Pink/Peach Glow */}
                     <motion.div
@@ -239,7 +239,7 @@ export default function Home() {
                             scale: [1, 1.05, 1],
                         }}
                         transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[10%] left-[-20%] w-[75vw] h-[75vw] md:w-[60vw] md:h-[60vw] bg-gradient-to-br from-orange-100 via-pink-200 to-transparent rounded-full blur-[80px] md:blur-[140px] opacity-50 will-change-transform"
+                        className="absolute top-[10%] left-[-20%] w-[75vw] h-[75vw] md:w-[60vw] md:h-[60vw] bg-gradient-to-br from-neutral-200 via-neutral-100 to-transparent rounded-full blur-[80px] md:blur-[140px] opacity-50 will-change-transform"
                     />
                     {/* Center - Deep Blue Accent */}
                     <motion.div
@@ -248,7 +248,7 @@ export default function Home() {
                             y: [0, -20, 30, 0],
                         }}
                         transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[20%] left-[20%] w-[55vw] h-[55vw] md:w-[40vw] md:h-[40vw] bg-indigo-300 rounded-full blur-[80px] md:blur-[150px] opacity-35 will-change-transform"
+                        className="absolute top-[20%] left-[20%] w-[55vw] h-[55vw] md:w-[40vw] md:h-[40vw] bg-neutral-200 rounded-full blur-[80px] md:blur-[150px] opacity-35 will-change-transform"
                     />
                 </div>
                 {/* Glassmorphism overlay — lighter blur on mobile */}
@@ -354,7 +354,7 @@ export default function Home() {
                             <p className="text-lg md:text-2xl text-neutral-500 font-medium leading-relaxed mb-8 max-w-lg">
                                 Spend less time on paperwork.{' '}
                                 {/* Fixed height prevents jump between subtitle phrases */}
-                                <span className="block min-h-[1.6em] text-blue-600 font-semibold">
+                                <span className="block min-h-[1.6em] text-neutral-700 font-semibold">
                                     <TypewriterText texts={[
                                         "More time teaching.",
                                         "More time with students.",
@@ -366,7 +366,7 @@ export default function Home() {
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                                 <Link
                                     to="/onboarding"
-                                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-indigo-600 text-white font-bold rounded-full transition-all hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/25 active:scale-95 group"
+                                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-neutral-900 text-white font-bold rounded-full transition-all hover:bg-neutral-800 hover:shadow-lg hover:shadow-neutral-500/25 active:scale-95 group"
                                 >
                                     Get Started
                                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -398,7 +398,7 @@ export default function Home() {
                                             <div className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29]" />
                                         </div>
                                     </div>
-                                    <div className="w-full relative bg-[#f8faff]">
+                                    <div className="w-full relative bg-neutral-50">
                                         <img
                                             src="/dashboard.png"
                                             alt="MathLogs dashboard showing student tracking, fee collection, and growth trends"
@@ -449,7 +449,7 @@ export default function Home() {
             <section id="features" className="py-24 md:py-32 bg-neutral-50 relative z-20">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="text-center max-w-3xl mx-auto mb-20">
-                        <h2 className="text-accent-primary font-bold tracking-wider uppercase text-sm mb-4">A unified solution</h2>
+                        <h2 className="text-neutral-500 font-bold tracking-wider uppercase text-sm mb-4">A unified solution</h2>
                         <h3 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-6">
                             Everything you need to run your center, built into one platform.
                         </h3>
@@ -472,10 +472,10 @@ export default function Home() {
                         >
                             {/* Icon + badge — same as other cards */}
                             <div className="flex items-center gap-3 mb-5 z-20 relative">
-                                <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100/60 flex items-center justify-center text-[#635bff] group-hover:scale-110 transition-transform shrink-0">
+                                <div className="w-11 h-11 rounded-2xl bg-neutral-100 border border-neutral-200/60 flex items-center justify-center text-neutral-900 group-hover:scale-110 transition-transform shrink-0">
                                     <Database className="w-5 h-5" />
                                 </div>
-                                <span className="text-[11px] font-bold text-[#635bff] bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full tracking-wide">Batch Management</span>
+                                <span className="text-[11px] font-bold text-neutral-700 bg-neutral-100 border border-neutral-200 px-3 py-1 rounded-full tracking-wide">Batch Management</span>
                             </div>
 
                             {/* Top row: Title and Expand Button */}
@@ -486,7 +486,7 @@ export default function Home() {
                                 <button
                                     onClick={() => setExpandedFeature('batch')}
                                     aria-label="Expand batch management details"
-                                    className="w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-[#635bff] hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm relative z-50 border border-neutral-200/50"
+                                    className="w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-neutral-700 hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm relative z-50 border border-neutral-200/50"
                                 >
                                     <Maximize2 className="w-4 h-4" />
                                 </button>
@@ -507,7 +507,7 @@ export default function Home() {
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className="text-[15px] font-bold text-[#1a1f36]">CLASS 10</span>
                                                     <span className="text-[10px] bg-neutral-100 text-neutral-600 font-semibold px-2 py-0.5 rounded-full border border-neutral-200">Math</span>
-                                                    <span className="text-[10px] bg-[#eff4ff] text-[#2970ff] font-bold px-2 py-0.5 rounded-full">10</span>
+                                                    <span className="text-[10px] bg-neutral-100 text-neutral-900 font-bold px-2 py-0.5 rounded-full">10</span>
                                                 </div>
                                                 <div className="flex items-center gap-3 text-[11px] text-[#697386]">
                                                     <span>🕐 4–5</span>
@@ -602,7 +602,7 @@ export default function Home() {
                             className="bg-white rounded-3xl md:rounded-[2.5rem] p-8 md:p-10 lg:p-12 border border-neutral-100 shadow-sm hover:shadow-md transition-all group relative overflow-hidden flex flex-col min-h-[580px]"
                         >
                             <div className="relative z-10 mb-8">
-                                <Shield className="w-8 h-8 text-[#9324ff] mb-6" strokeWidth={1.5} />
+                                <Shield className="w-8 h-8 text-neutral-700 mb-6" strokeWidth={1.5} />
                                 <h4 className="text-[24px] font-bold text-[#1a1f36] tracking-[-0.02em] mb-4">Fee Logging & Tracking</h4>
                                 <p className="text-[#697386] font-medium text-[15px] leading-relaxed">
                                     Log payments securely and track pending fees at a glance. Maintain absolute clarity over who has paid.
@@ -630,7 +630,7 @@ export default function Home() {
                                         <label className="text-[9px] font-bold text-[#697386] tracking-wider uppercase mb-2 block">Select Student</label>
                                         <div className="flex items-center justify-between border border-neutral-200/80 rounded-lg p-2 bg-white">
                                             <div className="flex items-center gap-2.5">
-                                                <div className="w-5 h-5 rounded overflow-hidden bg-[#e3efff] text-[#0066ff] flex items-center justify-center text-[9px] font-bold shrink-0">
+                                                <div className="w-5 h-5 rounded overflow-hidden bg-neutral-100 text-neutral-900 flex items-center justify-center text-[9px] font-bold shrink-0">
                                                     RS
                                                 </div>
                                                 <motion.span
@@ -686,13 +686,13 @@ export default function Home() {
                         >
                             <div className="flex justify-between items-start mb-6 z-20 relative w-full">
                                 <div className="space-y-6">
-                                    <MessageSquare className="w-8 h-8 text-[#0066ff]" strokeWidth={1.5} />
+                                    <MessageSquare className="w-8 h-8 text-neutral-700" strokeWidth={1.5} />
                                     <h4 className="text-[24px] font-bold text-[#1a1f36] tracking-[-0.02em] leading-tight">WhatsApp Alerts</h4>
                                 </div>
                                 <button
                                     onClick={() => setExpandedFeature('whatsapp')}
                                     aria-label="Expand WhatsApp alerts details"
-                                    className="w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-[#0066ff] hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm relative z-50 border border-neutral-200/50"
+                                    className="w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-neutral-700 hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm relative z-50 border border-neutral-200/50"
                                 >
                                     <Maximize2 className="w-4 h-4" />
                                 </button>
@@ -736,39 +736,39 @@ export default function Home() {
                             <button
                                 onClick={() => setExpandedFeature('scan')}
                                 aria-label="Expand smart scanning details"
-                                className="absolute top-8 right-8 md:top-12 md:right-12 lg:top-16 lg:right-16 w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-[#0066ff] hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm z-50 border border-neutral-200/50"
+                                className="absolute top-8 right-8 md:top-12 md:right-12 lg:top-16 lg:right-16 w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-neutral-700 hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm z-50 border border-neutral-200/50"
                             >
                                 <Maximize2 className="w-4 h-4" />
                             </button>
 
                             <div className="relative z-10 mb-12 md:mb-0 max-w-full max-w-[460px]">
-                                <Camera className="w-8 h-8 text-[#0066ff] mb-8" strokeWidth={1.5} />
+                                <Camera className="w-8 h-8 text-neutral-700 mb-8" strokeWidth={1.5} />
                                 <h4 className="text-[32px] md:text-[40px] font-bold text-[#1a1f36] tracking-[-0.03em] mb-5 leading-[1.1]">Smart Sticker Scanning</h4>
                                 <ul className="space-y-4">
                                     <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-[#0066ff] shrink-0 mt-0.5" strokeWidth={2} />
+                                        <CheckCircle className="w-5 h-5 text-neutral-900 shrink-0 mt-0.5" strokeWidth={2} />
                                         <span className="text-[#697386] font-medium text-[15px] leading-snug">Generate and print custom QR stickers for each test sheet</span>
                                     </li>
                                     <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-[#0066ff] shrink-0 mt-0.5" strokeWidth={2} />
+                                        <CheckCircle className="w-5 h-5 text-neutral-900 shrink-0 mt-0.5" strokeWidth={2} />
                                         <span className="text-[#697386] font-medium text-[15px] leading-snug">Teacher manually writes the student's marks directly on the sticker</span>
                                     </li>
                                     <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-[#0066ff] shrink-0 mt-0.5" strokeWidth={2} />
+                                        <CheckCircle className="w-5 h-5 text-neutral-900 shrink-0 mt-0.5" strokeWidth={2} />
                                         <span className="text-[#697386] font-medium text-[15px] leading-snug">Scan the sheet: instantly identify the student (QR) and read their score (OCR)</span>
                                     </li>
                                 </ul>
                             </div>
 
                             {/* Scanning UI Animation */}
-                            <div className="relative z-0 mt-8 md:mt-0 h-[320px] w-[100%] md:w-full max-w-[420px] bg-[#f8faff] rounded-[2rem] border border-blue-50 overflow-hidden shadow-inner shrink-0 group">
+                            <div className="relative z-0 mt-8 md:mt-0 h-[320px] w-[100%] md:w-full max-w-[420px] bg-neutral-50 rounded-[2rem] border border-neutral-100 overflow-hidden shadow-inner shrink-0 group">
                                 {/* Fake Test Paper Background */}
                                 <div className="absolute inset-x-8 -bottom-16 top-12 bg-[#fdfdfd] rounded-t-md border border-neutral-300 shadow-[0_0_30px_rgba(0,0,0,0.1)] overflow-hidden transition-transform duration-700 ease-in-out group-hover:-translate-y-2">
                                     {/* Vertical Red Margin Line */}
                                     <div className="absolute left-10 top-0 bottom-0 w-[1.5px] bg-red-200/80"></div>
 
                                     {/* Paper Header / Name Field */}
-                                    <div className="pt-6 pl-14 pr-6 pb-3 border-b border-blue-100 flex flex-col gap-2 relative z-0">
+                                    <div className="pt-6 pl-14 pr-6 pb-3 border-b border-neutral-200 flex flex-col gap-2 relative z-0">
                                         <div className="text-[#9ca3af] font-medium text-[11px] tracking-wide uppercase">Physics Final Exam</div>
                                         <div className="flex items-end gap-2 text-[#cbd5e1] font-mono text-sm leading-none">
                                             <span className="text-[#64748b] text-[12px]">Name:</span>
@@ -779,7 +779,7 @@ export default function Home() {
                                     {/* Horizontal Ruled Lines */}
                                     <div className="w-full flex-1 flex flex-col relative z-0">
                                         {[...Array(7)].map((_, i) => (
-                                            <div key={i} className="w-full h-[36px] bg-transparent border-b border-blue-100/60"></div>
+                                            <div key={i} className="w-full h-[36px] bg-transparent border-b border-neutral-200/60"></div>
                                         ))}
                                     </div>
 
@@ -788,7 +788,7 @@ export default function Home() {
                                         <div className="text-[13px] font-medium text-neutral-600 font-serif italic -rotate-1">
                                             Q1. State Newton's Second Law of Motion.
                                         </div>
-                                        <div className="text-[14px] text-blue-800/80 italic pl-2 rotate-1 leading-relaxed">
+                                        <div className="text-[14px] text-neutral-700 italic pl-2 rotate-1 leading-relaxed">
                                             "The rate of change of momentum of a body <br />
                                             is directly proportional to the applied force <br />
                                             and takes place in the direction of the force."
@@ -830,8 +830,8 @@ export default function Home() {
                     {/* Horizontal lines containing the metrics */}
                     <div className="relative border-y border-neutral-200 py-12 md:py-16">
                         {/* Top subtle gradient overlay on the border line */}
-                        <div className="absolute top-[-1px] left-0 w-1/3 h-[1px] bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-60"></div>
-                        <div className="absolute bottom-[-1px] left-[20%] w-1/2 h-[1px] bg-gradient-to-r from-transparent via-purple-300 to-transparent opacity-60"></div>
+                        <div className="absolute top-[-1px] left-0 w-1/3 h-[1px] bg-gradient-to-r from-transparent via-neutral-400 to-transparent opacity-60"></div>
+                        <div className="absolute bottom-[-1px] left-[20%] w-1/2 h-[1px] bg-gradient-to-r from-transparent via-neutral-300 to-transparent opacity-60"></div>
 
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-y-12 gap-x-6 text-center">
 
@@ -896,27 +896,27 @@ export default function Home() {
                             </Link>
                             <ul className="space-y-4">
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">Up to 100 students</span>
                                 </li>
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">Unlimited Batches</span>
                                 </li>
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">Automated Grading</span>
                                 </li>
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">WhatsApp Alerts</span>
                                 </li>
                             </ul>
                         </div>
 
                         {/* Pro Tier (Most Popular) */}
-                        <div className="bg-white rounded-3xl p-8 border-2 border-indigo-500 shadow-xl shadow-indigo-100 relative transform md:-translate-y-4">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-indigo-500 text-white text-xs font-bold uppercase tracking-wider py-1.5 px-3 rounded-full">
+                        <div className="bg-white rounded-3xl p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200 relative transform md:-translate-y-4">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider py-1.5 px-3 rounded-full">
                                 Most Popular
                             </div>
                             <h3 className="text-xl font-bold text-neutral-900 mb-2">Pro</h3>
@@ -925,24 +925,24 @@ export default function Home() {
                                 <span className="text-4xl font-extrabold text-neutral-900">₹1,999</span>
                                 <span className="text-neutral-500"> /mo</span>
                             </div>
-                            <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors mb-8 shadow-md">
+                            <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-900 text-white font-bold hover:bg-neutral-800 transition-colors mb-8 shadow-md">
                                 Try Pro Today
                             </Link>
                             <ul className="space-y-4">
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-900 font-medium">Up to 250 students</span>
                                 </li>
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">Unlimited Batches</span>
                                 </li>
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">Automated Grading</span>
                                 </li>
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">WhatsApp Alerts</span>
                                 </li>
                             </ul>
@@ -961,19 +961,19 @@ export default function Home() {
                             </a>
                             <ul className="space-y-4">
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">Unlimited students</span>
                                 </li>
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">Unlimited Batches</span>
                                 </li>
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">White-label branding</span>
                                 </li>
                                 <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                     <span className="text-neutral-600">Dedicated account manager</span>
                                 </li>
                             </ul>
@@ -1031,7 +1031,7 @@ export default function Home() {
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <Link
                             to="/onboarding"
-                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white text-xs md:text-sm font-bold tracking-wide rounded-full transition-all hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/25 active:scale-95 group"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-neutral-900 text-white text-xs md:text-sm font-bold tracking-wide rounded-full transition-all hover:bg-neutral-800 hover:shadow-lg hover:shadow-neutral-500/25 active:scale-95 group"
                         >
                             Get Started
                             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -1056,9 +1056,9 @@ export default function Home() {
                     <div className="mb-16 md:mb-0 max-w-sm">
                         <div className="w-[48px] h-[48px] border border-slate-800 rounded-[14px] flex items-center justify-center bg-slate-900/50 shadow-inner">
                             <div className="w-[20px] h-[20px] grid grid-cols-2 gap-[4px]">
-                                <div className="bg-indigo-500 rounded-[4px]"></div>
-                                <div className="bg-indigo-400 rounded-[4px] opacity-60"></div>
-                                <div className="bg-indigo-400 rounded-[4px] opacity-60"></div>
+                                <div className="bg-neutral-500 rounded-[4px]"></div>
+                                <div className="bg-neutral-400 rounded-[4px] opacity-60"></div>
+                                <div className="bg-neutral-400 rounded-[4px] opacity-60"></div>
                                 <div className="bg-white rounded-[4px]"></div>
                             </div>
                         </div>
@@ -1073,9 +1073,9 @@ export default function Home() {
                         <div className="flex flex-col gap-6">
                             <span className="text-[12px] text-slate-100 font-bold tracking-wider uppercase">Product</span>
                             <div className="flex flex-col gap-4">
-                                <Link to="/" className="text-[13px] font-medium text-slate-400 hover:text-indigo-400 transition-colors duration-300">Home</Link>
-                                <a href="#features" className="text-[13px] font-medium text-slate-400 hover:text-indigo-400 transition-colors duration-300">Features</a>
-                                <a href="#pricing" className="text-[13px] font-medium text-slate-400 hover:text-indigo-400 transition-colors duration-300">Pricing</a>
+                                <Link to="/" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Home</Link>
+                                <a href="#features" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Features</a>
+                                <a href="#pricing" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Pricing</a>
                             </div>
                         </div>
 
@@ -1083,9 +1083,9 @@ export default function Home() {
                         <div className="flex flex-col gap-6">
                             <span className="text-[12px] text-slate-100 font-bold tracking-wider uppercase">Company</span>
                             <div className="flex flex-col gap-4">
-                                <Link to="/about" className="text-[13px] font-medium text-slate-400 hover:text-indigo-400 transition-colors duration-300">About Us</Link>
-                                <Link to="/privacy-policy" className="text-[13px] font-medium text-slate-400 hover:text-indigo-400 transition-colors duration-300">Privacy Policy</Link>
-                                <Link to="/terms" className="text-[13px] font-medium text-slate-400 hover:text-indigo-400 transition-colors duration-300">Terms of Service</Link>
+                                <Link to="/about" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">About Us</Link>
+                                <Link to="/privacy-policy" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Privacy Policy</Link>
+                                <Link to="/terms" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Terms of Service</Link>
                             </div>
                         </div>
 
@@ -1093,9 +1093,9 @@ export default function Home() {
                         <div className="flex flex-col gap-6" id="contact">
                             <span className="text-[12px] text-slate-100 font-bold tracking-wider uppercase">Contact Us</span>
                             <div className="flex flex-col gap-4">
-                                <a href="mailto:support@mathlogs.app" className="text-[13px] font-medium text-slate-400 hover:text-indigo-400 transition-colors duration-300">Email: support@mathlogs.app</a>
-                                <a href="https://wa.me/918439245302" target="_blank" rel="noopener noreferrer" className="text-[13px] font-medium text-slate-400 hover:text-indigo-400 transition-colors duration-300">WhatsApp: +91 8439245302</a>
-                                <a href="tel:+918439245302" className="text-[13px] font-medium text-slate-400 hover:text-indigo-400 transition-colors duration-300">Call: +91 8439245302</a>
+                                <a href="mailto:support@mathlogs.app" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Email: support@mathlogs.app</a>
+                                <a href="https://wa.me/918439245302" target="_blank" rel="noopener noreferrer" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">WhatsApp: +91 8439245302</a>
+                                <a href="tel:+918439245302" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Call: +91 8439245302</a>
                             </div>
                         </div>
                     </div>
@@ -1133,7 +1133,7 @@ export default function Home() {
                                     <button
                                         onClick={() => setExpandedFeature(null)}
                                         aria-label="Close details"
-                                        className="w-10 h-10 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 flex items-center justify-center text-indigo-500 transition-colors"
+                                        className="w-10 h-10 rounded-xl bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 flex items-center justify-center text-neutral-500 transition-colors"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>
@@ -1226,9 +1226,9 @@ export default function Home() {
                                                         <span className="text-[11px] font-semibold text-orange-700">Avg. Marks</span>
                                                     </div>
 
-                                                    <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                                                        <span className="text-[11px] font-semibold text-blue-700">Performance</span>
+                                                    <div className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
+                                                        <span className="text-[11px] font-semibold text-neutral-700">Performance</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1365,7 +1365,7 @@ export default function Home() {
                                     <button
                                         onClick={() => setExpandedFeature(null)}
                                         aria-label="Close details"
-                                        className="w-10 h-10 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 flex items-center justify-center text-blue-500 transition-colors"
+                                        className="w-10 h-10 rounded-xl bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 flex items-center justify-center text-neutral-700 transition-colors"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>
@@ -1425,13 +1425,13 @@ export default function Home() {
                                         transition={{ duration: 0.5, delay: 0.35 }}
                                     >
                                         <div className="flex items-center gap-2 mb-6">
-                                            <span className="text-[10px] sm:text-[11px] font-bold text-[#3b82f6] bg-[#eff6ff] px-3 py-1.5 rounded-full uppercase tracking-widest flex items-center gap-1.5"><span className="text-sm">📊</span> TEST RESULT</span>
+                                            <span className="text-[10px] sm:text-[11px] font-bold text-neutral-700 bg-neutral-100 px-3 py-1.5 rounded-full uppercase tracking-widest flex items-center gap-1.5"><span className="text-sm">📊</span> TEST RESULT</span>
                                         </div>
                                         <div className="mb-5 text-[15px] flex-1">
                                             Hi <strong>Aarav</strong>, your marks for <strong>Mid Term · CLASS 10</strong> are out!
                                         </div>
 
-                                        <div className="bg-[#f8faff] rounded-xl p-5 border border-blue-50 grid grid-cols-2 gap-y-5 gap-x-2 shadow-inner mt-auto">
+                                        <div className="bg-neutral-50 rounded-xl p-5 border border-neutral-100 grid grid-cols-2 gap-y-5 gap-x-2 shadow-inner mt-auto">
                                             <div>
                                                 <div className="text-[10px] text-[#667781] uppercase tracking-wider mb-1">Score</div>
                                                 <div className="text-[18px] font-bold text-neutral-900">78<span className="text-[12px] text-[#667781] font-normal"> / 100</span></div>
@@ -1440,9 +1440,9 @@ export default function Home() {
                                                 <div className="text-[10px] text-[#667781] uppercase tracking-wider mb-1">Rank</div>
                                                 <div className="text-[18px] font-bold text-neutral-900">#3</div>
                                             </div>
-                                            <div className="col-span-2 pt-4 border-t border-blue-100">
+                                            <div className="col-span-2 pt-4 border-t border-neutral-200">
                                                 <div className="text-[10px] text-[#667781] uppercase tracking-wider mb-1">Normalised Score</div>
-                                                <div className="text-[18px] font-bold text-[#3b82f6]">7.8<span className="text-[13px] text-[#3b82f6]/60 font-medium"> / 10</span></div>
+                                                <div className="text-[18px] font-bold text-neutral-900">7.8<span className="text-[13px] text-neutral-500 font-medium"> / 10</span></div>
                                             </div>
                                         </div>
                                         <div className="flex justify-end mt-4">
@@ -1509,7 +1509,7 @@ export default function Home() {
                                     <button
                                         onClick={() => setExpandedFeature(null)}
                                         aria-label="Close details"
-                                        className="w-10 h-10 rounded-xl bg-blue-100/50 hover:bg-blue-100 border border-blue-200/50 flex items-center justify-center text-[#0066ff] transition-colors"
+                                        className="w-10 h-10 rounded-xl bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 flex items-center justify-center text-neutral-900 transition-colors"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>
@@ -1517,7 +1517,7 @@ export default function Home() {
 
                                 <div className="max-w-4xl mx-auto w-full mb-12 text-center mt-10 sm:mt-4">
                                     <h3 className="text-3xl md:text-5xl font-bold text-[#1a1f36] tracking-tight mb-4 flex items-center justify-center gap-4">
-                                        <Camera className="w-10 h-10 text-[#0066ff]" strokeWidth={1.5} />
+                                        <Camera className="w-10 h-10 text-neutral-900" strokeWidth={1.5} />
                                         Smart Scanning Workflow
                                     </h3>
                                     <p className="text-[#697386] text-lg mx-auto">
@@ -1533,14 +1533,14 @@ export default function Home() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.5, delay: 0.2 }}
                                     >
-                                        <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mb-6">
-                                            <Camera className="w-6 h-6 text-[#0066ff]" />
+                                        <div className="w-12 h-12 rounded-2xl bg-neutral-100 flex items-center justify-center mb-6">
+                                            <Camera className="w-6 h-6 text-neutral-900" />
                                         </div>
                                         <h4 className="text-[20px] font-bold text-[#1a1f36] mb-3 leading-snug">1. Instant OCR Scan</h4>
                                         <p className="text-[14.5px] text-[#697386] leading-relaxed mb-8 flex-1">
                                             We automatically detect the student via the printed smart QR code and read the handwritten marks using advanced OCR. Manual entry is also fully supported.
                                         </p>
-                                        <div className="bg-[#f8faff] rounded-[1rem] p-5 border border-blue-50 flex items-center justify-center h-[120px] shadow-inner mt-auto">
+                                        <div className="bg-neutral-50 rounded-[1rem] p-5 border border-neutral-100 flex items-center justify-center h-[120px] shadow-inner mt-auto">
                                             <div className="text-center w-full flex flex-col items-center">
                                                 <div className="text-4xl text-neutral-800 font-medium italic border-b border-neutral-300 pb-1 mb-3 w-16 mx-auto flex justify-center">
                                                     <span style={{ transform: 'rotate(-4deg)', display: 'inline-block' }}>8</span>
@@ -1570,7 +1570,7 @@ export default function Home() {
                                             <div className="bg-white p-4 rounded-xl rounded-tl-[4px] shadow-sm relative z-10 w-[95%] border border-neutral-100">
                                                 <div className="text-[13px] text-[#111b21] leading-relaxed">
                                                     Hi <strong>Aarav's Parent</strong>,
-                                                    The Mid Term marks are <strong className="text-[#3b82f6]">78/100</strong>.
+                                                    The Mid Term marks are <strong className="text-neutral-900">78/100</strong>.
                                                 </div>
                                                 <div className="flex justify-end mt-1.5">
                                                     <span className="text-[10px] text-[#8696a0] font-medium tracking-wide">2:30 PM <span className="text-[#53bdeb] ml-0.5 tracking-tighter">✓✓</span></span>
@@ -1602,7 +1602,7 @@ export default function Home() {
                                                 <div className="flex justify-between items-center bg-white p-2.5 rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.02)] border border-[#f3e9da]">
                                                     <span className="text-[13px] font-medium text-[#111b21] pl-1">Aarav</span>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[14px] font-bold text-[#0066ff]">92</span>
+                                                        <span className="text-[14px] font-bold text-neutral-900">92</span>
                                                         <span className="text-[11px] font-bold text-neutral-600 bg-[#f9fafb] border border-neutral-100 px-2 py-0.5 rounded-md">#1</span>
                                                     </div>
                                                 </div>
@@ -1656,9 +1656,9 @@ function TypewriterText({ texts }: { texts: string[] }) {
     }, [charIndex, isDeleting, textIndex, texts]);
 
     return (
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
+        <span className="text-neutral-900">
             {texts[textIndex].substring(0, charIndex)}
-            <span className="animate-pulse text-indigo-500 font-light" style={{ WebkitTextFillColor: '#6366f1' }}>|</span>
+            <span className="animate-pulse text-neutral-400 font-light">|</span>
         </span>
     );
 }
@@ -1668,7 +1668,7 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
-        <div className={`border border-neutral-200 bg-white rounded-2xl overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md ${isOpen ? 'ring-1 ring-indigo-500/20' : ''}`}>
+        <div className={`border border-neutral-200 bg-white rounded-2xl overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md ${isOpen ? 'ring-1 ring-neutral-400/30' : ''}`}>
             <button
                 className="w-full px-6 py-5 flex items-center justify-between text-left focus:outline-none"
                 onClick={() => setIsOpen(!isOpen)}
@@ -1676,7 +1676,7 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
                 <span className="font-semibold text-neutral-900 text-[15px]">{question}</span>
                 <span className="ml-6 flex-shrink-0 text-neutral-400 object-contain overflow-visible flex items-center justify-center">
                     <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.3 }}>
-                        {isOpen ? <Minus className="h-5 w-5 text-indigo-500" /> : <Plus className="h-5 w-5 text-neutral-400" />}
+                        {isOpen ? <Minus className="h-5 w-5 text-neutral-500" /> : <Plus className="h-5 w-5 text-neutral-400" />}
                     </motion.div>
                 </span>
             </button>
@@ -1786,7 +1786,7 @@ function AnimatedAmountInput() {
         <div className="flex items-center">
             <span className="text-neutral-700 text-[10px] font-medium min-w-[38px] text-left inline-block">{text}</span>
             <motion.div
-                className="w-[1.5px] h-3 bg-blue-500 ml-[1px]"
+                className="w-[1.5px] h-3 bg-neutral-1000 ml-[1px]"
                 animate={{ opacity: [1, 0] }}
                 transition={{ repeat: Infinity, duration: 0.8 }}
             />
