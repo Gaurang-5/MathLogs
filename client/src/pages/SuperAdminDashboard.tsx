@@ -23,7 +23,10 @@ import {
     Edit2,
     AlertTriangle,
     GraduationCap,
-    IndianRupee
+    IndianRupee,
+    User,
+    Phone,
+    Mail
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -51,6 +54,7 @@ export default function SuperAdminDashboard() {
 
     // State
     const [institutes, setInstitutes] = useState<Institute[]>([]);
+    const [leads, setLeads] = useState<any[]>([]);
     const [analytics, setAnalytics] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -109,13 +113,15 @@ export default function SuperAdminDashboard() {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
 
-            const [institutesRes, analyticsRes] = await Promise.all([
+            const [institutesRes, analyticsRes, leadsRes] = await Promise.all([
                 axios.get(`${API_URL}/institutes`, { headers }),
-                axios.get(`${API_URL}/institutes/analytics`, { headers }).catch(() => null)
+                axios.get(`${API_URL}/institutes/analytics`, { headers }).catch(() => null),
+                axios.get(`${API_URL}/onboarding/leads`, { headers }).catch(() => null)
             ]);
 
             setInstitutes(institutesRes.data);
             if (analyticsRes) setAnalytics(analyticsRes.data);
+            if (leadsRes) setLeads(leadsRes.data);
         } catch (err) {
             console.error('Failed to fetch dashboard data');
             // If 403, might redirect, but for now just log
@@ -681,6 +687,94 @@ export default function SuperAdminDashboard() {
                             )}
                         </div>
                     </div>
+
+                    {/* Onboarding Leads List */}
+                    <div className="lg:col-span-2 space-y-6 mt-10">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-black">
+                                <UserPlus className="w-5 h-5" />
+                                Onboarding Leads
+                            </h2>
+                            <p className="text-sm font-medium text-gray-400">Centers currently setting up via mathlogs.app/onboard</p>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            {leads.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <p className="text-gray-500 font-medium">No active onboarding leads</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm text-gray-600">
+                                        <thead className="bg-gray-50 border-b border-gray-100 text-gray-900 font-semibold uppercase text-xs tracking-wider">
+                                            <tr>
+                                                <th className="px-6 py-4">Lead Status</th>
+                                                <th className="px-6 py-4">Coaching & Owner</th>
+                                                <th className="px-6 py-4">Contact Details</th>
+                                                <th className="px-6 py-4">Plan / Cycle</th>
+                                                <th className="px-6 py-4 text-right">Last Updated</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {leads.map((lead) => (
+                                                <tr key={lead.id} className="hover:bg-gray-50/50 transition-colors">
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        {lead.step === 'CONVERTED' && <span className="px-3 py-1 bg-green-100 text-green-700 font-bold rounded-lg text-xs">✔ Converted</span>}
+                                                        {lead.step === 'PAYMENT_FAILED' && (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="px-3 py-1 bg-red-100 text-red-700 font-bold rounded-lg text-xs w-max">✖ Payment Failed</span>
+                                                                <span className="text-xs text-red-500 font-medium max-w-[150px] truncate" title={lead.failureReason || ''}>{lead.failureReason || 'Unknown error'}</span>
+                                                            </div>
+                                                        )}
+                                                        {lead.step === 'DETAILS_FILLED' && <span className="px-3 py-1 bg-gray-100 text-gray-700 font-bold rounded-lg text-xs">Details Filled</span>}
+                                                        {lead.step === 'PLAN_SELECTED' && <span className="px-3 py-1 bg-blue-100 text-blue-700 font-bold rounded-lg text-xs">Plan Selected</span>}
+                                                        {lead.step === 'PAYMENT_STARTED' && <span className="px-3 py-1 bg-orange-100 text-orange-700 font-bold rounded-lg text-xs">Payment Started</span>}
+                                                        {lead.step === 'STEP_1_STARTED' && <span className="px-3 py-1 bg-gray-100 text-gray-700 font-bold rounded-lg text-xs">Pinging Start</span>}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-bold text-gray-900">{lead.tuitionName || 'Unknown'}</div>
+                                                        <div className="text-xs font-medium text-gray-500 flex items-center gap-1 mt-1">
+                                                            <User className="w-3.5 h-3.5" />
+                                                            {lead.ownerName || 'Unknown'}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col gap-1.5">
+                                                            <div className="text-xs font-bold text-gray-800 flex items-center gap-2">
+                                                                <span className="p-1 bg-green-50 text-green-600 rounded">
+                                                                    <Phone className="w-3 h-3" />
+                                                                </span>
+                                                                {lead.phone}
+                                                            </div>
+                                                            <div className="text-xs font-medium text-gray-500 flex items-center gap-2">
+                                                                <span className="p-1 bg-blue-50 text-blue-600 rounded">
+                                                                    <Mail className="w-3 h-3" />
+                                                                </span>
+                                                                {lead.email || 'N/A'}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="font-bold uppercase tracking-wider text-xs">
+                                                            {lead.planId || '-'}
+                                                        </span>
+                                                        <div className="text-[10px] text-gray-400 font-semibold uppercase mt-0.5">
+                                                            {lead.billingCycle || ''}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right whitespace-nowrap text-xs font-medium text-gray-400">
+                                                        {new Date(lead.updatedAt).toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+
                 </div >
             </div >
 

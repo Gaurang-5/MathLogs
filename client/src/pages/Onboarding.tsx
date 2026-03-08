@@ -70,15 +70,33 @@ export default function Onboarding() {
         }
     };
 
-    const handleContinueToPlans = (e: React.FormEvent) => {
+    const handleContinueToPlans = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!isStep1Valid) return;
+
+        // Track Step 1 completion
+        try {
+            await api.post('/onboarding/lead', {
+                tuitionName, ownerName, phone, email, step: 'DETAILS_FILLED'
+            });
+        } catch (err) {
+            console.error('Failed to track lead', err);
+        }
+
         setActiveStep(2);
         scrollToRef(planRef);
     };
 
-    const handleSelectPlan = (planId: 'basic' | 'pro') => {
+    const handleSelectPlan = async (planId: 'basic' | 'pro') => {
         setSelectedPlan(planId);
+
+        // Track plan selection
+        try {
+            await api.post('/onboarding/lead', {
+                tuitionName, ownerName, phone, email, planId, billingCycle, step: 'PLAN_SELECTED'
+            });
+        } catch (err) { }
+
         setActiveStep(3);
         scrollToRef(checkoutRef);
     };
@@ -108,6 +126,13 @@ export default function Onboarding() {
                 return;
             }
 
+            // Track payment initiation
+            try {
+                await api.post('/onboarding/lead', {
+                    tuitionName, ownerName, phone, email, planId: selectedPlan, billingCycle, step: 'PAYMENT_STARTED'
+                });
+            } catch (err) { }
+
             const options: any = {
                 key: orderRes.keyId,
                 name: tuitionName,
@@ -129,6 +154,12 @@ export default function Onboarding() {
 
                         if (verifyRes.success && verifyRes.setupLink) {
                             toast.success('Payment verified! Redirecting to setup...');
+                            // Track conversion
+                            try {
+                                await api.post('/onboarding/lead', {
+                                    phone, step: 'CONVERTED'
+                                });
+                            } catch (err) { }
                             setTimeout(() => {
                                 window.location.href = verifyRes.setupLink;
                             }, 1500);
@@ -163,6 +194,15 @@ export default function Onboarding() {
             }
 
             const paymentObject = new (window as any).Razorpay(options);
+
+            paymentObject.on('payment.failed', async function (response: any) {
+                try {
+                    await api.post('/onboarding/lead', {
+                        phone, step: 'PAYMENT_FAILED', failureReason: response.error.description || 'Unknown Error'
+                    });
+                } catch (err) { }
+            });
+
             paymentObject.open();
 
         } catch (err: any) {

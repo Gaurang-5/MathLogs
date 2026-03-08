@@ -325,3 +325,23 @@ model OcrScanCache {
   @@index([createdAt]) // For TTL cleanup queries
 }
 
+
+model OnboardingLead {
+  id            String   @id @default(uuid())
+  tuitionName   String?
+  ownerName     String?
+  phone         String   @unique
+  email         String?
+  planId        String?
+  billingCycle  String?
+  
+  // Tracking
+  step          String   @default("STEP_1_STARTED") // DETAILS_FILLED, PLAN_SELECTED, PAYMENT_STARTED, PAYMENT_FAILED, CONVERTED
+  failureReason String?  // Razorpay error description if failed
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([step])
+  @@index([createdAt])
+}

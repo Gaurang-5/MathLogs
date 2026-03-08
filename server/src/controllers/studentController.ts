@@ -479,21 +479,30 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
 
         // Get the start date - use academic year start or default to start of current year
         const currentSysDate = new Date();
-        const startRawDate = (academicYear?.startDate)
+        let startRawDate = (academicYear?.startDate)
             ? new Date(academicYear.startDate)
             : new Date(currentSysDate.getFullYear(), 0, 1);
 
-        // Normalize execution to IST (GMT+5:30)
-        // We add offset to UTC timestamps so that getMonth() (which is UTC on server) reflects IST date
+        // Calculate end date (Today + IST Buffer)
         const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+        const endDate = new Date(Date.now() + IST_OFFSET);
+
+        // If students joined before the official start date, start the chart from their joining date
+        const firstStudentDate = new Date(new Date(students[0].createdAt).getTime() + IST_OFFSET);
+        if (firstStudentDate < startRawDate) {
+            startRawDate = firstStudentDate;
+        }
+
+        // If the start date is STILL in the future (e.g., no students yet, or all somehow future dated)
+        // ensure we show at least the current month
+        if (startRawDate > endDate) {
+            startRawDate = new Date(endDate);
+        }
 
         // Iterate months safely by setting date to 1st
         const months: { name: string; year: number; monthIndex: number }[] = [];
         const tempDate = new Date(startRawDate);
         tempDate.setDate(1); // Force to 1st to avoid Jan 31 -> Mar 3 skip issue
-
-        // Calculate end date (Today + IST Buffer)
-        const endDate = new Date(Date.now() + IST_OFFSET);
 
         // Standardize loop comparison using YYYYMM
         const getMonthKey = (d: Date) => d.getFullYear() * 100 + d.getMonth();

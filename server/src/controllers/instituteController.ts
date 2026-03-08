@@ -242,22 +242,36 @@ export const deleteInstitute = async (req: Request, res: Response) => {
 };
 
 export const getMyInstitute = async (req: Request, res: Response) => {
-    const user = (req as any).user;
-    if (!user.instituteId) return res.status(400).json({ error: 'No institute assigned' });
-
     try {
-        const institute = await prisma.institute.findUnique({
-            where: { id: user.instituteId },
-            select: {
-                id: true,
-                name: true,
-                config: true
-            }
+        const adminId = (req as any).user.id;
+        const admin = await prisma.admin.findUnique({
+            where: { id: adminId },
+            include: { institute: true }
         });
-        if (!institute) return res.status(404).json({ error: 'Institute not found' });
-        res.json(institute);
-    } catch (e) {
-        console.error('Failed to fetch my institute:', e);
-        res.status(500).json({ error: 'Failed to fetch institute details' });
+        if (!admin || !admin.institute) {
+            return res.status(404).json({ error: "Institute not found" });
+        }
+        res.json(admin.institute);
+    } catch (error) {
+        console.error("Error fetching my institute:", error);
+        res.status(500).json({ error: "Failed to fetch institute" });
+    }
+};
+
+export const getOnboardingLeads = async (req: Request, res: Response) => {
+    try {
+        if ((req as any).user.role !== 'SUPER_ADMIN') {
+            return res.status(403).json({ error: 'Only SuperAdmin can view leads' });
+        }
+
+        const leads = await prisma.onboardingLead.findMany({
+            orderBy: { updatedAt: 'desc' },
+            take: 100 // Limit to recent 100 to keep it performing
+        });
+
+        res.json(leads);
+    } catch (error) {
+        console.error('Fetch Leads Error:', error);
+        res.status(500).json({ error: 'Failed to fetch leads' });
     }
 };

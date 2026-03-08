@@ -10,6 +10,44 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_secret',
 });
 
+// Track Lead Progress
+export const trackLead = async (req: Request, res: Response) => {
+    try {
+        const { tuitionName, ownerName, phone, email, planId, billingCycle, step, failureReason } = req.body;
+
+        if (!phone) {
+            return res.status(400).json({ error: 'Phone number is required to track lead' });
+        }
+
+        const lead = await prisma.onboardingLead.upsert({
+            where: { phone },
+            update: {
+                ...(tuitionName && { tuitionName }),
+                ...(ownerName && { ownerName }),
+                ...(email && { email }),
+                ...(planId && { planId }),
+                ...(billingCycle && { billingCycle }),
+                ...(step && { step }),
+                ...(failureReason && { failureReason })
+            },
+            create: {
+                tuitionName,
+                ownerName,
+                phone,
+                email,
+                planId,
+                billingCycle,
+                step: step || 'STEP_1_STARTED'
+            }
+        });
+
+        res.json({ success: true, leadId: lead.id });
+    } catch (error) {
+        console.error('Track Lead Error:', error);
+        res.status(500).json({ error: 'Failed to track lead' });
+    }
+};
+
 // Create Order (Step 3 checkout initialization)
 export const createOrder = async (req: Request, res: Response) => {
     try {
