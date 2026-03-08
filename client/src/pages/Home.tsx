@@ -27,8 +27,8 @@ const OnboardingCard = memo(function OnboardingCard() {
         return () => clearInterval(t);
     }, []);
     return (
-        <div className="bg-white rounded-[2.5rem] p-8 lg:p-12 shadow-sm border border-neutral-100 flex flex-col lg:col-span-2 hover:shadow-md transition-all overflow-hidden">
-            <div className="w-[52px] h-[52px] rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-900 mb-8 shadow-sm">
+        <div className="bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-sm border border-neutral-100 flex flex-col lg:col-span-2 hover:shadow-md transition-all overflow-hidden">
+            <div className="w-[48px] h-[48px] rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-900 mb-5 shadow-sm">
                 <Database className="w-6 h-6" strokeWidth={1.5} />
             </div>
             <h4 className="text-[28px] font-bold text-[#1a1f36] tracking-[-0.03em] mb-4 leading-[1.1]">Flexible Student Onboarding</h4>
@@ -1125,7 +1125,7 @@ export default function Home() {
                                 animate={{ y: 0, opacity: 1, scale: 1 }}
                                 exit={{ y: 20, opacity: 0, scale: 0.95 }}
                                 transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-                                className="bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl w-full max-w-full max-w-[1400px] h-full max-h-[900px] overflow-hidden flex flex-col relative"
+                                className="bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl w-full max-w-[1100px] h-full max-h-[900px] overflow-hidden flex flex-col relative"
                                 onClick={e => e.stopPropagation()}
                             >
                                 {/* Modal Header */}
@@ -1140,26 +1140,26 @@ export default function Home() {
                                 </div>
 
                                 {/* Modal Content - Nested Cards Layout */}
-                                <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col p-6 md:p-10 lg:p-16 relative bg-neutral-50/50">
+                                <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col p-5 md:p-8 lg:p-10 relative bg-neutral-50/50">
 
                                     {/* Header */}
-                                    <div className="max-w-5xl mx-auto w-full mb-12 text-center mt-8">
-                                        <h3 className="text-3xl md:text-5xl font-bold text-neutral-900 tracking-tight mb-4">
+                                    <div className="max-w-5xl mx-auto w-full mb-8 text-center mt-4">
+                                        <h3 className="text-2xl md:text-4xl font-bold text-neutral-900 tracking-tight mb-3">
                                             Supercharge your batch operations
                                         </h3>
-                                        <p className="text-neutral-500 text-lg max-w-2xl mx-auto">
+                                        <p className="text-neutral-500 text-base max-w-2xl mx-auto">
                                             Everything you need to run your center, flawlessly integrated into one powerful dashboard. Explore the features below.
                                         </p>
                                     </div>
 
                                     {/* Nested Feature Cards Grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto w-full mb-20">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto w-full mb-10">
 
                                         {/* Card 1: 3 Registration Modes — animated */}
                                         <OnboardingCard />
 
                                         {/* Card 2: Complete Control */}
-                                        <div className="bg-white rounded-3xl p-8 shadow-sm border border-neutral-200/60 flex flex-col group hover:shadow-md transition-all relative overflow-hidden">
+                                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-neutral-200/60 flex flex-col group hover:shadow-md transition-all relative overflow-hidden">
                                             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl -mr-10 -mt-10 transition-all group-hover:bg-purple-500/20" />
                                             <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600 mb-5 group-hover:scale-110 transition-transform relative z-10">
                                                 <Settings className="w-6 h-6" />
@@ -1190,7 +1190,7 @@ export default function Home() {
                                         </div>
 
                                         {/* Card 3: WhatsApp Automation */}
-                                        <div className="bg-[#fcfdfd] rounded-[2.5rem] pt-8 lg:pt-10 px-8 lg:px-10 pb-0 shadow-sm border border-neutral-100 flex flex-col group hover:shadow-md transition-all relative overflow-hidden">
+                                        <div className="bg-[#fcfdfd] rounded-[2.5rem] pt-6 lg:pt-8 px-6 lg:px-8 pb-0 shadow-sm border border-neutral-100 flex flex-col group hover:shadow-md transition-all relative overflow-hidden">
                                             <div className="w-[48px] h-[48px] rounded-2xl bg-[#effdf4] border border-[#dcfce7] flex items-center justify-center text-[#22c55e] mb-5 relative z-10 shadow-sm">
                                                 <MessageSquare className="w-5 h-5" strokeWidth={1.5} />
                                             </div>
@@ -1204,7 +1204,7 @@ export default function Home() {
                                         </div>
 
                                         {/* Card 4: Student Performance Insights (Spans 2 columns) */}
-                                        <div className="bg-white rounded-3xl p-8 shadow-sm border border-neutral-200/60 flex flex-col gap-6 lg:col-span-2 group hover:shadow-md transition-all">
+                                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-neutral-200/60 flex flex-col gap-5 lg:col-span-2 group hover:shadow-md transition-all">
 
                                             {/* TOP: compact text + pills row */}
                                             <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
@@ -1291,7 +1291,7 @@ export default function Home() {
                                         </div>
 
                                         {/* Card 5: Export & Print — full-width row spanning all 3 cols */}
-                                        <div className="bg-white rounded-3xl p-7 shadow-sm border border-neutral-200/60 flex flex-col sm:flex-row sm:items-center gap-6 group hover:shadow-md transition-all relative overflow-hidden lg:col-span-3">
+                                        <div className="bg-white rounded-3xl p-5 shadow-sm border border-neutral-200/60 flex flex-col sm:flex-row sm:items-center gap-5 group hover:shadow-md transition-all relative overflow-hidden lg:col-span-3">
                                             <div className="absolute top-0 right-0 w-48 h-48 bg-sky-400/10 rounded-full blur-3xl -mr-12 -mt-12 transition-all group-hover:bg-sky-400/20 pointer-events-none" />
 
                                             {/* Left: icon + title + description */}

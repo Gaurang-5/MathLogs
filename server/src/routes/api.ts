@@ -12,7 +12,7 @@ import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, 
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
 
-import { getDashboardSummary } from '../controllers/dashboardController';
+import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
 import { createOrder, verifyPayment, trackLead } from '../controllers/onboardingController';
 import { getPaymentHistory } from '../controllers/feeController';
@@ -271,6 +271,7 @@ router.post('/fees/remind', authenticateToken as any, sendFeeReminder as any);
 
 // Stats
 router.get('/stats/growth', authenticateToken as any, getStudentGrowthStats as any);
+router.get('/stats/finance-growth', authenticateToken as any, getFinancialGrowthStats as any);
 
 // Invites
 router.post('/invites', authenticateToken as any, generateInvite as any);

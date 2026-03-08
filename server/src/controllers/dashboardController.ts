@@ -156,3 +156,143 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to fetch dashboard summary' });
     }
 };
+
+export const getFinancialGrowthStats = async (req: Request, res: Response) => {
+    try {
+        const academicYearId = (req as any).user?.currentAcademicYearId;
+        const instituteId = (req as any).user?.instituteId;
+
+        // Get academic year details to determine start month
+        const academicYear = await prisma.academicYear.findUnique({
+            where: { id: academicYearId }
+        });
+
+        const currentSysDate = new Date();
+        let startRawDate = academicYear?.startDate
+            ? new Date(academicYear.startDate)
+            : new Date(currentSysDate.getFullYear(), 0, 1);
+
+        const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+        const endDate = new Date(Date.now() + IST_OFFSET);
+
+        if (startRawDate > endDate) {
+            startRawDate = new Date(endDate);
+        }
+
+        const months: { name: string; year: number; monthIndex: number }[] = [];
+        const tempDate = new Date(startRawDate);
+        tempDate.setDate(1);
+
+        const getMonthKey = (d: Date) => d.getFullYear() * 100 + d.getMonth();
+
+        while (getMonthKey(tempDate) <= getMonthKey(endDate)) {
+            months.push({
+                name: tempDate.toLocaleString('default', { month: 'short' }),
+                year: tempDate.getFullYear(),
+                monthIndex: tempDate.getMonth()
+            });
+            tempDate.setMonth(tempDate.getMonth() + 1);
+        }
+
+        // Initialize monthly data
+        const monthlyData: Record<string, { collected: number, generated: number }> = {};
+        months.forEach(m => {
+            monthlyData[`${m.year}-${m.monthIndex}`] = { collected: 0, generated: 0 };
+        });
+
+        // 1. Fetch Students (Generated fee = batch flat fee OR installments)
+        const students = await prisma.student.findMany({
+            where: {
+                status: 'APPROVED',
+                instituteId: instituteId,
+                ...(academicYearId && { academicYearId })
+            },
+            include: {
+                batch: { include: { feeInstallments: true } }
+            }
+        });
+
+        students.forEach(s => {
+            const hasInstallments = s.batch?.feeInstallments && s.batch.feeInstallments.length > 0;
+
+            if (!hasInstallments && s.batch?.feeAmount) {
+                const d = new Date(s.createdAt.getTime() + IST_OFFSET);
+                const key = `${d.getFullYear()}-${d.getMonth()}`;
+                if (monthlyData[key]) {
+                    monthlyData[key].generated += s.batch.feeAmount;
+                }
+            } else if (hasInstallments) {
+                s.batch!.feeInstallments.forEach(inst => {
+                    const d = new Date(inst.createdAt.getTime() + IST_OFFSET);
+                    const key = `${d.getFullYear()}-${d.getMonth()}`;
+                    if (monthlyData[key]) {
+                        monthlyData[key].generated += inst.amount;
+                    }
+                });
+            }
+        });
+
+        // 2. Fetch Payments (Collected fee)
+        const feePayments = await prisma.feePayment.findMany({
+            where: {
+                student: {
+                    instituteId: instituteId,
+                    ...(academicYearId && { academicYearId }),
+                    status: 'APPROVED'
+                }
+            }
+        });
+
+        feePayments.forEach(p => {
+            const d = new Date(p.date.getTime() + IST_OFFSET);
+            const key = `${d.getFullYear()}-${d.getMonth()}`;
+            if (monthlyData[key]) {
+                monthlyData[key].collected += p.amountPaid;
+            }
+        });
+
+        const feeRecords = await prisma.feeRecord.findMany({
+            where: {
+                status: 'PAID',
+                student: {
+                    instituteId: instituteId,
+                    ...(academicYearId && { academicYearId }),
+                    status: 'APPROVED'
+                }
+            }
+        });
+
+        feeRecords.forEach(r => {
+            const d = new Date(r.date.getTime() + IST_OFFSET);
+            const key = `${d.getFullYear()}-${d.getMonth()}`;
+            if (monthlyData[key]) {
+                monthlyData[key].collected += r.amount;
+            }
+        });
+
+        // 3. Format Data
+        let cumulativeGenerated = 0;
+        let cumulativeCollected = 0;
+
+        const data = months.map(m => {
+            const key = `${m.year}-${m.monthIndex}`;
+            const stats = monthlyData[key] || { collected: 0, generated: 0 };
+
+            cumulativeGenerated += stats.generated;
+            cumulativeCollected += stats.collected;
+
+            const remaining = Math.max(0, cumulativeGenerated - cumulativeCollected);
+
+            return {
+                name: m.name,
+                collected: stats.collected,
+                remaining: remaining
+            };
+        });
+
+        res.json(data);
+    } catch (e) {
+        console.error('Finance growth stats error:', e);
+        res.status(500).json({ error: 'Failed to fetch financial stats' });
+    }
+};

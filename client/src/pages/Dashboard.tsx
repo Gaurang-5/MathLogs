@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart, BarChart, Bar } from 'recharts';
 import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CountUp from 'react-countup';
@@ -9,12 +9,13 @@ import CountUp from 'react-countup';
 export default function Dashboard() {
     const [stats, setStats] = useState({ batches: 0, students: 0 });
     const [growthData, setGrowthData] = useState([]);
+    const [financeGrowthData, setFinanceGrowthData] = useState([]);
     const [finances, setFinances] = useState({ collected: 0, totalCollected: 0, pending: 0 });
     const [defaulters, setDefaulters] = useState<any[]>([]);
     const [userName, setUserName] = useState('');
 
     // Separate loading states for progressive rendering
-    const [loading, setLoading] = useState({ summary: true, growth: true });
+    const [loading, setLoading] = useState({ summary: true, growth: true, financeGrowth: true });
 
     // Privacy toggle for fee data
     const [showFeeData, setShowFeeData] = useState(true);
@@ -51,24 +52,32 @@ export default function Dashboard() {
             if ('requestIdleCallback' in window) {
                 requestIdleCallback(async () => {
                     try {
-                        const growth = await api.get('/stats/growth');
+                        const [growth, financeGrowth] = await Promise.all([
+                            api.get('/stats/growth'),
+                            api.get('/stats/finance-growth')
+                        ]);
                         setGrowthData(growth);
-                        setLoading(prev => ({ ...prev, growth: false }));
+                        setFinanceGrowthData(financeGrowth);
+                        setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
                     } catch (error) {
-                        console.error('Failed to load growth data:', error);
-                        setLoading(prev => ({ ...prev, growth: false }));
+                        console.error('Failed to load chart data:', error);
+                        setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
                     }
                 });
             } else {
                 // Fallback for browsers without requestIdleCallback
                 setTimeout(async () => {
                     try {
-                        const growth = await api.get('/stats/growth');
+                        const [growth, financeGrowth] = await Promise.all([
+                            api.get('/stats/growth'),
+                            api.get('/stats/finance-growth')
+                        ]);
                         setGrowthData(growth);
-                        setLoading(prev => ({ ...prev, growth: false }));
+                        setFinanceGrowthData(financeGrowth);
+                        setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
                     } catch (error) {
-                        console.error('Failed to load growth data:', error);
-                        setLoading(prev => ({ ...prev, growth: false }));
+                        console.error('Failed to load chart data:', error);
+                        setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
                     }
                 }, 100);
             }
@@ -273,8 +282,8 @@ export default function Dashboard() {
             </div>
 
             {/* Charts Grid - Mobile First */}
-            <div className="mb-6">
-                {/* Growth Trends Chart - Full Width */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* Growth Trends Chart */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -286,11 +295,11 @@ export default function Dashboard() {
                         Growth Trends
                     </h3>
                     {loading.growth ? (
-                        <div className="h-[250px] flex items-center justify-center">
+                        <div className="h-[280px] flex items-center justify-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                         </div>
                     ) : growthData.length > 0 ? (
-                        <div className="h-[250px] w-full">
+                        <div className="h-[280px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={growthData}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -316,7 +325,7 @@ export default function Dashboard() {
                             </ResponsiveContainer>
                         </div>
                     ) : (
-                        <div className="h-[250px] flex items-center justify-center">
+                        <div className="h-[280px] flex items-center justify-center">
                             <div className="text-center">
                                 <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-2" />
                                 <p className="text-sm text-gray-400">No growth data available</p>
@@ -324,10 +333,85 @@ export default function Dashboard() {
                         </div>
                     )}
                 </motion.div>
+
+                {/* Fee Collected vs Remaining - Bar Chart */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="bg-white/70 backdrop-blur-xl p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between"
+                >
+                    <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <Wallet className="w-5 h-5 text-gray-900" />
+                        Fee Overview
+                    </h3>
+                    {loading.financeGrowth ? (
+                        <div className="h-[280px] flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        </div>
+                    ) : financeGrowthData.length > 0 ? (
+                        <>
+                            <div className="h-[280px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={financeGrowthData}
+                                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                                        barGap={4}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                                        <XAxis
+                                            dataKey="name"
+                                            stroke="#9ca3af"
+                                            style={{ fontSize: '12px' }}
+                                        />
+                                        <YAxis
+                                            stroke="#9ca3af"
+                                            style={{ fontSize: '12px' }}
+                                            tickFormatter={(v: number) => showFeeData ? `₹${(v / 1000).toFixed(0)}k` : '₹•••'}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                                border: '1px solid #e5e7eb',
+                                                borderRadius: '12px',
+                                                backdropFilter: 'blur(10px)',
+                                                padding: '12px 16px'
+                                            }}
+                                            formatter={((value: number | undefined, name: string | undefined) => [
+                                                showFeeData ? `₹${(value ?? 0).toLocaleString()}` : '₹••••••',
+                                                name === 'collected' ? 'Collected' : 'Remaining'
+                                            ]) as any}
+                                        />
+                                        <Bar dataKey="collected" name="Collected" fill="#111827" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                        <Bar dataKey="remaining" name="Remaining" fill="#d1d5db" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                            {/* Legend */}
+                            <div className="flex items-center justify-center gap-6 mt-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-sm bg-gray-900"></div>
+                                    <span className="text-sm text-gray-600 font-medium">Collected · {showFeeData ? `₹${finances.totalCollected.toLocaleString()}` : '₹••••••'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-sm bg-gray-300"></div>
+                                    <span className="text-sm text-gray-600 font-medium">Remaining · {showFeeData ? `₹${finances.pending.toLocaleString()}` : '₹••••••'}</span>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="h-[280px] flex items-center justify-center">
+                            <div className="text-center">
+                                <Wallet className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                                <p className="text-sm text-gray-400">No fee data available yet</p>
+                            </div>
+                        </div>
+                    )}
+                </motion.div>
             </div>
 
             {/* Pending Dues List */}
-            {showFeeData && defaulters.length > 0 && (
+            {defaulters.length > 0 && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -358,7 +442,7 @@ export default function Dashboard() {
                                         <span className="font-medium text-gray-900">{batch.name}</span>
                                     </div>
                                     <span className="text-gray-900 font-bold text-lg">
-                                        ₹{batch.amount.toLocaleString()}
+                                        {showFeeData ? `₹${batch.amount.toLocaleString()}` : '₹••••••'}
                                     </span>
                                 </motion.div>
                             ))}

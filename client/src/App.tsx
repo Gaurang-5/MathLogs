@@ -13,7 +13,7 @@ const TestList = lazy(() => import('./pages/TestList'));
 const TestDetails = lazy(() => import('./pages/TestDetails'));
 const ScanMarks = lazy(() => import('./pages/ScanMarks'));
 const Fees = lazy(() => import('./pages/Fees'));
-const Home = lazy(() => import('./pages/Home'));
+import Home from './pages/Home';
 const Settings = lazy(() => import('./pages/Settings'));
 const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
