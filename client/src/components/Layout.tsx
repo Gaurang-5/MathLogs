@@ -142,22 +142,31 @@ export default function Layout({ children, title }: LayoutProps) {
                 </div>
             </aside>
 
-            {/* Mobile Header - Glassy with Safe Area */}
-            <header className="fixed top-0 left-0 right-0 glass border-b-0 flex items-center justify-between px-6 xl:hidden z-50 transition-colors" style={{
-                height: 'calc(4rem + env(safe-area-inset-top))',
-                paddingTop: 'max(0.5rem, env(safe-area-inset-top))'
+            {/* Mobile Header - Floating Pill */}
+            <header className="fixed top-0 left-0 right-0 z-50 xl:hidden px-4 transition-all duration-300" style={{
+                paddingTop: 'calc(0.75rem + env(safe-area-inset-top))'
             }}>
-                <Link to="/dashboard" className="font-semibold text-xl text-app-text tracking-tight">ML</Link>
-                <div className="flex items-center gap-3">
-                    <Link
-                        to="/scan"
-                        className="w-10 h-10 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary active:scale-95 transition-transform"
-                    >
-                        <Scan className="w-5 h-5" />
+                <div className="bg-app-surface/90 backdrop-blur-2xl border border-app-border shadow-[0_8px_32px_rgba(0,0,0,0.08)] rounded-[24px] flex items-center justify-between px-4 h-14">
+                    <Link to="/dashboard" className="flex items-center gap-2 group active:scale-95 transition-transform">
+                        <img
+                            src="/icon-512x512.png"
+                            alt="MathLogs Logo"
+                            className="w-8 h-8 rounded-full shadow-md object-cover border border-app-border/50"
+                        />
+                        <span className="font-semibold text-[15px] text-app-text tracking-tight">Math<span className="text-accent opacity-90 group-hover:opacity-100 transition-opacity">Logs</span></span>
                     </Link>
-                    <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-app-text-secondary w-10 h-10 flex items-center justify-center rounded-full bg-app-surface-opaque">
-                        {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            to="/scan"
+                            className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90"
+                        >
+                            <Scan className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                        </Link>
+                        <div className="w-[1px] h-4 bg-app-border/80 mx-0.5"></div>
+                        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90">
+                            {mobileMenuOpen ? <X size={20} strokeWidth={2.5} /> : <Menu size={20} strokeWidth={2.5} />}
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -225,41 +234,53 @@ export default function Layout({ children, title }: LayoutProps) {
 
             {/* Mobile Bottom Navigation (Floating Island) */}
             {showMobileNav && (
-                <nav className="fixed bottom-6 left-4 right-4 z-50 bg-app-surface/90 backdrop-blur-2xl border border-app-border shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-[32px] h-[72px] xl:hidden">
+                <nav className="fixed bottom-6 left-4 right-4 z-50 bg-app-surface/80 backdrop-blur-3xl border border-app-border shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] rounded-[32px] h-[72px] xl:hidden">
 
-                    <div className="grid grid-cols-5 items-center h-full w-full relative z-10">
-                        <Link to="/dashboard" className={`flex flex-col items-center justify-center gap-1 ${location.pathname === '/dashboard' ? 'text-app-text' : 'text-app-text-tertiary'}`}>
-                            <LayoutDashboard className="w-6 h-6" strokeWidth={1.5} />
-                            <span className="text-[10px] font-bold">Home</span>
+                    <div className="grid grid-cols-5 items-center h-full w-full relative z-10 px-2">
+                        <Link to="/dashboard" className="flex flex-col items-center justify-center group h-full">
+                            <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname === '/dashboard' ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                <LayoutDashboard className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname === '/dashboard' ? 2.5 : 1.5} />
+                                <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname === '/dashboard' ? 'opacity-100' : 'opacity-70'}`}>Home</span>
+                                {location.pathname === '/dashboard' && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                            </div>
                         </Link>
 
-                        <Link to="/batches" className={`flex flex-col items-center justify-center gap-1 ${location.pathname.startsWith('/batches') ? 'text-app-text' : 'text-app-text-tertiary'}`}>
-                            <Users className="w-6 h-6" strokeWidth={1.5} />
-                            <span className="text-[10px] font-bold">Batches</span>
+                        <Link to="/batches" className="flex flex-col items-center justify-center group h-full">
+                            <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/batches') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                <Users className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/batches') ? 2.5 : 1.5} />
+                                <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/batches') ? 'opacity-100' : 'opacity-70'}`}>Batches</span>
+                                {location.pathname.startsWith('/batches') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                            </div>
                         </Link>
 
-                        {/* Spacer for Scan Button */}
+                        {/* Spacer for Center Button */}
                         <div></div>
 
-                        <Link to="/tests" className={`flex flex-col items-center justify-center gap-1 ${location.pathname.startsWith('/tests') ? 'text-app-text' : 'text-app-text-tertiary'}`}>
-                            <FileText className="w-6 h-6" strokeWidth={1.5} />
-                            <span className="text-[10px] font-bold">Tests</span>
+                        <Link to="/tests" className="flex flex-col items-center justify-center group h-full">
+                            <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/tests') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                <FileText className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/tests') ? 2.5 : 1.5} />
+                                <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/tests') ? 'opacity-100' : 'opacity-70'}`}>Tests</span>
+                                {location.pathname.startsWith('/tests') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                            </div>
                         </Link>
 
-                        <Link to="/fees" className={`flex flex-col items-center justify-center gap-1 ${location.pathname.startsWith('/fees') ? 'text-app-text' : 'text-app-text-tertiary'}`}>
-                            <Receipt className="w-6 h-6" strokeWidth={1.5} />
-                            <span className="text-[10px] font-bold">Fees</span>
+                        <Link to="/fees" className="flex flex-col items-center justify-center group h-full">
+                            <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/fees') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                <Receipt className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/fees') ? 2.5 : 1.5} />
+                                <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/fees') ? 'opacity-100' : 'opacity-70'}`}>Fees</span>
+                                {location.pathname.startsWith('/fees') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                            </div>
                         </Link>
                     </div>
 
-                    {/* Floating Log Fee Button */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80px] h-[80px] z-20">
+                    {/* Floating Center Action Button (Quick Fee) */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[74px] h-[74px] z-20">
                         <button
                             onClick={() => setShowQuickFeeModal(true)}
-                            className="flex w-full h-full bg-app-text rounded-full items-center justify-center text-app-bg shadow-xl border-[6px] border-app-bg overflow-hidden active:scale-95 transition-all group"
+                            className="relative flex w-full h-full bg-app-text rounded-full items-center justify-center text-app-bg shadow-[0_8px_24px_rgba(30,41,59,0.3)] border-[5px] border-app-surface/95 overflow-hidden active:scale-90 transition-all duration-300 group"
                         >
-                            <Zap className="w-8 h-8" fill="currentColor" />
-                            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <Zap className="w-7 h-7" fill="currentColor" />
+                            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                         </button>
                     </div>
                 </nav>

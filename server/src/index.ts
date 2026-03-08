@@ -82,7 +82,8 @@ app.use(cors({
         // SECURITY: Strict exact-match allowlist. No substring/endsWith.
         // endsWith('mathlogs.app') was exploitable via evilmathlogs.app
         const isDev = process.env.NODE_ENV !== 'production';
-        const isAllowed = PRODUCTION_ORIGINS.has(origin) || (isDev && DEVELOPMENT_ORIGINS.has(origin));
+        const isCloudflareTunnel = origin.endsWith('.trycloudflare.com');
+        const isAllowed = PRODUCTION_ORIGINS.has(origin) || (isDev && (DEVELOPMENT_ORIGINS.has(origin) || isCloudflareTunnel));
 
         if (isAllowed) {
             callback(null, true);

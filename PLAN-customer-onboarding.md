@@ -13,7 +13,7 @@ Implementing a multi-step customer onboarding flow that collects essential clien
 - [ ] User state is saved after successful payment and account is provisioned.
 - [ ] Webhook integration or synchronous success handler captures payment status.
 
-## � Pricing Tiers
+## � Pricing Tiersi 
 | Feature | 🌱 Basic Plan | 🚀 Pro Plan | 🏢 Custom (Enterprise) |
 | :--- | :--- | :--- | :--- |
 | **Student Limit** | Up to 80 Students | Up to 250 Students | Unlimited |

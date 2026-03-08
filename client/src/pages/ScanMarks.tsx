@@ -360,6 +360,14 @@ export default function ScanMarks() {
 
     return (
         <Layout title="Scan Marks">
+            {/* Hide top and bottom navigation bars when in immersive scanning mode or showing modals */}
+            {(scanning || student || pendingStudent) && (
+                <style>{`
+                    nav.fixed.bottom-6 { display: none !important; }
+                    header.fixed.top-0 { display: none !important; }
+                `}</style>
+            )}
+
             {/* Test Selector */}
             {!scanning && (
                 <div className="max-w-md mx-auto mt-10">
@@ -433,10 +441,7 @@ export default function ScanMarks() {
             {scanning && (
                 <div className="fixed inset-0 z-[200] bg-black overflow-hidden">
                     {/* Camera Viewfinder */}
-                    {/* Hide bottom navigation */}
                     <style>{`
-                        nav.fixed.bottom-6 { display: none !important; }
-                        
                         /* Hide html5-qrcode's default qrbox border AND background */
                         #${READER_ID} #qr-shaded-region { 
                             border: none !important; 
