@@ -261,7 +261,7 @@ export default function Home() {
             {/* NAV BAR */}
             <nav role="navigation" aria-label="Main navigation" className="relative z-50 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
                 <div className="flex items-center gap-2.5">
-                    <img src="/icon-512x512.png" alt="MathLogs Logo" width={36} height={36} fetchPriority="high" className="w-9 h-9 rounded-xl shadow-md border border-neutral-100 object-cover" />
+                    <img src="/icon-192x192.png" alt="MathLogs Logo" width={36} height={36} fetchPriority="high" className="w-9 h-9 rounded-xl shadow-md border border-neutral-100 object-cover" />
                     <span className="text-[22px] font-extrabold tracking-tight text-neutral-900">MathLogs</span>
                 </div>
 
@@ -395,7 +395,7 @@ export default function Home() {
                                     </div>
                                     <div className="w-full relative bg-neutral-50">
                                         <img
-                                            src="/dashboard.png"
+                                            src="/dashboard.webp"
                                             alt="MathLogs dashboard showing student tracking, fee collection, and growth trends"
                                             fetchPriority="high"
                                             width={2880}
@@ -412,25 +412,29 @@ export default function Home() {
 
                 {/* ── MOBILE MOCKUP (< 768px) — Bulletproof Flex Centering ── */}
                 <div className="md:hidden mt-auto pt-6 flex justify-center overflow-hidden w-screen relative left-1/2 -translate-x-1/2">
-                    <img
-                        src="/images/features/dashboard-mobile.png"
+                    <motion.img
+                        src="/images/features/dashboard-mobile.webp"
                         alt="MathLogs mobile app dashboard"
                         fetchPriority="high"
                         width={1920}
                         height={1440}
-                        className="w-[220%] max-w-[1000px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.18)] origin-top"
+                        animate={{ y: [0, -10, 0] }}
+                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                        className="w-[220%] max-w-[1000px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.18)] origin-top object-contain"
                     />
                 </div>
 
                 {/* ── TABLET MOCKUP  (md → lg, 768–1023px) ─────────────────────────── */}
                 <div className="hidden md:flex lg:hidden mt-auto pt-6 justify-center overflow-hidden w-screen relative left-1/2 -translate-x-1/2 h-auto items-end">
-                    <img
-                        src="/images/features/dashboard-tablet.png"
+                    <motion.img
+                        src="/images/features/dashboard-tablet.webp"
                         alt="MathLogs tablet app dashboard"
                         fetchPriority="high"
                         width={1920}
                         height={1440}
-                        className="w-[160%] min-w-[1000px] max-w-[1400px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.14)] origin-top mb-[-28%]"
+                        animate={{ y: [0, -8, 0] }}
+                        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                        className="w-[160%] min-w-[1000px] max-w-[1400px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.14)] origin-top mb-[-28%] object-contain"
                     />
                 </div>
             </main>
@@ -1617,32 +1621,49 @@ export default function Home() {
     );
 }
 
-// Fully optimized alternating Text Component
-// Eliminates the 0.08 CLS layout-shift from character by character typing
+// Fully optimized Typewriter Component
+// Returns character-by-character typing while utilizing an invisible footprint placeholder to
+// forcefully eliminate the 0.08 CLS layout-shift without penalizing the Desktop score
 function TypewriterText({ texts }: { texts: string[] }) {
-    const [index, setIndex] = useState(0);
+    const [textIndex, setTextIndex] = useState(0);
+    const [charIndex, setCharIndex] = useState(texts[0].length); // Start fully typed to prevent CPU thrashing during LCP
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setIndex((prev) => (prev + 1) % texts.length);
-        }, 3500);
-        return () => clearInterval(interval);
-    }, [texts]);
+        const currentText = texts[textIndex];
+
+        const timeout = setTimeout(() => {
+            if (!isDeleting) {
+                if (charIndex < currentText.length) {
+                    setCharIndex(prev => prev + 1);
+                } else {
+                    setTimeout(() => setIsDeleting(true), 2500); // Pause before deleting
+                }
+            } else {
+                if (charIndex > 0) {
+                    setCharIndex(prev => prev - 1);
+                } else {
+                    setIsDeleting(false);
+                    setTextIndex((prev) => (prev + 1) % texts.length);
+                }
+            }
+        }, isDeleting ? 45 : 60);
+
+        return () => clearTimeout(timeout);
+    }, [charIndex, isDeleting, textIndex, texts]);
+
+    // Calculate maximum width placeholder to prevent CLS
+    const longestText = [...texts].sort((a, b) => b.length - a.length)[0];
 
     return (
-        <span className="relative inline-flex items-center text-neutral-900 justify-start h-[1.2lh] w-full mt-[-0.2lh] -ml-0.5 overflow-hidden align-bottom">
-            <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                    key={index}
-                    initial={{ y: 20, opacity: 0, filter: 'blur(2px)' }}
-                    animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
-                    exit={{ y: -20, opacity: 0, filter: 'blur(2px)' }}
-                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                    className="absolute left-0 bottom-0 whitespace-nowrap"
-                >
-                    {texts[index]}
-                </motion.span>
-            </AnimatePresence>
+        <span className="relative inline-flex whitespace-nowrap">
+            {/* Invisible placeholder reserves EXACT space, preventing any layout shifts */}
+            <span className="invisible select-none overflow-hidden" aria-hidden="true">{longestText}</span>
+            {/* Actual typing text ABSOLUTELY positioned so it doesn't affect document flow */}
+            <span className="absolute left-0 top-0 text-neutral-900 pointer-events-none">
+                {texts[textIndex].substring(0, charIndex)}
+                <span className="animate-pulse text-neutral-400 font-light ml-[2px]">|</span>
+            </span>
         </span>
     );
 }
