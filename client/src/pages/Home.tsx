@@ -418,7 +418,7 @@ export default function Home() {
                     <motion.img
                         src="/images/features/dashboard-mobile.png"
                         alt="MathLogs mobile app dashboard"
-                        loading="lazy"
+                        fetchPriority="high"
                         animate={{ y: [0, -10, 0] }}
                         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                         className="w-[220%] max-w-[1000px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.18)] origin-top"
@@ -430,7 +430,7 @@ export default function Home() {
                     <motion.img
                         src="/images/features/dashboard-tablet.png"
                         alt="MathLogs tablet app dashboard"
-                        loading="lazy"
+                        fetchPriority="high"
                         animate={{ y: [0, -10, 0] }}
                         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                         className="w-[160%] min-w-[1000px] max-w-[1400px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.14)] origin-top mb-[-28%]"
