@@ -1,6 +1,6 @@
 import { useState, useEffect, memo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     ChevronRight, MessageSquare, Shield,
     CheckCircle, ArrowRight, Database, LineChart,
@@ -167,12 +167,9 @@ function FloatingPaths({ position }: { position: number }) {
 }
 
 export default function Home() {
-    const { scrollY } = useScroll();
     const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const carouselRef = useRef<HTMLDivElement>(null);
-    const y1 = useTransform(scrollY, [0, 1000], [0, 200]);
-    const y2 = useTransform(scrollY, [0, 1000], [0, -100]);
 
     // Auto-scroll logic for mobile carousel
     useEffect(() => {
@@ -385,11 +382,9 @@ export default function Home() {
                         {/* DESKTOP MOCKUP — right column, lg+ only */}
                         <div className="hidden lg:block relative z-10 w-full h-[600px] flex items-center justify-center perspective-[2000px]">
                             <div className="relative w-full h-full flex items-center justify-center">
-                                <motion.div
-                                    initial={{ opacity: 0, y: 40, rotateX: 10, rotateY: -10 }}
-                                    animate={{ opacity: 1, y: 0, rotateX: 0, rotateY: -2 }}
-                                    transition={{ duration: 1.2, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+                                <div
                                     className="absolute left-1/2 -translate-x-[33%] top-[10%] w-[160%] max-w-[1300px] z-10 flex flex-col bg-white rounded-3xl shadow-[0_30px_100px_-20px_rgba(0,0,0,0.2)] border border-neutral-200/60 overflow-hidden transform-gpu"
+                                    style={{ transform: 'rotateY(-2deg)' }}
                                 >
                                     <div className="w-full bg-neutral-100/80 backdrop-blur-md border-b border-neutral-200/80 px-4 py-3 flex items-center gap-2">
                                         <div className="flex gap-2">
@@ -409,7 +404,7 @@ export default function Home() {
                                         />
                                         <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-white/10 to-transparent pointer-events-none" />
                                     </div>
-                                </motion.div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -417,28 +412,24 @@ export default function Home() {
 
                 {/* ── MOBILE MOCKUP (< 768px) — Bulletproof Flex Centering ── */}
                 <div className="md:hidden mt-auto pt-6 flex justify-center overflow-hidden w-screen relative left-1/2 -translate-x-1/2">
-                    <motion.img
+                    <img
                         src="/images/features/dashboard-mobile.png"
                         alt="MathLogs mobile app dashboard"
                         fetchPriority="high"
                         width={1920}
                         height={1440}
-                        animate={{ y: [0, -10, 0] }}
-                        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                         className="w-[220%] max-w-[1000px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.18)] origin-top"
                     />
                 </div>
 
                 {/* ── TABLET MOCKUP  (md → lg, 768–1023px) ─────────────────────────── */}
                 <div className="hidden md:flex lg:hidden mt-auto pt-6 justify-center overflow-hidden w-screen relative left-1/2 -translate-x-1/2 h-auto items-end">
-                    <motion.img
+                    <img
                         src="/images/features/dashboard-tablet.png"
                         alt="MathLogs tablet app dashboard"
                         fetchPriority="high"
                         width={1920}
                         height={1440}
-                        animate={{ y: [0, -10, 0] }}
-                        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                         className="w-[160%] min-w-[1000px] max-w-[1400px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.14)] origin-top mb-[-28%]"
                     />
                 </div>
