@@ -67,7 +67,63 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <!-- App Shell for instantaneous LCP -->
+    <style>
+      body {
+        margin: 0;
+        background: white;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+
+      .app-shell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        min-height: 100vh;
+        padding-top: 15vh;
+        opacity: 0;
+        animation: fadein 0.3s forwards 0.2s;
+      }
+
+      @keyframes fadein {
+        to {
+          opacity: 1;
+        }
+      }
+
+      .app-shell h1 {
+        font-size: 2.5rem;
+        letter-spacing: -0.05em;
+        color: #111827;
+        margin: 0;
+      }
+
+      .app-shell .hero {
+        width: 90vw;
+        max-width: 1000px;
+        margin-top: 3rem;
+        transform: translateY(20px);
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+        border-radius: 24px;
+      }
+
+      @media(min-width: 768px) {
+        .app-shell h1 {
+          font-size: 4rem;
+        }
+      }
+    </style>
+    <div class="app-shell">
+      <h1>MathLogs</h1>
+      <picture>
+        <source media="(min-width: 768px)" srcset="/dashboard.png" />
+        <img src="/images/features/dashboard-mobile.png" class="hero" fetchpriority="high"
+          alt="MathLogs App Shell Hero" />
+      </picture>
+    </div>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 
