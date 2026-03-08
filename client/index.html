@@ -49,8 +49,14 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet">
+
+  <!-- Preload hero images for faster LCP -->
+  <link rel="preload" as="image" href="/images/features/dashboard-mobile.png" media="(max-width: 767px)">
+  <link rel="preload" as="image" href="/dashboard.png" media="(min-width: 1024px)">
 </head>
 
 <body>

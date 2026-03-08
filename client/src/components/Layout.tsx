@@ -151,6 +151,8 @@ export default function Layout({ children, title }: LayoutProps) {
                         <img
                             src="/icon-512x512.png"
                             alt="MathLogs Logo"
+                            width={32}
+                            height={32}
                             className="w-8 h-8 rounded-full shadow-md object-cover border border-app-border/50"
                         />
                         <span className="font-semibold text-[15px] text-app-text tracking-tight">Math<span className="text-accent opacity-90 group-hover:opacity-100 transition-opacity">Logs</span></span>

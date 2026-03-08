@@ -118,7 +118,7 @@ const OnboardingCard = memo(function OnboardingCard() {
                     </AnimatePresence>
                     <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
                         {[0, 1, 2].map(i => (
-                            <button key={i} onClick={() => setActiveStep(i)} className={`h-1.5 rounded-full transition-all duration-300 ${activeStep === i ? 'bg-[#2970ff] w-4' : 'bg-neutral-300 w-1.5'}`} />
+                            <button key={i} onClick={() => setActiveStep(i)} aria-label={`Go to step ${i + 1}`} className={`h-1.5 rounded-full transition-all duration-300 ${activeStep === i ? 'bg-[#2970ff] w-4' : 'bg-neutral-300 w-1.5'}`} />
                         ))}
                     </div>
                 </div>
@@ -403,6 +403,8 @@ export default function Home() {
                                             src="/dashboard.png"
                                             alt="MathLogs dashboard showing student tracking, fee collection, and growth trends"
                                             fetchPriority="high"
+                                            width={2880}
+                                            height={2231}
                                             className="w-full h-auto object-cover pointer-events-none origin-top"
                                         />
                                         <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-white/10 to-transparent pointer-events-none" />
@@ -419,6 +421,8 @@ export default function Home() {
                         src="/images/features/dashboard-mobile.png"
                         alt="MathLogs mobile app dashboard"
                         fetchPriority="high"
+                        width={1920}
+                        height={1440}
                         animate={{ y: [0, -10, 0] }}
                         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                         className="w-[220%] max-w-[1000px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.18)] origin-top"
@@ -431,6 +435,8 @@ export default function Home() {
                         src="/images/features/dashboard-tablet.png"
                         alt="MathLogs tablet app dashboard"
                         fetchPriority="high"
+                        width={1920}
+                        height={1440}
                         animate={{ y: [0, -10, 0] }}
                         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                         className="w-[160%] min-w-[1000px] max-w-[1400px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.14)] origin-top mb-[-28%]"
@@ -479,6 +485,7 @@ export default function Home() {
                                 </h4>
                                 <button
                                     onClick={() => setExpandedFeature('batch')}
+                                    aria-label="Expand batch management details"
                                     className="w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-[#635bff] hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm relative z-50 border border-neutral-200/50"
                                 >
                                     <Maximize2 className="w-4 h-4" />
@@ -684,6 +691,7 @@ export default function Home() {
                                 </div>
                                 <button
                                     onClick={() => setExpandedFeature('whatsapp')}
+                                    aria-label="Expand WhatsApp alerts details"
                                     className="w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-[#0066ff] hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm relative z-50 border border-neutral-200/50"
                                 >
                                     <Maximize2 className="w-4 h-4" />
@@ -727,6 +735,7 @@ export default function Home() {
                         >
                             <button
                                 onClick={() => setExpandedFeature('scan')}
+                                aria-label="Expand smart scanning details"
                                 className="absolute top-8 right-8 md:top-12 md:right-12 lg:top-16 lg:right-16 w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-[#0066ff] hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm z-50 border border-neutral-200/50"
                             >
                                 <Maximize2 className="w-4 h-4" />
@@ -1123,6 +1132,7 @@ export default function Home() {
                                 <div className="absolute top-6 right-6 z-50">
                                     <button
                                         onClick={() => setExpandedFeature(null)}
+                                        aria-label="Close details"
                                         className="w-10 h-10 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 flex items-center justify-center text-indigo-500 transition-colors"
                                     >
                                         <X className="w-5 h-5" />
@@ -1189,7 +1199,7 @@ export default function Home() {
                                                 Link your WhatsApp group once — approved students join automatically.
                                             </p>
                                             <div className="mt-auto pointer-events-none relative flex justify-center px-4">
-                                                <img src="/images/features/registration-success.png" alt="WhatsApp Alert" className="w-[220px] rounded-t-[1.5rem] shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.15)] border border-neutral-200/60 object-cover object-top opacity-95 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0 duration-500 ease-out" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                                <img src="/images/features/registration-success.png" alt="WhatsApp Alert" width={961} height={1622} loading="lazy" className="w-[220px] rounded-t-[1.5rem] shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.15)] border border-neutral-200/60 object-cover object-top opacity-95 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0 duration-500 ease-out" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                             </div>
                                         </div>
 
@@ -1354,6 +1364,7 @@ export default function Home() {
                                 <div className="absolute top-3 right-3 sm:top-6 sm:right-6 z-50">
                                     <button
                                         onClick={() => setExpandedFeature(null)}
+                                        aria-label="Close details"
                                         className="w-10 h-10 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 flex items-center justify-center text-blue-500 transition-colors"
                                     >
                                         <X className="w-5 h-5" />
@@ -1497,6 +1508,7 @@ export default function Home() {
                                 <div className="absolute top-3 right-3 sm:top-6 sm:right-6 z-50">
                                     <button
                                         onClick={() => setExpandedFeature(null)}
+                                        aria-label="Close details"
                                         className="w-10 h-10 rounded-xl bg-blue-100/50 hover:bg-blue-100 border border-blue-200/50 flex items-center justify-center text-[#0066ff] transition-colors"
                                     >
                                         <X className="w-5 h-5" />
