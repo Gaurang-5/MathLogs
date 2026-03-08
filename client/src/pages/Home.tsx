@@ -1617,39 +1617,32 @@ export default function Home() {
     );
 }
 
-// Custom Typewriter Component for Hero Section
+// Fully optimized alternating Text Component
+// Eliminates the 0.08 CLS layout-shift from character by character typing
 function TypewriterText({ texts }: { texts: string[] }) {
-    const [textIndex, setTextIndex] = useState(0);
-    const [charIndex, setCharIndex] = useState(texts[0].length); // Start fully typed to prevent CPU thrashing during LCP
-    const [isDeleting, setIsDeleting] = useState(false);
+    const [index, setIndex] = useState(0);
 
     useEffect(() => {
-        const currentText = texts[textIndex];
-
-        const timeout = setTimeout(() => {
-            if (!isDeleting) {
-                if (charIndex < currentText.length) {
-                    setCharIndex(prev => prev + 1);
-                } else {
-                    setTimeout(() => setIsDeleting(true), 2500); // Pause before deleting
-                }
-            } else {
-                if (charIndex > 0) {
-                    setCharIndex(prev => prev - 1);
-                } else {
-                    setIsDeleting(false);
-                    setTextIndex((prev) => (prev + 1) % texts.length);
-                }
-            }
-        }, isDeleting ? 45 : 60); // Typing speed vs deleting speed (45ms delete feels calmer)
-
-        return () => clearTimeout(timeout);
-    }, [charIndex, isDeleting, textIndex, texts]);
+        const interval = setInterval(() => {
+            setIndex((prev) => (prev + 1) % texts.length);
+        }, 3500);
+        return () => clearInterval(interval);
+    }, [texts]);
 
     return (
-        <span className="text-neutral-900">
-            {texts[textIndex].substring(0, charIndex)}
-            <span className="animate-pulse text-neutral-400 font-light">|</span>
+        <span className="relative inline-flex items-center text-neutral-900 justify-start h-[1.2lh] w-full mt-[-0.2lh] -ml-0.5 overflow-hidden align-bottom">
+            <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                    key={index}
+                    initial={{ y: 20, opacity: 0, filter: 'blur(2px)' }}
+                    animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
+                    exit={{ y: -20, opacity: 0, filter: 'blur(2px)' }}
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    className="absolute left-0 bottom-0 whitespace-nowrap"
+                >
+                    {texts[index]}
+                </motion.span>
+            </AnimatePresence>
         </span>
     );
 }
