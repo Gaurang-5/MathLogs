@@ -842,12 +842,12 @@ export default function BatchDetails() {
                     </div>
                 </div>
 
-                <div className="hidden md:block overflow-x-auto overflow-y-hidden rounded-b-[24px] w-full max-w-full">
-                    <table className="w-full text-left border-collapse">
-                        <thead className={cn("bg-app-surface/50 text-app-text-secondary uppercase font-bold tracking-wider backdrop-blur-md", getTextSizeClass('header'))}>
+                <div className="hidden md:block overflow-auto rounded-b-[24px] w-full max-w-full custom-scrollbar" style={{ maxHeight: 'calc(100vh - 220px)' }}>
+                    <table className="w-full text-left border-collapse relative">
+                        <thead className={cn("bg-app-surface text-app-text-secondary uppercase font-bold tracking-wider sticky top-0 z-20 shadow-sm outline outline-1 outline-app-border", getTextSizeClass('header'))}>
                             <tr>
                                 <th
-                                    className={cn("border-b border-app-border cursor-pointer select-none hover:bg-app-surface-hover transition-colors group", getCellPadding())}
+                                    className={cn("bg-app-surface cursor-pointer select-none hover:bg-app-surface-hover transition-colors group", getCellPadding())}
                                     style={{ minWidth: '100px', whiteSpace: 'nowrap' }}
                                     onClick={() => {
                                         setSortConfig(current => {
@@ -866,14 +866,14 @@ export default function BatchDetails() {
                                         )}
                                     </div>
                                 </th>
-                                <th className={cn("border-b border-app-border", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Student Name</th>
-                                <th className={cn("border-b border-app-border", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>School</th>
-                                <th className={cn("border-b border-app-border", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Parent Name</th>
-                                <th className={cn("border-b border-app-border", getCellPadding())} style={{ minWidth: '200px', whiteSpace: 'nowrap' }}>Contact</th>
-                                <th className={cn("border-b border-app-border text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Tests</th>
-                                <th className={cn("border-b border-app-border text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Avg (10)</th>
+                                <th className={cn("bg-app-surface", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Student Name</th>
+                                <th className={cn("bg-app-surface", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>School</th>
+                                <th className={cn("bg-app-surface", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Parent Name</th>
+                                <th className={cn("bg-app-surface", getCellPadding())} style={{ minWidth: '200px', whiteSpace: 'nowrap' }}>Contact</th>
+                                <th className={cn("bg-app-surface text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Tests</th>
+                                <th className={cn("bg-app-surface text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Avg (10)</th>
                                 {batch.feeInstallments?.map(inst => (
-                                    <th key={inst.id} className={cn("border-b border-app-border text-center", getCellPadding())} style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>
+                                    <th key={inst.id} className={cn("bg-app-surface text-center", getCellPadding())} style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>
                                         <div className="flex flex-col items-center">
                                             <span>{inst.name}</span>
                                             <span className={cn("text-app-text-tertiary", getTextSizeClass('sub'))}>₹{inst.amount}</span>
@@ -1149,7 +1149,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     editingStudent && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1285,7 +1285,7 @@ export default function BatchDetails() {
             {/* View Marks Modal */}
             <AnimatePresence>
                 {viewMarks && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1364,7 +1364,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showAddStudent && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1488,7 +1488,7 @@ export default function BatchDetails() {
             {/* Delete Student Confirmation Modal */}
             <AnimatePresence>
                 {studentToDelete && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1554,7 +1554,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showEditBatch && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1623,7 +1623,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showWhatsAppModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1676,7 +1676,7 @@ export default function BatchDetails() {
             {/* Manage Installments Modal */}
             <AnimatePresence>
                 {showManageInstallments && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1739,7 +1739,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showAddInstallment && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1801,7 +1801,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     editingInstallment && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1860,7 +1860,7 @@ export default function BatchDetails() {
             {/* Delete Installment Confirmation Modal */}
             <AnimatePresence>
                 {installmentToDelete && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1910,7 +1910,7 @@ export default function BatchDetails() {
             {/* Payment Confirmation Modal (Menu Style) */}
             <AnimatePresence>
                 {paymentModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1986,7 +1986,7 @@ export default function BatchDetails() {
             {/* View Payment Details / Revoke Menu */}
             <AnimatePresence>
                 {viewPayment && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2062,7 +2062,7 @@ export default function BatchDetails() {
             {/* Permanent Close Confirmation Modal */}
             <AnimatePresence>
                 {showCloseConfirm && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2105,7 +2105,7 @@ export default function BatchDetails() {
             {/* Delete Confirmation Modal */}
             <AnimatePresence>
                 {showDeleteConfirm && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2159,7 +2159,7 @@ export default function BatchDetails() {
             {/* Sending Progress Modal */}
             <AnimatePresence>
                 {sendingState.isOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
