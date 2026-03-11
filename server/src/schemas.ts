@@ -98,7 +98,8 @@ export const createTestSchema = z.object({
         name: z.string().min(1, "Test name is required").max(200),
         subject: z.string().min(1, "Subject is required").max(100),
         date: z.string().datetime().or(z.string()), // ISO date or any string
-        maxMarks: z.number().positive("Max marks must be positive"),
+        maxMarks: z.number().positive("Max marks must be positive")
+            .or(z.string().regex(/^\d+(\.\d+)?$/).transform(Number)),
         className: z.string().max(100).optional()
     })
 });
@@ -107,7 +108,7 @@ export const updateTestSchema = z.object({
     body: z.object({
         name: z.string().min(1).max(200).optional(),
         date: z.string().optional(),
-        maxMarks: z.number().positive().optional()
+        maxMarks: z.number().positive().or(z.string().regex(/^\d+(\.\d+)?$/).transform(Number)).optional()
     })
 });
 

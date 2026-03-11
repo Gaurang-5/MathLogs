@@ -63,7 +63,7 @@ export default function TestDetails() {
         try {
             await apiRequest(`/tests/${id}`, 'PUT', {
                 name: editName,
-                maxMarks: editMaxMarks,
+                maxMarks: parseFloat(editMaxMarks as string),
                 date: editDate
             });
             toast.success('Test updated successfully');

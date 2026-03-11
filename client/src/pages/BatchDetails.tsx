@@ -1274,6 +1274,7 @@ export default function BatchDetails() {
                                             <Save className="w-4 h-4 mr-2" /> Save Changes
                                         </button>
                                     </div>
+                                    <div className="h-4 md:hidden"></div>
                                 </form>
                             </motion.div>
                         </div>
@@ -1353,6 +1354,7 @@ export default function BatchDetails() {
                                     </table>
                                 </div>
                             </div>
+                            <div className="h-4 md:hidden"></div>
                         </motion.div>
                     </div>
                 )}
@@ -1475,6 +1477,7 @@ export default function BatchDetails() {
                                             <Plus className="w-4 h-4 mr-2" /> Add Student
                                         </button>
                                     </div>
+                                    <div className="h-4 md:hidden"></div>
                                 </form>
                             </motion.div>
                         </div>
@@ -1608,6 +1611,7 @@ export default function BatchDetails() {
                                             <Save className="w-4 h-4 mr-2" /> Update Batch
                                         </button>
                                     </div>
+                                    <div className="h-4 md:hidden"></div>
                                 </form>
                             </motion.div>
                         </div>
@@ -1661,6 +1665,7 @@ export default function BatchDetails() {
                                             <Save className="w-4 h-4 mr-2" /> Save Link
                                         </button>
                                     </div>
+                                    <div className="h-4 md:hidden"></div>
                                 </form>
                             </motion.div>
                         </div>
@@ -1784,6 +1789,7 @@ export default function BatchDetails() {
                                             Create Installment
                                         </button>
                                     </div>
+                                    <div className="h-4 md:hidden"></div>
                                 </form>
                             </motion.div>
                         </div>
