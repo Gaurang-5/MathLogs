@@ -48,7 +48,7 @@ const Fees: React.FC = () => {
     }, [searchTerm]);
 
     const [selectedBatch, setSelectedBatch] = useState('All');
-    const [viewMode, setViewMode] = useState<'all' | 'defaulters'>('defaulters'); // Default to defaulters usually more useful
+    const [viewMode, setViewMode] = useState<'all' | 'defaulters' | 'recent'>('recent'); // Default to recent payments
 
     const [selectedStudent, setSelectedStudent] = useState<FeeSummary | null>(null);
     const [paymentAmount, setPaymentAmount] = useState('');
@@ -203,31 +203,38 @@ const Fees: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+            <div className="space-y-6">
                 {/* Main List Section */}
-                <div className="xl:col-span-8 space-y-6">
+                <div className="space-y-6">
 
                     {/* Toolbar */}
                     <div className="bg-white p-4 rounded-[24px] shadow-sm flex flex-col gap-4">
                         {/* View Toggle */}
-                        <div className="flex bg-gray-100 p-1 rounded-2xl w-full">
+                        <div className="flex flex-wrap bg-gray-100 p-1 rounded-2xl w-full">
+                            <button
+                                onClick={() => setViewMode('recent')}
+                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'recent' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                            >
+                                Recent Payments
+                            </button>
                             <button
                                 onClick={() => setViewMode('defaulters')}
-                                className={cn("flex-1 px-6 py-2 rounded-xl text-center text-sm font-bold transition-all", viewMode === 'defaulters' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'defaulters' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
                             >
                                 Defaulters
                             </button>
                             <button
                                 onClick={() => setViewMode('all')}
-                                className={cn("flex-1 px-6 py-2 rounded-xl text-center text-sm font-bold transition-all", viewMode === 'all' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'all' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
                             >
                                 All Records
                             </button>
                         </div>
 
                         {/* Search & Filter */}
-                        <div className="flex flex-col md:flex-row gap-3">
-                            <div className="relative flex-1">
+                        {viewMode !== 'recent' && (
+                            <div className="flex flex-col md:flex-row gap-3">
+                                <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input
                                     type="text"
@@ -313,8 +320,42 @@ const Fees: React.FC = () => {
                                 </button>
                             </div>
                         </div>
+                        )}
                     </div>
 
+                    {viewMode === 'recent' ? (
+                        <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-gray-100 p-6 md:p-8">
+                            <div className="flex items-center justify-between mb-8">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
+                                    <History className="w-5 h-5 text-gray-500" /> Recent Transactions
+                                </h3>
+                            </div>
+                            <div className="space-y-4">
+                                {transactions.length === 0 ? (
+                                    <div className="text-center text-gray-400 text-sm py-10">No recent transactions</div>
+                                ) : (
+                                    transactions.map(tx => (
+                                        <div key={tx.id} className="group flex items-start justify-between p-5 rounded-2xl hover:bg-gray-50 transition-colors border border-gray-100/80 hover:border-gray-200">
+                                            <div className="flex gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0">
+                                                    {tx.studentName.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div className="text-base font-bold text-gray-800">{tx.studentName}</div>
+                                                    <div className="text-xs text-gray-400 uppercase tracking-wide font-bold mt-1">{tx.batchName}</div>
+                                                    <div className="text-[11px] text-gray-500 mt-2 bg-gray-100 px-2 py-1 rounded-md mb-0.5 inline-block font-medium">{tx.type.replace('Installment: ', '')}</div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right flex flex-col items-end">
+                                                <div className="text-lg font-bold text-green-600 font-mono">+₹{tx.amount.toLocaleString()}</div>
+                                                <div className="text-xs text-gray-400 mt-1.5 font-medium">{new Date(tx.date).toLocaleDateString()}</div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    ) : (
                     <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-gray-100">
                         {loading ? (
                             <div className="flex flex-col items-center justify-center h-96 text-gray-400">
@@ -409,43 +450,7 @@ const Fees: React.FC = () => {
                             </div>
                         )}
                     </div>
-                </div>
-
-                {/* Sidebar */}
-                <div className="xl:col-span-4 space-y-6">
-                    {/* Recent Transactions List */}
-                    <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 p-6 flex flex-col h-[calc(100vh-200px)] sticky top-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <History className="w-5 h-5 text-gray-400" /> Recent Payments
-                            </h3>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto pr-1 space-y-4 custom-scrollbar">
-                            {transactions.length === 0 ? (
-                                <div className="text-center text-gray-400 text-sm py-10">No recent transactions</div>
-                            ) : (
-                                transactions.map(tx => (
-                                    <div key={tx.id} className="group flex items-start justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                                        <div className="flex gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
-                                                {tx.studentName.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <div className="text-sm font-bold text-gray-800">{tx.studentName}</div>
-                                                <div className="text-[10px] text-gray-400 uppercase tracking-wide font-medium mt-0.5">{tx.batchName}</div>
-                                                <div className="text-xs text-gray-500 mt-1">{tx.type.replace('Installment: ', '')}</div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-sm font-bold text-green-600 font-mono">+₹{tx.amount.toLocaleString()}</div>
-                                            <div className="text-[10px] text-gray-400 mt-1">{new Date(tx.date).toLocaleDateString()}</div>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
+                    )}
                 </div>
             </div>
 
