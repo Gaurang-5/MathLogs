@@ -1096,6 +1096,11 @@ export default function Home() {
                     </div>
                 </div>
 
+                {/* Copyright Bar */}
+                <div className="w-full max-w-6xl mx-auto px-8 md:px-12 pt-8 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-center sm:justify-between text-[13px] text-slate-500 font-medium mb-16 relative z-10 gap-4 sm:gap-0">
+                    <p>&copy; {new Date().getFullYear()} Mathlogs. All rights reserved.</p>
+                </div>
+
                 {/* Decorative large brand text */}
                 <div className="w-full flex justify-center pointer-events-none select-none overflow-hidden translate-y-[28%] md:translate-y-[26%]" aria-hidden="true">
                     <p className="text-[28vw] md:text-[24vw] font-black leading-[0.7] tracking-tighter mx-auto text-center whitespace-nowrap !text-white">
