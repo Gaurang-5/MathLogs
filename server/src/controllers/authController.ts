@@ -148,7 +148,11 @@ export const getProfile = async (req: Request, res: Response) => {
             username: admin.institute?.teacherName || admin.username,
             email: admin.institute?.email || '',
             phone: admin.institute?.phoneNumber || '',
-            instituteName: admin.institute?.name || ''
+            instituteName: admin.institute?.name || '',
+            planName: (admin.institute?.config as any)?.planName || 'Basic',
+            maxStudents: (admin.institute?.config as any)?.maxStudents || 100,
+            planStartDate: admin.institute?.planStartDate || null,
+            planExpiryDate: admin.institute?.planExpiryDate || null
         });
     } catch (e) {
         console.error('Profile fetch error:', e);

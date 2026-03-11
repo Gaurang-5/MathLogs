@@ -35,18 +35,8 @@ export const createBatch = async (req: Request, res: Response) => {
 
     const requiresGrades = config.requiresGrades !== false; // Default to true if not specified
 
-    // Validate Global Limit (New Requirement)
-    if (config.maxBatches) {
-        const totalBatches = await prisma.batch.count({
-            where: {
-                instituteId: user.instituteId,
-                academicYearId
-            }
-        });
-        if (totalBatches >= config.maxBatches) {
-            return res.status(400).json({ error: `Max total batches limit reached (${config.maxBatches}).` });
-        }
-    }
+    // Validate Global Limit (New Requirement) - REMOVED (Replaced by Student Limits)
+    // if (config.maxBatches) { ... }
 
     // If institute doesn't require grades, skip className validation
     if (!requiresGrades) {
@@ -74,12 +64,7 @@ export const createBatch = async (req: Request, res: Response) => {
             }
         });
 
-        // Only enforce subject limit if Global Limit is NOT active
-        if (!config.maxBatches && existingBatchesCount >= maxBatchesPerSubject) {
-            return res.status(400).json({
-                error: `Max limit of ${maxBatchesPerSubject} batches reached for subject: ${currentSubject}`
-            });
-        }
+    // Only enforce subject limit if Global Limit is NOT active - REMOVED
 
         try {
             // Check for duplicate batch number in the current academic year
@@ -152,12 +137,7 @@ export const createBatch = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Batch Number must be greater than 0' });
     }
 
-    // Only enforce class limit if Global Limit is NOT active
-    if (!config.maxBatches && num > classConfig.maxBatches) {
-        return res.status(400).json({
-            error: `${className} can only have up to ${classConfig.maxBatches} batches`
-        });
-    }
+    // Only enforce class limit if Global Limit is NOT active - REMOVED
 
     try {
         // Check for duplicate
@@ -335,7 +315,8 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
 
         // PERF FIX (P0-C): Run synchronous PDFKit in a worker thread.
         // PDFKit blocks the event loop for 200-500ms per PDF — catastrophic at scale.
-        const workerScript = path.resolve(__dirname, '../workers/batchPdfWorker.js');
+        const ext = path.extname(__filename); // Returns .ts in dev, .js in prod
+        const workerScript = path.resolve(__dirname, `../workers/batchPdfWorker${ext}`);
         const pdfBuffer = await runPdfInWorker(workerScript, { batch });
 
         res.setHeader('Content-Type', 'application/pdf');

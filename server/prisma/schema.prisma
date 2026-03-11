@@ -20,6 +20,8 @@ model Institute {
   email         String?
   config        Json?          @default("{\"requiresGrades\": true, \"allowedClasses\": [\"9\", \"10\"], \"subjects\": [\"Math\", \"Science\"]}")
   plan          Tier           @default(FREE)
+  planStartDate DateTime?
+  planExpiryDate DateTime?
   
   // Status
   status           String      @default("ACTIVE") // ACTIVE, SUSPENDED

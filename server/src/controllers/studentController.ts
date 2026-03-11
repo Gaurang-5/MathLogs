@@ -124,6 +124,20 @@ export const registerStudent = async (req: Request, res: Response) => {
         // Multi-Tenant: Ensure Student inherits instituteId from Batch
         if (!batch.instituteId) return res.status(500).json({ error: 'Batch has no institute assigned' });
 
+        // Enforce Plan Limits
+        const institute = await prisma.institute.findUnique({ where: { id: batch.instituteId! } });
+        if (institute && institute.config && typeof institute.config === 'object' && (institute.config as any).maxStudents) {
+            const currentStudentCount = await prisma.student.count({
+                where: {
+                    instituteId: batch.instituteId,
+                    academicYearId: batch.academicYearId
+                }
+            });
+            if (currentStudentCount >= (institute.config as any).maxStudents) {
+                return res.status(400).json({ error: `You have reached the limit of ${(institute.config as any).maxStudents} students for your current plan.` });
+            }
+        }
+
 
         // Idempotency Check: Prevent duplicate registrations
         const existingStudent = await prisma.student.findFirst({
@@ -222,6 +236,20 @@ export const addStudentManually = async (req: Request, res: Response) => {
 
         const user = (req as any).user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+
+        // Enforce Plan Limits
+        const institute = await prisma.institute.findUnique({ where: { id: batch.instituteId! } });
+        if (institute && institute.config && typeof institute.config === 'object' && (institute.config as any).maxStudents) {
+            const currentStudentCount = await prisma.student.count({
+                where: {
+                    instituteId: batch.instituteId,
+                    academicYearId: batch.academicYearId
+                }
+            });
+            if (currentStudentCount >= (institute.config as any).maxStudents) {
+                return res.status(400).json({ error: `You have reached the limit of ${(institute.config as any).maxStudents} students for your current plan.` });
+            }
+        }
 
 
         // Idempotency Check

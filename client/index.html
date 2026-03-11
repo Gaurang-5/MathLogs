@@ -85,11 +85,21 @@
     }
   </style>
 
+  <!-- Prevent static shell from flashing during auth/routing -->
+  <script>
+    if (localStorage.getItem('token') || window.location.pathname !== '/') {
+      document.documentElement.classList.add('hide-static-shell');
+    }
+  </script>
+  <style>
+    .hide-static-shell #static-shell { display: none !important; }
+  </style>
 </head>
 
 <body>
   <!-- Static HTML shell for instant first paint (React replaces on mount) -->
   <div id="root">
+    <div id="static-shell">
     <!-- Nav -->
     <nav
       style="display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;max-width:80rem;margin:0 auto">

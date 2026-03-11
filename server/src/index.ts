@@ -181,10 +181,22 @@ app.listen(PORT, () => {
     // Initialize background workers
     emailWorker.start();
 
-    // Start WhatsApp Worker (every 5 seconds)
+    // Start WhatsApp Worker (Smart Polling)
     import('./utils/whatsappWorker').then(({ processWhatsappQueue }) => {
         console.log('✅ WhatsApp Worker Initialized');
-        setInterval(processWhatsappQueue, 5000);
+        
+        const pollQueue = async () => {
+            try {
+                const processedCount = await processWhatsappQueue();
+                // If jobs were processed, poll again almost immediately.
+                // If queue is empty, wait 2 seconds.
+                setTimeout(pollQueue, processedCount && processedCount > 0 ? 100 : 2000);
+            } catch (err) {
+                setTimeout(pollQueue, 5000); // Backoff on error
+            }
+        };
+        
+        pollQueue();
     });
 
     console.log(`Server running on http://localhost:${PORT}`);

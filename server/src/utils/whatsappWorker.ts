@@ -6,7 +6,7 @@ const META_API_VERSION = 'v22.0';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 
-const BATCH_SIZE = 5; // Conservative to stay within Meta rate limits
+const BATCH_SIZE = 25; // Safely increased to 25 for higher throughput without hitting rate limits
 
 /**
  * Worker Function: Polls for pending WhatsApp jobs and sends them.
@@ -20,7 +20,7 @@ const BATCH_SIZE = 5; // Conservative to stay within Meta rate limits
 export const processWhatsappQueue = async () => {
     if (!WHATSAPP_PHONE_NUMBER_ID || !WHATSAPP_ACCESS_TOKEN) {
         console.warn('[WhatsApp Worker] API credentials missing. Skipping...');
-        return;
+        return 0;
     }
 
     try {
@@ -56,13 +56,14 @@ export const processWhatsappQueue = async () => {
             });
         });
 
-        if (claimedJobs.length === 0) return;
+        if (claimedJobs.length === 0) return 0;
 
         console.log(`[WhatsApp Worker] Claimed ${claimedJobs.length} jobs (lock-safe).`);
 
         // Process all claimed jobs concurrently (outside transaction to avoid long lock times)
         await Promise.allSettled(claimedJobs.map(job => processJob(job)));
 
+        return claimedJobs.length;
     } catch (error) {
         console.error('[WhatsApp Worker] Queue processing error:', error);
     }

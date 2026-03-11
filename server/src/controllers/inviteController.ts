@@ -15,8 +15,8 @@ export const generateInvite = async (req: Request, res: Response) => {
         teacherName,
         phoneNumber,
         email,
-        totalClasses,
-        batchesPerClass,
+        plan, // 'Basic', 'Pro', or 'Custom'
+        customMaxStudents,
         subjects,
         allowedClasses,
         requiresGrades = true // Default to true if not provided
@@ -55,6 +55,25 @@ export const generateInvite = async (req: Request, res: Response) => {
     try {
         secureLogger.debug('Generating invite', { instituteName, teacherName });
 
+        let maxStudents = 100;
+        let planName = 'Basic';
+        let planEnum: any = 'FREE';
+
+        if (plan === 'Pro') {
+            maxStudents = 250;
+            planName = 'Pro';
+            planEnum = 'PRO';
+        } else if (plan === 'Custom') {
+            maxStudents = customMaxStudents ? Number(customMaxStudents) : 1000;
+            planName = 'Custom';
+            planEnum = 'ENTERPRISE';
+        }
+
+        // Set plan start/expiry dates (1 year by default)
+        const startDate = new Date();
+        const expiryDate = new Date();
+        expiryDate.setFullYear(startDate.getFullYear() + 1);
+
         // Create Institute
         const institute = await prisma.institute.create({
             data: {
@@ -62,11 +81,13 @@ export const generateInvite = async (req: Request, res: Response) => {
                 teacherName,
                 phoneNumber,
                 email,
+                plan: planEnum,
+                planStartDate: startDate,
+                planExpiryDate: expiryDate,
                 config: {
                     requiresGrades: requiresGrades,
-                    maxClasses: Number(totalClasses) || 12,
-                    maxBatches: Number(batchesPerClass) || 10, // Global Limit
-                    maxBatchesPerClass: 100, // Deprecated: Set high to avoid per-class Limits blocking global limit
+                    maxStudents: maxStudents,
+                    planName: planName,
                     allowedClasses: classList,
                     subjects: subjectList
                 }

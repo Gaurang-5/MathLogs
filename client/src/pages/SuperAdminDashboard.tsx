@@ -57,7 +57,7 @@ export default function SuperAdminDashboard() {
     const [leads, setLeads] = useState<any[]>([]);
     const [analytics, setAnalytics] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [error] = useState<string | null>(null);
 
     // Create Institute State
     const [showOnboardForm, setShowOnboardForm] = useState(false);
@@ -65,8 +65,8 @@ export default function SuperAdminDashboard() {
     const [teacherName, setTeacherName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [email, setEmail] = useState('');
-    const [totalClasses, setTotalClasses] = useState('12');
-    const [batchesPerClass, setBatchesPerClass] = useState('5');
+    const [plan, setPlan] = useState('Basic');
+    const [customMaxStudentsForInvite, setCustomMaxStudentsForInvite] = useState<number | ''>('');
     const [subjects, setSubjects] = useState('Math, Science, English');
     const [allowedClassesString, setAllowedClassesString] = useState('Class 9, Class 10');
     const [requiresGrades, setRequiresGrades] = useState(true);
@@ -75,7 +75,7 @@ export default function SuperAdminDashboard() {
     const [isCreating, setIsCreating] = useState(false);
 
     // Edit Institute State
-    const [editInstituteId, setEditInstituteId] = useState<string | null>(null);
+    // const [editInstituteId, setEditInstituteId] = useState<string | null>(null);
     const [inviteLink, setInviteLink] = useState('');
     const [copied, setCopied] = useState(false);
 
@@ -94,6 +94,7 @@ export default function SuperAdminDashboard() {
     // Config Modal State
     const [selectedInstitute, setSelectedInstitute] = useState<Institute | null>(null);
     const [configJson, setConfigJson] = useState('');
+    const [configMaxStudents, setConfigMaxStudents] = useState<number | ''>('');
     const [isSavingConfig, setIsSavingConfig] = useState(false);
 
     // Edit Details Modal State
@@ -145,7 +146,9 @@ export default function SuperAdminDashboard() {
 
     const handleOpenConfig = (inst: Institute) => {
         setSelectedInstitute(inst);
-        setConfigJson(JSON.stringify(inst.config || { classes: [] }, null, 2));
+        const cfg = inst.config as any || { classes: [] };
+        setConfigJson(JSON.stringify(cfg, null, 2));
+        setConfigMaxStudents(cfg.maxStudents || '');
     };
 
     const handleSaveConfig = async () => {
@@ -153,6 +156,9 @@ export default function SuperAdminDashboard() {
         setIsSavingConfig(true);
         try {
             const parsedConfig = JSON.parse(configJson);
+            if (configMaxStudents !== '') {
+                parsedConfig.maxStudents = Number(configMaxStudents);
+            }
             const token = localStorage.getItem('token');
             await axios.put(`${API_URL}/institutes/${selectedInstitute.id}/config`, {
                 config: parsedConfig
@@ -215,8 +221,8 @@ export default function SuperAdminDashboard() {
                 teacherName,
                 phoneNumber,
                 email,
-                totalClasses,
-                batchesPerClass,
+                plan,
+                customMaxStudents: plan === 'Custom' ? customMaxStudentsForInvite : undefined,
                 subjects,
                 allowedClasses: allowedClassesString,
                 requiresGrades
@@ -231,8 +237,9 @@ export default function SuperAdminDashboard() {
             setTeacherName('');
             setPhoneNumber('');
             setEmail('');
-
-            fetchData();
+            setPlan('Basic');
+            setCustomMaxStudentsForInvite('');
+            setSubjects('Math, Science, English');
         } catch (err) {
             alert('Failed to generate invite');
         } finally {
@@ -396,13 +403,27 @@ export default function SuperAdminDashboard() {
                             <h3 className="text-lg font-bold">Configuration: {selectedInstitute.name}</h3>
                             <button onClick={() => setSelectedInstitute(null)}><X className="w-5 h-5 text-gray-400" /></button>
                         </div>
-                        <div className="p-6">
-                            <p className="text-sm text-gray-500 mb-2">Edit allowed classes and batch limits (JSON).</p>
-                            <textarea
-                                value={configJson}
-                                onChange={(e) => setConfigJson(e.target.value)}
-                                className="w-full h-64 font-mono text-sm bg-gray-50 border border-gray-200 rounded-lg p-4 focus:ring-2 focus:ring-black outline-none"
-                            />
+                        <div className="p-6 space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 mb-2">Max Students Allowed (Custom Override)</label>
+                                <input 
+                                    type="number"
+                                    value={configMaxStudents}
+                                    onChange={(e) => setConfigMaxStudents(e.target.value === '' ? '' : Number(e.target.value))}
+                                    placeholder="Leave empty for plan default, or set custom limit e.g., 500"
+                                    className="w-full bg-gray-50 font-medium border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none transition-all placeholder:text-gray-400"
+                                />
+                                <p className="text-[10px] text-gray-400 pl-1 mt-1">This overrides the selected plan's default student capacity.</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 mb-2">Advanced Config (JSON)</label>
+                                <textarea
+                                    value={configJson}
+                                    onChange={(e) => setConfigJson(e.target.value)}
+                                    className="w-full h-48 font-mono text-sm bg-gray-50 border border-gray-200 rounded-xl p-4 focus:ring-2 focus:ring-black outline-none transition-all"
+                                />
+                            </div>
                         </div>
                         <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
                             <button onClick={() => setSelectedInstitute(null)} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancel</button>
@@ -998,18 +1019,33 @@ export default function SuperAdminDashboard() {
 
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">
-                                                Total Batches Allowed
+                                                Plan
                                             </label>
-                                            <input
-                                                type="number"
-                                                inputMode="numeric"
-                                                value={batchesPerClass}
-                                                onChange={(e) => setBatchesPerClass(e.target.value)}
-                                                placeholder="e.g. 10"
-                                                className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                            />
-                                            <p className="text-[10px] text-gray-400 pl-1">Total combined limit across all classes/subjects.</p>
+                                            <select
+                                                value={plan}
+                                                onChange={(e) => setPlan(e.target.value)}
+                                                className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all cursor-pointer font-medium"
+                                            >
+                                                <option value="Basic">Basic Plan (Max 100 students)</option>
+                                                <option value="Pro">Pro Plan (Max 250 students)</option>
+                                                <option value="Custom">Custom Plan</option>
+                                            </select>
                                         </div>
+
+                                        {plan === 'Custom' && (
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">
+                                                    Custom Limit
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={customMaxStudentsForInvite}
+                                                    onChange={(e) => setCustomMaxStudentsForInvite(e.target.value === '' ? '' : Number(e.target.value))}
+                                                    placeholder="e.g. 500"
+                                                    className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

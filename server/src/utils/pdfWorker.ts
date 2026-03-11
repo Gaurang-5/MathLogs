@@ -31,9 +31,13 @@ export function runPdfInWorker(
     timeoutMs = 30_000
 ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-        const worker = new Worker(workerScriptPath, {
-            workerData: data,
-        });
+        const isTs = workerScriptPath.endsWith('.ts');
+        const workerOptions: any = { workerData: data };
+        if (isTs) {
+            workerOptions.execArgv = ['-r', 'ts-node/register'];
+        }
+        
+        const worker = new Worker(workerScriptPath, workerOptions);
 
         let settled = false;
 
