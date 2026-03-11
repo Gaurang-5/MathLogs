@@ -48,7 +48,7 @@ const Fees: React.FC = () => {
     }, [searchTerm]);
 
     const [selectedBatch, setSelectedBatch] = useState('All');
-    const [viewMode, setViewMode] = useState<'all' | 'defaulters' | 'recent'>('recent'); // Default to recent payments
+    const [viewMode, setViewMode] = useState<'defaulters' | 'recent'>('defaulters'); // Default to defaulters
 
     const [selectedStudent, setSelectedStudent] = useState<FeeSummary | null>(null);
     const [paymentAmount, setPaymentAmount] = useState('');
@@ -138,7 +138,7 @@ const Fees: React.FC = () => {
             const matchesSearch = s.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
                 (s.humanId && s.humanId.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
             const matchesBatch = selectedBatch === 'All' || s.batchName === selectedBatch;
-            const matchesView = viewMode === 'all' || (viewMode === 'defaulters' && s.balance > 0);
+            const matchesView = viewMode === 'defaulters' ? s.balance > 0 : true; // all defaults to showing all if somehow not recent
             return matchesSearch && matchesBatch && matchesView;
         }).sort((a, b) => {
             if (listSort === 'date') {
@@ -149,6 +149,14 @@ const Fees: React.FC = () => {
             return b.balance - a.balance; // Descending Amount
         });
     }, [students, debouncedSearchTerm, selectedBatch, viewMode, listSort]);
+
+    const filteredTransactions = React.useMemo(() => {
+        return transactions.filter(tx => {
+            const matchesSearch = tx.studentName.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+            const matchesBatch = selectedBatch === 'All' || tx.batchName === selectedBatch;
+            return matchesSearch && matchesBatch;
+        });
+    }, [transactions, debouncedSearchTerm, selectedBatch]);
 
     // Corrected Logic: Only count positive balances as "Due".
     // "Balance" = Total Fee - Total Paid. If negative, it means surplus. We shouldn't subtract surplus from total pending dues of others.
@@ -212,29 +220,22 @@ const Fees: React.FC = () => {
                         {/* View Toggle */}
                         <div className="flex flex-wrap bg-gray-100 p-1 rounded-2xl w-full">
                             <button
-                                onClick={() => setViewMode('recent')}
-                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'recent' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
-                            >
-                                Recent Payments
-                            </button>
-                            <button
                                 onClick={() => setViewMode('defaulters')}
                                 className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'defaulters' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
                             >
                                 Defaulters
                             </button>
                             <button
-                                onClick={() => setViewMode('all')}
-                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'all' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                onClick={() => setViewMode('recent')}
+                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'recent' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
                             >
-                                All Records
+                                Recent Payments
                             </button>
                         </div>
 
                         {/* Search & Filter */}
-                        {viewMode !== 'recent' && (
-                            <div className="flex flex-col md:flex-row gap-3">
-                                <div className="relative flex-1">
+                        <div className="flex flex-col md:flex-row gap-3">
+                            <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input
                                     type="text"
@@ -320,7 +321,6 @@ const Fees: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        )}
                     </div>
 
                     {viewMode === 'recent' ? (
@@ -331,10 +331,10 @@ const Fees: React.FC = () => {
                                 </h3>
                             </div>
                             <div className="space-y-4">
-                                {transactions.length === 0 ? (
+                                {filteredTransactions.length === 0 ? (
                                     <div className="text-center text-gray-400 text-sm py-10">No recent transactions</div>
                                 ) : (
-                                    transactions.map(tx => (
+                                    filteredTransactions.map(tx => (
                                         <div key={tx.id} className="group flex items-start justify-between p-5 rounded-2xl hover:bg-gray-50 transition-colors border border-gray-100/80 hover:border-gray-200">
                                             <div className="flex gap-4">
                                                 <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0">
@@ -560,7 +560,7 @@ const Fees: React.FC = () => {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-0 overflow-hidden relative z-10"
+                            className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-0 overflow-visible relative z-10"
                         >
                             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                                 <div>
@@ -717,7 +717,7 @@ const Fees: React.FC = () => {
                                             {showMonthMenu && (
                                                 <>
                                                     <div className="fixed inset-0 z-20" onClick={() => setShowMonthMenu(false)}></div>
-                                                    <div className="absolute left-0 top-full mt-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-30 max-h-48 overflow-y-auto custom-scrollbar">
+                                                    <div className="absolute left-0 bottom-full mb-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-30 max-h-48 overflow-y-auto custom-scrollbar">
                                                         {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                                                             <button
                                                                 key={m}
@@ -746,7 +746,7 @@ const Fees: React.FC = () => {
                                             {showYearMenu && (
                                                 <>
                                                     <div className="fixed inset-0 z-20" onClick={() => setShowYearMenu(false)}></div>
-                                                    <div className="absolute right-0 top-full mt-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-30">
+                                                    <div className="absolute right-0 bottom-full mb-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-30">
                                                         {[2023, 2024, 2025, 2026].map(y => (
                                                             <button
                                                                 key={y}

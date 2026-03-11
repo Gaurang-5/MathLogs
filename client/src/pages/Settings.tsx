@@ -206,9 +206,9 @@ function BillingSection() {
                     <div className="relative z-10 flex flex-col md:flex-row justify-between md:items-center gap-4">
                         <div>
                             <p className="text-xs font-bold uppercase tracking-widest opacity-70 mb-1 text-white dark:text-black">Current Plan</p>
-                            <h4 className="text-3xl font-black flex items-center gap-3 text-white dark:text-black">
-                                {profile.planName} Plan
-                                {profile.planName !== 'Basic' && (
+                            <h4 className="text-3xl font-black flex items-center gap-3 !text-white dark:!text-black">
+                                {profile.planName || 'Basic'} Plan
+                                {profile.planName !== 'Basic' && profile.planName && (
                                     <span className="text-xs font-bold bg-white text-black px-2 py-1 rounded-md uppercase tracking-wide">
                                         Pro
                                     </span>
@@ -247,7 +247,7 @@ function BillingSection() {
                 </div>
 
                 <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1 pl-1">Expiray / Renewal Date</label>
+                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1 pl-1">Expiry / Renewal Date</label>
                     <div className={`w-full bg-app-bg border border-app-border rounded-xl px-4 py-3.5 font-medium shadow-sm flex items-center justify-between ${isExpiringSoon ? 'border-red-500/50 bg-red-50 text-red-700' : 'text-app-text'}`}>
                         <div className="flex items-center gap-2">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-calendar-off ${isExpiringSoon ? 'text-red-500' : 'text-orange-500'}`}><path d="M4.2 4.2A2 2 0 0 0 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 1.82-1.18"/><path d="M21 15.5V6a2 2 0 0 0-2-2H9.5"/><path d="M16 2v4"/><path d="M3 10h7"/><path d="M21 10h-5.5"/><path d="m2 2 20 20"/></svg>
