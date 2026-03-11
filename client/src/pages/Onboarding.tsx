@@ -135,7 +135,7 @@ export default function Onboarding() {
 
             const options: any = {
                 key: orderRes.keyId,
-                name: tuitionName,
+                name: 'MathLogs',
                 description: 'MathLogs License',
                 handler: async function (response: any) {
                     try {

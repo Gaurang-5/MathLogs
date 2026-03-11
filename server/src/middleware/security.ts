@@ -17,6 +17,7 @@ export const configureSecurityHeaders = (app: Express) => {
                     "'self'",
                     "'unsafe-inline'",                // Required: Razorpay injects inline scripts
                     "https://checkout.razorpay.com",
+                    "https://checkout-static-next.razorpay.com",
                     "https://*.razorpay.com"
                 ],
                 imgSrc: ["'self'", "data:", "blob:", "https://*.razorpay.com"],
@@ -25,6 +26,7 @@ export const configureSecurityHeaders = (app: Express) => {
                     "data:",
                     "https://fonts.googleapis.com",
                     "https://fonts.gstatic.com",
+                    "https://checkout-static-next.razorpay.com",
                     "https://*.razorpay.com",         // Razorpay API calls
                     "https://api.razorpay.com",
                     "https://lumberjack.razorpay.com", // Razorpay analytics
