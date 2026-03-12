@@ -186,6 +186,14 @@ export default function Layout({ children, title }: LayoutProps) {
                             {/* Navigation items are moved to Bottom Bar. Keeping menu for system actions only. */}
                             <div className="pt-2">
                                 <Link
+                                    to="/billing"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center w-full px-4 py-4 text-base font-medium text-app-text-secondary hover:bg-black/5 hover:text-app-text rounded-2xl"
+                                >
+                                    <CreditCard className="w-6 h-6 mr-4" />
+                                    Billing
+                                </Link>
+                                <Link
                                     to="/settings"
                                     onClick={() => setMobileMenuOpen(false)}
                                     className="flex items-center w-full px-4 py-4 text-base font-medium text-app-text-secondary hover:bg-black/5 hover:text-app-text rounded-2xl"
