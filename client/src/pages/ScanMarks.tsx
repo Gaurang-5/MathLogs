@@ -109,10 +109,7 @@ export default function ScanMarks() {
                     console.log("📸 Starting camera with config...");
                     await html5QrCode.start(
                         {
-                            facingMode: "environment",
-                            // Request maximum resolution to ensure sharp images
-                            width: { ideal: [1920, 2560] },
-                            height: { ideal: [1080, 1440] }
+                            facingMode: "environment"
                         },
                         {
                             fps: 10, // Lower FPS is more stable on iOS/mobile
