@@ -263,7 +263,13 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
                     planName: link.plan,
                     billingCycle: cycle,
                     allowedClasses: classList.length > 0 ? classList : ["Class 9", "Class 10"],
-                    subjects: subjectList
+                    subjects: subjectList,
+                    // Store pricing info for billing page renewals
+                    ...(link.plan === 'CUSTOM' ? {
+                        customPriceMonthly: (link.customPriceMonthlyPaise || 0) / 100,
+                        customPriceYearly: (link.customPriceYearlyPaise || 0) / 100,
+                    } : {}),
+                    ...(link.discountPercent ? { discountPercent: link.discountPercent } : {}),
                 }
             }
         });
