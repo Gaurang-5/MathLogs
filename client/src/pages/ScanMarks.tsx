@@ -113,12 +113,8 @@ export default function ScanMarks() {
                         },
                         {
                             fps: 10, // Lower FPS is more stable on iOS/mobile
-                            qrbox: (viewfinderWidth, viewfinderHeight) => {
-                                const width = viewfinderWidth * 0.9;
-                                const height = Math.min(viewfinderHeight * 0.5, 400); // Narrower height means less pixels to search
-                                return { width, height };
-                            },
-                            // DO NOT use aspectRatio or experimental flags here — they break iOS PWA
+                            // Scan the full frame. In iOS PWAs, object-fit: cover can cause qrbox 
+                            // to internally scan the wrong region of the camera feed.
                             disableFlip: false
                         },
                         async (decodedText) => {
