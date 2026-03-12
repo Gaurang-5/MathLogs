@@ -38,106 +38,121 @@ function getClient(): TextractClient {
  *   - Tiny stray detections (noise)
  */
 function extractScoreFromBlocks(blocks: Block[]): { score: string; confidence: number; rawTexts: string[] } {
-    // Collect WORD blocks with geometry
     const textBlocks: Array<{
         text: string;
+        normalizedText: string;
         confidence: number;
         top: number;
         left: number;
         width: number;
         height: number;
-        blockType: string;
+        centerX: number;
     }> = [];
 
+    // 1. Process and normalize text
     for (const block of blocks) {
-        if (
-            block.BlockType === "WORD" &&
-            block.Text &&
-            block.Geometry?.BoundingBox
-        ) {
-            textBlocks.push({
-                text: block.Text.trim(),
-                confidence: block.Confidence || 0,
-                top: block.Geometry.BoundingBox.Top || 0,
-                left: block.Geometry.BoundingBox.Left || 0,
-                width: block.Geometry.BoundingBox.Width || 0,
-                height: block.Geometry.BoundingBox.Height || 0,
-                blockType: block.BlockType as string,
-            });
+        if (block.BlockType === "WORD" && block.Text && block.Geometry?.BoundingBox) {
+            let t = block.Text.trim();
+            
+            // Skip known text labels that survived cropping
+            if (/^(marks|ocr|name|total|max|:|\.)$/i.test(t)) continue;
+
+            // OCR Normalization for handwritten digits
+            // Often "1" is read as I, l, |, !, i
+            t = t.replace(/[Il|!i]/g, "1");
+            // "0" as O, o, Q, D
+            t = t.replace(/[OoQD]/g, "0");
+            // "5" as S, s
+            t = t.replace(/[Ss]/g, "5");
+            // "2" as Z, z
+            t = t.replace(/[Zz]/g, "2");
+            // "8" as B
+            t = t.replace(/[B]/g, "8");
+
+            // Strip out any non-digits after normalization
+            t = t.replace(/[^0-9]/g, "");
+
+            if (t.length > 0) {
+                const geom = block.Geometry.BoundingBox;
+                textBlocks.push({
+                    text: block.Text,
+                    normalizedText: t,
+                    confidence: block.Confidence || 0,
+                    top: geom.Top || 0,
+                    left: geom.Left || 0,
+                    width: geom.Width || 0,
+                    height: geom.Height || 0,
+                    centerX: (geom.Left || 0) + ((geom.Width || 0) / 2)
+                });
+            }
         }
     }
 
-    const rawTexts = textBlocks.map((b) => `"${b.text}" (conf: ${b.confidence.toFixed(1)}%, box: L${b.left.toFixed(2)} T${b.top.toFixed(2)} W${b.width.toFixed(2)} H${b.height.toFixed(2)})`);
+    const rawTexts = textBlocks.map((b) => `"${b.text}"->"${b.normalizedText}" (conf: ${b.confidence.toFixed(1)}%, box: L${b.left.toFixed(2)} W${b.width.toFixed(2)} CX${b.centerX.toFixed(2)})`);
 
-    // Filter to valid digit candidates
-    const digitWords = textBlocks.filter((b) => {
-        const t = b.text;
-
-        // 1. Must contain at least one digit
-        if (!/\d/.test(t)) return false;
-
-        // 2. Skip known labels (MARKS, OCR, etc.)
-        if (/^(marks|ocr|name|total|max)$/i.test(t)) return false;
-        if (t === ":" || t === ".") return false;
-
-        // 3. SPATIAL FILTER: reject text too close to edges (noise/artifacts)
-        //    The cropped image should have digits roughly centered
-        //    Reject if left edge is < 3% or right edge > 97% (edge noise)
-        const rightEdge = b.left + b.width;
-        if (b.left < 0.03 || rightEdge > 0.97) return false;
-
-        // 4. SIZE FILTER: reject tiny detections (noise, underline artifacts)
-        //    Real handwritten digits should have meaningful size
-        if (b.height < 0.08) return false;  // Too small vertically = noise
-
-        // 5. Confidence filter: reject low-confidence detections
-        if (b.confidence < 50) return false;
-
+    // 2. Filter noise
+    const validDigits = textBlocks.filter(b => {
+        // Reject edge noise
+        if (b.left < 0.02 || (b.left + b.width) > 0.98) return false;
+        // Reject tiny artifacts (dots/underlines)
+        if (b.height < 0.08) return false;
+        // Confidence filter (lower threshold because handwriting can be sketchy)
+        if (b.confidence < 30) return false;
         return true;
     });
 
-    if (digitWords.length === 0) {
+    if (validDigits.length === 0) {
         return { score: "ERROR_UNCERTAIN", confidence: 0, rawTexts };
     }
 
-    // Sort by horizontal position (left to right) to read boxes in order
-    digitWords.sort((a, b) => a.left - b.left);
+    // 3. Slot into 3 virtual boxes based on Center X
+    // The image consists of 3 square boxes side-by-side. 
+    // Roughly, Box 1: 0.0 - 0.33, Box 2: 0.33 - 0.66, Box 3: 0.66 - 1.0
+    
+    let box1: string = ""; let conf1 = 0;
+    let box2: string = ""; let conf2 = 0;
+    let box3: string = ""; let conf3 = 0;
 
-    // Check for fraction pattern (e.g., "45/50")
-    const allText = digitWords.map((d) => d.text).join(" ");
-    const fractionMatch = allText.match(/(\d+)\s*\/\s*(\d+)/);
-    if (fractionMatch) {
-        const avgConf = digitWords.reduce((sum, d) => sum + d.confidence, 0) / digitWords.length;
-        return {
-            score: `${fractionMatch[1]}/${fractionMatch[2]}`,
-            confidence: avgConf / 100,
-            rawTexts,
-        };
+    for (const b of validDigits) {
+        // If a block contains multiple digits (e.g. "99"), it spans across boxes.
+        // We will process character by character based on estimated char X.
+        const charWidth = b.width / b.normalizedText.length;
+        
+        for (let i = 0; i < b.normalizedText.length; i++) {
+            const char = b.normalizedText[i];
+            const charCenterX = b.left + (i * charWidth) + (charWidth / 2);
+
+            let targetBox = 0;
+            // Boundaries roughly at 1/3 and 2/3, padded slightly inwards
+            if (charCenterX < 0.36) targetBox = 1;
+            else if (charCenterX < 0.64) targetBox = 2;
+            else targetBox = 3;
+
+            // Update the box if this char has higher confidence OR if the box is currently empty
+            if (targetBox === 1 && (box1 === "" || b.confidence > conf1)) { box1 = char; conf1 = b.confidence; }
+            if (targetBox === 2 && (box2 === "" || b.confidence > conf2)) { box2 = char; conf2 = b.confidence; }
+            if (targetBox === 3 && (box3 === "" || b.confidence > conf3)) { box3 = char; conf3 = b.confidence; }
+        }
     }
 
-    // Combine all digit characters from left-to-right
-    let combined = digitWords
-        .map((d) => d.text.replace(/[^0-9]/g, ""))
-        .filter(Boolean)
-        .join("");
+    // Combine them, skipping empty boxes
+    const finalScore = [box1, box2, box3].filter(x => x !== "").join("");
 
-    // Safety: sticker has max 3 digit boxes, so cap at 3 digits
-    // If we got more, it means noise crept in — take only the first 3
-    if (combined.length > 3) {
-        console.warn(`⚠️ Textract extracted ${combined.length} digits ("${combined}"), capping to 3`);
-        combined = combined.substring(0, 3);
-    }
-
-    if (!combined) {
+    if (!finalScore) {
         return { score: "ERROR_UNCERTAIN", confidence: 0, rawTexts };
     }
 
-    const avgConfidence = digitWords.reduce((sum, d) => sum + d.confidence, 0) / digitWords.length;
-
+    // Calculate average confidence for the boxes we used
+    let totalConf = 0;
+    let numBoxes = 0;
+    if (box1) { totalConf += conf1; numBoxes++; }
+    if (box2) { totalConf += conf2; numBoxes++; }
+    if (box3) { totalConf += conf3; numBoxes++; }
+    
     return {
-        score: combined,
-        confidence: avgConfidence / 100,
-        rawTexts,
+        score: finalScore,
+        confidence: (totalConf / numBoxes) / 100, // Normalized to 0-1
+        rawTexts
     };
 }
 
