@@ -109,7 +109,10 @@ export default function ScanMarks() {
                     console.log("📸 Starting camera with config...");
                     await html5QrCode.start(
                         {
-                            facingMode: "environment"
+                            facingMode: "environment",
+                            // Request maximum resolution to ensure sharp images
+                            width: { ideal: [1920, 2560] },
+                            height: { ideal: [1080, 1440] }
                         },
                         {
                             fps: 10, // Lower FPS is more stable on iOS/mobile
@@ -450,7 +453,7 @@ export default function ScanMarks() {
                             background: transparent !important;
                         }
                     `}</style>
-                    <div id={READER_ID} className="w-full h-full absolute inset-0 [&>video]:object-cover [&>video]:w-full [&>video]:h-full"></div>
+                    <div id={READER_ID} className="w-full h-full absolute inset-0 flex items-center justify-center bg-black"></div>
 
                     {/* Dark Backdrop for non-scanned area */}
                     <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
