@@ -56,9 +56,9 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
                 return;
             }
 
-            if (dbUser.institute?.planExpiryDate || (dbUser.institute as any).plan === 'NO_PLAN') {
-                const expiry = dbUser.institute?.planExpiryDate ? new Date(dbUser.institute.planExpiryDate) : new Date(0);
-                const isNoPlan = (dbUser.institute as any).plan === 'NO_PLAN';
+            if (dbUser.institute && (dbUser.institute.planExpiryDate || dbUser.institute.plan === 'NO_PLAN')) {
+                const expiry = dbUser.institute.planExpiryDate ? new Date(dbUser.institute.planExpiryDate) : new Date(0);
+                const isNoPlan = dbUser.institute.plan === 'NO_PLAN';
                 const isExpired = expiry.getTime() < Date.now();
 
                 if (isExpired || isNoPlan) {
