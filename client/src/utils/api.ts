@@ -46,6 +46,14 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
             const errorData = await res.json().catch(() => ({}));
             const serverMessage = errorData.error || errorData.message || 'Request failed';
 
+            // Special case for expired free trial / subscription
+            if (res.status === 402) {
+                if (window.location.pathname !== '/billing') {
+                    window.location.href = '/billing';
+                }
+                throw new Error(serverMessage || 'Subscription expired.');
+            }
+
             // Categorize by status code and provide context
             switch (res.status) {
                 case 400:

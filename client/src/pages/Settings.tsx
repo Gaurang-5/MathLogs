@@ -157,116 +157,6 @@ function ProfileSection() {
     );
 }
 
-function BillingSection() {
-    const [profile, setProfile] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchProfile = async () => {
-            try {
-                const data = await api.get('/auth/me');
-                setProfile(data);
-            } catch (e) {
-                console.error('Failed to fetch profile', e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchProfile();
-    }, []);
-
-    if (isLoading) return <div className="text-sm text-app-text-tertiary">Loading billing...</div>;
-    if (!profile) return null;
-
-    const formatDate = (dateString: string | null) => {
-        if (!dateString) return 'Not Available';
-        return new Date(dateString).toLocaleDateString('en-IN', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-    };
-    
-    // Check if expiry is near (within 30 days)
-    const isExpiringSoon = profile.planExpiryDate && 
-        new Date(profile.planExpiryDate).getTime() < (Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-    return (
-        <div className="mb-8 mt-8 p-6 lg:p-10 bg-app-surface-opaque border border-app-border rounded-[24px]">
-            <h3 className="text-xl font-bold text-app-text mb-1 flex items-center gap-2">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-                Billing & Subscription
-            </h3>
-            <p className="text-app-text-secondary text-sm mb-8">Manage your subscription plan, capacity limits, and billing cycle.</p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {/* Plan Info Card */}
-                <div className="col-span-1 md:col-span-2 bg-black dark:bg-white text-white dark:text-black border border-black dark:border-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-                    <div className="relative z-10 flex flex-col md:flex-row justify-between md:items-center gap-4">
-                        <div>
-                            <p className="text-xs font-bold uppercase tracking-widest opacity-70 mb-1 text-white dark:text-black">Current Plan</p>
-                            <h4 className="text-3xl font-black flex items-center gap-3 !text-white dark:!text-black">
-                                {profile.planName || 'Basic'} Plan
-                                {profile.planName !== 'Basic' && profile.planName && (
-                                    <span className="text-xs font-bold bg-white text-black px-2 py-1 rounded-md uppercase tracking-wide">
-                                        Pro
-                                    </span>
-                                )}
-                            </h4>
-                            <p className="opacity-80 mt-2 text-sm">
-                                You are currently allowed up to <strong className="text-white dark:text-black">{profile.maxStudents || 100} students</strong> in your institute.
-                            </p>
-                        </div>
-                        <div className="flex flex-col gap-2 min-w-[200px]">
-                            <button 
-                                onClick={() => alert('Please contact the admin via WhatsApp (+91 8439245302) to upgrade your plan.')} 
-                                className="w-full bg-white dark:bg-black text-black dark:text-white font-bold py-3 px-6 rounded-xl hover:scale-105 transition-all shadow-lg active:scale-95 text-sm"
-                            >
-                                Upgrade Plan
-                            </button>
-                            {isExpiringSoon && (
-                                <button 
-                                    onClick={() => alert('Please contact the admin via WhatsApp (+91 8439245302) to renew your subscription.')} 
-                                    className="w-full bg-transparent border-2 border-white/20 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-white/10 transition-all text-sm"
-                                >
-                                    Renew Subscription
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Billing Details */}
-                <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1 pl-1">Subscription Start Date</label>
-                    <div className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3.5 text-app-text font-medium shadow-sm flex items-center gap-2">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar-check text-green-500"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>
-                        {formatDate(profile.planStartDate)}
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-1 pl-1">Expiry / Renewal Date</label>
-                    <div className={`w-full bg-app-bg border border-app-border rounded-xl px-4 py-3.5 font-medium shadow-sm flex items-center justify-between ${isExpiringSoon ? 'border-red-500/50 bg-red-50 text-red-700' : 'text-app-text'}`}>
-                        <div className="flex items-center gap-2">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-calendar-off ${isExpiringSoon ? 'text-red-500' : 'text-orange-500'}`}><path d="M4.2 4.2A2 2 0 0 0 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 1.82-1.18"/><path d="M21 15.5V6a2 2 0 0 0-2-2H9.5"/><path d="M16 2v4"/><path d="M3 10h7"/><path d="M21 10h-5.5"/><path d="m2 2 20 20"/></svg>
-                            {formatDate(profile.planExpiryDate)}
-                        </div>
-                        {isExpiringSoon && <span className="text-xs font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-md">Expiring Soon</span>}
-                    </div>
-                </div>
-            </div>
-            
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm p-4 rounded-xl flex items-start gap-3">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-info shrink-0 mt-0.5 text-yellow-600"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                <p>
-                    Upgrading or renewing your plan requires assistance from our support team. Please WhatsApp us at <strong>+91 8439245302</strong> for immediate assistance. Your institute data remains completely safe after expiry, but you won't be able to add new students until renewed.
-                </p>
-            </div>
-        </div>
-    );
-}
 
 export default function Settings() {
     const [years, setYears] = useState<any[]>([]);
@@ -383,7 +273,6 @@ export default function Settings() {
         <Layout title="Settings">
             <div className="max-w-4xl mx-auto">
                 <ProfileSection />
-                <BillingSection />
 
                 <div className="flex items-center justify-between mb-8 mt-12">
                     <div>

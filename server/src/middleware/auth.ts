@@ -41,13 +41,38 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
                     currentAcademicYearId: true,
                     passwordVersion: true,
                     instituteId: true,
-                    role: true
+                    role: true,
+                    institute: {
+                        select: {
+                            planExpiryDate: true,
+                            plan: true
+                        }
+                    }
                 }
             });
 
             if (!dbUser) {
                 res.sendStatus(403);
                 return;
+            }
+
+            if (dbUser.institute?.planExpiryDate || (dbUser.institute as any).plan === 'NO_PLAN') {
+                const expiry = dbUser.institute?.planExpiryDate ? new Date(dbUser.institute.planExpiryDate) : new Date(0);
+                const isNoPlan = (dbUser.institute as any).plan === 'NO_PLAN';
+                const isExpired = expiry.getTime() < Date.now();
+
+                if (isExpired || isNoPlan) {
+                    // Allowed paths even when expired
+                    const path = req.path;
+                    const isExempt = path.startsWith('/billing') || path.startsWith('/auth') || path.startsWith('/institute');
+                    
+                    if (!isExempt) {
+                        // Grant "View Only" access: they can read and download PDFs (GET) but cannot create/update/delete (POST/PUT/DELETE)
+                        if (req.method !== 'GET') {
+                            return res.status(402).json({ error: 'View Only Mode Active: Actions are restricted. Please upgrade your plan.' });
+                        }
+                    }
+                }
             }
 
             // Invalidate token if password was changed (version mismatch)

@@ -248,3 +248,71 @@ export const verifyPayment = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Internal server error during payment verification.' });
     }
 };
+
+export const startTrial = async (req: Request, res: Response) => {
+    try {
+        const { tuitionName, ownerName, phone, email, planId, billingCycle } = req.body;
+
+        if (!tuitionName || !ownerName || !phone || !email || !planId) {
+            return res.status(400).json({ error: 'All fields are required.' });
+        }
+
+        const existingAdmin = await prisma.admin.findUnique({ where: { username: phone } });
+        if (existingAdmin) {
+            return res.status(400).json({ error: 'An account with this phone number already exists.' });
+        }
+
+        const tier = planId === 'pro' ? 'PRO' as const : 'BASIC' as const;
+
+        // 14 days trial
+        const planStartDate = new Date();
+        const planExpiryDate = new Date();
+        planExpiryDate.setDate(planExpiryDate.getDate() + 14);
+
+        const newInstitute = await prisma.institute.create({
+            data: {
+                name: tuitionName,
+                teacherName: ownerName,
+                phoneNumber: phone,
+                email: email,
+                plan: tier,
+                planStartDate,
+                planExpiryDate,
+                config: {
+                    requiresGrades: true,
+                    maxStudents: planId === 'pro' ? 250 : 100,
+                    isTrial: true,
+                    trialStartDate: planStartDate.toISOString(),
+                    allowedClasses: ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"],
+                    subjects: ["Mathematics", "Science", "Physics", "Chemistry", "Biology", "English"]
+                }
+            }
+        });
+
+        const tokenString = crypto.randomBytes(24).toString('hex');
+
+        const invite = await prisma.inviteToken.create({
+            data: {
+                token: tokenString,
+                instituteId: newInstitute.id,
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            }
+        });
+
+        const clientUrl = getClientUrl(req);
+        const setupLink = `${clientUrl}/setup?token=${invite.token}`;
+
+        await sendSetupLinkWhatsApp(phone, { ownerName, setupLink, tuitionName });
+
+        res.json({
+            success: true,
+            setupLink: setupLink,
+            message: 'Trial started. Setup link generated.'
+        });
+
+    } catch (error) {
+        console.error('Start Trial Error:', error);
+        res.status(500).json({ error: 'Internal server error starting trial.' });
+    }
+};
+

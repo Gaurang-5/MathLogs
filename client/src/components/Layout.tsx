@@ -2,7 +2,7 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, FileText, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, Zap, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, Zap, Settings, CreditCard } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../utils/cn';
 import ToastProvider from './ToastProvider';
@@ -27,7 +27,7 @@ export default function Layout({ children, title }: LayoutProps) {
     });
     const [showQuickFeeModal, setShowQuickFeeModal] = useState(false);
 
-    const showMobileNav = ['/dashboard', '/batches', '/tests', '/fees', '/scan', '/settings'].includes(location.pathname);
+    const showMobileNav = ['/dashboard', '/batches', '/tests', '/fees', '/scan', '/settings', '/billing'].includes(location.pathname);
 
     const handleLogout = () => {
         localStorage.clear();
@@ -40,6 +40,7 @@ export default function Layout({ children, title }: LayoutProps) {
         { name: 'Tests', path: '/tests', icon: FileText },
         { name: 'Scan Marks', path: '/scan', icon: Scan },
         { name: 'Fees', path: '/fees', icon: Receipt },
+        { name: 'Billing', path: '/billing', icon: CreditCard },
         { name: 'Settings', path: '/settings', icon: Settings },
     ];
 

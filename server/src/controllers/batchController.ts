@@ -449,15 +449,25 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
         const batch = await prisma.batch.findUnique({
             where: { id },
             select: {
-                id: true,
                 name: true,
                 subject: true,
                 isRegistrationOpen: true,
-                isRegistrationEnded: true
+                isRegistrationEnded: true,
+                institute: {
+                    select: { name: true, areRegistrationsPaused: true, plan: true, planExpiryDate: true }
+                }
             }
         });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+        // Overwrite so frontend disables registration natively if sub is cancelled or expired
+        if (batch.institute) {
+            const isPlanExpired = batch.institute.planExpiryDate && new Date(batch.institute.planExpiryDate).getTime() < Date.now();
+            if (batch.institute.areRegistrationsPaused || (batch.institute as any).plan === 'NO_PLAN' || isPlanExpired) {
+                batch.isRegistrationOpen = false;
+            }
+        }
 
         // Save to cache
         publicBatchCache.set(id, { data: batch, timestamp: now });

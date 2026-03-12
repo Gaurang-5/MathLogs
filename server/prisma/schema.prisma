@@ -23,9 +23,14 @@ model Institute {
   planStartDate DateTime?
   planExpiryDate DateTime?
   
+  // Billing
+  razorpaySubscriptionId String?
+  razorpayOrderId        String?
+  
   // Status
   status           String      @default("ACTIVE") // ACTIVE, SUSPENDED
   suspensionReason String?
+  areRegistrationsPaused Boolean @default(false)
 
   admins        Admin[]
   academicYears AcademicYear[]
@@ -263,7 +268,9 @@ model IdCounter {
 }
 
 enum Tier {
+  NO_PLAN
   FREE
+  BASIC
   PRO
   ENTERPRISE
 }
@@ -327,6 +334,31 @@ model OcrScanCache {
   @@index([createdAt]) // For TTL cleanup queries
 }
 
+
+model AdminOnboardingLink {
+  id              String   @id @default(uuid())
+  token           String   @unique
+  
+  // Plan Config (set by Super Admin)
+  plan            String   // BASIC, PRO, CUSTOM
+  discountPercent Int      @default(0) // Discount % for Basic/Pro (0-100)
+  customPriceMonthlyPaise Int? // Custom monthly price in paise (Custom plan only)
+  customPriceYearlyPaise  Int? // Custom yearly price in paise (Custom plan only)
+  maxStudents     Int      @default(100)
+  
+  // State
+  status          String   @default("PENDING") // PENDING, PAID, SETUP_COMPLETE, EXPIRED
+  billingCycle    String?  // Filled by user: monthly or yearly
+  instituteId     String?  // Populated after payment + provisioning
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  expiresAt       DateTime // Link expiry (e.g. 30 days from creation)
+  
+  @@index([token])
+  @@index([status])
+  @@index([createdAt])
+}
 
 model OnboardingLead {
   id            String   @id @default(uuid())

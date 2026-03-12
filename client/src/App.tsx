@@ -16,9 +16,11 @@ const ScanMarks = lazy(() => import('./pages/ScanMarks'));
 const Fees = lazy(() => import('./pages/Fees'));
 const Home = lazy(() => import('./pages/Home'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Billing = lazy(() => import('./pages/Billing'));
 const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
+const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
 // Onboarding is eagerly imported above (only 15KB) for instant navigation from Sign Up/Get Started
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -69,6 +71,7 @@ function App() {
             <Route path="/login" element={<AdminLogin />} />
             <Route path="/setup" element={<SetupAccount />} />
             <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/join/:token" element={<JoinOnboarding />} />
             <Route path="/super-admin" element={
               <RoleRoute allowedRole="SUPER_ADMIN">
                 <SuperAdminDashboard />
@@ -83,6 +86,7 @@ function App() {
             <Route path="/scan" element={<PrivateRoute><ScanMarks /></PrivateRoute>} />
             <Route path="/fees" element={<PrivateRoute><Fees /></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+            <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
 
             <Route path="/approvals" element={<PrivateRoute><Approvals /></PrivateRoute>} />
 

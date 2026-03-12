@@ -60,6 +60,8 @@ export default function Onboarding() {
     const planRef = useRef<HTMLDivElement>(null);
     const checkoutRef = useRef<HTMLDivElement>(null);
 
+    const isFreeTrial = true;
+
     const isStep1Valid = tuitionName.length > 2 && ownerName.length > 2 && phone.length >= 10 && email.includes('@');
 
     const scrollToRef = (ref: React.RefObject<HTMLDivElement | null>) => {
@@ -103,6 +105,37 @@ export default function Onboarding() {
 
     const handleCheckout = async () => {
         setIsLoading(true);
+
+        if (isFreeTrial) {
+            try {
+                const res = await api.post('/onboarding/start-trial', {
+                    tuitionName,
+                    ownerName,
+                    phone,
+                    email,
+                    planId: selectedPlan,
+                    billingCycle,
+                });
+
+                if (res.success && res.setupLink) {
+                    toast.success('Trial started! Redirecting to setup...');
+                    try {
+                        await api.post('/onboarding/lead', { phone, step: 'CONVERTED' });
+                    } catch (err) { }
+                    setTimeout(() => {
+                        window.location.href = res.setupLink;
+                    }, 1500);
+                } else {
+                    toast.error(res.error || 'Failed to start trial.');
+                    setIsLoading(false);
+                }
+            } catch (err: any) {
+                toast.error(err.message || 'Trial initialization failed.');
+                setIsLoading(false);
+            }
+            return;
+        }
+
         try {
             const isLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
             if (!isLoaded) {
@@ -384,7 +417,7 @@ export default function Onboarding() {
                                         className={`px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all focus:outline-none flex items-center gap-1 sm:gap-2 ${billingCycle === 'yearly' ? 'bg-black text-white shadow-lg scale-105' : 'text-gray-500 hover:text-black hover:bg-black/5'}`}
                                     >
                                         Yearly
-                                        <span className={`px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] uppercase tracking-wider sm:tracking-widest ${billingCycle === 'yearly' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'}`}>Save ~16%</span>
+                                        <span className={`px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] uppercase tracking-wider sm:tracking-widest ${billingCycle === 'yearly' ? 'bg-white/20 text-white' : 'bg-black/10 text-black font-extrabold'}`}>Save ~16%</span>
                                     </button>
                                 </div>
                             </div>
@@ -439,7 +472,7 @@ export default function Onboarding() {
                                             {/* Selection Indicator */}
                                             <div className={`mt-8 w-full py-3 rounded-xl font-bold text-center transition-colors ${selectedPlan === plan.id ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-900 group-hover:bg-neutral-200'
                                                 }`}>
-                                                {selectedPlan === plan.id ? 'Selected' : 'Select Plan'}
+                                                {selectedPlan === plan.id ? 'Selected' : (isFreeTrial ? 'Start 14-Day Free Trial' : 'Select Plan')}
                                             </div>
 
                                         </div>
@@ -463,18 +496,24 @@ export default function Onboarding() {
 
                             <div className="relative z-10 flex flex-col gap-6 sm:gap-8">
                                 <div>
-                                    <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2 text-white">Ready to initialize?</h2>
+                                    <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2 !text-white">
+                                        {isFreeTrial ? "Start your 14-Day Free Trial" : "Ready to initialize?"}
+                                    </h2>
                                     <p className="text-neutral-400 font-medium mb-4 text-sm sm:text-base">
-                                        You have selected the <span className="text-white font-bold">{pricingPlans.find(p => p.id === selectedPlan)?.name}</span>.
-                                        Secure your payment via Razorpay to activate your center immediately.
+                                        You have selected the <span className="!text-white font-bold">{pricingPlans.find(p => p.id === selectedPlan)?.name}</span>.
+                                        {isFreeTrial 
+                                            ? " Start your 14-day free trial immediately without a credit card. You can upgrade anytime during the trial." 
+                                            : " Secure your payment via Razorpay to activate your center immediately."}
                                     </p>
 
-                                    <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs sm:text-sm font-medium text-neutral-300">
-                                        <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 shrink-0 mt-0.5" />
-                                        <p>
-                                            <span className="text-red-400 font-bold">Heads up:</span> Failure to complete recurring payment renewals will result in your Center's subscription being revoked and locked after a <span className="text-white font-bold">7-day grace period</span>.
-                                        </p>
-                                    </div>
+                                    {!isFreeTrial && (
+                                        <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs sm:text-sm font-medium text-neutral-300">
+                                            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 shrink-0 mt-0.5" />
+                                            <p>
+                                                <span className="text-red-400 font-bold">Heads up:</span> Failure to complete recurring payment renewals will result in your Center's subscription being revoked and locked after a <span className="text-white font-bold">7-day grace period</span>.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button
@@ -486,11 +525,20 @@ export default function Onboarding() {
                                         <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
                                     ) : (
                                         <>
-                                            <CreditCard className="w-6 h-6" />
-                                            Pay ₹{(billingCycle === 'yearly'
-                                                ? pricingPlans.find(p => p.id === selectedPlan)?.yearlyPrice
-                                                : pricingPlans.find(p => p.id === selectedPlan)?.monthlyPrice)?.toLocaleString('en-IN')
-                                            } Securely
+                                            {isFreeTrial ? (
+                                                <>
+                                                    <Sparkles className="w-6 h-6" />
+                                                    Start 14-Day Free Trial
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CreditCard className="w-6 h-6" />
+                                                    Pay ₹{(billingCycle === 'yearly'
+                                                        ? pricingPlans.find(p => p.id === selectedPlan)?.yearlyPrice
+                                                        : pricingPlans.find(p => p.id === selectedPlan)?.monthlyPrice)?.toLocaleString('en-IN')
+                                                    } Securely
+                                                </>
+                                            )}
                                         </>
                                     )}
                                 </button>

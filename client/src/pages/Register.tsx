@@ -224,7 +224,12 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
             >
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-bold text-app-text tracking-tight mb-2">Student Registration</h1>
-                    <p className="text-app-text-secondary">Join your batch and start learning.</p>
+                    {batchStatus?.institute?.name && (
+                        <p className="text-app-text-secondary text-sm font-semibold mb-1">
+                            {batchStatus.institute.name}
+                        </p>
+                    )}
+                    <p className="text-app-text-tertiary text-sm">Join {batchStatus?.name ? <span className="font-semibold text-app-text">{batchStatus.name}</span> : 'your batch'} and start learning.</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">

@@ -170,6 +170,8 @@ export default function Home() {
     const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const carouselRef = useRef<HTMLDivElement>(null);
+    
+    const isFreeTrial = true;
 
     // Auto-scroll logic for mobile carousel
     useEffect(() => {
@@ -327,6 +329,25 @@ export default function Home() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* 14-DAY FREE TRIAL BANNER */}
+            {isFreeTrial && (
+                <div className="relative z-40 w-full overflow-hidden bg-black text-white py-2.5 shadow-md border-y border-white/10">
+                    <motion.div
+                        animate={{ x: [0, -1000] }}
+                        transition={{ repeat: Infinity, ease: 'linear', duration: 25 }}
+                        className="flex whitespace-nowrap w-max"
+                    >
+                        {[...Array(12)].map((_, i) => (
+                            <div key={i} className="flex items-center mx-6 text-[13px] font-extrabold tracking-widest uppercase">
+                                <span className="text-white mr-2 text-lg leading-none">★</span>
+                                Start Your 14-Day Free Trial Today — No Credit Card Required
+                                <span className="text-white ml-2 text-lg leading-none">★</span>
+                            </div>
+                        ))}
+                    </motion.div>
+                </div>
+            )}
 
             {/* HERO SECTION */}
             <main id="main-content" role="main" className="relative z-10 lg:block flex flex-col lg:min-h-0 min-h-svh pt-14 pb-0 md:pt-24 px-6 lg:pb-40">
@@ -887,7 +908,7 @@ export default function Home() {
                                 <span className="text-neutral-500"> /mo</span>
                             </div>
                             <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-100 text-neutral-900 font-bold hover:bg-neutral-200 transition-colors mb-8">
-                                Get Started
+                                {isFreeTrial ? 'Start 14-Day Free Trial' : 'Get Started'}
                             </Link>
                             <ul className="space-y-4">
                                 <li className="flex items-start gap-3">
@@ -921,7 +942,7 @@ export default function Home() {
                                 <span className="text-neutral-500"> /mo</span>
                             </div>
                             <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-900 text-white font-bold hover:bg-neutral-800 transition-colors mb-8 shadow-md">
-                                Try Pro Today
+                                {isFreeTrial ? 'Start 14-Day Free Trial' : 'Try Pro Today'}
                             </Link>
                             <ul className="space-y-4">
                                 <li className="flex items-start gap-3">

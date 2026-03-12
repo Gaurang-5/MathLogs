@@ -14,7 +14,7 @@ import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcadem
 
 import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
-import { createOrder, verifyPayment, trackLead } from '../controllers/onboardingController';
+import { createOrder, verifyPayment, trackLead, startTrial } from '../controllers/onboardingController';
 import { getPaymentHistory } from '../controllers/feeController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
@@ -276,12 +276,18 @@ router.get('/stats/finance-growth', authenticateToken as any, getFinancialGrowth
 // Invites
 router.post('/invites', authenticateToken as any, generateInvite as any);
 router.get('/institutes', authenticateToken as any, getInstitutes as any);
+import { createBillingSession, verifyBillingPayment, cancelSubscription } from '../controllers/billingController';
+router.post('/billing/create', authenticateToken as any, createBillingSession as any);
+router.post('/billing/verify', authenticateToken as any, verifyBillingPayment as any);
+router.delete('/billing/cancel', authenticateToken as any, cancelSubscription as any);
+
 // New Analytics & Config Routes
 // New Analytics & Config Routes
-import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute } from '../controllers/instituteController';
+import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute } from '../controllers/instituteController';
 router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
 router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
 router.put('/institutes/:id/details', authenticateToken as any, updateInstituteDetails as any);
+router.put('/institutes/:id/plan', authenticateToken as any, updateInstitutePlan as any);
 router.get('/institute/me', authenticateToken as any, getMyInstitute as any);
 router.get('/institute/:id/details', authenticateToken as any, getInstituteDetails as any);
 router.put('/institutes/:id/suspend', authenticateToken as any, suspendInstitute as any);
@@ -297,5 +303,14 @@ router.post('/auth/setup-account', publicLimiter, setupAccount as any);
 router.post('/onboarding/lead', publicLimiter, trackLead as any);
 router.post('/onboarding/create-order', publicLimiter, createOrder as any);
 router.post('/onboarding/verify-payment', publicLimiter, verifyPayment as any);
+router.post('/onboarding/start-trial', publicLimiter, startTrial as any);
+
+// Admin Onboarding Links (Super Admin custom pricing flow)
+import { createAdminOnboardingLink, getAdminOnboardingLink, createAdminOnboardingOrder, verifyAdminOnboardingPayment, listAdminOnboardingLinks } from '../controllers/adminOnboardingController';
+router.post('/admin-onboarding/create-link', authenticateToken as any, createAdminOnboardingLink as any);
+router.get('/admin-onboarding/links', authenticateToken as any, listAdminOnboardingLinks as any);
+router.get('/admin-onboarding/:token', publicLimiter, getAdminOnboardingLink as any);
+router.post('/admin-onboarding/create-order', publicLimiter, createAdminOnboardingOrder as any);
+router.post('/admin-onboarding/verify-payment', publicLimiter, verifyAdminOnboardingPayment as any);
 
 export default router;

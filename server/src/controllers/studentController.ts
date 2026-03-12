@@ -113,10 +113,18 @@ export const registerStudent = async (req: Request, res: Response) => {
             where: { id: batchId },
             include: {
                 academicYearRef: true,
-                institute: { select: { name: true } } // Fetch institute name for SMS
+                institute: { select: { name: true, areRegistrationsPaused: true, plan: true, planExpiryDate: true } } // Fetch institute name for SMS
             }
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+        if (batch.institute) {
+            const isPlanExpired = batch.institute.planExpiryDate && new Date(batch.institute.planExpiryDate).getTime() < Date.now();
+            if (batch.institute.areRegistrationsPaused || (batch.institute as any).plan === 'NO_PLAN' || isPlanExpired) {
+                return res.status(403).json({ error: 'Registrations are currently paused or the plan is inactive for this institute.' });
+            }
+        }
+
         if (!batch.isRegistrationOpen || batch.isRegistrationEnded) {
             return res.status(403).json({ error: 'Registration for this batch is closed.' });
         }

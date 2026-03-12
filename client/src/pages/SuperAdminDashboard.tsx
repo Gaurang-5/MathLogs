@@ -26,7 +26,8 @@ import {
     IndianRupee,
     User,
     Phone,
-    Mail
+    Mail,
+    Link as LinkIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -59,17 +60,13 @@ export default function SuperAdminDashboard() {
     const [isLoading, setIsLoading] = useState(true);
     const [error] = useState<string | null>(null);
 
-    // Create Institute State
+    // Create Onboarding Link State
     const [showOnboardForm, setShowOnboardForm] = useState(false);
-    const [newInstituteName, setNewInstituteName] = useState('');
-    const [teacherName, setTeacherName] = useState('');
-    const [phoneNumber, setPhoneNumber] = useState('');
-    const [email, setEmail] = useState('');
-    const [plan, setPlan] = useState('Basic');
-    const [customMaxStudentsForInvite, setCustomMaxStudentsForInvite] = useState<number | ''>('');
-    const [subjects, setSubjects] = useState('Math, Science, English');
-    const [allowedClassesString, setAllowedClassesString] = useState('Class 9, Class 10');
-    const [requiresGrades, setRequiresGrades] = useState(true);
+    const [plan, setPlan] = useState<'BASIC' | 'PRO' | 'CUSTOM'>('BASIC');
+    const [discountPercent, setDiscountPercent] = useState<number | ''>(0);
+    const [customPriceMonthly, setCustomPriceMonthly] = useState<number | ''>('');
+    const [customPriceYearly, setCustomPriceYearly] = useState<number | ''>('');
+    const [customMaxStudentsForInvite, setCustomMaxStudentsForInvite] = useState<number | ''>(100);
 
     // Loading State
     const [isCreating, setIsCreating] = useState(false);
@@ -104,6 +101,11 @@ export default function SuperAdminDashboard() {
     const [editPhone, setEditPhone] = useState('');
     const [editEmail, setEditEmail] = useState('');
     const [isSavingDetails, setIsSavingDetails] = useState(false);
+
+    // Edit Plan / Revoke Modal State
+    const [editPlanModal, setEditPlanModal] = useState<Institute | null>(null);
+    const [selectedNewPlan, setSelectedNewPlan] = useState<'NO_PLAN' | 'BASIC' | 'PRO'>('NO_PLAN');
+    const [isSavingPlan, setIsSavingPlan] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -209,39 +211,76 @@ export default function SuperAdminDashboard() {
         }
     };
 
-    const handleGenerateInvite = async (e: React.FormEvent) => {
+    const handleOpenEditPlan = (inst: Institute) => {
+        setEditPlanModal(inst);
+        setSelectedNewPlan('NO_PLAN'); // Reset to default NO_PLAN or whatever logic needed
+    };
+
+    const handleSavePlan = async (action: 'UPDATE' | 'REVOKE') => {
+        if (!editPlanModal) return;
+        setIsSavingPlan(true);
+
+        const confirmMessage = action === 'REVOKE' 
+            ? `Are you sure you want to completely REVOKE the plan for ${editPlanModal.name}? This will change their plan to NO PLAN, freeze registrations, and cancel any ongoing Razorpay subscriptions instantly.`
+            : `Are you sure you want to change the plan of ${editPlanModal.name} to ${selectedNewPlan}?`;
+
+        if (!window.confirm(confirmMessage)) {
+            setIsSavingPlan(false);
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`${API_URL}/institutes/${editPlanModal.id}/plan`, {
+                action: action,
+                plan: action === 'UPDATE' ? selectedNewPlan : 'NO_PLAN'
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchData();
+            setEditPlanModal(null);
+            alert(`Plan successfully ${action === 'REVOKE' ? 'revoked' : 'updated'}.`);
+        } catch (e: any) {
+            console.error(e);
+            alert(e.response?.data?.error || 'Failed to update plan');
+        } finally {
+            setIsSavingPlan(false);
+        }
+    };
+
+    const handleGenerateOnboardingLink = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newInstituteName.trim()) return;
+
+        if (plan === 'CUSTOM') {
+            if (!customPriceMonthly && !customPriceYearly) {
+                alert('Please enter at least one custom price (monthly or yearly).');
+                return;
+            }
+        }
 
         setIsCreating(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post(`${API_URL}/invites`, {
-                instituteName: newInstituteName,
-                teacherName,
-                phoneNumber,
-                email,
+            const res = await axios.post(`${API_URL}/admin-onboarding/create-link`, {
                 plan,
-                customMaxStudents: plan === 'Custom' ? customMaxStudentsForInvite : undefined,
-                subjects,
-                allowedClasses: allowedClassesString,
-                requiresGrades
+                discountPercent: plan !== 'CUSTOM' ? (Number(discountPercent) || 0) : 0,
+                customPriceMonthly: plan === 'CUSTOM' ? (Number(customPriceMonthly) || 0) : 0,
+                customPriceYearly: plan === 'CUSTOM' ? (Number(customPriceYearly) || 0) : 0,
+                maxStudents: plan === 'CUSTOM' ? (Number(customMaxStudentsForInvite) || 100) : (plan === 'PRO' ? 250 : 100),
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            setInviteLink(res.data.inviteLink);
+            setInviteLink(res.data.link);
 
-            // Reset Form (Keeping defaults for limits)
-            setNewInstituteName('');
-            setTeacherName('');
-            setPhoneNumber('');
-            setEmail('');
-            setPlan('Basic');
-            setCustomMaxStudentsForInvite('');
-            setSubjects('Math, Science, English');
-        } catch (err) {
-            alert('Failed to generate invite');
+            // Reset Form
+            setPlan('BASIC');
+            setDiscountPercent(0);
+            setCustomPriceMonthly('');
+            setCustomPriceYearly('');
+            setCustomMaxStudentsForInvite(100);
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Failed to generate onboarding link');
         } finally {
             setIsCreating(false);
         }
@@ -514,6 +553,59 @@ export default function SuperAdminDashboard() {
                 </div>
             )}
 
+            {/* Edit Plan Modal */}
+            {editPlanModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Manage Subscription</h3>
+                                <p className="text-sm text-gray-500">Update or revoke {editPlanModal.name}'s plan</p>
+                            </div>
+                            <button onClick={() => setEditPlanModal(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            <div className="space-y-2 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
+                                <label className="text-sm font-bold text-gray-900">Change Plan Prefix</label>
+                                <p className="text-xs text-gray-500 mb-3">Manually upgrade or downgrade their tier.</p>
+                                <select
+                                    value={selectedNewPlan}
+                                    onChange={(e) => setSelectedNewPlan(e.target.value as any)}
+                                    className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black outline-none font-medium text-sm"
+                                >
+                                    <option value="NO_PLAN">NO_PLAN (Paused)</option>
+                                    <option value="BASIC">BASIC</option>
+                                    <option value="PRO">PRO</option>
+                                </select>
+                                <button
+                                    onClick={() => handleSavePlan('UPDATE')}
+                                    disabled={isSavingPlan}
+                                    className="w-full mt-3 px-4 py-2.5 bg-black text-white font-bold rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 text-sm"
+                                >
+                                    Force Update Plan
+                                </button>
+                            </div>
+
+                            <div className="space-y-2 border border-red-100 p-4 rounded-xl bg-red-50/40">
+                                <h4 className="text-sm font-bold text-red-700">Danger Zone: Revoke Plan</h4>
+                                <p className="text-xs text-red-600 mb-3">This action drops the institute to NO PLAN immediately, pausing new registrations, and scrubs any bound Razorpay subscription IDs.</p>
+                                <button
+                                    onClick={() => handleSavePlan('REVOKE')}
+                                    disabled={isSavingPlan}
+                                    className="w-full px-4 py-2.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm shadow-sm"
+                                >
+                                    <AlertTriangle className="w-4 h-4" /> Revoke Plan Access completely
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            )}
+
             <nav className="bg-white border-b border-gray-200 sticky top-0 z-10 px-6 py-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     <div className="bg-black text-white p-2 rounded-lg">
@@ -677,6 +769,14 @@ export default function SuperAdminDashboard() {
                                             >
                                                 <Settings className="w-4 h-4" />
                                                 Config
+                                            </button>
+                                            <button
+                                                onClick={() => handleOpenEditPlan(inst)}
+                                                className="p-3 bg-orange-50/50 hover:bg-orange-50 text-orange-600 hover:text-orange-700 rounded-xl transition-all border border-orange-100 hover:border-orange-200 font-medium text-sm flex items-center gap-2"
+                                                title="Manage Subscription Plan"
+                                            >
+                                                <ShieldCheck className="w-4 h-4" />
+                                                Plan
                                             </button>
                                             {inst.status === 'SUSPENDED' ? (
                                                 <button
@@ -912,154 +1012,137 @@ export default function SuperAdminDashboard() {
             {
                 showOnboardForm && (
                     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowOnboardForm(false)}>
-                        <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-xl font-bold flex items-center gap-2 text-black">
-                                    <UserPlus className="w-5 h-5" />
-                                    Onboard Institute
+                                    <LinkIcon className="w-5 h-5" />
+                                    Create Onboarding Link
                                 </h2>
                                 <button onClick={() => setShowOnboardForm(false)} className="text-gray-400 hover:text-gray-600">
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            <p className="text-gray-500 text-sm mb-6">Create a secure invite link to onboard a new institute to the platform.</p>
+                            <p className="text-gray-500 text-sm mb-6">Select a plan and set pricing. The coaching center will fill in all other details, choose billing cycle, and pay.</p>
 
-                            <form onSubmit={handleGenerateInvite} className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Institute Details</label>
-                                    <input
-                                        type="text"
-                                        value={newInstituteName}
-                                        onChange={(e) => setNewInstituteName(e.target.value)}
-                                        placeholder="Institute Name (e.g. Apex Academy)"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                        required
-                                    />
-                                    <input
-                                        type="text"
-                                        value={teacherName}
-                                        onChange={(e) => setTeacherName(e.target.value)}
-                                        placeholder="Teacher Name (e.g. Rajesh Kumar)"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                        required
-                                    />
+                            <form onSubmit={handleGenerateOnboardingLink} className="space-y-5">
+                                {/* Plan Selection */}
+                                <div className="space-y-4">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Select Plan</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {(['BASIC', 'PRO', 'CUSTOM'] as const).map((p) => (
+                                            <button
+                                                key={p}
+                                                type="button"
+                                                onClick={() => {
+                                                    setPlan(p);
+                                                    setDiscountPercent(0);
+                                                    setCustomPriceMonthly('');
+                                                    setCustomPriceYearly('');
+                                                    if (p === 'BASIC') setCustomMaxStudentsForInvite(100);
+                                                    else if (p === 'PRO') setCustomMaxStudentsForInvite(250);
+                                                    else setCustomMaxStudentsForInvite(100);
+                                                }}
+                                                className={`py-3 px-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                                                    plan === p
+                                                        ? 'bg-black text-white border-black'
+                                                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                                }`}
+                                            >
+                                                <div className="text-center">
+                                                    <div>{p === 'BASIC' ? 'Basic' : p === 'PRO' ? 'Pro' : 'Custom'}</div>
+                                                    {p !== 'CUSTOM' && (
+                                                        <div className={`text-[10px] mt-0.5 ${plan === p ? 'text-gray-300' : 'text-gray-400'}`}>
+                                                            {p === 'BASIC' ? '100 Students' : '250 Students'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Contact</label>
-                                        <input
-                                            type="tel"
-                                            value={phoneNumber}
-                                            onChange={(e) => setPhoneNumber(e.target.value)}
-                                            placeholder="Phone"
-                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 invisible">Email</label>
-                                        <input
-                                            type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            placeholder="Email ID"
-                                            className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-4 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <label className="text-sm font-bold text-gray-700">Require Grades/Classes?</label>
-                                            <p className="text-xs text-gray-500">Enable if this institute organizes students by Class/Grade.</p>
+                                {/* Pricing: Discount for Basic/Pro OR Custom Price */}
+                                {plan !== 'CUSTOM' ? (
+                                    <div className="space-y-3 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Discount</label>
+                                        <div className="text-xs text-gray-500 -mt-1">
+                                            Base: <span className="font-bold text-gray-700">₹{plan === 'BASIC' ? '999' : '1,999'}/mo</span> or <span className="font-bold text-gray-700">₹{plan === 'BASIC' ? '9,999' : '19,999'}/yr</span>
                                         </div>
-                                        <div className="flex bg-gray-200 p-1 rounded-lg">
-                                            <button
-                                                type="button"
-                                                onClick={() => setRequiresGrades(true)}
-                                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${requiresGrades ? 'bg-white shadow-sm text-black' : 'text-gray-500 hover:text-gray-700'}`}
-                                            >
-                                                Yes
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setRequiresGrades(false)}
-                                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${!requiresGrades ? 'bg-white shadow-sm text-black' : 'text-gray-500 hover:text-gray-700'}`}
-                                            >
-                                                No
-                                            </button>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                value={discountPercent}
+                                                onChange={(e) => setDiscountPercent(e.target.value === '' ? '' : Math.min(100, Math.max(0, Number(e.target.value))))}
+                                                placeholder="0"
+                                                min="0"
+                                                max="100"
+                                                className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 pr-10 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-bold text-lg"
+                                            />
+                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">%</span>
                                         </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {requiresGrades ? (
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Configured Classes</label>
-                                                <input
-                                                    type="text"
-                                                    value={allowedClassesString}
-                                                    onChange={(e) => setAllowedClassesString(e.target.value)}
-                                                    placeholder="e.g. Class 9, Class 10"
-                                                    className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2 opacity-50 pointer-events-none">
-                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Configured Classes</label>
-                                                <input
-                                                    type="text"
-                                                    value="Not Applicable"
-                                                    readOnly
-                                                    className="w-full bg-gray-100 text-gray-500 border border-gray-200 rounded-xl px-4 py-3 font-medium cursor-not-allowed"
-                                                />
-                                            </div>
-                                        )}
-
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">
-                                                Plan
-                                            </label>
-                                            <select
-                                                value={plan}
-                                                onChange={(e) => setPlan(e.target.value)}
-                                                className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all cursor-pointer font-medium"
-                                            >
-                                                <option value="Basic">Basic Plan (Max 100 students)</option>
-                                                <option value="Pro">Pro Plan (Max 250 students)</option>
-                                                <option value="Custom">Custom Plan</option>
-                                            </select>
-                                        </div>
-
-                                        {plan === 'Custom' && (
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">
-                                                    Custom Limit
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    value={customMaxStudentsForInvite}
-                                                    onChange={(e) => setCustomMaxStudentsForInvite(e.target.value === '' ? '' : Number(e.target.value))}
-                                                    placeholder="e.g. 500"
-                                                    className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                                />
+                                        {Number(discountPercent) > 0 && (
+                                            <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-xs">
+                                                <div className="flex justify-between text-green-700">
+                                                    <span>Monthly after discount:</span>
+                                                    <span className="font-bold">
+                                                        ₹{Math.round((plan === 'BASIC' ? 999 : 1999) * (1 - Number(discountPercent) / 100)).toLocaleString('en-IN')}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between text-green-700 mt-1">
+                                                    <span>Yearly after discount:</span>
+                                                    <span className="font-bold">
+                                                        ₹{Math.round((plan === 'BASIC' ? 9999 : 19999) * (1 - Number(discountPercent) / 100)).toLocaleString('en-IN')}
+                                                    </span>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Subjects Offered</label>
-                                    <input
-                                        type="text"
-                                        value={subjects}
-                                        onChange={(e) => setSubjects(e.target.value)}
-                                        placeholder="e.g. Math, Physics, Chemistry"
-                                        className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
-                                    />
-                                    <p className="text-[10px] text-gray-400 pl-1">Comma separated list</p>
-                                </div>
+                                ) : (
+                                    <div className="space-y-3 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Custom Pricing</label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase pl-1">Monthly (₹)</label>
+                                                <div className="relative">
+                                                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                                    <input
+                                                        type="number"
+                                                        value={customPriceMonthly}
+                                                        onChange={(e) => setCustomPriceMonthly(e.target.value === '' ? '' : Number(e.target.value))}
+                                                        placeholder="e.g. 2499"
+                                                        className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl pl-9 pr-3 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-bold"
+                                                        min="1"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase pl-1">Yearly (₹)</label>
+                                                <div className="relative">
+                                                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                                    <input
+                                                        type="number"
+                                                        value={customPriceYearly}
+                                                        onChange={(e) => setCustomPriceYearly(e.target.value === '' ? '' : Number(e.target.value))}
+                                                        placeholder="e.g. 24999"
+                                                        className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl pl-9 pr-3 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-bold"
+                                                        min="1"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase pl-1">Max Students</label>
+                                            <input
+                                                type="number"
+                                                value={customMaxStudentsForInvite}
+                                                onChange={(e) => setCustomMaxStudentsForInvite(e.target.value === '' ? '' : Number(e.target.value))}
+                                                placeholder="e.g. 500"
+                                                className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
+                                                min="1"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
                                 <button
                                     type="submit"
@@ -1069,7 +1152,7 @@ export default function SuperAdminDashboard() {
                                     {isCreating ? (
                                         'Generating Link...'
                                     ) : (
-                                        <>Generate Invite Link <ArrowRight className="w-4 h-4" /></>
+                                        <>Generate Onboarding Link <ArrowRight className="w-4 h-4" /></>
                                     )}
                                 </button>
                             </form>
@@ -1077,7 +1160,7 @@ export default function SuperAdminDashboard() {
                             {inviteLink && (
                                 <div className="mt-6 p-4 bg-green-50 border border-green-100 rounded-2xl animate-in fade-in slide-in-from-top-2">
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Invite Generated</span>
+                                        <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Link Ready</span>
                                         {copied ? (
                                             <CheckCircle className="w-5 h-5 text-green-600" />
                                         ) : (
@@ -1090,6 +1173,7 @@ export default function SuperAdminDashboard() {
                                     <code className="block w-full bg-white border border-green-200 p-3 rounded-xl text-xs text-green-800 break-all font-mono select-all">
                                         {inviteLink}
                                     </code>
+                                    <p className="text-[10px] text-green-600 mt-2 font-medium">Share this link. The coaching center will fill in details, choose billing cycle, pay, and set up their account.</p>
                                 </div>
                             )}
                         </div>

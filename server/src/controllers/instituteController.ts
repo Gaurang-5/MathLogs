@@ -79,6 +79,70 @@ export const updateInstituteDetails = async (req: Request, res: Response) => {
     }
 };
 
+export const updateInstitutePlan = async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const { plan, planExpiryDate, action } = req.body;
+    const user = (req as any).user;
+
+    if (user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const institute = await prisma.institute.findUnique({ where: { id } });
+        if (!institute) return res.status(404).json({ error: 'Institute not found' });
+
+        if (action === 'REVOKE') {
+            const currentConfig = (institute.config as any) || {};
+            const updated = await prisma.institute.update({
+                where: { id },
+                data: {
+                    plan: 'NO_PLAN',
+                    planExpiryDate: new Date(),
+                    razorpaySubscriptionId: null,
+                    razorpayOrderId: null,
+                    config: { ...currentConfig, maxStudents: 0 },
+                    areRegistrationsPaused: true
+                }
+            });
+            return res.json({ success: true, message: 'Plan revoked successfully.', updated });
+        }
+
+        const currentConfig = (institute.config as any) || {};
+        const maxStudents = plan === 'PRO' ? 250 : plan === 'BASIC' ? 100 : plan === 'FREE' ? 100 : 0;
+        const areRegistrationsPaused = plan === 'NO_PLAN';
+
+        // Ensure that if a SuperAdmin activates a plan, the expiry date isn't stuck in the past
+        let newExpiryDate = planExpiryDate ? new Date(planExpiryDate) : institute.planExpiryDate;
+        const now = new Date();
+        if (!planExpiryDate && plan && plan !== 'NO_PLAN') {
+            if (!newExpiryDate || newExpiryDate.getTime() < now.getTime()) {
+                newExpiryDate = new Date();
+                if (plan === 'FREE') {
+                    newExpiryDate.setDate(now.getDate() + 14); // 14-day free trial
+                } else {
+                    newExpiryDate.setMonth(now.getMonth() + 1); // 1-month cycle for PRO/BASIC defaults
+                }
+            }
+        }
+
+        const updated = await prisma.institute.update({
+            where: { id },
+            data: {
+                plan: plan || institute.plan,
+                planExpiryDate: newExpiryDate,
+                config: { ...currentConfig, maxStudents },
+                areRegistrationsPaused
+            }
+        });
+
+        res.json({ success: true, message: 'Plan updated successfully.', updated });
+    } catch (error) {
+        console.error('Failed to update institute plan:', error);
+        res.status(500).json({ error: 'Failed to update plan' });
+    }
+};
+
 
 export const getInstituteDetails = async (req: Request, res: Response) => {
     const id = req.params.id as string;
