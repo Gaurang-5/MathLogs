@@ -112,15 +112,13 @@ export default function ScanMarks() {
                             facingMode: "environment"
                         },
                         {
-                            fps: 25,
-                            // Optimized: Wide scanning area matching new sticker layout
+                            fps: 10, // Lower FPS is more stable on iOS/mobile
                             qrbox: (viewfinderWidth, viewfinderHeight) => {
                                 const width = viewfinderWidth * 0.9;
                                 const height = Math.min(viewfinderHeight * 0.5, 400); // Narrower height means less pixels to search
                                 return { width, height };
                             },
-                            // Request high resolution for sharp handwriting OCR
-                            aspectRatio: 16 / 9,
+                            // DO NOT use aspectRatio or experimental flags here — they break iOS PWA
                             disableFlip: false
                         },
                         async (decodedText) => {
@@ -140,8 +138,8 @@ export default function ScanMarks() {
                             const ocrPromise = (async () => {
                                 try {
                                     // ⏳ Brief settle: QR fires instantly but sticker may
-                                    // still be moving. 200ms is enough for camera to lock focus.
-                                    await new Promise(r => setTimeout(r, 200));
+                                    // still be moving. 100ms is enough.
+                                    await new Promise(r => setTimeout(r, 100));
 
                                     // NOW pause (video still had live frames during the wait)
                                     html5QrCode.pause();
