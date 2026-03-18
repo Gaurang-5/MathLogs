@@ -360,16 +360,30 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Name and amount are required' });
     }
 
+    // M5 fix: Guard against NaN or zero/negative amounts
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ error: 'Amount must be a positive number' });
+    }
+
     try {
+        // M6 fix: Fetch only the fields we need for fee reminders
+        // H3 fix: Scope feePayments to only this batch's installments
         const batch = await prisma.batch.findUnique({ 
             where: { id },
             include: {
-                institute: true,
+                institute: { select: { name: true } },
                 students: {
                     where: { status: 'APPROVED' },
-                    include: { feePayments: true }
+                    select: {
+                        name: true,
+                        parentWhatsapp: true,
+                        feePayments: {
+                            where: { installment: { batchId: id } }
+                        }
+                    }
                 },
-                feeInstallments: true
+                feeInstallments: { select: { id: true, name: true, amount: true } }
             }
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
@@ -381,7 +395,7 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
             data: {
                 batchId: id,
                 name,
-                amount: parseFloat(amount)
+                amount: parsedAmount
             }
         });
 
@@ -422,8 +436,15 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
             }
         });
         
-        // Fire array of promises without awaiting to ensure fast API response
-        Promise.allSettled(notifyPromises);
+        // H4 fix: Log results of background notification sends
+        Promise.allSettled(notifyPromises).then(results => {
+            const failed = results.filter(r => r.status === 'rejected').length;
+            if (failed > 0) {
+                console.error(`[Fee Reminder] ${failed}/${results.length} failed for batch ${id}`);
+            } else {
+                console.log(`[Fee Reminder] ${results.length} reminders dispatched for batch ${id}`);
+            }
+        });
 
         res.json(installment);
     } catch (e) {

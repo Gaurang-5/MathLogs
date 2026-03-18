@@ -53,7 +53,8 @@ export const updateBatchSchema = z.object({
         className: z.string().max(100).optional(),
         timeSlot: z.string().max(100).optional(),
         feeAmount: z.number().min(0).optional(),
-        whatsappGroupLink: z.string().url("Invalid URL").optional().or(z.literal(''))
+        whatsappGroupLink: z.string().url("Invalid URL").optional().or(z.literal('')),
+        autoSendWelcome: z.boolean().optional()
     })
 });
 

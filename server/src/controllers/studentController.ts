@@ -3,7 +3,29 @@ import { prisma } from '../prisma';
 import logger from '../utils/logger';
 import { sendWelcomeWhatsApp } from '../utils/whatsapp';
 
-const autoSendWelcomeInvite = async (student: any, batch: any) => {
+// H5 fix: Shared constant so both registerStudent and addStudentManually
+// always include the fields that autoSendWelcomeInvite depends on.
+const AUTO_INVITE_INSTITUTE_SELECT = { name: true } as const;
+
+// M2 fix: Typed interfaces instead of `any`
+interface AutoInviteStudent {
+    name: string;
+    humanId: string | null;
+    parentEmail: string | null;
+    parentWhatsapp: string;
+}
+interface AutoInviteBatch {
+    autoSendWelcome: boolean;
+    whatsappGroupLink: string | null;
+    name: string;
+    subject: string | null;
+    className: string | null;
+    timeSlot: string | null;
+    instituteId: string | null;
+    institute?: { name: string } | null;
+}
+
+const autoSendWelcomeInvite = async (student: AutoInviteStudent, batch: AutoInviteBatch) => {
     if (!batch.autoSendWelcome || !batch.whatsappGroupLink) return;
     
     try {
@@ -12,7 +34,7 @@ const autoSendWelcomeInvite = async (student: any, batch: any) => {
 
         const body = `Hello ${student.name},\n\nWelcome to ${batch.name} (${batch.subject || 'Course'}).\n\nBatch Details:\n• Class: ${batch.className || 'N/A'}\n• Time: ${batch.timeSlot || 'N/A'}\n• Student ID: ${student.humanId || 'N/A'}\n\nJoin the official WhatsApp group for announcements and updates:\n👉 ${link}\n\nPlease join the group to stay informed.\n\n– ${senderName}`;
 
-        // Queue Email Invite
+        // H2 fix: Cast only the Json `options` field instead of the entire data object
         if (student.parentEmail) {
             await prisma.emailJob.create({
                 data: {
@@ -20,9 +42,9 @@ const autoSendWelcomeInvite = async (student: any, batch: any) => {
                     subject: `Welcome to ${batch.name} – ${batch.subject}`,
                     body,
                     status: 'PENDING',
-                    options: { senderName, senderType: 'WELCOME' },
+                    options: { senderName, senderType: 'WELCOME' } as any,
                     instituteId: batch.instituteId
-                } as any
+                }
             });
         }
 
@@ -154,7 +176,7 @@ export const registerStudent = async (req: Request, res: Response) => {
             where: { id: batchId },
             include: {
                 academicYearRef: true,
-                institute: { select: { name: true, areRegistrationsPaused: true, plan: true, planExpiryDate: true } } // Fetch institute name for SMS
+                institute: { select: { ...AUTO_INVITE_INSTITUTE_SELECT, areRegistrationsPaused: true, plan: true, planExpiryDate: true } }
             }
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
@@ -263,7 +285,7 @@ export const registerStudent = async (req: Request, res: Response) => {
         }
 
         // Auto-send welcome invite if enabled
-        await autoSendWelcomeInvite(student, batch);
+        await autoSendWelcomeInvite(student!, batch);
 
         res.json(student);
     } catch (e: any) {
@@ -281,7 +303,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
             where: { id: batchId },
             include: {
                 academicYearRef: true,
-                institute: { select: { name: true } }
+                institute: { select: { ...AUTO_INVITE_INSTITUTE_SELECT } }
             }
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
@@ -359,7 +381,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
         if (!success) throw new Error('Failed to generate unique ID');
 
         // Auto-send invite if enabled
-        await autoSendWelcomeInvite(student, batch);
+        await autoSendWelcomeInvite(student!, batch);
 
         res.json(student);
     } catch (e) {
@@ -468,7 +490,7 @@ export const approveStudent = async (req: Request, res: Response) => {
         if (!success) throw new Error('Collision');
 
         // Auto-send welcome invite if enabled
-        await autoSendWelcomeInvite(student, studentToApprove.batch);
+        await autoSendWelcomeInvite(student!, studentToApprove.batch);
 
         res.json(student);
     } catch (e: any) {

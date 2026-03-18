@@ -15,20 +15,35 @@ export const loginAdmin = async (req: Request, res: Response) => {
     const { username, password } = req.body;
 
     try {
-        const admin = await prisma.admin.findUnique({
+        // M4 fix: Support login by username, phone, or email
+        // Try findUnique first (fast path for username), fall back to broader search
+        let admin = await prisma.admin.findUnique({
             where: { username },
             include: { institute: true }
         });
 
         if (!admin) {
-            console.warn(`[Auth] Failed login attempt for username: ${username} (User not found)`);
+            // Fallback: search by institute phone or email
+            admin = await prisma.admin.findFirst({
+                where: {
+                    OR: [
+                        { institute: { phoneNumber: username } },
+                        { institute: { email: username } }
+                    ]
+                },
+                include: { institute: true }
+            });
+        }
+
+        if (!admin) {
+            console.warn(`[Auth] Failed login attempt for identifier: ${username} (User not found)`);
             res.status(404).json({ error: 'User not found' });
             return;
         }
 
         const isMatch = await bcrypt.compare(password, admin.password);
         if (!isMatch) {
-            console.warn(`[Auth] Failed login attempt for username: ${username} (Invalid password)`);
+            console.warn(`[Auth] Failed login attempt for identifier: ${username} (Invalid password)`);
             res.status(401).json({ error: 'Incorrect password' });
             return;
         }
