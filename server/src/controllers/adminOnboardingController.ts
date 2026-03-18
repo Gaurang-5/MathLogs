@@ -3,6 +3,8 @@ import { prisma } from '../prisma';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { getClientUrl } from '../utils/urlConfig';
+import { sendSetupLinkWhatsApp } from '../utils/whatsapp';
+import { sendSetupLinkEmail } from '../utils/email';
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key',
@@ -43,14 +45,20 @@ export const createAdminOnboardingLink = async (req: Request, res: Response) => 
         customPriceMonthly = 0,
         customPriceYearly = 0,
         maxStudents,
+        isFreeTrial = false,
+        trialDays = 14,
     } = req.body;
 
     if (!plan || !['BASIC', 'PRO', 'CUSTOM'].includes(plan)) {
         return res.status(400).json({ error: 'Valid plan is required (BASIC, PRO, CUSTOM).' });
     }
 
-    if (plan === 'CUSTOM' && !customPriceMonthly && !customPriceYearly) {
-        return res.status(400).json({ error: 'At least one custom price (monthly or yearly) is required for Custom plan.' });
+    if (plan === 'CUSTOM' && !isFreeTrial && !customPriceMonthly && !customPriceYearly) {
+        return res.status(400).json({ error: 'At least one custom price (monthly or yearly) is required for paid Custom plan.' });
+    }
+
+    if (isFreeTrial && (!trialDays || trialDays < 1 || trialDays > 365)) {
+        return res.status(400).json({ error: 'Trial days must be between 1 and 365.' });
     }
 
     // Resolve max students: BASIC=100, PRO=250, CUSTOM=user-specified
@@ -66,9 +74,11 @@ export const createAdminOnboardingLink = async (req: Request, res: Response) => 
                 token,
                 plan,
                 discountPercent: plan !== 'CUSTOM' ? Math.min(100, Math.max(0, Number(discountPercent))) : 0,
-                customPriceMonthlyPaise: plan === 'CUSTOM' ? Math.round(Number(customPriceMonthly) * 100) : null,
-                customPriceYearlyPaise: plan === 'CUSTOM' ? Math.round(Number(customPriceYearly) * 100) : null,
+                customPriceMonthlyPaise: plan === 'CUSTOM' && !isFreeTrial ? Math.round(Number(customPriceMonthly) * 100) : null,
+                customPriceYearlyPaise: plan === 'CUSTOM' && !isFreeTrial ? Math.round(Number(customPriceYearly) * 100) : null,
                 maxStudents: resolvedMaxStudents,
+                isFreeTrial: Boolean(isFreeTrial),
+                trialDays: isFreeTrial ? Number(trialDays) : null,
                 expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
             }
         });
@@ -112,6 +122,8 @@ export const getAdminOnboardingLink = async (req: Request, res: Response) => {
             monthlyPrice,
             yearlyPrice,
             maxStudents: link.maxStudents,
+            isFreeTrial: link.isFreeTrial,
+            trialDays: link.trialDays,
         });
     } catch (error) {
         console.error('Get Admin Onboarding Link Error:', error);
@@ -122,10 +134,6 @@ export const getAdminOnboardingLink = async (req: Request, res: Response) => {
 // PUBLIC: Create Razorpay order for an admin onboarding link
 export const createAdminOnboardingOrder = async (req: Request, res: Response) => {
     const { token, billingCycle, instituteName, teacherName, phoneNumber, email } = req.body;
-
-    if (!billingCycle || !['monthly', 'yearly'].includes(billingCycle)) {
-        return res.status(400).json({ error: 'Valid billing cycle (monthly/yearly) is required.' });
-    }
 
     try {
         const link = await prisma.adminOnboardingLink.findUnique({
@@ -144,14 +152,179 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
             }
         }
 
+        // Handle FREE TRIAL links — skip payment entirely
+        if (link.isFreeTrial) {
+            let planEnum: any = 'BASIC';
+            if (link.plan === 'PRO') planEnum = 'PRO';
+            else if (link.plan === 'CUSTOM') planEnum = 'ENTERPRISE';
+
+            const planStartDate = new Date();
+            const planExpiryDate = new Date();
+            planExpiryDate.setDate(planExpiryDate.getDate() + (link.trialDays || 14));
+
+            const finalName = instituteName || 'New Institute';
+            const finalTeacher = teacherName || '';
+            const finalPhone = phoneNumber || '';
+            const finalEmail = email || '';
+
+            const newInstitute = await prisma.institute.create({
+                data: {
+                    name: finalName,
+                    teacherName: finalTeacher,
+                    phoneNumber: finalPhone,
+                    email: finalEmail,
+                    plan: planEnum,
+                    planStartDate,
+                    planExpiryDate,
+                    config: {
+                        requiresGrades: true,
+                        maxStudents: link.maxStudents,
+                        planName: link.plan,
+                        billingCycle: 'trial',
+                        trialDays: link.trialDays,
+                        isTrial: true,
+                        allowedClasses: ["Class 9", "Class 10"],
+                        subjects: ["Mathematics"],
+                        ...(link.discountPercent ? { discountPercent: link.discountPercent } : {}),
+                    }
+                }
+            });
+
+            const tokenString = crypto.randomBytes(24).toString('hex');
+            const invite = await prisma.inviteToken.create({
+                data: {
+                    token: tokenString,
+                    instituteId: newInstitute.id,
+                    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                }
+            });
+
+            await prisma.adminOnboardingLink.update({
+                where: { id: link.id },
+                data: { status: 'USED', instituteId: newInstitute.id }
+            });
+
+            const clientUrl = getClientUrl(req);
+            const setupLink = `${clientUrl}/setup?token=${invite.token}`;
+
+            const notificationData = {
+                ownerName: finalTeacher || 'there',
+                setupLink,
+                tuitionName: finalName
+            };
+
+            if (finalPhone) {
+                await Promise.allSettled([
+                    sendSetupLinkWhatsApp(finalPhone, notificationData),
+                    finalEmail ? sendSetupLinkEmail(finalEmail, notificationData) : Promise.resolve()
+                ]);
+            }
+
+            return res.json({
+                success: true,
+                freeSetup: true,
+                setupLink,
+                message: `Your ${link.trialDays}-day free trial has been activated!`
+            });
+        }
+
+        // For paid plans, validate billing cycle
+        if (!billingCycle || !['monthly', 'yearly'].includes(billingCycle)) {
+            return res.status(400).json({ error: 'Valid billing cycle (monthly/yearly) is required.' });
+        }
+
         // Calculate price based on user's chosen billing cycle
         const amountInPaise = getPriceInPaise(link, billingCycle as 'monthly' | 'yearly');
 
+        // Handle FREE plans (100% discount or ₹0 custom price)
         if (amountInPaise <= 0) {
-            return res.status(400).json({ error: 'Invalid pricing configuration. Contact admin.' });
+            // Directly provision the institute — no payment needed
+            let planEnum: any = 'BASIC';
+            if (link.plan === 'PRO') planEnum = 'PRO';
+            else if (link.plan === 'CUSTOM') planEnum = 'ENTERPRISE';
+
+            const planStartDate = new Date();
+            const planExpiryDate = new Date();
+            const cycle = billingCycle || 'yearly';
+            if (cycle === 'monthly') {
+                planExpiryDate.setDate(planExpiryDate.getDate() + 30);
+            } else {
+                planExpiryDate.setDate(planExpiryDate.getDate() + 365);
+            }
+
+            const finalName = instituteName || 'New Institute';
+            const finalTeacher = teacherName || '';
+            const finalPhone = phoneNumber || '';
+            const finalEmail = email || '';
+
+            const newInstitute = await prisma.institute.create({
+                data: {
+                    name: finalName,
+                    teacherName: finalTeacher,
+                    phoneNumber: finalPhone,
+                    email: finalEmail,
+                    plan: planEnum,
+                    planStartDate,
+                    planExpiryDate,
+                    config: {
+                        requiresGrades: true,
+                        maxStudents: link.maxStudents,
+                        planName: link.plan,
+                        billingCycle: cycle,
+                        allowedClasses: ["Class 9", "Class 10"],
+                        subjects: ["Mathematics"],
+                        ...(link.plan === 'CUSTOM' ? {
+                            customPriceMonthly: (link.customPriceMonthlyPaise || 0) / 100,
+                            customPriceYearly: (link.customPriceYearlyPaise || 0) / 100,
+                        } : {}),
+                        ...(link.discountPercent ? { discountPercent: link.discountPercent } : {}),
+                    }
+                }
+            });
+
+            // Create invite token for setup
+            const tokenString = crypto.randomBytes(24).toString('hex');
+            const invite = await prisma.inviteToken.create({
+                data: {
+                    token: tokenString,
+                    instituteId: newInstitute.id,
+                    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                }
+            });
+
+            // Mark the link as used
+            await prisma.adminOnboardingLink.update({
+                where: { id: link.id },
+                data: { status: 'USED' }
+            });
+
+            const clientUrl = getClientUrl(req);
+            const setupLink = `${clientUrl}/setup?token=${invite.token}`;
+
+            // Send notifications
+            const notifPhone = finalPhone;
+            const notificationData = {
+                ownerName: finalTeacher || 'there',
+                setupLink,
+                tuitionName: finalName
+            };
+
+            if (notifPhone) {
+                await Promise.allSettled([
+                    sendSetupLinkWhatsApp(notifPhone, notificationData),
+                    finalEmail ? sendSetupLinkEmail(finalEmail, notificationData) : Promise.resolve()
+                ]);
+            }
+
+            return res.json({
+                success: true,
+                freeSetup: true,
+                setupLink,
+                message: 'Your free plan has been activated! Setup link sent to your WhatsApp and email.'
+            });
         }
 
-        // Create Razorpay Order
+        // Create Razorpay Order (for paid plans)
         const order = await razorpay.orders.create({
             amount: amountInPaise,
             currency: 'INR',
@@ -192,9 +365,6 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
         teacherName,
         phoneNumber,
         email,
-        subjects,
-        allowedClasses,
-        requiresGrades = true
     } = req.body;
 
     try {
@@ -232,17 +402,7 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
             planExpiryDate.setDate(planExpiryDate.getDate() + 365);
         }
 
-        // 4. Build subjects & classes lists from user input
-        let subjectList = ['Mathematics'];
-        if (subjects) {
-            subjectList = subjects.split(',').map((s: string) => s.trim()).filter(Boolean);
-        }
-        let classList: string[] = [];
-        if (allowedClasses) {
-            classList = allowedClasses.split(',').map((s: string) => s.trim()).filter(Boolean);
-        }
-
-        // 5. Create Institute
+        // 4. Create Institute (subjects/classes are configured on the /setup page)
         const finalName = instituteName || 'New Institute';
         const finalTeacher = teacherName || '';
         const finalPhone = phoneNumber || '';
@@ -258,12 +418,12 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
                 planStartDate,
                 planExpiryDate,
                 config: {
-                    requiresGrades: requiresGrades,
+                    requiresGrades: true,
                     maxStudents: link.maxStudents,
                     planName: link.plan,
                     billingCycle: cycle,
-                    allowedClasses: classList.length > 0 ? classList : ["Class 9", "Class 10"],
-                    subjects: subjectList,
+                    allowedClasses: ["Class 9", "Class 10"],
+                    subjects: ["Mathematics"],
                     // Store pricing info for billing page renewals
                     ...(link.plan === 'CUSTOM' ? {
                         customPriceMonthly: (link.customPriceMonthlyPaise || 0) / 100,
@@ -297,10 +457,25 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
         const clientUrl = getClientUrl(req);
         const setupLink = `${clientUrl}/setup?token=${invite.token}`;
 
+        // Send setup link via WhatsApp + Email
+        const notifPhone = phoneNumber || '';
+        const notificationData = {
+            ownerName: finalTeacher || 'there',
+            setupLink,
+            tuitionName: finalName
+        };
+
+        if (notifPhone) {
+            await Promise.allSettled([
+                sendSetupLinkWhatsApp(notifPhone, notificationData),
+                finalEmail ? sendSetupLinkEmail(finalEmail, notificationData) : Promise.resolve()
+            ]);
+        }
+
         res.json({
             success: true,
             setupLink,
-            message: 'Payment verified. Redirecting to account setup.'
+            message: 'Payment verified. Setup link sent to your WhatsApp and email.'
         });
 
     } catch (error: any) {

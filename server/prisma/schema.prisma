@@ -8,92 +8,73 @@ datasource db {
 }
 
 model Institute {
-  id            String         @id @default(uuid())
-  name          String
-  createdAt     DateTime       @default(now())
-
-  updatedAt     DateTime       @updatedAt
-  
-  // Contact Details
-  teacherName   String?
-  phoneNumber   String?
-  email         String?
-  config        Json?          @default("{\"requiresGrades\": true, \"allowedClasses\": [\"9\", \"10\"], \"subjects\": [\"Math\", \"Science\"]}")
-  plan          Tier           @default(FREE)
-  planStartDate DateTime?
-  planExpiryDate DateTime?
-  
-  // Billing
-  razorpaySubscriptionId String?
+  id                     String         @id @default(uuid())
+  name                   String
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  config                 Json?          @default("{\"subjects\": [\"Math\", \"Science\"], \"allowedClasses\": [\"9\", \"10\"], \"requiresGrades\": true}")
+  plan                   Tier           @default(FREE)
+  email                  String?
+  phoneNumber            String?
+  teacherName            String?
+  status                 String         @default("ACTIVE")
+  suspensionReason       String?
+  planExpiryDate         DateTime?
+  planStartDate          DateTime?
   razorpayOrderId        String?
-  
-  // Status
-  status           String      @default("ACTIVE") // ACTIVE, SUSPENDED
-  suspensionReason String?
-  areRegistrationsPaused Boolean @default(false)
-
-  admins        Admin[]
-  academicYears AcademicYear[]
-  students      Student[]
-  batches       Batch[]
-  tests         Test[]
-  invites       InviteToken[]
+  razorpaySubscriptionId String?
+  areRegistrationsPaused Boolean        @default(false)
+  academicYears          AcademicYear[]
+  admins                 Admin[]
+  batches                Batch[]
+  invites                InviteToken[]
+  students               Student[]
+  tests                  Test[]
 }
 
 model InviteToken {
   id          String    @id @default(uuid())
   token       String    @unique
   instituteId String
-  institute   Institute @relation(fields: [instituteId], references: [id])
   isUsed      Boolean   @default(false)
   expiresAt   DateTime
   createdAt   DateTime  @default(now())
+  institute   Institute @relation(fields: [instituteId], references: [id])
 }
 
 model Admin {
-  id                  String  @id @default(uuid())
-  username            String  @unique
-  password            String
-  passwordVersion     Int     @default(1)  // Increment on password change to invalidate old JWTs
-  currentAcademicYear String  @default("2024-2025")
-  
-  // Multi-tenancy
-  role                String  @default("INSTITUTE_ADMIN") // SUPER_ADMIN, INSTITUTE_ADMIN, STAFF
-  instituteId         String? // Optional during migration
-  institute           Institute? @relation(fields: [instituteId], references: [id])
-  
-  // New Academic Year Logic
+  id                    String         @id @default(uuid())
+  username              String         @unique
+  password              String
+  passwordVersion       Int            @default(1)
+  currentAcademicYear   String         @default("2024-2025")
   currentAcademicYearId String?
-  activeAcademicYear    AcademicYear? @relation("ActiveYear", fields: [currentAcademicYearId], references: [id])
-  
+  instituteId           String?
+  role                  String         @default("INSTITUTE_ADMIN")
   ownedAcademicYears    AcademicYear[] @relation("OwnedYears")
-
-  batches             Batch[]
-  tests               Test[]
+  activeAcademicYear    AcademicYear?  @relation("ActiveYear", fields: [currentAcademicYearId], references: [id])
+  institute             Institute?     @relation(fields: [instituteId], references: [id])
+  batches               Batch[]
+  tests                 Test[]
 }
 
 model AcademicYear {
-  id        String   @id @default(uuid())
-  name      String
-  startDate DateTime?
-  endDate   DateTime?
-  isDefault Boolean  @default(false)
-  
-  instituteId String? // Optional during migration
-  institute   Institute? @relation(fields: [instituteId], references: [id])
-  
-  teacherId String
-  teacher   Admin    @relation("OwnedYears", fields: [teacherId], references: [id])
-  
-  activeForAdmins Admin[] @relation("ActiveYear")
-  
-  batches   Batch[]
-  students  Student[]
-  tests     Test[]
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  id              String     @id @default(uuid())
+  name            String
+  startDate       DateTime?
+  endDate         DateTime?
+  isDefault       Boolean    @default(false)
+  teacherId       String
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  instituteId     String?
+  institute       Institute? @relation(fields: [instituteId], references: [id])
+  teacher         Admin      @relation("OwnedYears", fields: [teacherId], references: [id])
+  activeForAdmins Admin[]    @relation("ActiveYear")
+  batches         Batch[]
+  students        Student[]
+  tests           Test[]
+
   @@unique([teacherId, name])
 }
 
@@ -105,13 +86,7 @@ model Batch {
   timeSlot            String?
   feeAmount           Float            @default(0)
   academicYear        String?
-  
   academicYearId      String?
-  academicYearRef     AcademicYear?    @relation(fields: [academicYearId], references: [id])
-  
-  instituteId         String? // Optional during migration
-  institute           Institute? @relation(fields: [instituteId], references: [id])
-
   whatsappGroupLink   String?
   isRegistrationOpen  Boolean          @default(true)
   isRegistrationEnded Boolean          @default(false)
@@ -119,49 +94,49 @@ model Batch {
   teacherId           String?
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
+  instituteId         String?
+  academicYearRef     AcademicYear?    @relation(fields: [academicYearId], references: [id])
+  institute           Institute?       @relation(fields: [instituteId], references: [id])
   teacher             Admin?           @relation(fields: [teacherId], references: [id])
   feeInstallments     FeeInstallment[]
   students            Student[]
 
-  @@index([teacherId, academicYearId, className])  // PERF: Common filter combination
-  @@index([instituteId, academicYearId])            // PERF: Tenant-scoped batch listing at scale
+  @@index([teacherId, academicYearId, className])
+  @@index([instituteId, academicYearId])
 }
 
 model Student {
-  id             String       @id @default(uuid())
-  humanId        String?
-  name           String
-  parentName     String
-  parentWhatsapp String
-  parentEmail    String?
-  status         String       @default("PENDING")
-  batchId        String?
-  
-  academicYearId String?
-  academicYearRef AcademicYear? @relation(fields: [academicYearId], references: [id])
+  id              String          @id @default(uuid())
+  humanId         String?
+  name            String
+  parentName      String
+  parentWhatsapp  String
+  parentEmail     String?
+  status          String          @default("PENDING")
+  batchId         String?
+  academicYearId  String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  schoolName      String?
+  instituteId     String?
+  feePayments     FeePayment[]
+  fees            FeeRecord[]
+  marks           Mark[]
+  academicYearRef AcademicYear?   @relation(fields: [academicYearId], references: [id])
+  batch           Batch?          @relation(fields: [batchId], references: [id])
+  institute       Institute?      @relation(fields: [instituteId], references: [id])
+  balance         StudentBalance?
 
-  instituteId    String? // Optional during migration
-  institute      Institute? @relation(fields: [instituteId], references: [id])
-
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  schoolName     String?
-  feePayments    FeePayment[]
-  fees           FeeRecord[]
-  marks          Mark[]
-  batch          Batch?       @relation(fields: [batchId], references: [id])
-  balance        StudentBalance? // PERF: Materialized balance (auto-updated by DB triggers)
-
+  @@unique([humanId, academicYearId])
+  @@unique([name, parentWhatsapp, batchId], name: "student_natural_key")
   @@index([batchId])
   @@index([status])
   @@index([name])
-  @@index([status, academicYearId])  // PERF: For approved student listings
-  @@index([batchId, status])          // PERF: For batch details queries
-  @@index([createdAt])                // PERF: For growth stats chronological queries
-  @@index([instituteId, status])      // PERF: Tenant-scoped status filters (prevents full table scans)
-  @@index([instituteId, createdAt])   // PERF: Tenant-scoped chronological queries at 1M+ rows
-  @@unique([humanId, academicYearId])
-  @@unique([name, parentWhatsapp, batchId], name: "student_natural_key")
+  @@index([status, academicYearId])
+  @@index([batchId, status])
+  @@index([createdAt])
+  @@index([instituteId, status])
+  @@index([instituteId, createdAt])
 }
 
 model FeeRecord {
@@ -173,34 +148,30 @@ model FeeRecord {
   student   Student  @relation(fields: [studentId], references: [id])
 
   @@index([studentId])
-  @@index([date])  // PERF: For recent transactions and chronological queries
+  @@index([date])
 }
 
 model Test {
-  id           String   @id @default(uuid())
-  name         String
-  subject      String
-  className    String?
-  date         DateTime
-  maxMarks     Float
-  
-  instituteId  String? // Optional during migration
-  institute    Institute? @relation(fields: [instituteId], references: [id])
-
-  teacherId    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  academicYear String?
-  
-  academicYearId String?
+  id              String        @id @default(uuid())
+  name            String
+  subject         String
+  className       String?
+  date            DateTime
+  maxMarks        Float
+  teacherId       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  academicYear    String?
+  academicYearId  String?
+  instituteId     String?
+  marks           Mark[]
   academicYearRef AcademicYear? @relation(fields: [academicYearId], references: [id])
+  institute       Institute?    @relation(fields: [instituteId], references: [id])
+  teacher         Admin?        @relation(fields: [teacherId], references: [id])
 
-  marks        Mark[]
-  teacher      Admin?   @relation(fields: [teacherId], references: [id])
-
-  @@index([teacherId, academicYearId])  // PERF: For teacher test lookups
-  @@index([date])                       // PERF: For chronological test lists
-  @@index([instituteId, academicYearId]) // PERF: Tenant + year scoped test queries
+  @@index([teacherId, academicYearId])
+  @@index([date])
+  @@index([instituteId, academicYearId])
 }
 
 model Mark {
@@ -208,8 +179,8 @@ model Mark {
   score     Float
   studentId String
   testId    String
-  test      Test    @relation(fields: [testId], references: [id], onDelete: Cascade)
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  test      Test    @relation(fields: [testId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, testId])
   @@index([testId])
@@ -238,16 +209,12 @@ model FeePayment {
   installment   FeeInstallment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
   student       Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  // Removed @@unique([studentId, installmentId]) to allow multiple partial payments
   @@index([studentId])
   @@index([installmentId])
-  @@index([studentId, installmentId]) // Added for query performance
-  @@index([date]) // PERF: For dashboard monthly collection queries
+  @@index([studentId, installmentId])
+  @@index([date])
 }
 
-// PERF: Materialized view for student balances
-// Auto-updated via database triggers when fees/payments change
-// Eliminates duplicate balance calculations across endpoints
 model StudentBalance {
   studentId       String    @id
   totalFee        Float     @default(0)
@@ -255,24 +222,15 @@ model StudentBalance {
   balance         Float     @default(0)
   lastPaymentDate DateTime?
   updatedAt       DateTime  @default(now())
-  
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  @@index([balance], name: "idx_balance_desc") // For finding defaulters
-  @@index([updatedAt]) // For recent updates
+  @@index([balance], map: "idx_balance_desc")
+  @@index([updatedAt])
 }
 
 model IdCounter {
   prefix String @id
   seq    Int
-}
-
-enum Tier {
-  NO_PLAN
-  FREE
-  BASIC
-  PRO
-  ENTERPRISE
 }
 
 model EmailJob {
@@ -284,77 +242,59 @@ model EmailJob {
   attempts    Int       @default(0)
   maxAttempts Int       @default(3)
   error       String?
-  options     Json?     // Stores { senderName, replyTo, senderType }
-  
+  options     Json?
   instituteId String?
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([status])
-  @@index([createdAt]) // FIFO processing
-}
-
-model WhatsappJob {
-  id          String    @id @default(uuid())
-  recipient   String    // Phone number (E.164 format: +91...)
-  templateId  String    // e.g., "fee_reminder"
-  data        Json      // Variables: ["Rahul", "5000"]
-  status      JobStatus @default(PENDING) // PENDING, PROCESSING, COMPLETED, FAILED
-  attempts    Int       @default(0)
-  maxAttempts Int       @default(3)
-  error       String?
-  messageId   String?   // External ID from provider
-  
-  instituteId String?   // For usage tracking/billing per institute
-  
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([status])
   @@index([createdAt])
-  @@index([status, attempts, createdAt], name: "idx_whatsapp_queue")
 }
 
-enum JobStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
+model WhatsappJob {
+  id          String    @id @default(uuid())
+  recipient   String
+  templateId  String
+  data        Json
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  error       String?
+  messageId   String?
+  instituteId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, attempts, createdAt], map: "idx_whatsapp_queue")
 }
 
-// PERF: DB-backed OCR scan dedup cache.
-// Replaces the in-memory Map that didn't work across multiple server instances.
-// TTL cleanup runs in-process every 5 minutes via setInterval in api.ts.
 model OcrScanCache {
-  imageHash String   @id                  // SHA-256 of raw image bytes
-  result    Json                           // OCR result to return on cache hit
+  imageHash String   @id
+  result    Json
   createdAt DateTime @default(now())
 
-  @@index([createdAt]) // For TTL cleanup queries
+  @@index([createdAt])
 }
 
-
 model AdminOnboardingLink {
-  id              String   @id @default(uuid())
-  token           String   @unique
-  
-  // Plan Config (set by Super Admin)
-  plan            String   // BASIC, PRO, CUSTOM
-  discountPercent Int      @default(0) // Discount % for Basic/Pro (0-100)
-  customPriceMonthlyPaise Int? // Custom monthly price in paise (Custom plan only)
-  customPriceYearlyPaise  Int? // Custom yearly price in paise (Custom plan only)
-  maxStudents     Int      @default(100)
-  
-  // State
-  status          String   @default("PENDING") // PENDING, PAID, SETUP_COMPLETE, EXPIRED
-  billingCycle    String?  // Filled by user: monthly or yearly
-  instituteId     String?  // Populated after payment + provisioning
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  expiresAt       DateTime // Link expiry (e.g. 30 days from creation)
-  
+  id                      String   @id @default(uuid())
+  token                   String   @unique
+  plan                    String
+  billingCycle            String?
+  maxStudents             Int      @default(100)
+  status                  String   @default("PENDING")
+  instituteId             String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  expiresAt               DateTime
+  customPriceMonthlyPaise Int?
+  customPriceYearlyPaise  Int?
+  discountPercent         Int      @default(0)
+  isFreeTrial             Boolean  @default(false)
+  trialDays               Int?
+
   @@index([token])
   @@index([status])
   @@index([createdAt])
@@ -368,14 +308,26 @@ model OnboardingLead {
   email         String?
   planId        String?
   billingCycle  String?
-  
-  // Tracking
-  step          String   @default("STEP_1_STARTED") // DETAILS_FILLED, PLAN_SELECTED, PAYMENT_STARTED, PAYMENT_FAILED, CONVERTED
-  failureReason String?  // Razorpay error description if failed
-  
+  step          String   @default("STEP_1_STARTED")
+  failureReason String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([step])
   @@index([createdAt])
+}
+
+enum Tier {
+  FREE
+  PRO
+  ENTERPRISE
+  NO_PLAN
+  BASIC
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }

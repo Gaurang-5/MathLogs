@@ -27,7 +27,8 @@ import {
     User,
     Phone,
     Mail,
-    Link as LinkIcon
+    Link as LinkIcon,
+    Gift
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -67,6 +68,8 @@ export default function SuperAdminDashboard() {
     const [customPriceMonthly, setCustomPriceMonthly] = useState<number | ''>('');
     const [customPriceYearly, setCustomPriceYearly] = useState<number | ''>('');
     const [customMaxStudentsForInvite, setCustomMaxStudentsForInvite] = useState<number | ''>(100);
+    const [isFreeTrial, setIsFreeTrial] = useState(false);
+    const [trialDays, setTrialDays] = useState<number | ''>(14);
 
     // Loading State
     const [isCreating, setIsCreating] = useState(false);
@@ -251,11 +254,16 @@ export default function SuperAdminDashboard() {
     const handleGenerateOnboardingLink = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (plan === 'CUSTOM') {
+        if (plan === 'CUSTOM' && !isFreeTrial) {
             if (!customPriceMonthly && !customPriceYearly) {
                 alert('Please enter at least one custom price (monthly or yearly).');
                 return;
             }
+        }
+
+        if (isFreeTrial && (!trialDays || Number(trialDays) < 1)) {
+            alert('Please enter valid trial days (minimum 1).');
+            return;
         }
 
         setIsCreating(true);
@@ -263,10 +271,12 @@ export default function SuperAdminDashboard() {
             const token = localStorage.getItem('token');
             const res = await axios.post(`${API_URL}/admin-onboarding/create-link`, {
                 plan,
-                discountPercent: plan !== 'CUSTOM' ? (Number(discountPercent) || 0) : 0,
-                customPriceMonthly: plan === 'CUSTOM' ? (Number(customPriceMonthly) || 0) : 0,
-                customPriceYearly: plan === 'CUSTOM' ? (Number(customPriceYearly) || 0) : 0,
+                discountPercent: plan !== 'CUSTOM' && !isFreeTrial ? (Number(discountPercent) || 0) : 0,
+                customPriceMonthly: plan === 'CUSTOM' && !isFreeTrial ? (Number(customPriceMonthly) || 0) : 0,
+                customPriceYearly: plan === 'CUSTOM' && !isFreeTrial ? (Number(customPriceYearly) || 0) : 0,
                 maxStudents: plan === 'CUSTOM' ? (Number(customMaxStudentsForInvite) || 100) : (plan === 'PRO' ? 250 : 100),
+                isFreeTrial,
+                trialDays: isFreeTrial ? (Number(trialDays) || 14) : undefined,
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -279,6 +289,8 @@ export default function SuperAdminDashboard() {
             setCustomPriceMonthly('');
             setCustomPriceYearly('');
             setCustomMaxStudentsForInvite(100);
+            setIsFreeTrial(false);
+            setTrialDays(14);
         } catch (err: any) {
             alert(err.response?.data?.error || 'Failed to generate onboarding link');
         } finally {
@@ -1061,8 +1073,60 @@ export default function SuperAdminDashboard() {
                                     </div>
                                 </div>
 
-                                {/* Pricing: Discount for Basic/Pro OR Custom Price */}
-                                {plan !== 'CUSTOM' ? (
+                                {/* Free Trial Toggle */}
+                                <div className="flex items-center justify-between p-4 bg-amber-50/60 rounded-xl border border-amber-100">
+                                    <div className="flex items-center gap-3">
+                                        <Gift className="w-5 h-5 text-amber-600" />
+                                        <div>
+                                            <label className="text-sm font-bold text-gray-800">Free Trial</label>
+                                            <p className="text-[10px] text-gray-500">Skip payment. Give access for limited days.</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFreeTrial(!isFreeTrial)}
+                                        className={`relative w-12 h-6 rounded-full transition-colors ${isFreeTrial ? 'bg-amber-500' : 'bg-gray-300'}`}
+                                    >
+                                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${isFreeTrial ? 'left-[26px]' : 'left-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {isFreeTrial && (
+                                    <div className="space-y-2 border border-amber-100 p-4 rounded-xl bg-amber-50/30">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Trial Duration (Days)</label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {[7, 14, 30, 60].map((d) => (
+                                                <button
+                                                    key={d}
+                                                    type="button"
+                                                    onClick={() => setTrialDays(d)}
+                                                    className={`py-2.5 rounded-lg text-sm font-bold border-2 transition-all ${
+                                                        trialDays === d
+                                                            ? 'bg-amber-500 text-white border-amber-500'
+                                                            : 'bg-white text-gray-600 border-gray-200 hover:border-amber-300'
+                                                    }`}
+                                                >
+                                                    {d}d
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="relative mt-2">
+                                            <input
+                                                type="number"
+                                                value={trialDays}
+                                                onChange={(e) => setTrialDays(e.target.value === '' ? '' : Math.min(365, Math.max(1, Number(e.target.value))))}
+                                                placeholder="Custom days"
+                                                min="1"
+                                                max="365"
+                                                className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition-all placeholder:text-gray-400 font-bold"
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-amber-600 font-medium">🎯 User will get {trialDays || 0} days of free access to the {plan} plan.</p>
+                                    </div>
+                                )}
+
+                                {/* Pricing: Discount for Basic/Pro OR Custom Price (hidden when free trial) */}
+                                {!isFreeTrial && (plan !== 'CUSTOM' ? (
                                     <div className="space-y-3 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
                                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Discount</label>
                                         <div className="text-xs text-gray-500 -mt-1">
@@ -1142,7 +1206,7 @@ export default function SuperAdminDashboard() {
                                             />
                                         </div>
                                     </div>
-                                )}
+                                ))}
 
                                 <button
                                     type="submit"
@@ -1151,6 +1215,8 @@ export default function SuperAdminDashboard() {
                                 >
                                     {isCreating ? (
                                         'Generating Link...'
+                                    ) : isFreeTrial ? (
+                                        <>Generate Free Trial Link <Gift className="w-4 h-4" /></>
                                     ) : (
                                         <>Generate Onboarding Link <ArrowRight className="w-4 h-4" /></>
                                     )}

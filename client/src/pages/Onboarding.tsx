@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, ChevronDown, Check, Building2, User, Phone, Mail, CreditCard, Sparkles, Building, AlertCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Check, Building2, User, Phone, Mail, CreditCard, Sparkles, Building, AlertCircle, RotateCcw, Loader2 } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -55,6 +55,12 @@ export default function Onboarding() {
     // UI State
     const [activeStep, setActiveStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Resend Setup Link State
+    const [showResend, setShowResend] = useState(false);
+    const [resendPhone, setResendPhone] = useState('');
+    const [resendLoading, setResendLoading] = useState(false);
+    const [resendMessage, setResendMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     // References for scrolling
     const planRef = useRef<HTMLDivElement>(null);
@@ -546,6 +552,88 @@ export default function Onboarding() {
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* RESEND SETUP LINK SECTION */}
+                <div className="mt-10 mb-8">
+                    <button
+                        type="button"
+                        onClick={() => { setShowResend(!showResend); setResendMessage(null); }}
+                        className="w-full text-center text-sm font-semibold text-app-text-secondary hover:text-black transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                        Already paid but didn't finish setup?
+                    </button>
+
+                    <AnimatePresence>
+                        {showResend && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden"
+                            >
+                                <div className="mt-4 bg-app-surface-opaque border border-black/5 rounded-2xl p-5 sm:p-6 shadow-sm">
+                                    <p className="text-sm text-app-text-secondary mb-4">
+                                        Enter the phone number you used during signup. We'll resend the setup link to your WhatsApp and email.
+                                    </p>
+
+                                    <div className="flex gap-3">
+                                        <div className="relative flex-1">
+                                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                            <input
+                                                type="tel"
+                                                value={resendPhone}
+                                                onChange={(e) => { setResendPhone(e.target.value); setResendMessage(null); }}
+                                                className="w-full bg-neutral-50 border border-gray-200 pl-11 pr-4 py-3 rounded-xl outline-none focus:border-black focus:ring-1 focus:ring-black/10 transition-all font-medium text-sm placeholder:text-gray-400"
+                                                placeholder="+91 99999 99999"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            disabled={resendPhone.length < 10 || resendLoading}
+                                            onClick={async () => {
+                                                setResendLoading(true);
+                                                setResendMessage(null);
+                                                try {
+                                                    const res = await api.post('/onboarding/resend-setup-link', { phone: resendPhone });
+                                                    setResendMessage({ type: 'success', text: res.message || 'Setup link resent! Check your WhatsApp and email.' });
+                                                    toast.success('Setup link resent!');
+                                                } catch (err: any) {
+                                                    const msg = err?.message || 'Failed to resend. Please try again.';
+                                                    setResendMessage({ type: 'error', text: msg });
+                                                    toast.error(msg);
+                                                } finally {
+                                                    setResendLoading(false);
+                                                }
+                                            }}
+                                            className="px-5 py-3 bg-black text-white rounded-xl font-bold text-sm hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap cursor-pointer"
+                                        >
+                                            {resendLoading ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                'Resend Link'
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {resendMessage && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className={`mt-3 p-3 rounded-xl text-sm font-medium ${
+                                                resendMessage.type === 'success'
+                                                    ? 'bg-green-50 text-green-700 border border-green-100'
+                                                    : 'bg-red-50 text-red-600 border border-red-100'
+                                            }`}
+                                        >
+                                            {resendMessage.text}
+                                        </motion.div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
 
             </div>
         </div>

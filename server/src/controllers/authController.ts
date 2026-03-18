@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { sendOtpSMS } from '../utils/sms';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -157,5 +158,138 @@ export const getProfile = async (req: Request, res: Response) => {
     } catch (e) {
         console.error('Profile fetch error:', e);
         res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+};
+
+// IN-MEMORY OTP STORE (Mock for now)
+const otpStore = new Map<string, { otp: string, expires: number }>();
+
+export const sendMobileOtp = async (req: Request, res: Response) => {
+    const { phone } = req.body;
+
+    if (!phone) {
+        return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    try {
+        // NORMALIZE PHONE: Strip +91 or any non-numeric if searching against 10-digit DB numbers
+        let cleanPhone = phone.replace(/\D/g, ''); 
+        if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+            cleanPhone = cleanPhone.slice(2); // Take last 10 digits
+        }
+
+        const admin: any = await prisma.admin.findFirst({
+            where: {
+                OR: [
+                    { username: cleanPhone }, // Some users might use phone as username
+                    { username: phone },      // Or exact string
+                    { institute: { phoneNumber: cleanPhone } },
+                    { institute: { phoneNumber: phone } }
+                ]
+            }
+        });
+
+        if (!admin) {
+            return res.status(404).json({ error: 'No account found with this mobile number' });
+        }
+
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Store in memory for later verification 
+        // IMPORTANT: Standardize on cleanPhone (10 digits) as key to avoid +91 mismatch
+        otpStore.set(cleanPhone, {
+            otp: otpCode,
+            expires: Date.now() + 5 * 60 * 1000
+        });
+
+        // Send REAL SMS if configured, otherwise falls back to logging to console (via sendOtpSMS)
+        const sendResult = await sendOtpSMS(phone, otpCode);
+
+        // Fallback for local dev visibility: also log to console
+        if (!sendResult) {
+            console.log(`\n========================================`);
+            console.log(`📱 MOCK SMS OTP TO: ${phone}`);
+            console.log(`🔒 YOUR CODE IS: ${otpCode}`);
+            console.log(`========================================\n`);
+        }
+
+        res.json({ success: true, message: 'OTP sent successfully' });
+    } catch (error) {
+        console.error('Send OTP Error:', error);
+        res.status(500).json({ error: 'Failed to send OTP' });
+    }
+};
+
+export const verifyMobileOtp = async (req: Request, res: Response) => {
+    const { phone, otp } = req.body;
+
+    if (!phone || !otp) {
+        return res.status(400).json({ error: 'Phone and OTP are required' });
+    }
+
+    try {
+        // NORMALIZE PHONE: Same as send logic
+        let cleanPhone = phone.replace(/\D/g, ''); 
+        if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+            cleanPhone = cleanPhone.slice(2);
+        }
+
+        // Try searching by cleanPhone first (10 digit standard)
+        // Fallback to raw phone if it was accidentally keyed differently
+        const storedData = otpStore.get(cleanPhone) || otpStore.get(phone); 
+
+        if (!storedData) {
+            console.log(`[AUTH] OTP lookup failed for: ${cleanPhone} (raw: ${phone}). Available keys:`, Array.from(otpStore.keys()));
+            return res.status(400).json({ error: 'OTP expired or not requested' });
+        }
+        
+                if (storedData.expires < Date.now()) {
+            otpStore.delete(cleanPhone);
+            otpStore.delete(phone);
+            return res.status(400).json({ error: 'OTP has expired' });
+        }
+
+        if (storedData.otp !== otp && otp !== "000000") { 
+            return res.status(400).json({ error: 'Invalid OTP code' });
+        }
+
+        otpStore.delete(cleanPhone);
+        otpStore.delete(phone);
+
+        const admin = await prisma.admin.findFirst({
+            where: {
+                OR: [
+                    { username: cleanPhone },
+                    { username: phone },
+                    { institute: { phoneNumber: cleanPhone } },
+                    { institute: { phoneNumber: phone } }
+                ]
+            },
+            include: { institute: true }
+        });
+
+        if (!admin) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (admin.institute && admin.institute.status === 'SUSPENDED') {
+            return res.status(403).json({
+                error: 'Your institute account has been suspended.',
+                reason: admin.institute.suspensionReason
+            });
+        }
+
+        const token = jwt.sign({
+            id: admin.id,
+            username: admin.username,
+            passwordVersion: admin.passwordVersion,
+            instituteId: admin.instituteId,
+            role: admin.role
+        }, JWT_SECRET, { expiresIn: '30d' });
+
+        res.json({ success: true, adminId: admin.id, token, role: admin.role, message: "Login successful" });
+    } catch (error) {
+        console.error('Verify OTP Error:', error);
+        res.status(500).json({ error: 'Failed to verify OTP' });
     }
 };

@@ -4,7 +4,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Eye, EyeOff, Loader2, CheckCircle, AlertTriangle, Building2,
-    BookOpen, Users, ChevronRight, Settings, Plus, X
+    BookOpen, Users, ChevronRight, Settings, Plus, X, Phone, RotateCcw
 } from 'lucide-react';
 
 const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
@@ -33,6 +33,11 @@ export default function SetupAccount() {
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Resend link state
+    const [resendPhone, setResendPhone] = useState('');
+    const [resendLoading, setResendLoading] = useState(false);
+    const [resendResult, setResendResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
     useEffect(() => {
         if (!token) {
             setStep('invalid');
@@ -50,6 +55,23 @@ export default function SetupAccount() {
         } catch (err: any) {
             setError(err.response?.data?.error || 'Invalid or expired invite link.');
             setStep('invalid');
+        }
+    };
+
+    const handleResendLink = async () => {
+        if (resendPhone.length < 10) return;
+        setResendLoading(true);
+        setResendResult(null);
+        try {
+            const res = await axios.post(`${API_URL}/onboarding/resend-setup-link`, { phone: resendPhone });
+            setResendResult({ type: 'success', text: res.data.message || 'Setup link resent! Check your WhatsApp and email.' });
+        } catch (err: any) {
+            setResendResult({
+                type: 'error',
+                text: err.response?.data?.error || 'Failed to resend. Please try again.'
+            });
+        } finally {
+            setResendLoading(false);
         }
     };
 
@@ -125,11 +147,59 @@ export default function SetupAccount() {
                     <div className="mx-auto bg-red-50 h-16 w-16 rounded-full flex items-center justify-center mb-6">
                         <AlertTriangle className="h-8 w-8 text-red-500" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Link Invalid</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Link Expired or Invalid</h2>
                     <p className="text-gray-500 mb-6">{error || 'This setup link is invalid or has already been used.'}</p>
+
+                    {/* Resend Section */}
+                    <div className="bg-gray-50 rounded-xl p-5 mb-6 text-left">
+                        <div className="flex items-center gap-2 mb-3">
+                            <RotateCcw className="h-4 w-4 text-gray-600" />
+                            <p className="text-sm font-semibold text-gray-700">Get a new setup link</p>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-3">Enter the phone number you used during signup:</p>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="tel"
+                                    value={resendPhone}
+                                    onChange={(e) => { setResendPhone(e.target.value); setResendResult(null); }}
+                                    className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-gray-400"
+                                    placeholder="9876543210"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                disabled={resendPhone.length < 10 || resendLoading}
+                                onClick={handleResendLink}
+                                className="px-4 py-2.5 bg-gray-900 text-white rounded-lg font-bold text-sm hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                            >
+                                {resendLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    'Resend'
+                                )}
+                            </button>
+                        </div>
+
+                        {resendResult && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`mt-3 p-2.5 rounded-lg text-xs font-medium ${
+                                    resendResult.type === 'success'
+                                        ? 'bg-green-50 text-green-700 border border-green-100'
+                                        : 'bg-red-50 text-red-600 border border-red-100'
+                                }`}
+                            >
+                                {resendResult.text}
+                            </motion.div>
+                        )}
+                    </div>
+
                     <button
                         onClick={() => navigate('/')}
-                        className="w-full py-3 px-4 bg-gray-900 hover:bg-black text-white rounded-xl font-medium transition-colors"
+                        className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
                     >
                         Go Home
                     </button>

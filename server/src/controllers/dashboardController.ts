@@ -13,123 +13,129 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
         const user = (req as any).user;
 
         if (!teacherId || !academicYearId) {
+            console.warn(`[DASHBOARD_DEBUG] Missing context — Teacher: ${teacherId}, Year: ${academicYearId}, Institute: ${user.instituteId}`);
             return res.status(400).json({ error: 'Missing teacher or academic year context' });
         }
+
+        console.log(`[DASHBOARD_DEBUG] Fetching for Teacher: ${teacherId}, Year: ${academicYearId}, Inst: ${user.instituteId}`);
 
         // Get current month start and end dates
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-        // PERF OPTIMIZATION: Execute all queries in parallel using database aggregations
-        // This reduces payload from ~500KB to ~5KB and query time from 2.5s to ~200ms
-        const [batches, students, monthlyCollected, totalCollected, totalPending, batchDefaulters, institute] = await Promise.all([
-            // Query 1: Get batch count with instituteId filter (defense-in-depth)
-            prisma.batch.count({
-                where: {
-                    teacherId,
-                    academicYearId,
-                    instituteId: user.instituteId  // ✅ SECURITY: Multi-tenant isolation
-                }
-            }),
+        // PERF OPTIMIZATION / POOL LIMIT FIX: 
+        // Execute queries sequentially. Running 7 queries in Promise.all 
+        // exceeds the Prisma connection pool limit on serverless DBs (Neon Free), causing a 'too many connections' 500 error.
 
-            // Query 2: Get approved students count
-            prisma.student.count({
-                where: {
-                    status: 'APPROVED',
-                    batch: { teacherId },
-                    academicYearId
-                }
-            }),
+        // Query 1: Get batch count
+        const batches = await prisma.batch.count({
+            where: {
+                teacherId,
+                academicYearId,
+                instituteId: user.instituteId
+            }
+        });
 
-            // Query 3: Monthly collection (aggregated at DB level - 100x faster)
-            prisma.$queryRaw<[{ total: number }]>`
-                SELECT COALESCE(
-                    (
-                        SELECT COALESCE(SUM(fr.amount), 0)
-                        FROM "FeeRecord" fr
-                        JOIN "Student" s ON s.id = fr."studentId"
-                        JOIN "Batch" b ON b.id = s."batchId"
-                        WHERE fr.date >= ${monthStart}::timestamp
-                            AND fr.date <= ${monthEnd}::timestamp
-                            AND fr.status = 'PAID'
-                            AND b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
-                            AND s.status = 'APPROVED'
-                    ), 0
-                ) + COALESCE(
-                    (
-                        SELECT COALESCE(SUM(fp."amountPaid"), 0)
-                        FROM "FeePayment" fp
-                        JOIN "Student" s ON s.id = fp."studentId"
-                        JOIN "Batch" b ON b.id = s."batchId"
-                        WHERE fp.date >= ${monthStart}::timestamp
-                            AND fp.date <= ${monthEnd}::timestamp
-                            AND b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
-                            AND s.status = 'APPROVED'
-                    ), 0
-                ) as total
-            `.then(result => Number(result[0]?.total || 0)),
+        // Query 2: Get approved students count
+        const students = await prisma.student.count({
+            where: {
+                status: 'APPROVED',
+                batch: { teacherId },
+                academicYearId
+            }
+        });
 
-            // Query 4: Total collection (all-time) - for collection rate percentage
-            prisma.$queryRaw<[{ total: number }]>`
-                SELECT COALESCE(
-                    (
-                        SELECT COALESCE(SUM(fr.amount), 0)
-                        FROM "FeeRecord" fr
-                        JOIN "Student" s ON s.id = fr."studentId"
-                        JOIN "Batch" b ON b.id = s."batchId"
-                        WHERE fr.status = 'PAID'
-                            AND b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
-                            AND s.status = 'APPROVED'
-                    ), 0
-                ) + COALESCE(
-                    (
-                        SELECT COALESCE(SUM(fp."amountPaid"), 0)
-                        FROM "FeePayment" fp
-                        JOIN "Student" s ON s.id = fp."studentId"
-                        JOIN "Batch" b ON b.id = s."batchId"
-                        WHERE b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
-                            AND s.status = 'APPROVED'
-                    ), 0
-                ) as total
-            `.then(result => Number(result[0]?.total || 0)),
+        // Query 3: Monthly collection
+        const monthlyCollectedResult = await prisma.$queryRaw<[{ total: number }]>`
+            SELECT COALESCE(
+                (
+                    SELECT COALESCE(SUM(fr.amount), 0)
+                    FROM "FeeRecord" fr
+                    JOIN "Student" s ON s.id = fr."studentId"
+                    JOIN "Batch" b ON b.id = s."batchId"
+                    WHERE fr.date >= ${monthStart}::timestamp
+                        AND fr.date <= ${monthEnd}::timestamp
+                        AND fr.status = 'PAID'
+                        AND b."teacherId" = ${teacherId}
+                        AND s."academicYearId" = ${academicYearId}
+                        AND s.status = 'APPROVED'
+                ), 0
+            ) + COALESCE(
+                (
+                    SELECT COALESCE(SUM(fp."amountPaid"), 0)
+                    FROM "FeePayment" fp
+                    JOIN "Student" s ON s.id = fp."studentId"
+                    JOIN "Batch" b ON b.id = s."batchId"
+                    WHERE fp.date >= ${monthStart}::timestamp
+                        AND fp.date <= ${monthEnd}::timestamp
+                        AND b."teacherId" = ${teacherId}
+                        AND s."academicYearId" = ${academicYearId}
+                        AND s.status = 'APPROVED'
+                ), 0
+            ) as total
+        `;
+        const monthlyCollected = Number(monthlyCollectedResult[0]?.total || 0);
 
-            // Query 5: Total pending fees (Using Materialized StudentBalance!)
-            prisma.$queryRaw<[{ pending: number }]>`
-                SELECT COALESCE(SUM(sb.balance), 0) as pending
-                FROM "StudentBalance" sb
-                JOIN "Student" s ON s.id = sb."studentId"
-                JOIN "Batch" b ON b.id = s."batchId"
-                WHERE s.status = 'APPROVED'
-                    AND b."teacherId" = ${teacherId}
-                    AND s."academicYearId" = ${academicYearId}
-            `.then(result => Number(result[0]?.pending || 0)),
+        // Query 4: Total collection
+        const totalCollectedResult = await prisma.$queryRaw<[{ total: number }]>`
+            SELECT COALESCE(
+                (
+                    SELECT COALESCE(SUM(fr.amount), 0)
+                    FROM "FeeRecord" fr
+                    JOIN "Student" s ON s.id = fr."studentId"
+                    JOIN "Batch" b ON b.id = s."batchId"
+                    WHERE fr.status = 'PAID'
+                        AND b."teacherId" = ${teacherId}
+                        AND s."academicYearId" = ${academicYearId}
+                        AND s.status = 'APPROVED'
+                ), 0
+            ) + COALESCE(
+                (
+                    SELECT COALESCE(SUM(fp."amountPaid"), 0)
+                    FROM "FeePayment" fp
+                    JOIN "Student" s ON s.id = fp."studentId"
+                    JOIN "Batch" b ON b.id = s."batchId"
+                    WHERE b."teacherId" = ${teacherId}
+                        AND s."academicYearId" = ${academicYearId}
+                        AND s.status = 'APPROVED'
+                ), 0
+            ) as total
+        `;
+        const totalCollected = Number(totalCollectedResult[0]?.total || 0);
 
-            // Query 6: Top 5 defaulting batches (Using Materialized StudentBalance!)
-            prisma.$queryRaw<Array<{ name: string; amount: number }>>`
-                SELECT b.name as name, SUM(sb.balance) as amount
-                FROM "StudentBalance" sb
-                JOIN "Student" s ON s.id = sb."studentId"
-                JOIN "Batch" b ON b.id = s."batchId"
-                WHERE s.status = 'APPROVED'
-                    AND b."teacherId" = ${teacherId}
-                    AND s."academicYearId" = ${academicYearId}
-                    AND sb.balance > 0
-                GROUP BY b.id, b.name
-                ORDER BY amount DESC
-                LIMIT 5
-            `,
+        // Query 5: Total pending fees
+        const totalPendingResult = await prisma.$queryRaw<[{ pending: number }]>`
+            SELECT COALESCE(SUM(sb.balance), 0) as pending
+            FROM "StudentBalance" sb
+            JOIN "Student" s ON s.id = sb."studentId"
+            JOIN "Batch" b ON b.id = s."batchId"
+            WHERE s.status = 'APPROVED'
+                AND b."teacherId" = ${teacherId}
+                AND s."academicYearId" = ${academicYearId}
+        `;
+        const totalPending = Number(totalPendingResult[0]?.pending || 0);
 
-            // Query 7: Get teacher name from institute settings
-            user.instituteId ? prisma.institute.findUnique({
-                where: { id: user.instituteId },
-                select: { teacherName: true }
-            }) : Promise.resolve(null)
-        ]);
+        // Query 6: Top 5 defaulting batches
+        const batchDefaulters = await prisma.$queryRaw<Array<{ name: string; amount: number }>>`
+            SELECT b.name as name, SUM(sb.balance) as amount
+            FROM "StudentBalance" sb
+            JOIN "Student" s ON s.id = sb."studentId"
+            JOIN "Batch" b ON b.id = s."batchId"
+            WHERE s.status = 'APPROVED'
+                AND b."teacherId" = ${teacherId}
+                AND s."academicYearId" = ${academicYearId}
+                AND sb.balance > 0
+            GROUP BY b.id, b.name
+            ORDER BY amount DESC
+            LIMIT 5
+        `;
+
+        // Query 7: Get teacher name
+        const institute = user.instituteId ? await prisma.institute.findUnique({
+            where: { id: user.instituteId },
+            select: { teacherName: true }
+        }) : null;
 
         // Convert batchDefaulters to expected format
         const defaulters = batchDefaulters.map(d => ({

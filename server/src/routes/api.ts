@@ -14,7 +14,7 @@ import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcadem
 
 import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
-import { createOrder, verifyPayment, trackLead, startTrial } from '../controllers/onboardingController';
+import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } from '../controllers/onboardingController';
 import { getPaymentHistory } from '../controllers/feeController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
@@ -218,6 +218,10 @@ router.post('/auth/setup', authLimiter, validateRequest(setupSchema), createInit
 router.post('/auth/change-password', authenticateToken as any, validateRequest(changePasswordSchema), changePassword as any);
 router.get('/auth/me', authenticateToken as any, getProfile as any);
 
+import { sendMobileOtp, verifyMobileOtp } from '../controllers/authController';
+router.post('/auth/send-otp', authLimiter, sendMobileOtp as any);
+router.post('/auth/verify-otp', authLimiter, verifyMobileOtp as any);
+
 // Batches
 router.get('/batches', authenticateToken as any, getBatches as any);
 router.post('/batches', authenticateToken as any, validateRequest(createBatchSchema), createBatch as any);
@@ -305,6 +309,7 @@ router.post('/onboarding/lead', publicLimiter, trackLead as any);
 router.post('/onboarding/create-order', publicLimiter, createOrder as any);
 router.post('/onboarding/verify-payment', publicLimiter, verifyPayment as any);
 router.post('/onboarding/start-trial', publicLimiter, startTrial as any);
+router.post('/onboarding/resend-setup-link', publicLimiter, resendSetupLink as any);
 
 // Admin Onboarding Links (Super Admin custom pricing flow)
 import { createAdminOnboardingLink, getAdminOnboardingLink, createAdminOnboardingOrder, verifyAdminOnboardingPayment, listAdminOnboardingLinks } from '../controllers/adminOnboardingController';

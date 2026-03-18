@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Building2, User, Phone, Mail, CreditCard, Shield, CheckCircle2, Loader2, AlertCircle, BookOpen, GraduationCap } from 'lucide-react';
+import { Building2, User, Phone, Mail, CreditCard, Shield, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -21,6 +21,8 @@ interface LinkData {
     monthlyPrice: number;
     yearlyPrice: number;
     maxStudents: number;
+    isFreeTrial?: boolean;
+    trialDays?: number;
 }
 
 export default function JoinOnboarding() {
@@ -39,9 +41,6 @@ export default function JoinOnboarding() {
     const [phoneNumber, setPhoneNumber] = useState('');
     const [email, setEmail] = useState('');
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
-    const [subjects, setSubjects] = useState('');
-    const [allowedClasses, setAllowedClasses] = useState('');
-    const [requiresGrades, setRequiresGrades] = useState(true);
 
     useEffect(() => {
         if (!token) {
@@ -80,13 +79,7 @@ export default function JoinOnboarding() {
         setIsProcessing(true);
 
         try {
-            const isLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
-            if (!isLoaded) {
-                toast.error('Payment gateway failed to load. Are you online?');
-                setIsProcessing(false);
-                return;
-            }
-
+            // First, create the order (or handle free setup)
             const orderRes = await api.post('/admin-onboarding/create-order', {
                 token,
                 billingCycle,
@@ -98,6 +91,24 @@ export default function JoinOnboarding() {
 
             if (!orderRes.success) {
                 toast.error(orderRes.error || 'Failed to create payment order.');
+                setIsProcessing(false);
+                return;
+            }
+
+            // Handle FREE plans (100% discount) — skip Razorpay entirely
+            if (orderRes.freeSetup && orderRes.setupLink) {
+                setPaymentSuccess(true);
+                toast.success('Your free plan has been activated!');
+                setTimeout(() => {
+                    window.location.href = orderRes.setupLink;
+                }, 1500);
+                return;
+            }
+
+            // Paid plans — load Razorpay checkout
+            const isLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+            if (!isLoaded) {
+                toast.error('Payment gateway failed to load. Are you online?');
                 setIsProcessing(false);
                 return;
             }
@@ -121,9 +132,6 @@ export default function JoinOnboarding() {
                             teacherName,
                             phoneNumber,
                             email,
-                            subjects,
-                            allowedClasses,
-                            requiresGrades
                         });
 
                         if (verifyRes.success && verifyRes.setupLink) {
@@ -237,9 +245,15 @@ export default function JoinOnboarding() {
                         </div>
                         <h1 className="text-3xl font-black mb-4">
                             {linkData?.plan === 'PRO' ? 'Pro Plan' : linkData?.plan === 'BASIC' ? 'Basic Plan' : 'Custom Plan'}
+                            {linkData?.isFreeTrial && (
+                                <span className="ml-3 inline-block bg-amber-500 text-white text-sm font-bold px-3 py-1 rounded-full align-middle shadow-sm">
+                                    {linkData.trialDays}-Day Free Trial
+                                </span>
+                            )}
                         </h1>
 
-                        {/* Billing Cycle Toggle */}
+                        {/* Billing Cycle Toggle (Hidden for Free Trials) */}
+                        {!linkData?.isFreeTrial && (
                         <div className="flex gap-2 mb-4">
                             <button
                                 onClick={() => setBillingCycle('monthly')}
@@ -265,12 +279,17 @@ export default function JoinOnboarding() {
                                 )}
                             </button>
                         </div>
+                        )}
 
                         <div className="flex items-baseline gap-2 mb-4">
-                            <span className="text-4xl font-black">₹{displayPrice.toLocaleString('en-IN')}</span>
-                            <span className="text-sm text-gray-400 font-medium">
-                                / {billingCycle === 'monthly' ? 'month' : 'year'}
+                            <span className="text-4xl font-black">
+                                {linkData?.isFreeTrial ? '₹0' : `₹${displayPrice.toLocaleString('en-IN')}`}
                             </span>
+                            {!linkData?.isFreeTrial && (
+                                <span className="text-sm text-gray-400 font-medium">
+                                    / {billingCycle === 'monthly' ? 'month' : 'year'}
+                                </span>
+                            )}
                         </div>
 
                         {linkData && linkData.discountPercent > 0 && (
@@ -364,72 +383,6 @@ export default function JoinOnboarding() {
                     </div>
                 </div>
 
-                {/* Coaching Configuration */}
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 mb-6">
-                    <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
-                        <GraduationCap className="w-5 h-5" />
-                        Coaching Configuration
-                    </h2>
-                    <p className="text-sm text-gray-500 mb-6">Set up your coaching subjects and classes.</p>
-
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1 block">Subjects Offered</label>
-                            <div className="relative">
-                                <BookOpen className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                                <input
-                                    type="text"
-                                    value={subjects}
-                                    onChange={(e) => setSubjects(e.target.value)}
-                                    placeholder="e.g. Math, Physics, Chemistry"
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none font-medium placeholder:text-gray-400"
-                                />
-                            </div>
-                            <p className="text-[10px] text-gray-400 mt-1 pl-1">Comma separated list</p>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
-                            <div>
-                                <label className="text-sm font-bold text-gray-700">Organize by Grades/Classes?</label>
-                                <p className="text-xs text-gray-500">Enable if your students are grouped by classes.</p>
-                            </div>
-                            <div className="flex bg-gray-200 p-1 rounded-lg">
-                                <button
-                                    type="button"
-                                    onClick={() => setRequiresGrades(true)}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${requiresGrades ? 'bg-white shadow-sm text-black' : 'text-gray-500'}`}
-                                >
-                                    Yes
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setRequiresGrades(false)}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${!requiresGrades ? 'bg-white shadow-sm text-black' : 'text-gray-500'}`}
-                                >
-                                    No
-                                </button>
-                            </div>
-                        </div>
-
-                        {requiresGrades && (
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1 block">Classes / Grades</label>
-                                <div className="relative">
-                                    <GraduationCap className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                                    <input
-                                        type="text"
-                                        value={allowedClasses}
-                                        onChange={(e) => setAllowedClasses(e.target.value)}
-                                        placeholder="e.g. Class 9, Class 10, Class 11"
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none font-medium placeholder:text-gray-400"
-                                    />
-                                </div>
-                                <p className="text-[10px] text-gray-400 mt-1 pl-1">Comma separated list</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
                 {/* Pay Button */}
                 <button
                     onClick={handlePayment}
@@ -441,6 +394,10 @@ export default function JoinOnboarding() {
                             <Loader2 className="w-5 h-5 animate-spin" />
                             Processing...
                         </>
+                    ) : linkData?.isFreeTrial ? (
+                        <>
+                            Setup Account (Free Trial)
+                        </>
                     ) : (
                         <>
                             <CreditCard className="w-5 h-5" />
@@ -449,9 +406,11 @@ export default function JoinOnboarding() {
                     )}
                 </button>
 
-                <p className="text-center text-xs text-gray-400 mt-4">
-                    Secured by Razorpay. Your payment is encrypted and safe.
-                </p>
+                {!linkData?.isFreeTrial && (
+                    <p className="text-center text-xs text-gray-400 mt-4">
+                        Secured by Razorpay. Your payment is encrypted and safe.
+                    </p>
+                )}
             </div>
         </div>
     );

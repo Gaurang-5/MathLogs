@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { sendSetupLinkWhatsApp } from '../utils/whatsapp';
+import { sendSetupLinkEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
 
 const razorpay = new Razorpay({
@@ -231,16 +232,19 @@ export const verifyPayment = async (req: Request, res: Response) => {
         const clientUrl = getClientUrl(req);
         const setupLink = `${clientUrl}/setup?token=${invite.token}`;
 
-        // Send via WhatsApp and Email
-        // Email functionality uses an external mailer service depending on configuration.
-        await sendSetupLinkWhatsApp(phone, { ownerName, setupLink, tuitionName });
+        // Send setup link via WhatsApp + Email (fire-and-forget, don't block response)
+        const notificationData = { ownerName, setupLink, tuitionName };
+        await Promise.allSettled([
+            sendSetupLinkWhatsApp(phone, notificationData),
+            sendSetupLinkEmail(email, notificationData)
+        ]);
 
         console.log(`[ONBOARDING] Generated link for ${tuitionName}: ${setupLink}`);
 
         res.json({
             success: true,
             setupLink: setupLink,
-            message: 'Payment verified. Setup link generated.'
+            message: 'Payment verified. Setup link sent to your WhatsApp and email.'
         });
 
     } catch (error) {
@@ -302,12 +306,17 @@ export const startTrial = async (req: Request, res: Response) => {
         const clientUrl = getClientUrl(req);
         const setupLink = `${clientUrl}/setup?token=${invite.token}`;
 
-        await sendSetupLinkWhatsApp(phone, { ownerName, setupLink, tuitionName });
+        // Send setup link via WhatsApp + Email
+        const notificationData = { ownerName, setupLink, tuitionName };
+        await Promise.allSettled([
+            sendSetupLinkWhatsApp(phone, notificationData),
+            sendSetupLinkEmail(email, notificationData)
+        ]);
 
         res.json({
             success: true,
             setupLink: setupLink,
-            message: 'Trial started. Setup link generated.'
+            message: 'Trial started. Setup link sent to your WhatsApp and email.'
         });
 
     } catch (error) {
@@ -316,3 +325,102 @@ export const startTrial = async (req: Request, res: Response) => {
     }
 };
 
+// ── RESEND SETUP LINK ────────────────────────────────────────
+// Allows users who lost their link (browser crash, closed tab, etc.)
+// to recover it by entering their phone number.
+
+const resendCooldowns = new Map<string, { count: number; resetAt: number }>();
+const MAX_RESENDS_PER_HOUR = 3;
+
+export const resendSetupLink = async (req: Request, res: Response) => {
+    try {
+        const { phone } = req.body;
+
+        if (!phone) {
+            return res.status(400).json({ error: 'Phone number is required.' });
+        }
+
+        // Rate limit: 3 per hour per phone
+        const normalizedPhone = phone.replace(/\D/g, '');
+        const now = Date.now();
+        const cooldown = resendCooldowns.get(normalizedPhone);
+
+        if (cooldown) {
+            if (now < cooldown.resetAt && cooldown.count >= MAX_RESENDS_PER_HOUR) {
+                return res.status(429).json({
+                    error: 'Too many requests. Please try again in an hour.'
+                });
+            }
+            if (now >= cooldown.resetAt) {
+                resendCooldowns.set(normalizedPhone, { count: 1, resetAt: now + 60 * 60 * 1000 });
+            } else {
+                cooldown.count++;
+            }
+        } else {
+            resendCooldowns.set(normalizedPhone, { count: 1, resetAt: now + 60 * 60 * 1000 });
+        }
+
+        // 1. Find the institute by phone number
+        const institute = await prisma.institute.findFirst({
+            where: { phoneNumber: phone },
+            include: { admins: true, invites: true }
+        });
+
+        if (!institute) {
+            return res.status(404).json({
+                error: 'No pending setup found for this phone number. Please complete the signup process first.'
+            });
+        }
+
+        // 2. Check if already set up (admin exists)
+        if (institute.admins.length > 0) {
+            return res.status(400).json({
+                error: 'Your account is already set up! Please open the MathLogs app and log in with your credentials.'
+            });
+        }
+
+        // 3. Find existing valid invite token, or generate a new one
+        let validInvite = institute.invites.find(
+            (inv) => !inv.isUsed && new Date() < inv.expiresAt
+        );
+
+        if (!validInvite) {
+            // All tokens expired or used — generate a new one
+            const tokenString = crypto.randomBytes(24).toString('hex');
+            validInvite = await prisma.inviteToken.create({
+                data: {
+                    token: tokenString,
+                    instituteId: institute.id,
+                    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+                }
+            });
+            console.log(`[RESEND] Generated new invite token for ${institute.name}`);
+        }
+
+        const clientUrl = getClientUrl(req);
+        const setupLink = `${clientUrl}/setup?token=${validInvite.token}`;
+
+        // 4. Send via WhatsApp + Email
+        const notificationData = {
+            ownerName: institute.teacherName || 'there',
+            setupLink,
+            tuitionName: institute.name
+        };
+
+        await Promise.allSettled([
+            sendSetupLinkWhatsApp(phone, notificationData),
+            institute.email ? sendSetupLinkEmail(institute.email, notificationData) : Promise.resolve()
+        ]);
+
+        console.log(`[RESEND] Setup link resent for ${institute.name} to ${phone}`);
+
+        res.json({
+            success: true,
+            message: 'Setup link has been resent to your WhatsApp and email. Please check your messages.'
+        });
+
+    } catch (error) {
+        console.error('Resend Setup Link Error:', error);
+        res.status(500).json({ error: 'Failed to resend setup link. Please try again.' });
+    }
+};

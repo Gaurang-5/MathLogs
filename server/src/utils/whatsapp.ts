@@ -219,19 +219,53 @@ export const sendTestMarksWhatsApp = async (mobileNumber: string, data: TestMark
 
 /**
  * Specifically sends the Onboarding Setup Link via WhatsApp
+ * 
+ * MSG91 Template Variables (submit this to MSG91 for approval):
+ * ──────────────────────────────────────────────────────────────
+ * Template Name: onboarding_setup_link
+ * 
+ * Hi {{owner_name}} 👋
+ * 
+ * Welcome to MathLogs! Your coaching center *{{tuition_name}}* has been 
+ * successfully registered.
+ * 
+ * Please complete your account setup by clicking the link below:
+ * {{setup_link}}
+ * 
+ * This link is valid for 7 days. If you face any issues, reply to this 
+ * message and we'll help you out.
+ * 
+ * — Team MathLogs
+ * ──────────────────────────────────────────────────────────────
  */
 export const sendSetupLinkWhatsApp = async (mobileNumber: string, data: { ownerName: string, setupLink: string, tuitionName: string }) => {
-    // In a real scenario, use a specific MSG91 template. 
-    // Here we console log as requested until a template is provided.
-    console.log(`\n\n======================================`);
-    console.log(`[WHATSAPP MOCK] To: ${mobileNumber}`);
-    console.log(`Hi ${data.ownerName}, welcome to ${data.tuitionName}!`);
-    console.log(`Please complete your account setup and create your password here:`);
-    console.log(`${data.setupLink}`);
-    console.log(`======================================\n\n`);
+    const SETUP_TEMPLATE = process.env.MSG91_WA_TEMPLATE_SETUP;
 
-    // If a template exists later:
-    // const SETUP_TEMPLATE = process.env.MSG91_WA_TEMPLATE_SETUP;
-    // return await sendMsg91WhatsApp(mobileNumber, SETUP_TEMPLATE, components);
-    return true;
+    if (!SETUP_TEMPLATE) {
+        console.warn('⚠️ Missing MSG91_WA_TEMPLATE_SETUP in .env — falling back to mock.');
+        console.log(`\n[WHATSAPP MOCK] Setup Link to ${mobileNumber}:`);
+        console.log(`  Owner: ${data.ownerName} | Tuition: ${data.tuitionName}`);
+        console.log(`  Link: ${data.setupLink}\n`);
+        return true;
+    }
+
+    const components = {
+        body_owner_name: {
+            type: "text",
+            value: data.ownerName || "there",
+            parameter_name: "owner_name"
+        },
+        body_tuition_name: {
+            type: "text",
+            value: data.tuitionName || "your coaching center",
+            parameter_name: "tuition_name"
+        },
+        body_setup_link: {
+            type: "text",
+            value: data.setupLink,
+            parameter_name: "setup_link"
+        }
+    };
+
+    return await sendMsg91WhatsApp(mobileNumber, SETUP_TEMPLATE, components);
 };

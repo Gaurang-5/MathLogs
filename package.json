@@ -12,6 +12,7 @@
         "node": "20.x"
     },
     "dependencies": {
-        "@sentry/node": "^10.38.0"
+        "@sentry/node": "^10.38.0",
+        "lucide-react-native": "^0.577.0"
     }
 }

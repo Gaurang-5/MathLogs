@@ -137,3 +137,51 @@ export const sendEmail = async (to: string, subject: string, body: string, optio
         return { success: false, error: error.message || 'Unknown error' };
     }
 };
+
+/**
+ * Sends the onboarding setup link email after payment verification.
+ * Professional, welcoming email with clear CTA.
+ */
+export const sendSetupLinkEmail = async (
+    to: string,
+    data: { ownerName: string; setupLink: string; tuitionName: string }
+): Promise<{ success: boolean; error?: string }> => {
+    if (!to || !to.includes('@')) {
+        console.warn('[EMAIL] Skipping setup link email — invalid email:', to);
+        return { success: true };
+    }
+
+    const subject = `Welcome to MathLogs — Complete Your Setup, ${data.ownerName}!`;
+
+    const body = `Hi ${data.ownerName},
+
+Welcome to MathLogs! 🎉
+
+Your coaching center "${data.tuitionName}" has been successfully registered. You're just one step away from getting started.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+COMPLETE YOUR SETUP:
+${data.setupLink}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+What happens next?
+1. Click the link above to set up your account
+2. Configure your classes and subjects
+3. Create your login credentials
+4. Start managing your students!
+
+This link is valid for 7 days. If it expires, you can request a new one from our onboarding page.
+
+Need help? Simply reply to this email and our team will assist you.
+
+Best regards,
+Team MathLogs
+www.mathlogs.app`;
+
+    return await sendEmail(to, subject, body, {
+        senderType: 'WELCOME',
+        senderName: 'Team MathLogs'
+    });
+};
