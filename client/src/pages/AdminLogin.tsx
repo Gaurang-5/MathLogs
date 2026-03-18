@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Lock, User, ArrowRight, ShieldCheck, AlertOctagon, ArrowLeft } from 'lucide-react';
 
 export default function AdminLogin() {
-    const [username, setUsername] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export default function AdminLogin() {
         setLoading(true);
         setError('');
         try {
-            const data = await apiRequest('/auth/login', 'POST', { username, password });
+            const data = await apiRequest('/auth/login', 'POST', { username: identifier, password });
             if (data.success) {
                 localStorage.setItem('adminId', data.adminId);
                 localStorage.setItem('token', data.token); // Store JWT
@@ -85,15 +85,15 @@ export default function AdminLogin() {
 
                 <form onSubmit={handleLogin} className="space-y-6">
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest ml-1">Username</label>
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest ml-1">Email or Mobile</label>
                         <div className="relative group">
                             <User className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
                             <input
                                 type="text"
                                 className="w-full !bg-neutral-50 border-[1.5px] border-app-border text-app-text  pl-12 p-3.5 rounded-xl focus:ring-4 focus:ring-black/5 focus:border-black dark:focus:border-white outline-none transition-all placeholder:text-gray-400 font-medium"
-                                placeholder="Enter admin username"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder="Enter your email or phone number"
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value.trim())}
                             />
                         </div>
                     </div>

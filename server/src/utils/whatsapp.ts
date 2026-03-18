@@ -269,3 +269,20 @@ export const sendSetupLinkWhatsApp = async (mobileNumber: string, data: { ownerN
 
     return await sendMsg91WhatsApp(mobileNumber, SETUP_TEMPLATE, components);
 };
+
+/**
+ * Sends the Login OTP via WhatsApp
+ */
+export const sendOtpWhatsApp = async (mobileNumber: string, otpCode: string) => {
+    const OTP_TEMPLATE = process.env.MSG91_WA_TEMPLATE_OTP || 'mathlogs_login_otp';
+
+    const components = {
+        body_otp: {
+            type: "text",
+            value: otpCode,
+            parameter_name: "otp" // The MSG91 expected parameter
+        }
+    };
+
+    return await sendMsg91WhatsApp(mobileNumber, OTP_TEMPLATE, components);
+};

@@ -217,6 +217,7 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                 timeSlot: true,
                 feeAmount: true,
                 whatsappGroupLink: true,
+                autoSendWelcome: true,
                 isRegistrationOpen: true,
                 isRegistrationEnded: true,
                 teacherId: true,
@@ -360,7 +361,17 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
     }
 
     try {
-        const batch = await prisma.batch.findUnique({ where: { id } });
+        const batch = await prisma.batch.findUnique({ 
+            where: { id },
+            include: {
+                institute: true,
+                students: {
+                    where: { status: 'APPROVED' },
+                    include: { feePayments: true }
+                },
+                feeInstallments: true
+            }
+        });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
         const user = (req as any).user;
@@ -373,6 +384,47 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
                 amount: parseFloat(amount)
             }
         });
+
+        // --- Auto-Send Fee Reminder Logic ---
+        const { sendFeeReminderWhatsApp } = await import('../utils/whatsapp');
+        const instituteName = batch.institute?.name || 'Coaching Institute';
+        
+        const allInstallments = [...batch.feeInstallments, installment];
+        
+        const notifyPromises = batch.students.map(async (student) => {
+            if (!student.parentWhatsapp) return;
+            
+            let totalDue = 0;
+            const breakupLines: string[] = [];
+            
+            for (const inst of allInstallments) {
+                const payments = student.feePayments.filter(p => p.installmentId === inst.id);
+                const paidForInst = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+                
+                const dueForInst = inst.amount - paidForInst;
+                if (dueForInst > 0) {
+                    totalDue += dueForInst;
+                    breakupLines.push(`- ${inst.name}: ₹${dueForInst}`);
+                }
+            }
+            
+            if (totalDue > 0) {
+                let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
+                if (!phone.startsWith('+') && phone.length === 10) phone = '+91' + phone;
+                
+                return sendFeeReminderWhatsApp(phone, {
+                    studentName: student.name,
+                    batchName: batch.name,
+                    feeBreakup: breakupLines.join('\n'),
+                    totalAmount: totalDue.toString(),
+                    instituteName
+                }).catch(err => console.error(`WhatsApp fee reminder failed for ${phone}:`, err));
+            }
+        });
+        
+        // Fire array of promises without awaiting to ensure fast API response
+        Promise.allSettled(notifyPromises);
+
         res.json(installment);
     } catch (e) {
         console.error('Error creating installment:', e);
@@ -508,7 +560,7 @@ export const endBatchRegistration = async (req: Request, res: Response) => {
 
 export const updateBatch = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, subject, timeSlot, feeAmount, className, whatsappGroupLink } = req.body;
+    const { name, subject, timeSlot, feeAmount, className, whatsappGroupLink, autoSendWelcome } = req.body;
     const teacherId = (req as any).user?.id;
     const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
@@ -532,7 +584,8 @@ export const updateBatch = async (req: Request, res: Response) => {
                 timeSlot,
                 className,
                 feeAmount: feeAmount !== undefined ? parseFloat(feeAmount) : undefined,
-                whatsappGroupLink
+                whatsappGroupLink,
+                autoSendWelcome: autoSendWelcome !== undefined ? autoSendWelcome === true : undefined
             }
         });
         res.json(updated);

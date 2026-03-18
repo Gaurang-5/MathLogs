@@ -47,6 +47,7 @@ interface Batch {
     feeAmount: number;
     className: string;
     whatsappGroupLink?: string;
+    autoSendWelcome?: boolean;
     isRegistrationOpen: boolean;
     isRegistrationEnded?: boolean;
     students: Student[];
@@ -282,10 +283,12 @@ export default function BatchDetails() {
     // WhatsApp Modal State
     const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
     const [whatsappLinkInput, setWhatsappLinkInput] = useState('');
+    const [autoSendWelcomeInput, setAutoSendWelcomeInput] = useState(false);
 
     const openWhatsappModal = () => {
         if (batch) {
             setWhatsappLinkInput(batch.whatsappGroupLink || '');
+            setAutoSendWelcomeInput(batch.autoSendWelcome || false);
             setShowWhatsAppModal(true);
         }
     };
@@ -299,9 +302,12 @@ export default function BatchDetails() {
         }
 
         try {
-            const res = await apiRequest(`/batches/${id}`, 'PUT', { whatsappGroupLink: whatsappLinkInput });
+            const res = await apiRequest(`/batches/${id}`, 'PUT', { 
+                whatsappGroupLink: whatsappLinkInput,
+                autoSendWelcome: autoSendWelcomeInput
+            });
             setBatch(prev => prev ? { ...prev, ...res } : null);
-            toast.success('WhatsApp Link Updated');
+            toast.success('WhatsApp Settings Updated');
             setShowWhatsAppModal(false);
         } catch (e) {
             toast.error('Failed to update link');
@@ -1655,6 +1661,29 @@ export default function BatchDetails() {
                                         <p className="text-xs text-app-text-tertiary">
                                             Paste the invite link from your WhatsApp Group settings.
                                         </p>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 bg-app-surface rounded-xl border border-app-border">
+                                        <div className="space-y-0.5">
+                                            <label className="text-sm font-bold text-app-text">Auto-Send Invites</label>
+                                            <p className="text-xs text-app-text-tertiary w-11/12">Automatically send WhatsApp & Email invites to new students.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAutoSendWelcomeInput(!autoSendWelcomeInput)}
+                                            className={cn(
+                                                "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
+                                                autoSendWelcomeInput ? "bg-accent" : "bg-neutral-200 dark:bg-neutral-700"
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    "pointer-events-none inline-block h-5 w-5 transform bg-white shadow ring-0 transition duration-200 ease-in-out",
+                                                    autoSendWelcomeInput ? "translate-x-5" : "translate-x-0"
+                                                )}
+                                                style={{ borderRadius: '50%' }}
+                                            />
+                                        </button>
                                     </div>
 
                                     <div className="flex justify-end pt-4">

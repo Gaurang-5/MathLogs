@@ -26,7 +26,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSendOtp = async () => {
-    if (phone.length < 10) { Alert.alert('Invalid Phone', 'Please enter a valid 10-digit mobile number.'); return; }
+    if (phone.length < 5) { Alert.alert('Invalid Input', 'Please enter a valid mobile number or email.'); return; }
     Keyboard.dismiss();
     setIsLoading(true);
     try {
@@ -67,7 +67,7 @@ export default function LoginScreen() {
             </Animated.View>
             <Animated.View entering={FadeInDown.duration(600).delay(300)}>
               <Text style={s.subtitle}>
-                {step === 'phone' ? 'Enter your mobile number to sign in' : 'Enter the 6-digit code sent to your phone'}
+                {step === 'phone' ? 'Enter your mobile number or email to sign in' : 'Enter the 6-digit code sent to you'}
               </Text>
             </Animated.View>
           </View>
@@ -75,10 +75,8 @@ export default function LoginScreen() {
           <Animated.View entering={FadeInUp.duration(500).delay(400)} style={s.formArea}>
             {step === 'phone' ? (
               <View style={s.inputWrap}>
-                <Text style={s.countryCode}>+91</Text>
-                <View style={s.separator} />
-                <TextInput style={s.input} placeholder="Mobile Number" placeholderTextColor={T.textMuted}
-                  keyboardType="number-pad" maxLength={10} value={phone} onChangeText={setPhone} autoFocus />
+                <TextInput style={s.input} placeholder="Mobile Number or Email" placeholderTextColor={T.textMuted}
+                  keyboardType="default" autoCapitalize="none" autoCorrect={false} value={phone} onChangeText={setPhone} autoFocus />
               </View>
             ) : (
               <View style={[s.inputWrap, { borderColor: `${T.accent}40` }]}>
@@ -96,7 +94,7 @@ export default function LoginScreen() {
             </View>
             {step === 'otp' && (
               <TouchableWithoutFeedback onPress={() => { setStep('phone'); setOtp(''); }}>
-                <Text style={s.changeNum}>Change mobile number</Text>
+                <Text style={s.changeNum}>Change email / phone</Text>
               </TouchableWithoutFeedback>
             )}
           </Animated.View>

@@ -185,3 +185,40 @@ www.mathlogs.app`;
         senderName: 'Team MathLogs'
     });
 };
+
+/**
+ * Sends a Login OTP Email.
+ */
+export const sendOtpEmail = async (
+    to: string,
+    otp: string
+): Promise<{ success: boolean; error?: string }> => {
+    if (!to || !to.includes('@')) {
+        console.warn('[EMAIL] Skipping OTP email — invalid email:', to);
+        return { success: true };
+    }
+
+    const subject = `Your MathLogs Login Code is ${otp}`;
+
+    const body = `Hello,
+
+Your MathLogs login verification code is:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ${otp}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This code is valid for 5 minutes. Please do not share this code with anyone.
+
+If you did not request this code, you can safely ignore this email.
+
+Best regards,
+Team MathLogs
+www.mathlogs.app`;
+
+    return await sendEmail(to, subject, body, {
+        senderType: 'NOREPLY',
+        senderName: 'MathLogs Security'
+    });
+};

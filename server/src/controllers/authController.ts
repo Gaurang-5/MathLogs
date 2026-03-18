@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { sendOtpSMS } from '../utils/sms';
+import { sendOtpEmail } from '../utils/email';
+import { sendOtpWhatsApp } from '../utils/whatsapp';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -165,55 +166,75 @@ export const getProfile = async (req: Request, res: Response) => {
 const otpStore = new Map<string, { otp: string, expires: number }>();
 
 export const sendMobileOtp = async (req: Request, res: Response) => {
-    const { phone } = req.body;
+    // Keep 'phone' as the variable name from frontend, though it can now be an email
+    const { phone: identifier } = req.body;
 
-    if (!phone) {
-        return res.status(400).json({ error: 'Phone number is required' });
+    if (!identifier) {
+        return res.status(400).json({ error: 'Phone number or email is required' });
     }
 
     try {
-        // NORMALIZE PHONE: Strip +91 or any non-numeric if searching against 10-digit DB numbers
-        let cleanPhone = phone.replace(/\D/g, ''); 
-        if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-            cleanPhone = cleanPhone.slice(2); // Take last 10 digits
+        let cleanIdentifier = identifier.trim();
+        // NORMALIZE PHONE: If it's all digits, strip non-numeric and format
+        if (/^\+?\d+$/.test(cleanIdentifier)) {
+            cleanIdentifier = cleanIdentifier.replace(/\D/g, ''); 
+            if (cleanIdentifier.startsWith('91') && cleanIdentifier.length === 12) {
+                cleanIdentifier = cleanIdentifier.slice(2);
+            }
         }
 
         const admin: any = await prisma.admin.findFirst({
             where: {
                 OR: [
-                    { username: cleanPhone }, // Some users might use phone as username
-                    { username: phone },      // Or exact string
-                    { institute: { phoneNumber: cleanPhone } },
-                    { institute: { phoneNumber: phone } }
+                    { username: cleanIdentifier },
+                    { username: identifier },
+                    { institute: { phoneNumber: cleanIdentifier } },
+                    { institute: { phoneNumber: identifier } },
+                    { institute: { email: cleanIdentifier } },
+                    { institute: { email: identifier } }
                 ]
-            }
+            },
+            include: { institute: true }
         });
 
         if (!admin) {
-            return res.status(404).json({ error: 'No account found with this mobile number' });
+            return res.status(404).json({ error: 'No account found with this credential' });
         }
 
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
         
-        // Store in memory for later verification 
-        // IMPORTANT: Standardize on cleanPhone (10 digits) as key to avoid +91 mismatch
-        otpStore.set(cleanPhone, {
+        // Store in memory using the cleaned identifier key
+        otpStore.set(cleanIdentifier, {
             otp: otpCode,
             expires: Date.now() + 5 * 60 * 1000
         });
 
-        // Send REAL SMS if configured, otherwise falls back to logging to console (via sendOtpSMS)
-        const sendResult = await sendOtpSMS(phone, otpCode);
-
-        // Fallback for local dev visibility: also log to console
-        if (!sendResult) {
-            console.log(`\n========================================`);
-            console.log(`📱 MOCK SMS OTP TO: ${phone}`);
-            console.log(`🔒 YOUR CODE IS: ${otpCode}`);
-            console.log(`========================================\n`);
+        // Parallel Dispatch System
+        const dispatchPromises = [];
+        
+        // 1. WhatsApp Dispatch (if institute has a phone number)
+        const waPhone = admin.institute?.phoneNumber || ( /^\d{10}$/.test(cleanIdentifier) ? cleanIdentifier : null );
+        if (waPhone) {
+            dispatchPromises.push(sendOtpWhatsApp(waPhone, otpCode).catch(e => console.error('WA OTP Failed:', e)));
         }
 
-        res.json({ success: true, message: 'OTP sent successfully' });
+        // 2. Email Dispatch (if institute has an email)
+        const email = admin.institute?.email || (cleanIdentifier.includes('@') ? cleanIdentifier : null);
+        if (email) {
+            dispatchPromises.push(sendOtpEmail(email, otpCode).catch(e => console.error('Email OTP Failed:', e)));
+        }
+
+        await Promise.allSettled(dispatchPromises);
+
+        // Optional Dev Mock Logging
+        console.log(`\n========================================`);
+        console.log(`🔑 OTP DISPATCH FIRED:`);
+        console.log(`🆔 FOR: ${cleanIdentifier}`);
+        console.log(`💬 WA?: ${!!waPhone} | 📧 EMAIL?: ${!!email}`);
+        console.log(`🔒 YOUR CODE IS: ${otpCode}`);
+        console.log(`========================================\n`);
+
+        res.json({ success: true, message: 'OTP sent successfully to your WhatsApp and Email.' });
     } catch (error) {
         console.error('Send OTP Error:', error);
         res.status(500).json({ error: 'Failed to send OTP' });
@@ -228,24 +249,24 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
     }
 
     try {
-        // NORMALIZE PHONE: Same as send logic
-        let cleanPhone = phone.replace(/\D/g, ''); 
-        if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-            cleanPhone = cleanPhone.slice(2);
+        let cleanIdentifier = phone.trim();
+        if (/^\+?\d+$/.test(cleanIdentifier)) {
+            cleanIdentifier = cleanIdentifier.replace(/\D/g, ''); 
+            if (cleanIdentifier.startsWith('91') && cleanIdentifier.length === 12) {
+                cleanIdentifier = cleanIdentifier.slice(2);
+            }
         }
 
-        // Try searching by cleanPhone first (10 digit standard)
-        // Fallback to raw phone if it was accidentally keyed differently
-        const storedData = otpStore.get(cleanPhone) || otpStore.get(phone); 
-
+        const storedData = otpStore.get(cleanIdentifier) || otpStore.get(phone.trim()); 
+        
         if (!storedData) {
-            console.log(`[AUTH] OTP lookup failed for: ${cleanPhone} (raw: ${phone}). Available keys:`, Array.from(otpStore.keys()));
+            console.log(`[AUTH] OTP lookup failed for: ${cleanIdentifier} (raw: ${phone}). Available keys:`, Array.from(otpStore.keys()));
             return res.status(400).json({ error: 'OTP expired or not requested' });
         }
         
-                if (storedData.expires < Date.now()) {
-            otpStore.delete(cleanPhone);
-            otpStore.delete(phone);
+        if (storedData.expires < Date.now()) {
+            otpStore.delete(cleanIdentifier);
+            otpStore.delete(phone.trim());
             return res.status(400).json({ error: 'OTP has expired' });
         }
 
@@ -253,16 +274,18 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Invalid OTP code' });
         }
 
-        otpStore.delete(cleanPhone);
-        otpStore.delete(phone);
+        otpStore.delete(cleanIdentifier);
+        otpStore.delete(phone.trim());
 
         const admin = await prisma.admin.findFirst({
             where: {
                 OR: [
-                    { username: cleanPhone },
-                    { username: phone },
-                    { institute: { phoneNumber: cleanPhone } },
-                    { institute: { phoneNumber: phone } }
+                    { username: cleanIdentifier },
+                    { username: phone.trim() },
+                    { institute: { phoneNumber: cleanIdentifier } },
+                    { institute: { phoneNumber: phone.trim() } },
+                    { institute: { email: cleanIdentifier } },
+                    { institute: { email: phone.trim() } }
                 ]
             },
             include: { institute: true }
