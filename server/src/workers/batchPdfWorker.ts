@@ -24,6 +24,7 @@ interface BatchPdfData {
             schoolName: string | null;
             parentWhatsapp: string | null;
             humanId: string | null;
+            createdAt: string | Date;
             marks: Array<{ score: number }>;
             feePayments: Array<{ installmentId: string; amountPaid: number; date: string }>;
             fees: Array<{ amount: number; status: string }>;
@@ -157,7 +158,9 @@ async function generate(data: BatchPdfData): Promise<Buffer> {
 
             let totalDue = 0;
             if (installments.length > 0) {
-                const totalExpected = installments.reduce((s, i) => s + i.amount, 0);
+                const joinDate = new Date(student.createdAt);
+                const applicableInstallments = installments.filter(i => new Date(i.createdAt) >= joinDate);
+                const totalExpected = applicableInstallments.reduce((s, i) => s + i.amount, 0);
                 const totalPaidFromPayments = student.feePayments.reduce((s, p) => s + p.amountPaid, 0);
                 const totalPaidFromFees = student.fees.filter(f => f.status === 'PAID').reduce((s, f) => s + f.amount, 0);
                 totalDue = Math.max(0, totalExpected - totalPaidFromPayments - totalPaidFromFees);
@@ -184,11 +187,20 @@ async function generate(data: BatchPdfData): Promise<Buffer> {
             // Installments
             let instColIndex = 4;
             if (installments.length > 0) {
+                const joinDate = new Date(student.createdAt);
                 installments.forEach(inst => {
+                    const cWidth = columns[instColIndex].width;
+                    if (new Date(inst.createdAt) < joinDate) {
+                        doc.fillColor('gray').text('-', x, textY, { width: cWidth, align: 'center' });
+                        doc.fillColor('black');
+                        x += cWidth + 5;
+                        instColIndex++;
+                        return;
+                    }
+
                     const paymentsForThis = student.feePayments.filter(p => p.installmentId === inst.id);
                     const totalPaid = paymentsForThis.reduce((s, p) => s + p.amountPaid, 0);
                     const due = inst.amount - totalPaid;
-                    const cWidth = columns[instColIndex].width;
 
                     if (totalPaid >= inst.amount - 0.01) {
                         const latestPayment = [...paymentsForThis].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];

@@ -228,11 +228,14 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
                     monthlyData[key].generated += s.batch.feeAmount;
                 }
             } else if (hasInstallments) {
+                const studentJoinDate = new Date(s.createdAt);
                 s.batch!.feeInstallments.forEach(inst => {
-                    const d = new Date(inst.createdAt.getTime() + IST_OFFSET);
-                    const key = `${d.getFullYear()}-${d.getMonth()}`;
-                    if (monthlyData[key]) {
-                        monthlyData[key].generated += inst.amount;
+                    if (new Date(inst.createdAt) >= studentJoinDate) {
+                        const d = new Date(inst.createdAt.getTime() + IST_OFFSET);
+                        const key = `${d.getFullYear()}-${d.getMonth()}`;
+                        if (monthlyData[key]) {
+                            monthlyData[key].generated += inst.amount;
+                        }
                     }
                 });
             }

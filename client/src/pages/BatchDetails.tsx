@@ -21,6 +21,7 @@ interface Student {
     feePayments: FeePayment[];
     fees: any[];
     marks?: any[];
+    createdAt?: string;
 }
 
 interface FeeInstallment {
@@ -895,7 +896,10 @@ export default function BatchDetails() {
                                 const genericPaid = student.fees?.filter((f: any) => f.status === 'PAID').reduce((sum: number, f: any) => sum + f.amount, 0) || 0;
                                 let currentBuffer = genericPaid;
                                 // Sort installments (immutable copy) -> older first
-                                const sortedInsts = [...(batch.feeInstallments || [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                                const studentJoinDateForAllocation = student.createdAt ? new Date(student.createdAt).setHours(0, 0, 0, 0) : 0;
+                                const sortedInsts = [...(batch.feeInstallments || [])]
+                                    .filter(inst => new Date(inst.createdAt).setHours(0,0,0,0) >= studentJoinDateForAllocation)
+                                    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
                                 const instPaidMap: Record<string, number> = {};
                                 sortedInsts.forEach(inst => {
                                     const directPayments = student.feePayments?.filter((p: any) => p.installmentId === inst.id) || [];
@@ -933,6 +937,18 @@ export default function BatchDetails() {
                                             const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);
                                             const isFullyPaid = paidAmount >= inst.amount;
                                             const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
+
+                                            const studentJoinDate = student.createdAt ? new Date(student.createdAt).setHours(0, 0, 0, 0) : 0;
+                                            const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
+                                            const isNotApplicable = instDate < studentJoinDate;
+
+                                            if (isNotApplicable) {
+                                                return (
+                                                    <td key={inst.id} className={cn("text-center font-medium text-app-text-tertiary cursor-not-allowed", getCellPadding())} title="Not applicable. Student joined after this fee was generated.">
+                                                        -
+                                                    </td>
+                                                );
+                                            }
 
                                             return (
                                                 <td key={inst.id} className={cn("text-center", getCellPadding())}>
@@ -1021,7 +1037,10 @@ export default function BatchDetails() {
                             // Dynamic Fee Logic (Virtual Allocation) - Mobile
                             const genericPaid = student.fees?.filter((f: any) => f.status === 'PAID').reduce((sum: number, f: any) => sum + f.amount, 0) || 0;
                             let currentBuffer = genericPaid;
-                            const sortedInsts = [...(batch.feeInstallments || [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                            const studentJoinDateForAllocation = student.createdAt ? new Date(student.createdAt).setHours(0, 0, 0, 0) : 0;
+                            const sortedInsts = [...(batch.feeInstallments || [])]
+                                .filter(inst => new Date(inst.createdAt).setHours(0,0,0,0) >= studentJoinDateForAllocation)
+                                .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
                             const instPaidMap: Record<string, number> = {};
                             sortedInsts.forEach(inst => {
                                 const directPayments = student.feePayments?.filter((p: any) => p.installmentId === inst.id) || [];
@@ -1076,7 +1095,11 @@ export default function BatchDetails() {
                                         batch.feeInstallments && batch.feeInstallments.length > 0 && (
                                             <div className="mt-2 pt-3 border-t border-app-border/50">
                                                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
-                                                    {batch.feeInstallments.map(inst => {
+                                                    {batch.feeInstallments.filter((inst) => {
+                                                        const studentJoinDate = student.createdAt ? new Date(student.createdAt).setHours(0, 0, 0, 0) : 0;
+                                                        const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
+                                                        return instDate >= studentJoinDate;
+                                                    }).map((inst) => {
                                                         const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
                                                         // Use calculated amount from map
                                                         const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);

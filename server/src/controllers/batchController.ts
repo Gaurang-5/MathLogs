@@ -241,6 +241,7 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                         parentEmail: true,
                         schoolName: true,
                         status: true,
+                        createdAt: true,
                         feePayments: {
                             select: {
                                 id: true,

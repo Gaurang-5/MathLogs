@@ -39,7 +39,10 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
             let unallocatedCash = paidSimple;
 
             // Balance Calc
-            const sortedInstallments = student.batch?.feeInstallments?.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) || [];
+            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
+            const sortedInstallments = student.batch?.feeInstallments
+                ?.filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate)
+                ?.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) || [];
             const installmentTotal = sortedInstallments.reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
             const totalFee = installmentTotal > 0 ? installmentTotal : (student.batch?.feeAmount || 0);
 
@@ -296,7 +299,8 @@ export const getFeeSummary = async (req: Request, res: Response) => {
         });
 
         const summary = students.map((student: any) => {
-            const installments = student.batch?.feeInstallments || [];
+            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
+            const installments = (student.batch?.feeInstallments || []).filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
 
             // Calculate Total Paid & Unallocated Cash
             const paidSimple = student.fees
@@ -401,7 +405,8 @@ export const recordPayment = async (req: Request, res: Response) => {
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
 
-        const installments = student.batch?.feeInstallments || [];
+        const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
+        const installments = (student.batch?.feeInstallments || []).filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
 
         // Validation: Prevent Overpayment
         const installmentSum = installments.reduce((sum, i) => sum + i.amount, 0);
@@ -577,7 +582,8 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
         }
 
         // Calculate breakdown
-        const installments = student.batch?.feeInstallments || [];
+        const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
+        const installments = (student.batch?.feeInstallments || []).filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
         const breakdownLines: string[] = [];
         let totalPendingCalc = 0;
 
