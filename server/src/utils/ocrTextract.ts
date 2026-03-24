@@ -105,53 +105,75 @@ function extractScoreFromBlocks(blocks: Block[]): { score: string; confidence: n
         return { score: "ERROR_UNCERTAIN", confidence: 0, rawTexts };
     }
 
-    // 3. Slot into 3 virtual boxes based on Center X
-    // The image consists of 3 square boxes side-by-side. 
-    // Roughly, Box 1: 0.0 - 0.33, Box 2: 0.33 - 0.66, Box 3: 0.66 - 1.0
-    
-    let box1: string = ""; let conf1 = 0;
-    let box2: string = ""; let conf2 = 0;
-    let box3: string = ""; let conf3 = 0;
+    // 3. Dynamic Assignment of Digits
+    // Sort all characters across all blocks by their CenterX
+    const allChars: Array<{ char: string, centerX: number, confidence: number }> = [];
 
     for (const b of validDigits) {
         // If a block contains multiple digits (e.g. "99"), it spans across boxes.
-        // We will process character by character based on estimated char X.
         const charWidth = b.width / b.normalizedText.length;
         
         for (let i = 0; i < b.normalizedText.length; i++) {
             const char = b.normalizedText[i];
             const charCenterX = b.left + (i * charWidth) + (charWidth / 2);
-
-            let targetBox = 0;
-            // Boundaries roughly at 1/3 and 2/3, padded slightly inwards
-            if (charCenterX < 0.36) targetBox = 1;
-            else if (charCenterX < 0.64) targetBox = 2;
-            else targetBox = 3;
-
-            // Update the box if this char has higher confidence OR if the box is currently empty
-            if (targetBox === 1 && (box1 === "" || b.confidence > conf1)) { box1 = char; conf1 = b.confidence; }
-            if (targetBox === 2 && (box2 === "" || b.confidence > conf2)) { box2 = char; conf2 = b.confidence; }
-            if (targetBox === 3 && (box3 === "" || b.confidence > conf3)) { box3 = char; conf3 = b.confidence; }
+            allChars.push({ char, centerX: charCenterX, confidence: b.confidence });
         }
     }
 
-    // Combine them, skipping empty boxes
-    const finalScore = [box1, box2, box3].filter(x => x !== "").join("");
+    // Sort left to right
+    allChars.sort((a, b) => a.centerX - b.centerX);
+
+    let finalScore = "";
+    let totalConf = 0;
+    const numBoxes = allChars.length;
+
+    if (numBoxes === 3) {
+        // 3 blocks: Hundreds, Tens, Ones
+        finalScore = allChars.map(c => c.char).join("");
+        totalConf = allChars.reduce((sum, c) => sum + c.confidence, 0);
+    } else if (numBoxes === 2) {
+        // 2 blocks: Could be Tens+Ones (85), Hundreds+Tens (10), or Hundreds+Ones (105)
+        const [left, right] = allChars;
+        
+        // Define rough centers for the three boxes to gauge spacing
+        // Box 1 ~ 0.16, Box 2 ~ 0.50, Box 3 ~ 0.83
+        const getBoxIndex = (cx: number) => {
+            const dist0 = Math.abs(cx - 0.16);
+            const dist1 = Math.abs(cx - 0.50);
+            const dist2 = Math.abs(cx - 0.83);
+            if (dist0 <= dist1 && dist0 <= dist2) return 0;
+            if (dist1 <= dist0 && dist1 <= dist2) return 1;
+            return 2;
+        };
+
+        const leftBox = getBoxIndex(left.centerX);
+        const rightBox = getBoxIndex(right.centerX);
+
+        if (leftBox === 0 && rightBox === 2) {
+            // Gap in the middle! It must be Hundreds and Ones (e.g., 1_5 -> 105)
+            finalScore = left.char + "0" + right.char;
+        } else {
+            // Consecutive boxes or adjacent: just join them (Tens+Ones or Hundreds+Tens)
+            finalScore = left.char + right.char;
+        }
+        totalConf = left.confidence + right.confidence;
+    } else if (numBoxes === 1) {
+        // 1 block: Safely assume it is the Ones place (a single digit score)
+        finalScore = allChars[0].char;
+        totalConf = allChars[0].confidence;
+    } else if (numBoxes > 3) {
+        // Fallback for >3 decoded digits
+        finalScore = allChars.map(c => c.char).join("").substring(0, 3);
+        totalConf = allChars.slice(0, 3).reduce((sum, c) => sum + c.confidence, 0);
+    }
 
     if (!finalScore) {
         return { score: "ERROR_UNCERTAIN", confidence: 0, rawTexts };
     }
 
-    // Calculate average confidence for the boxes we used
-    let totalConf = 0;
-    let numBoxes = 0;
-    if (box1) { totalConf += conf1; numBoxes++; }
-    if (box2) { totalConf += conf2; numBoxes++; }
-    if (box3) { totalConf += conf3; numBoxes++; }
-    
     return {
         score: finalScore,
-        confidence: (totalConf / numBoxes) / 100, // Normalized to 0-1
+        confidence: numBoxes > 0 ? (totalConf / Math.min(numBoxes, 3)) / 100 : 0,
         rawTexts
     };
 }

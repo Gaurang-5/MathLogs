@@ -6,7 +6,6 @@ import {
     Users,
     Plus,
     Copy,
-    Check,
     Loader2,
     ShieldCheck,
     ArrowRight,
@@ -254,7 +253,7 @@ export default function SuperAdminDashboard() {
     const handleGenerateOnboardingLink = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (plan === 'CUSTOM' && !isFreeTrial) {
+        if (plan === 'CUSTOM') {
             if (!customPriceMonthly && !customPriceYearly) {
                 alert('Please enter at least one custom price (monthly or yearly).');
                 return;
@@ -271,9 +270,9 @@ export default function SuperAdminDashboard() {
             const token = localStorage.getItem('token');
             const res = await axios.post(`${API_URL}/admin-onboarding/create-link`, {
                 plan,
-                discountPercent: plan !== 'CUSTOM' && !isFreeTrial ? (Number(discountPercent) || 0) : 0,
-                customPriceMonthly: plan === 'CUSTOM' && !isFreeTrial ? (Number(customPriceMonthly) || 0) : 0,
-                customPriceYearly: plan === 'CUSTOM' && !isFreeTrial ? (Number(customPriceYearly) || 0) : 0,
+                discountPercent: plan !== 'CUSTOM' ? (Number(discountPercent) || 0) : 0,
+                customPriceMonthly: plan === 'CUSTOM' ? (Number(customPriceMonthly) || 0) : 0,
+                customPriceYearly: plan === 'CUSTOM' ? (Number(customPriceYearly) || 0) : 0,
                 maxStudents: plan === 'CUSTOM' ? (Number(customMaxStudentsForInvite) || 100) : (plan === 'PRO' ? 250 : 100),
                 isFreeTrial,
                 trialDays: isFreeTrial ? (Number(trialDays) || 14) : undefined,
@@ -1125,8 +1124,8 @@ export default function SuperAdminDashboard() {
                                     </div>
                                 )}
 
-                                {/* Pricing: Discount for Basic/Pro OR Custom Price (hidden when free trial) */}
-                                {!isFreeTrial && (plan !== 'CUSTOM' ? (
+                                {/* Pricing: Discount for Basic/Pro OR Custom Price */}
+                                {plan !== 'CUSTOM' ? (
                                     <div className="space-y-3 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
                                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Discount</label>
                                         <div className="text-xs text-gray-500 -mt-1">
@@ -1206,7 +1205,7 @@ export default function SuperAdminDashboard() {
                                             />
                                         </div>
                                     </div>
-                                ))}
+                                )}
 
                                 <button
                                     type="submit"

@@ -1,7 +1,9 @@
 const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor?.isNative;
 export const API_URL = isCapacitor
     ? 'https://mathlogs.app/api'
-    : (import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api'));
+    : (import.meta.env.VITE_API_URL || '/api');
+
+
 
 async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?: number) {
     const headers: any = {};

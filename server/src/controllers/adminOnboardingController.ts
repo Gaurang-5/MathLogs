@@ -53,8 +53,8 @@ export const createAdminOnboardingLink = async (req: Request, res: Response) => 
         return res.status(400).json({ error: 'Valid plan is required (BASIC, PRO, CUSTOM).' });
     }
 
-    if (plan === 'CUSTOM' && !isFreeTrial && !customPriceMonthly && !customPriceYearly) {
-        return res.status(400).json({ error: 'At least one custom price (monthly or yearly) is required for paid Custom plan.' });
+    if (plan === 'CUSTOM' && !customPriceMonthly && !customPriceYearly) {
+        return res.status(400).json({ error: 'At least one custom price (monthly or yearly) is required for Custom plan.' });
     }
 
     if (isFreeTrial && (!trialDays || trialDays < 1 || trialDays > 365)) {
@@ -74,8 +74,8 @@ export const createAdminOnboardingLink = async (req: Request, res: Response) => 
                 token,
                 plan,
                 discountPercent: plan !== 'CUSTOM' ? Math.min(100, Math.max(0, Number(discountPercent))) : 0,
-                customPriceMonthlyPaise: plan === 'CUSTOM' && !isFreeTrial ? Math.round(Number(customPriceMonthly) * 100) : null,
-                customPriceYearlyPaise: plan === 'CUSTOM' && !isFreeTrial ? Math.round(Number(customPriceYearly) * 100) : null,
+                customPriceMonthlyPaise: plan === 'CUSTOM' ? Math.round(Number(customPriceMonthly) * 100) : null,
+                customPriceYearlyPaise: plan === 'CUSTOM' ? Math.round(Number(customPriceYearly) * 100) : null,
                 maxStudents: resolvedMaxStudents,
                 isFreeTrial: Boolean(isFreeTrial),
                 trialDays: isFreeTrial ? Number(trialDays) : null,
@@ -185,6 +185,10 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
                         isTrial: true,
                         allowedClasses: ["Class 9", "Class 10"],
                         subjects: ["Mathematics"],
+                        ...(link.plan === 'CUSTOM' ? {
+                            customPriceMonthly: (link.customPriceMonthlyPaise || 0) / 100,
+                            customPriceYearly: (link.customPriceYearlyPaise || 0) / 100,
+                        } : {}),
                         ...(link.discountPercent ? { discountPercent: link.discountPercent } : {}),
                     }
                 }

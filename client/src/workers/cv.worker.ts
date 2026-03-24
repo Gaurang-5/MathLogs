@@ -65,121 +65,82 @@ function detectAndWarp(imageData: ImageData): { success: boolean, data?: Uint8Ar
         const hierarchy = new cv.Mat();
         cv.findContours(binary, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
 
-        let bestContour = null;
-        let maxArea = 0;
+        const markers: Array<{ x: number, y: number }> = [];
 
-        // sticker aspect ratio = 39mm / 21mm ≈ 1.857  (physical size: 3.9cm × 2.1cm)
-        const TARGET_RATIO = 39 / 21; // ≈ 1.857
-        const RATIO_TOLERANCE = 0.4;
-
+        // 5. Hierarchical Contour Analysis for 'L' Marker Detection
+        // An 'L' marker is an irregular polygon (usually 6 vertices)
+        // Check size, bounding rect, and solidity to find the 4 markers.
         for (let i = 0; i < contours.size(); ++i) {
             const cnt = contours.get(i);
             const area = cv.contourArea(cnt);
 
-            if (area < 5000) continue;
+            // Filter by area: Markers shouldn't be too huge or too tiny compared to full frame
+            if (area < 100 || area > 5000) continue;
 
-            const peri = cv.arcLength(cnt, true);
-            const approx = new cv.Mat();
-            cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+            const rect = cv.boundingRect(cnt);
+            const aspectRatio = rect.width / rect.height;
 
-            if (approx.rows === 4) {
-                const rect = cv.boundingRect(approx);
-                const aspectRatio = rect.width / rect.height;
+            // L markers are roughly square in bounding box aspect ratio
+            if (aspectRatio < 0.6 || aspectRatio > 1.6) continue;
 
-                if (aspectRatio > (TARGET_RATIO - RATIO_TOLERANCE) &&
-                    aspectRatio < (TARGET_RATIO + RATIO_TOLERANCE)) {
+            // Check Solidity (Contour Area / Convex Hull Area)
+            // A solid square has solidity ~1.0, but an "L" has empty space inside its bounds.
+            // Solidity for an L shape is typically between 0.3 and 0.75.
+            const hull = new cv.Mat();
+            cv.convexHull(cnt, hull, false, true);
+            const hullArea = cv.contourArea(hull);
+            const solidity = area / hullArea;
+            hull.delete();
 
-                    if (area > maxArea) {
-                        maxArea = area;
-                        bestContour = approx.clone();
+            if (solidity > 0.3 && solidity < 0.75) {
+                // Approximate the polygon and verify ~6 vertices
+                const peri = cv.arcLength(cnt, true);
+                const approx = new cv.Mat();
+                cv.approxPolyDP(cnt, approx, 0.04 * peri, true);
+                
+                // Allow some tolerance for scanned/noisy shapes (5-8 vertices)
+                if (approx.rows >= 5 && approx.rows <= 8) {
+                    const M = cv.moments(cnt, false);
+                    if (M.m00 !== 0) {
+                        const cx = M.m10 / M.m00;
+                        const cy = M.m01 / M.m00;
+                        markers.push({ x: cx, y: cy });
                     }
                 }
+                approx.delete();
             }
-            approx.delete();
         }
 
         // Cleanup detection mats
         gray.delete(); blurred.delete(); binary.delete(); contours.delete(); hierarchy.delete();
 
-        if (bestContour) {
-            // Found candidate!
-            const pointsData = [];
-            let sumX = 0;
-            let sumY = 0;
-
-            for (let i = 0; i < 4; i++) {
-                const px = bestContour.data32S[i * 2];
-                const py = bestContour.data32S[i * 2 + 1];
-                pointsData.push({ x: px, y: py });
-                sumX += px;
-                sumY += py;
-            }
-
-            // Calculate Centroid
-            const centerX = sumX / 4;
-            const centerY = sumY / 4;
-
-            // Sort points by angle from centroid (-PI to PI)
-            // This gives us points in counter-clockwise order (usually BR -> TR -> TL -> BL or similar depending on start)
-            // We need to identify Top-Left first.
-
-            // In a wide rectangle (4.18 ratio), the points are distinct.
-            // We can sort by angle:
-            // TL should be around -135 deg (-3PI/4) or similar relative to center?
-            // Actually simpler:
-            // Top-Left:  x < cx, y < cy
-            // Top-Right: x > cx, y < cy
-            // Bot-Right: x > cx, y > cy
-            // Bot-Left:  x < cx, y > cy
-
-            // BUT this fails if rotated 45 degrees.
-
-            // Robust Method: Sort by Y first to separate Top/Bottom? No that fails on 90 deg rotation.
-
-            // Robust Method 2: Sum of (x + y) is min for TL, max for BR.
-            // Diff (y - x) is min for TR, max for BL.
-            // This works for moderate rotations (< 45 deg).
-
-            // Robust Method 3 (General):
-            // Sort angularly around center.
-            pointsData.sort((a, b) => {
-                return Math.atan2(a.y - centerY, a.x - centerX) - Math.atan2(b.y - centerY, b.x - centerX);
-            });
-
-            // Now points are ordered angularly. We need to find the "first" point (Top-Left).
-            // Since the sticker is very wide (4:1), the "Top" edge and "Bottom" edge are long.
-            // The distance between [0]-[1] should be large (width) or small (height).
-
-            // Let's assume the user holds it ROUGHLY upright (+/- 45 deg).
-            // In that case, we can find TL by min(x+y).
-
-            // Let's use the sum/diff approach for now as it's robust for handheld scanning (+/- 45 deg).
-            // If we want FULL 360 freedom, we need L-marker detection (Phase 3).
-
-            const sortedPoints = [
+        if (markers.length >= 4) {
+            // Found candidates!
+            // Sort to find the 4 extreme outward corners mapping to TL, TR, BR, BL
+            // Using sum and diff of X,Y coordinates
+            let minSum = Infinity, maxSum = -Infinity;
+            let minDiff = Infinity, maxDiff = -Infinity;
+            
+            const orderedPoints = [
                 { x: 0, y: 0 }, // TL
                 { x: 0, y: 0 }, // TR
                 { x: 0, y: 0 }, // BR
                 { x: 0, y: 0 }  // BL
             ];
 
-            // sums = x + y  (min = TL, max = BR)
-            // diffs = y - x (min = TR, max = BL)
-
-            let minSum = Infinity, maxSum = -Infinity;
-            let minDiff = Infinity, maxDiff = -Infinity;
-
-            pointsData.forEach(p => {
+            markers.forEach(p => {
                 const sum = p.x + p.y;
                 const diff = p.y - p.x;
 
-                if (sum < minSum) { minSum = sum; sortedPoints[0] = p; }
-                if (sum > maxSum) { maxSum = sum; sortedPoints[2] = p; }
-                if (diff < minDiff) { minDiff = diff; sortedPoints[1] = p; }
-                if (diff > maxDiff) { maxDiff = diff; sortedPoints[3] = p; }
+                // TL: Minimum (X + Y)
+                if (sum < minSum) { minSum = sum; orderedPoints[0] = p; }
+                // BR: Maximum (X + Y)
+                if (sum > maxSum) { maxSum = sum; orderedPoints[2] = p; }
+                // TR: Minimum (Y - X)
+                if (diff < minDiff) { minDiff = diff; orderedPoints[1] = p; }
+                // BL: Maximum (Y - X)
+                if (diff > maxDiff) { maxDiff = diff; orderedPoints[3] = p; }
             });
-
-            const orderedPoints = sortedPoints;
 
             // Destination coordinates match 3.9cm × 2.1cm sticker ratio (39/21 ≈ 1.857)
             // 1200px wide for high-res sharpness → height = 1200 / (39/21) ≈ 646px
@@ -207,22 +168,12 @@ function detectAndWarp(imageData: ImageData): { success: boolean, data?: Uint8Ar
             cv.warpPerspective(src, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
 
             // Convert result to raw pixel data to send back
-            // We can't send Mat back, and toDataURL is slow in worker (no canvas DOM)
-            // Best practice: Send ImageData buffer
-
-            // However, OpenCv.js doesn't have easy Mat->ArrayBuffer without Canvas in some versions
-            // We can use data() to get the raw pointer.
-
-            // For simplicity in this P1 refactor, we will rely on a neat trick:
-            // Respond with raw bytes. Main thread converts to Canvas.
-
             const imgData = new Uint8Array(dst.data); // Copy data
-            // const channels = dst.channels(); // Should be 4 (RGBA)
             const cols = dst.cols;
             const rows = dst.rows;
 
             // Cleanup
-            srcTri.delete(); dstTri.delete(); M.delete(); bestContour.delete(); src.delete(); dst.delete();
+            srcTri.delete(); dstTri.delete(); M.delete(); src.delete(); dst.delete();
 
             return {
                 success: true,
