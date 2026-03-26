@@ -223,22 +223,30 @@ export default function BatchDetails() {
         }
     };
 
-    const fetchDetails = async () => {
+    const fetchDetails = async (silent = false) => {
         try {
             const data = await apiRequest(`/batches/${id}?t=${Date.now()}`);
             setBatch(data);
         } catch (e) {
-            toast.error('Failed to load batch details');
-            navigate('/batches');
+            if (!silent) {
+                toast.error('Failed to load batch details');
+                navigate('/batches');
+            }
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
     useEffect(() => {
-        // PERF: Removed window focus listener - it was causing full refetch on every tab switch
-        // Users can manually refresh if they need fresh data
+        // Initial load
         fetchDetails();
+
+        // Silent auto-refresh every 15 seconds for incoming live registrations
+        const interval = setInterval(() => {
+            fetchDetails(true);
+        }, 15000);
+
+        return () => clearInterval(interval);
     }, [id, navigate]);
 
     const handleDownloadPDF = async () => {
