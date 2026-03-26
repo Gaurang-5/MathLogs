@@ -177,7 +177,10 @@ export const registerStudent = async (req: Request, res: Response) => {
     
     // Data Normalization (Fix for typical duplications)
     if (typeof name === 'string') name = name.trim();
-    if (typeof parentWhatsapp === 'string') parentWhatsapp = parentWhatsapp.replace(/\s+/g, ''); // Remove spaces from phone number
+    if (typeof parentWhatsapp === 'string') {
+        parentWhatsapp = parentWhatsapp.replace(/\D/g, ''); // Extract all digits
+        if (parentWhatsapp.length > 10) parentWhatsapp = parentWhatsapp.slice(-10); // Keep only the last 10 digits
+    }
 
     const startTime = Date.now();
 
@@ -311,7 +314,10 @@ export const addStudentManually = async (req: Request, res: Response) => {
     
     // Data Normalization
     if (typeof name === 'string') name = name.trim();
-    if (typeof parentWhatsapp === 'string') parentWhatsapp = parentWhatsapp.replace(/\s+/g, '');
+    if (typeof parentWhatsapp === 'string') {
+        parentWhatsapp = parentWhatsapp.replace(/\D/g, ''); 
+        if (parentWhatsapp.length > 10) parentWhatsapp = parentWhatsapp.slice(-10);
+    }
 
     try {
         const teacherId = (req as any).user?.id;

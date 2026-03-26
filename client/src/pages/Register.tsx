@@ -315,10 +315,15 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                         <div className="relative group">
                             <Smartphone className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
                             <input
+                                type="tel"
+                                maxLength={10}
                                 className="w-full !bg-neutral-50 border border-app-border text-app-text  pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-gray-400"
                                 placeholder="10-digit number"
                                 value={whatsapp}
-                                onChange={e => setWhatsapp(e.target.value)}
+                                onChange={e => {
+                                    const val = e.target.value.replace(/\D/g, '');
+                                    if (val.length <= 10) setWhatsapp(val);
+                                }}
                                 required
                             />
                         </div>
