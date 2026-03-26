@@ -62,10 +62,8 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
                     throw new Error(serverMessage); // Validation errors - use server message
 
                 case 409:
-                    // Conflict - likely concurrent modification, safe to retry
-                    throw new Error(serverMessage.includes('Concurrent')
-                        ? serverMessage
-                        : 'Concurrent modification detected. ' + serverMessage);
+                    // Conflict
+                    throw new Error(serverMessage);
 
                 case 429:
                     // Log rate limit for monitoring - should NOT occur in normal testing

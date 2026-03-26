@@ -26,13 +26,21 @@ interface AutoInviteBatch {
 }
 
 const autoSendWelcomeInvite = async (student: AutoInviteStudent, batch: AutoInviteBatch) => {
-    if (!batch.autoSendWelcome || !batch.whatsappGroupLink) return;
+    if (!batch.autoSendWelcome) return;
     
     try {
         const link = batch.whatsappGroupLink;
         const senderName = batch.institute?.name || 'Coaching Centre';
 
-        const body = `Hello ${student.name},\n\nWelcome to ${batch.name} (${batch.subject || 'Course'}).\n\nBatch Details:\n• Class: ${batch.className || 'N/A'}\n• Time: ${batch.timeSlot || 'N/A'}\n• Student ID: ${student.humanId || 'N/A'}\n\nJoin the official WhatsApp group for announcements and updates:\n👉 ${link}\n\nPlease join the group to stay informed.\n\n– ${senderName}`;
+        let body = `Hello ${student.name},\n\nWelcome to ${batch.name} (${batch.subject || 'Course'}).\n\nBatch Details:\n• Class: ${batch.className || 'N/A'}\n• Time: ${batch.timeSlot || 'N/A'}\n• Student ID: ${student.humanId || 'N/A'}\n\n`;
+
+        if (link) {
+            body += `Join the official WhatsApp group for announcements and updates:\n👉 ${link}\n\nPlease join the group to stay informed.\n\n`;
+        } else {
+            body += `You will receive the WhatsApp group link here soon. Please keep checking your WhatsApp for updates.\n\n`;
+        }
+
+        body += `– ${senderName}`;
 
         // H2 fix: Cast only the Json `options` field instead of the entire data object
         if (student.parentEmail) {
@@ -58,7 +66,7 @@ const autoSendWelcomeInvite = async (student: AutoInviteStudent, batch: AutoInvi
                 studentName: student.name,
                 batchName: batch.name,
                 instituteName: senderName,
-                whatsappLink: link
+                whatsappLink: link || ''
             }).catch(err => console.error(`WhatsApp auto-invite failed for ${phone}:`, err));
         }
     } catch (inviteErr) {
@@ -165,7 +173,12 @@ const generateHumanId = async (batch: any) => {
 const MAX_RETRIES = 15;
 
 export const registerStudent = async (req: Request, res: Response) => {
-    const { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName } = req.body;
+    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName } = req.body;
+    
+    // Data Normalization (Fix for typical duplications)
+    if (typeof name === 'string') name = name.trim();
+    if (typeof parentWhatsapp === 'string') parentWhatsapp = parentWhatsapp.replace(/\s+/g, ''); // Remove spaces from phone number
+
     const startTime = Date.now();
 
     try {
@@ -209,12 +222,10 @@ export const registerStudent = async (req: Request, res: Response) => {
             }
         }
 
-
-        // Idempotency Check: Prevent duplicate registrations
+        // Idempotency Check: Strict One-Phone-Number-Per-Batch logic
         const existingStudent = await prisma.student.findFirst({
             where: {
                 batchId,
-                name,
                 parentWhatsapp,
                 instituteId: batch.instituteId
             }
@@ -222,7 +233,7 @@ export const registerStudent = async (req: Request, res: Response) => {
 
         if (existingStudent) {
             logger.registration.idempotencyHit(batchId, name, existingStudent.humanId || existingStudent.id);
-            return res.json(existingStudent);
+            return res.status(409).json({ error: 'This phone number is already registered for this batch.' });
         }
 
         let retries = 0;
@@ -262,7 +273,7 @@ export const registerStudent = async (req: Request, res: Response) => {
                                 error: 'Concurrent modification detected. Please retry registration.'
                             });
                         }
-                        return res.json(existing);
+                        return res.status(409).json({ error: 'This phone number is already registered for this batch.' });
                     } else {
                         retries++;
                         const seq = error.meta?.target?.match(/\d+/)?.[0];
@@ -296,7 +307,12 @@ export const registerStudent = async (req: Request, res: Response) => {
 };
 
 export const addStudentManually = async (req: Request, res: Response) => {
-    const { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName } = req.body;
+    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName } = req.body;
+    
+    // Data Normalization
+    if (typeof name === 'string') name = name.trim();
+    if (typeof parentWhatsapp === 'string') parentWhatsapp = parentWhatsapp.replace(/\s+/g, '');
+
     try {
         const teacherId = (req as any).user?.id;
         const batch = await prisma.batch.findUnique({
@@ -326,9 +342,9 @@ export const addStudentManually = async (req: Request, res: Response) => {
         }
 
 
-        // Idempotency Check
+        // Idempotency Check: Strict One-Phone-Number-Per-Batch logic
         const existingStudent = await prisma.student.findFirst({
-            where: { batchId, name, parentWhatsapp, instituteId: user.instituteId }
+            where: { batchId, parentWhatsapp, instituteId: user.instituteId }
         });
         if (existingStudent) return res.json(existingStudent);
 

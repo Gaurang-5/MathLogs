@@ -3,10 +3,10 @@
  * Handles authentication headers, base URL, and token refresh.
  */
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { getItemAsync, deleteItemAsync } from './storage';
 import { Platform } from 'react-native';
 
-const DEV_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.5:3001';
+const DEV_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.100.3.216:3001';
 
 const PROD_URL = 'https://mathlogs.app';
 
@@ -23,7 +23,7 @@ const api = axios.create({
 // Request interceptor: Attach JWT token
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const token = await SecureStore.getItemAsync('auth_token');
+    const token = await getItemAsync('auth_token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -37,8 +37,8 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      await SecureStore.deleteItemAsync('auth_token');
-      await SecureStore.deleteItemAsync('user_data');
+      await deleteItemAsync('auth_token');
+      await deleteItemAsync('user_data');
       // The auth context will pick up the missing token and redirect to login
     }
     return Promise.reject(error);

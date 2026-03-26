@@ -3,7 +3,7 @@
  * Tokens live in SecureStore (device keychain), never AsyncStorage.
  */
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import { getItemAsync, setItemAsync, deleteItemAsync } from '../services/storage';
 import { useRouter } from 'expo-router';
 import api from '../services/api';
 
@@ -41,8 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadStoredSession = async () => {
     try {
-      const storedToken = await SecureStore.getItemAsync('auth_token');
-      const storedUser = await SecureStore.getItemAsync('user_data');
+      const storedToken = await getItemAsync('auth_token');
+      const storedUser = await getItemAsync('user_data');
 
       if (storedToken && storedUser) {
         // Set token directly in api client headers as well
@@ -87,16 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Store securely in device keychain
-    await SecureStore.setItemAsync('auth_token', newToken);
-    await SecureStore.setItemAsync('user_data', JSON.stringify(userData));
+    await setItemAsync('auth_token', newToken);
+    await setItemAsync('user_data', JSON.stringify(userData));
 
     setToken(newToken);
     setUser(userData);
   }, []);
 
   const logout = useCallback(async () => {
-    await SecureStore.deleteItemAsync('auth_token');
-    await SecureStore.deleteItemAsync('user_data');
+    await deleteItemAsync('auth_token');
+    await deleteItemAsync('user_data');
     delete api.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);

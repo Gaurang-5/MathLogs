@@ -15,7 +15,7 @@ import api from '../../services/api';
 import { SkeletonLoader, BrandButton } from '../../components/ui';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import * as SecureStore from 'expo-secure-store';
+import { getItemAsync } from '../../services/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -83,7 +83,7 @@ export default function BatchDetailScreen() {
   const handleDownload = async (type: 'pdf' | 'stickers') => {
     setIsDownloading(true);
     try {
-      const token = await SecureStore.getItemAsync('userToken');
+      const token = await getItemAsync('auth_token');
       const url = type === 'pdf' ? `/batches/${id}/download` : `/stickers/download?batchId=${id}`;
       const baseUrl = api.defaults.baseURL || 'http://localhost:3001/api';
       const fileUri = FileSystem.documentDirectory + `${type}_${id}.pdf`;

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { motion } from 'framer-motion';
@@ -26,6 +26,21 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     // Status Check
     const [batchStatus, setBatchStatus] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+
+    // Prevent re-registration UI if already registered on this device
+    useEffect(() => {
+        if (mode === 'standard' && batchId) {
+            const cachedData = localStorage.getItem(`registered_batch_${batchId}`);
+            if (cachedData) {
+                try {
+                    setSubmittedData(JSON.parse(cachedData));
+                    setSubmitted(true);
+                } catch (e) {
+                    console.error("Local storage parse error", e);
+                }
+            }
+        }
+    }, [batchId, mode]);
 
     // Fetch batch status with timeout protection
     useState(() => {
@@ -98,8 +113,14 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
             }
 
             toast.success('✅ ✅ Registration successful!', { id: toastId });
-            setSubmittedData({ ...student, batchId });
+            const finalData = { ...student, batchId };
+            setSubmittedData(finalData);
             setSubmitted(true);
+            
+            if (mode === 'standard') {
+                localStorage.setItem(`registered_batch_${batchId}`, JSON.stringify(finalData));
+            }
+
         } catch (e: any) {
             clearFeedback();
 
@@ -181,12 +202,40 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                                 <p className="text-xs text-app-text-tertiary uppercase font-bold mb-1">School</p>
                                 <p className="text-app-text">{submittedData.schoolName}</p>
                             </div>
+                            <div className="pt-2 border-t border-app-border">
+                                {batchStatus?.autoSendWelcome && batchStatus?.whatsappGroupLink ? (
+                                    <div className="space-y-2 mt-2">
+                                        <p className="text-sm text-app-text font-semibold">Join the WhatsApp Group</p>
+                                        <p className="text-xs text-app-text-secondary">Please join the official WhatsApp group for updates.</p>
+                                        <a href={batchStatus.whatsappGroupLink} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-bold py-2 px-4 rounded-lg text-center transition-colors">
+                                            Join Group
+                                        </a>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1 mt-2 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
+                                        <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">WhatsApp Link Coming Soon</p>
+                                        <p className="text-xs text-app-text-secondary">You will receive the WhatsApp group link on WhatsApp soon. Please keep checking your WhatsApp.</p>
+                                    </div>
+                                )}
+                            </div>
                             <div className="pt-2">
                                 <p className="text-app-text-tertiary text-xs italic">Please save a screenshot of this card.</p>
                             </div>
                         </div>
                     ) : (
-                        <p className="text-app-text-secondary mt-4 leading-relaxed">Your request has been submitted successfully.</p>
+                        <div className="mt-4 space-y-4">
+                            <p className="text-app-text-secondary leading-relaxed">Your request has been submitted successfully.</p>
+                            {batchStatus?.autoSendWelcome && batchStatus?.whatsappGroupLink ? (
+                                <a href={batchStatus.whatsappGroupLink} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-bold py-3 px-4 rounded-xl text-center transition-colors mt-4">
+                                    Join WhatsApp Group
+                                </a>
+                            ) : (
+                                <div className="mt-4 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20 text-left">
+                                    <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">WhatsApp Link Coming Soon</p>
+                                    <p className="text-xs text-app-text-secondary mt-1">You will receive the WhatsApp group link on WhatsApp soon. Please keep checking your WhatsApp.</p>
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     {mode === 'kiosk' ? (

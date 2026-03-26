@@ -70,6 +70,8 @@ const DEVELOPMENT_ORIGINS = new Set([
     'http://localhost:5184',
     'http://localhost:5185',
     'http://localhost:3001',
+    'http://localhost:8081',
+    'http://10.100.3.216:8081',
 ]);
 
 app.use(cors({

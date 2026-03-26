@@ -527,6 +527,8 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
                 subject: true,
                 isRegistrationOpen: true,
                 isRegistrationEnded: true,
+                whatsappGroupLink: true,
+                autoSendWelcome: true,
                 institute: {
                     select: { name: true, areRegistrationsPaused: true, plan: true, planExpiryDate: true }
                 }
