@@ -23,6 +23,13 @@ export interface TestMarksWAData {
     instituteName: string;
 }
 
+export interface PaymentReceiptWAData {
+    studentName: string;
+    amountPaid: string;
+    installmentName: string;
+    instituteName: string;
+}
+
 /**
  * Sends a WhatsApp message using the MSG91 WhatsApp API.
  * 
@@ -285,4 +292,42 @@ export const sendOtpWhatsApp = async (mobileNumber: string, otpCode: string) => 
     };
 
     return await sendMsg91WhatsApp(mobileNumber, OTP_TEMPLATE, components);
+};
+
+/**
+ * Specifically sends the Payment Receipt WhatsApp Message
+ */
+export const sendPaymentReceiptWhatsApp = async (mobileNumber: string, data: PaymentReceiptWAData) => {
+    // The name of the template in MSG91 (e.g., "payment_receipt_1")
+    const PAYMENT_TEMPLATE_NAME = process.env.MSG91_WA_TEMPLATE_PAYMENT || 'payment_receipt_1';
+
+    if (!PAYMENT_TEMPLATE_NAME) {
+        console.warn('⚠️ Missing MSG91_WA_TEMPLATE_PAYMENT in .env. Skipping payment WhatsApp.');
+        return false;
+    }
+
+    const components = {
+        body_student_name: {
+            type: "text",
+            value: data.studentName || "Student",
+            parameter_name: "student_name"
+        },
+        body_amount_paid: {
+            type: "text",
+            value: data.amountPaid || "0",
+            parameter_name: "amount_paid"
+        },
+        body_installment_name: {
+            type: "text",
+            value: data.installmentName || "installment",
+            parameter_name: "installment_name"
+        },
+        body_institute_name: {
+            type: "text",
+            value: data.instituteName || "our institute",
+            parameter_name: "institute_name"
+        }
+    };
+
+    return await sendMsg91WhatsApp(mobileNumber, PAYMENT_TEMPLATE_NAME, components);
 };

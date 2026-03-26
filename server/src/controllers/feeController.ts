@@ -395,7 +395,7 @@ export const recordPayment = async (req: Request, res: Response) => {
         const student = await prisma.student.findUnique({
             where: { id: studentId },
             include: {
-                batch: { include: { feeInstallments: { orderBy: { createdAt: 'asc' } } } },
+                batch: { include: { feeInstallments: { orderBy: { createdAt: 'asc' } }, institute: true } },
                 feePayments: true,
                 fees: true
             }
@@ -463,6 +463,30 @@ export const recordPayment = async (req: Request, res: Response) => {
             });
         }
 
+        // Send WhatsApp receipt to parent (fire-and-forget)
+        if (student.parentWhatsapp) {
+            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
+            if (phone.length === 10) phone = '+91' + phone;
+
+            // Build installment summary from what was allocated
+            const allocatedInstallments = installments
+                .filter(inst => {
+                    const paidBefore = student.feePayments.filter(p => p.installmentId === inst.id).reduce((s, p) => s + p.amountPaid, 0);
+                    return inst.amount - paidBefore > 0; // had pending before this payment
+                })
+                .map(inst => inst.name)
+                .join(', ') || 'Fee Payment';
+
+            import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
+                sendPaymentReceiptWhatsApp(phone, {
+                    studentName: student.name,
+                    amountPaid: `Rs. ${parseFloat(amount).toLocaleString()}`,
+                    installmentName: allocatedInstallments,
+                    instituteName: student.batch?.institute?.name || 'our institute'
+                }).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
+            });
+        }
+
         res.json({ success: true, message: 'Payment recorded and allocated' });
     } catch (error) {
         console.error("Error recording payment:", error);
@@ -487,7 +511,7 @@ export const payInstallment = async (req: Request, res: Response) => {
         // Verify student ownership
         const student = await prisma.student.findUnique({
             where: { id: studentId },
-            include: { batch: true }
+            include: { batch: { include: { institute: true } } }
         });
 
         secureLogger.debug('Student found', student ? { id: student.id, name: student.name, batchId: student.batchId, hasBatch: !!student.batch } : 'NOT FOUND');
@@ -553,6 +577,21 @@ export const payInstallment = async (req: Request, res: Response) => {
             amount: payment.amountPaid,
             date: payment.date
         });
+
+        // Send WhatsApp receipt to parent (fire-and-forget)
+        if (student.parentWhatsapp) {
+            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
+            if (phone.length === 10) phone = '+91' + phone;
+
+            import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
+                sendPaymentReceiptWhatsApp(phone, {
+                    studentName: student.name,
+                    amountPaid: `Rs. ${newPaymentAmount.toLocaleString()}`,
+                    installmentName: installment.name,
+                    instituteName: student.batch?.institute?.name || 'our institute'
+                }).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
+            });
+        }
 
         // Payment recorded successfully (this will automatically appear in transaction reports)
         res.json(payment);
