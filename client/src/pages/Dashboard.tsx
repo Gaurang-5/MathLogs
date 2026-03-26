@@ -17,8 +17,19 @@ export default function Dashboard() {
     // Separate loading states for progressive rendering
     const [loading, setLoading] = useState({ summary: true, growth: true, financeGrowth: true });
 
-    // Privacy toggle for fee data
-    const [showFeeData, setShowFeeData] = useState(true);
+    // Privacy toggle for fee data — persisted across sessions
+    const [showFeeData, setShowFeeData] = useState(() => {
+        const saved = localStorage.getItem('mathlogs_hide_fees');
+        return saved === null ? true : saved !== 'true';
+    });
+
+    const toggleFeeVisibility = () => {
+        setShowFeeData(prev => {
+            const next = !prev;
+            localStorage.setItem('mathlogs_hide_fees', next ? 'false' : 'true');
+            return next;
+        });
+    };
 
     // Rotating insights
     const [currentInsight, setCurrentInsight] = useState(0);
@@ -267,7 +278,7 @@ export default function Dashboard() {
                                 </p>
                             </div>
                             <button
-                                onClick={() => setShowFeeData(!showFeeData)}
+                                onClick={toggleFeeVisibility}
                                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                             >
                                 {showFeeData ? (
