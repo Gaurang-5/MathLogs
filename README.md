@@ -41,6 +41,6 @@ We have a strict workflow to protect the live production environment. If you are
 All detailed documentation has been moved to the [`docs/`](./docs) directory.
 
 ### Key Documents:
-- [Quick Start Guide](./docs/QUICK_START.md)
-- [Deployment Guide](./docs/COMPLETE_READINESS_CERTIFICATION.md)
+- [Local Developer Setup](./docs/LOCAL_DEVELOPMENT_GUIDE.md)
+- [Deployment Guide](./docs/DEPLOY_TO_HEROKU.md)
 - [Backup Recovery](./docs/BACKUP_RECOVERY_GUIDE.md)
