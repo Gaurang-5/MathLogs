@@ -117,8 +117,9 @@ export default function SetupAccount() {
             });
 
             if (res.data.success) {
-                localStorage.setItem('token', res.data.token);
                 localStorage.setItem('adminId', res.data.adminId);
+                localStorage.setItem('token', res.data.token);
+                localStorage.setItem('refreshToken', res.data.refreshToken);
                 setStep('done');
                 setTimeout(() => navigate('/dashboard'), 1500);
             }

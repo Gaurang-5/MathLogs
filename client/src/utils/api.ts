@@ -5,6 +5,17 @@ export const API_URL = isCapacitor
 
 
 
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (value?: any) => void, reject: (reason?: any) => void }> = [];
+
+const processQueue = (error: Error | null, token: string | null = null) => {
+    failedQueue.forEach(prom => {
+        if (error) prom.reject(error);
+        else prom.resolve(token);
+    });
+    failedQueue = [];
+};
+
 async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?: number) {
     const headers: any = {};
     if (method !== 'GET' && method !== 'DELETE') {
@@ -35,13 +46,67 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
         if (!res.ok) {
             // Handle authentication errors
             // Exception: DELETE /academic-years/:id returns 401 for wrong password, not invalid session
-            const isPasswordVerification = (method === 'DELETE' && endpoint.includes('/academic-years/')) || endpoint.includes('/auth/login');
+            // Exception: auth endpoints obviously shouldn't loop
+            const isPasswordVerification = (method === 'DELETE' && endpoint.includes('/academic-years/')) || endpoint.includes('/auth/');
 
             if ((res.status === 401 || res.status === 403) && !isPasswordVerification) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('adminId');
-                window.location.href = '/login';
-                throw new Error('Session expired. Please login again.');
+                const refreshToken = localStorage.getItem('refreshToken');
+                
+                if (!refreshToken) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('refreshToken');
+                    localStorage.removeItem('adminId');
+                    window.location.href = '/login';
+                    throw new Error('Session expired. Please login again.');
+                }
+
+                if (isRefreshing) {
+                    // Wait for the ongoing refresh to complete
+                    try {
+                        const newToken = await new Promise<string>((resolve, reject) => {
+                            failedQueue.push({ resolve, reject });
+                        });
+                        headers['Authorization'] = `Bearer ${newToken}`;
+                        const retryRes = await fetch(`${API_URL}${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+                        if (!retryRes.ok) throw new Error('Retry failed after token rotation');
+                        return retryRes.json();
+                    } catch (err) {
+                        throw err;
+                    }
+                }
+
+                // Initiate refresh
+                isRefreshing = true;
+                try {
+                    const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refreshToken })
+                    });
+
+                    if (!refreshRes.ok) throw new Error('Refresh token invalid');
+
+                    const refreshData = await refreshRes.json();
+                    localStorage.setItem('token', refreshData.token);
+                    localStorage.setItem('refreshToken', refreshData.refreshToken);
+                    
+                    isRefreshing = false;
+                    processQueue(null, refreshData.token);
+
+                    // Re-fire original request
+                    headers['Authorization'] = `Bearer ${refreshData.token}`;
+                    const retryRes = await fetch(`${API_URL}${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+                    if (!retryRes.ok) throw new Error('Retry failed after token rotation');
+                    return retryRes.json();
+                } catch (err) {
+                    processQueue(err as Error, null);
+                    isRefreshing = false;
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('refreshToken');
+                    localStorage.removeItem('adminId');
+                    window.location.href = '/login';
+                    throw new Error('Session expired securely. Please login again.');
+                }
             }
 
             // Extract error message from response

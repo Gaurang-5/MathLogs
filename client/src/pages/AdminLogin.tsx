@@ -21,7 +21,7 @@ export default function AdminLogin() {
             if (data.success) {
                 localStorage.setItem('adminId', data.adminId);
                 localStorage.setItem('token', data.token); // Store JWT
-                localStorage.setItem('token', data.token); // Store JWT
+                localStorage.setItem('refreshToken', data.refreshToken); // Store Refresh Token
                 if (data.role === 'SUPER_ADMIN') {
                     navigate('/super-admin');
                 } else {

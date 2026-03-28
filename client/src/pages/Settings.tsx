@@ -33,6 +33,9 @@ function ChangePasswordForm() {
             if (res.token) {
                 localStorage.setItem('token', res.token);
             }
+            if (res.refreshToken) {
+                localStorage.setItem('refreshToken', res.refreshToken);
+            }
 
             toast.success('Password changed successfully');
             setCurrentPassword('');
