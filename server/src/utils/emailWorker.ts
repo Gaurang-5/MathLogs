@@ -1,8 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+// CRITICAL FIX: Use shared PrismaClient singleton instead of creating a second instance.
+// The old code created a new PrismaClient() which opened its own connection pool (5 extra connections),
+// causing "too many connections" errors under load with Neon's 10-connection limit.
+import { prisma } from '../prisma';
 import { sendEmail } from './email'; // Your existing email utility
 import { secureLogger } from './secureLogger';
-
-const prisma = new PrismaClient();
 
 const BATCH_SIZE = 20; // Increased concurrency
 const POLLING_INTERVAL = 2000; // Faster polling

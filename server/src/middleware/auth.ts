@@ -1,12 +1,48 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { prisma } from '../prisma';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('FATAL: JWT_SECRET environment variable must be set. Generate a secure secret with: openssl rand -base64 32');
 }
 
+// ─── PERF FIX (C1): Auth Cache ───────────────────────────────────────
+// Previously, EVERY authenticated request hit the DB to fetch user data.
+// At 100 req/s, this alone saturated the 10-connection pool.
+//
+// Now we cache user data for 60 seconds. Cache is invalidated on:
+// - Password changes (passwordVersion mismatch)
+// - Plan changes (TTL expiry forces re-fetch)
+// - Manual invalidation via invalidateAuthCache()
+
+interface CachedUser {
+    data: any;
+    fetchedAt: number;
+}
+
+const AUTH_CACHE_TTL_MS = 60_000; // 60 seconds
+const AUTH_CACHE_MAX_SIZE = 500;
+const authCache = new Map<string, CachedUser>();
+
+// Cleanup stale entries every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [key, val] of authCache.entries()) {
+        if (now - val.fetchedAt > AUTH_CACHE_TTL_MS * 2) {
+            authCache.delete(key);
+            cleaned++;
+        }
+    }
+    if (cleaned > 0) console.log(`[AUTH_CACHE] Cleaned ${cleaned} stale entries. Size: ${authCache.size}`);
+}, 5 * 60_000);
+
+/** Call this when user changes password or critical settings */
+export const invalidateAuthCache = (userId: string) => {
+    authCache.delete(userId);
+};
 
 export interface AuthRequest extends Request {
     user?: any;
@@ -28,30 +64,54 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
         }
 
         try {
-            // Fetch fresh user data to get currentAcademicYearId
-            // Import prisma dynamically to avoid circular dependency issues if any, 
-            // though standard import at top is better. I'll add import at top.
-            const { prisma } = await import('../prisma');
+            let dbUser: any;
+            const cached = authCache.get(user.id);
+            const now = Date.now();
 
-            const dbUser = await prisma.admin.findUnique({
-                where: { id: user.id },
-                select: {
-                    id: true,
-                    username: true,
-                    currentAcademicYearId: true,
-                    passwordVersion: true,
-                    instituteId: true,
-                    role: true,
-                    institute: {
-                        select: {
-                            planExpiryDate: true,
-                            plan: true
+            if (cached && (now - cached.fetchedAt < AUTH_CACHE_TTL_MS)) {
+                // CACHE HIT — skip DB query entirely
+                dbUser = cached.data;
+            } else {
+                // CACHE MISS — fetch from DB and cache
+                dbUser = await prisma.admin.findUnique({
+                    where: { id: user.id },
+                    select: {
+                        id: true,
+                        username: true,
+                        currentAcademicYearId: true,
+                        passwordVersion: true,
+                        instituteId: true,
+                        role: true,
+                        institute: {
+                            select: {
+                                planExpiryDate: true,
+                                plan: true
+                            }
                         }
                     }
+                });
+
+                if (dbUser) {
+                    // Evict oldest entries if cache is full
+                    if (authCache.size >= AUTH_CACHE_MAX_SIZE) {
+                        const oldest = [...authCache.entries()]
+                            .sort((a, b) => a[1].fetchedAt - b[1].fetchedAt)[0];
+                        if (oldest) authCache.delete(oldest[0]);
+                    }
+                    authCache.set(user.id, { data: dbUser, fetchedAt: now });
                 }
-            });
+            }
 
             if (!dbUser) {
+                res.sendStatus(403);
+                return;
+            }
+
+            // Invalidate token if password was changed (version mismatch)
+            // This also invalidates the cache since we re-check on every request
+            if (user.passwordVersion !== undefined && dbUser.passwordVersion !== user.passwordVersion) {
+                console.warn(`[SECURITY] Token invalidated due to password change for user: ${user.username}`);
+                authCache.delete(user.id); // Force re-fetch next time
                 res.sendStatus(403);
                 return;
             }
@@ -73,13 +133,6 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
                         }
                     }
                 }
-            }
-
-            // Invalidate token if password was changed (version mismatch)
-            if (user.passwordVersion !== undefined && dbUser.passwordVersion !== user.passwordVersion) {
-                console.warn(`[SECURITY] Token invalidated due to password change for user: ${user.username}`);
-                res.sendStatus(403);
-                return;
             }
 
             req.user = { ...user, ...dbUser };

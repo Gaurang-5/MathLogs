@@ -194,3 +194,34 @@ export const ocrLimiter = rateLimit({
         });
     }
 });
+
+// ✅ P0 FIX: Bulk WhatsApp/Notification Rate Limiter
+// Prevents teachers from accidentally sending duplicate bulk messages
+// by spamming "Send Invite" or "Send Results" buttons
+export const bulkNotifyLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 5, // Max 5 bulk sends per minute per user
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { ip: false },
+    keyGenerator: (req) => {
+        const user = (req as any).user;
+        return user?.id || req.ip || 'unknown';
+    },
+    message: { error: 'Too many notifications sent. Please wait a minute before sending again.' },
+    handler: (req: Request, res: Response) => {
+        const user = (req as any).user;
+        console.warn('[RATE_LIMIT_EXCEEDED]', {
+            type: 'bulk_notify',
+            userId: user?.id || 'unknown',
+            ip: req.ip,
+            path: req.path,
+            timestamp: new Date().toISOString(),
+            severity: 'HIGH',
+            message: 'Bulk notification rate limit hit - possible duplicate sends'
+        });
+        res.status(429).json({
+            error: 'Too many notifications sent. Please wait a minute before sending again.'
+        });
+    }
+});

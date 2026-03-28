@@ -56,6 +56,7 @@ model Admin {
   institute             Institute?     @relation(fields: [instituteId], references: [id])
   batches               Batch[]
   tests                 Test[]
+  refreshTokens         RefreshToken[]
 }
 
 model AcademicYear {
@@ -318,6 +319,34 @@ model OnboardingLead {
   @@index([createdAt])
 }
 
+
+// OTP tokens stored in DB instead of in-memory Map
+// Survives server restarts and works across multiple Heroku dynos
+model OtpToken {
+  id         String   @id @default(uuid())
+  identifier String   // Phone number or email (normalized)
+  otp        String
+  expiresAt  DateTime
+  verified   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([identifier]) // One active OTP per identifier (upsert replaces old)
+  @@index([expiresAt])   // For cleanup queries
+}
+
+// Refresh tokens for secure JWT rotation
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  adminId   String
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([expiresAt])
+}
+
 enum Tier {
   FREE
   PRO
@@ -332,3 +361,4 @@ enum JobStatus {
   COMPLETED
   FAILED
 }
+

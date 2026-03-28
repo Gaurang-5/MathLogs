@@ -16,6 +16,23 @@ import { emailWorker } from './utils/emailWorker';
 // ✅ MONITORING: Initialize Sentry FIRST (before all other middleware)
 initializeSentry(app);
 
+import * as Sentry from '@sentry/node';
+
+// CRITICAL FIX: Prevent uncaught async errors from crashing the process.
+// Fire-and-forget WhatsApp/email calls can produce unhandled rejections
+// if their .catch() callback itself throws.
+process.on('unhandledRejection', (reason: any, promise) => {
+    console.error('[FATAL] Unhandled Promise Rejection:', reason?.message || reason);
+    Sentry.captureException(reason, { tags: { type: 'unhandled_rejection' } });
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('[FATAL] Uncaught Exception:', error);
+    Sentry.captureException(error, { tags: { type: 'uncaught_exception' } });
+    // Give Sentry time to flush, then exit
+    setTimeout(() => process.exit(1), 2000);
+});
+
 configureSecurityHeaders(app);
 
 app.set('trust proxy', 1); // Trust first proxy (necessary for rate limiting behind load balancers)

@@ -185,6 +185,7 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
             startRawDate = new Date(endDate);
         }
 
+        // Build month labels
         const months: { name: string; year: number; monthIndex: number }[] = [];
         const tempDate = new Date(startRawDate);
         tempDate.setDate(1);
@@ -206,80 +207,94 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
             monthlyData[`${m.year}-${m.monthIndex}`] = { collected: 0, generated: 0 };
         });
 
-        // 1. Fetch Students (Generated fee = batch flat fee OR installments)
-        const students = await prisma.student.findMany({
-            where: {
-                status: 'APPROVED',
-                instituteId: instituteId,
-                ...(academicYearId && { academicYearId })
-            },
-            include: {
-                batch: { include: { feeInstallments: true } }
-            }
-        });
+        // ─── PERF FIX: Use raw SQL aggregation instead of loading ALL records ───
+        // Previous code: loaded ALL students + nested installments + ALL payments into JS memory
+        // New code: 2 SQL queries returning ~12 rows each (one per month)
 
-        students.forEach(s => {
-            const hasInstallments = s.batch?.feeInstallments && s.batch.feeInstallments.length > 0;
+        const { Prisma } = await import('@prisma/client');
+        const ayFilter = academicYearId 
+            ? Prisma.sql`AND s."academicYearId" = ${academicYearId}` 
+            : Prisma.empty;
 
-            if (!hasInstallments && s.batch?.feeAmount) {
-                const d = new Date(s.createdAt.getTime() + IST_OFFSET);
-                const key = `${d.getFullYear()}-${d.getMonth()}`;
-                if (monthlyData[key]) {
-                    monthlyData[key].generated += s.batch.feeAmount;
-                }
-            } else if (hasInstallments) {
-                const studentJoinDate = new Date(s.createdAt);
-                s.batch!.feeInstallments.forEach(inst => {
-                    if (new Date(inst.createdAt) >= studentJoinDate) {
-                        const d = new Date(inst.createdAt.getTime() + IST_OFFSET);
-                        const key = `${d.getFullYear()}-${d.getMonth()}`;
-                        if (monthlyData[key]) {
-                            monthlyData[key].generated += inst.amount;
-                        }
-                    }
-                });
-            }
-        });
+        // 1. GENERATED FEE: Aggregate by month
+        const generatedByMonth = await prisma.$queryRaw<Array<{ yr: number; mo: number; total: number }>>(Prisma.sql`
+            SELECT
+                EXTRACT(YEAR FROM fi."createdAt" AT TIME ZONE 'Asia/Kolkata')::int AS yr,
+                EXTRACT(MONTH FROM fi."createdAt" AT TIME ZONE 'Asia/Kolkata')::int - 1 AS mo,
+                COALESCE(SUM(fi.amount), 0)::float AS total
+            FROM "FeeInstallment" fi
+            JOIN "Batch" b ON b.id = fi."batchId"
+            JOIN "Student" s ON s."batchId" = b.id
+            WHERE s.status = 'APPROVED'
+                AND s."instituteId" = ${instituteId}
+                ${ayFilter}
+                AND fi."createdAt" >= s."createdAt"
+            GROUP BY yr, mo
 
-        // 2. Fetch Payments (Collected fee)
-        const feePayments = await prisma.feePayment.findMany({
-            where: {
-                student: {
-                    instituteId: instituteId,
-                    ...(academicYearId && { academicYearId }),
-                    status: 'APPROVED'
-                }
-            }
-        });
+            UNION ALL
 
-        feePayments.forEach(p => {
-            const d = new Date(p.date.getTime() + IST_OFFSET);
-            const key = `${d.getFullYear()}-${d.getMonth()}`;
+            SELECT
+                EXTRACT(YEAR FROM s."createdAt" AT TIME ZONE 'Asia/Kolkata')::int AS yr,
+                EXTRACT(MONTH FROM s."createdAt" AT TIME ZONE 'Asia/Kolkata')::int - 1 AS mo,
+                COALESCE(SUM(b."feeAmount"), 0)::float AS total
+            FROM "Student" s
+            JOIN "Batch" b ON b.id = s."batchId"
+            WHERE s.status = 'APPROVED'
+                AND s."instituteId" = ${instituteId}
+                ${ayFilter}
+                AND b."feeAmount" > 0
+                AND NOT EXISTS (
+                    SELECT 1 FROM "FeeInstallment" fi2 WHERE fi2."batchId" = b.id
+                )
+            GROUP BY yr, mo
+        `);
+
+        generatedByMonth.forEach(row => {
+            const key = `${row.yr}-${row.mo}`;
             if (monthlyData[key]) {
-                monthlyData[key].collected += p.amountPaid;
+                monthlyData[key].generated += Number(row.total);
             }
         });
 
-        const feeRecords = await prisma.feeRecord.findMany({
-            where: {
-                status: 'PAID',
-                student: {
-                    instituteId: instituteId,
-                    ...(academicYearId && { academicYearId }),
-                    status: 'APPROVED'
-                }
-            }
-        });
+        // 2. COLLECTED FEE: Aggregate payments + fee records by month
+        const collectedByMonth = await prisma.$queryRaw<Array<{ yr: number; mo: number; total: number }>>(Prisma.sql`
+            SELECT yr, mo, SUM(total)::float AS total FROM (
+                SELECT
+                    EXTRACT(YEAR FROM fp.date AT TIME ZONE 'Asia/Kolkata')::int AS yr,
+                    EXTRACT(MONTH FROM fp.date AT TIME ZONE 'Asia/Kolkata')::int - 1 AS mo,
+                    COALESCE(SUM(fp."amountPaid"), 0) AS total
+                FROM "FeePayment" fp
+                JOIN "Student" s ON s.id = fp."studentId"
+                WHERE s.status = 'APPROVED'
+                    AND s."instituteId" = ${instituteId}
+                    ${ayFilter}
+                GROUP BY yr, mo
 
-        feeRecords.forEach(r => {
-            const d = new Date(r.date.getTime() + IST_OFFSET);
-            const key = `${d.getFullYear()}-${d.getMonth()}`;
+                UNION ALL
+
+                SELECT
+                    EXTRACT(YEAR FROM fr.date AT TIME ZONE 'Asia/Kolkata')::int AS yr,
+                    EXTRACT(MONTH FROM fr.date AT TIME ZONE 'Asia/Kolkata')::int - 1 AS mo,
+                    COALESCE(SUM(fr.amount), 0) AS total
+                FROM "FeeRecord" fr
+                JOIN "Student" s ON s.id = fr."studentId"
+                WHERE fr.status = 'PAID'
+                    AND s.status = 'APPROVED'
+                    AND s."instituteId" = ${instituteId}
+                    ${ayFilter}
+                GROUP BY yr, mo
+            ) sub
+            GROUP BY yr, mo
+        `);
+
+        collectedByMonth.forEach(row => {
+            const key = `${row.yr}-${row.mo}`;
             if (monthlyData[key]) {
-                monthlyData[key].collected += r.amount;
+                monthlyData[key].collected += Number(row.total);
             }
         });
 
-        // 3. Format Data
+        // 3. Format with cumulative remaining
         let cumulativeGenerated = 0;
         let cumulativeCollected = 0;
 

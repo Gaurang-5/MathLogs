@@ -2,15 +2,43 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { sendOtpEmail } from '../utils/email';
 import { sendOtpWhatsApp } from '../utils/whatsapp';
+import { invalidateAuthCache } from '../middleware/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('FATAL: JWT_SECRET environment variable must be set. Generate a secure secret with: openssl rand -base64 32');
 }
 
+/**
+ * Helper to generate and store Short-Lived Access Token (1h) + Long-Lived Refresh Token (30d)
+ */
+const generateAuthTokens = async (admin: any) => {
+    // Access Token: 1 hour expiry (reduced from 30 days for security)
+    const token = jwt.sign({
+        id: admin.id,
+        username: admin.username,
+        passwordVersion: admin.passwordVersion,
+        instituteId: admin.instituteId,
+        role: admin.role
+    }, JWT_SECRET, { expiresIn: '1h' });
 
+    // Refresh Token: Cryptographically secure string, 30 day expiry in DB
+    const refreshTokenString = crypto.randomBytes(40).toString('hex');
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    await prisma.refreshToken.create({
+        data: {
+            token: refreshTokenString,
+            adminId: admin.id,
+            expiresAt
+        }
+    });
+
+    return { token, refreshToken: refreshTokenString };
+};
 export const loginAdmin = async (req: Request, res: Response) => {
     const { username, password } = req.body;
 
@@ -56,15 +84,9 @@ export const loginAdmin = async (req: Request, res: Response) => {
             });
         }
 
-        const token = jwt.sign({
-            id: admin.id,
-            username: admin.username,
-            passwordVersion: admin.passwordVersion,
-            instituteId: admin.instituteId,
-            role: admin.role
-        }, JWT_SECRET, { expiresIn: '30d' });
+        const tokens = await generateAuthTokens(admin);
 
-        res.json({ success: true, adminId: admin.id, token, role: admin.role, message: "Login successful" });
+        res.json({ success: true, adminId: admin.id, token: tokens.token, refreshToken: tokens.refreshToken, role: admin.role, message: "Login successful" });
     } catch (error) {
         res.status(500).json({ error: 'Login failed' });
     }
@@ -130,22 +152,32 @@ export const changePassword = async (req: Request, res: Response) => {
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         // Update password and increment version to invalidate old tokens
-        await prisma.admin.update({
-            where: { id: adminId },
-            data: {
-                password: hashedPassword,
-                passwordVersion: { increment: 1 }
-            }
+        const updatedAdmin = await prisma.$transaction(async (tx) => {
+            const result = await tx.admin.update({
+                where: { id: adminId },
+                data: {
+                    password: hashedPassword,
+                    passwordVersion: { increment: 1 }
+                }
+            });
+            await tx.refreshToken.deleteMany({
+                where: { adminId }
+            });
+            return result;
         });
 
-        // Generate new token directly so user doesn't have to re-login immediately
-        const token = jwt.sign({
-            id: admin.id,
-            username: admin.username,
-            passwordVersion: admin.passwordVersion + 1
-        }, JWT_SECRET, { expiresIn: '30d' });
+        // Invalidate auth cache so stale passwordVersion isn't served
+        invalidateAuthCache(adminId);
 
-        res.json({ success: true, message: 'Password changed successfully', token });
+        // Generate new token directly so user doesn't have to re-login immediately
+        const tokens = await generateAuthTokens(updatedAdmin);
+
+        res.json({ 
+            success: true, 
+            message: 'Password changed successfully', 
+            token: tokens.token, 
+            refreshToken: tokens.refreshToken 
+        });
     } catch (error) {
         console.error('Change password error:', error);
         res.status(500).json({ error: 'Failed to change password' });
@@ -177,11 +209,29 @@ export const getProfile = async (req: Request, res: Response) => {
     }
 };
 
-// IN-MEMORY OTP STORE (Mock for now)
-const otpStore = new Map<string, { otp: string, expires: number }>();
+// ─── POSTGRES-BACKED OTP STORE ───────────────────────────────────
+// Replaces the previous in-memory Map which was:
+// - Lost on server restart (all pending OTPs gone)
+// - Broken on multi-dyno Heroku (OTP sent via Dyno A, verified on Dyno B)
+// - A memory leak vector under DDoS
+//
+// Now uses the OtpToken table with upsert (one active OTP per identifier).
+
+// Periodic cleanup of expired OTP tokens (runs every 5 minutes)
+setInterval(async () => {
+    try {
+        const result = await prisma.otpToken.deleteMany({
+            where: { expiresAt: { lt: new Date() } }
+        });
+        if (result.count > 0) {
+            console.log(`[OTP] Cleaned ${result.count} expired tokens from DB`);
+        }
+    } catch (e) {
+        console.error('[OTP] Cleanup error:', e);
+    }
+}, 5 * 60_000);
 
 export const sendMobileOtp = async (req: Request, res: Response) => {
-    // Keep 'phone' as the variable name from frontend, though it can now be an email
     const { phone: identifier } = req.body;
 
     if (!identifier) {
@@ -190,7 +240,6 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
 
     try {
         let cleanIdentifier = identifier.trim();
-        // NORMALIZE PHONE: If it's all digits, strip non-numeric and format
         if (/^\+?\d+$/.test(cleanIdentifier)) {
             cleanIdentifier = cleanIdentifier.replace(/\D/g, ''); 
             if (cleanIdentifier.startsWith('91') && cleanIdentifier.length === 12) {
@@ -218,38 +267,56 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
 
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
         
-        // Store in memory using the cleaned identifier key
-        otpStore.set(cleanIdentifier, {
-            otp: otpCode,
-            expires: Date.now() + 5 * 60 * 1000
+        // Store OTP in Postgres (upsert = one active OTP per identifier)
+        await prisma.otpToken.upsert({
+            where: { identifier: cleanIdentifier },
+            update: {
+                otp: otpCode,
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+                verified: false
+            },
+            create: {
+                identifier: cleanIdentifier,
+                otp: otpCode,
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+            }
         });
 
         // Parallel Dispatch System
         const dispatchPromises = [];
+        const dispatchMethods = [];
         
-        // 1. WhatsApp Dispatch (if institute has a phone number)
         const waPhone = admin.institute?.phoneNumber || ( /^\d{10}$/.test(cleanIdentifier) ? cleanIdentifier : null );
         if (waPhone) {
             dispatchPromises.push(sendOtpWhatsApp(waPhone, otpCode).catch(e => console.error('WA OTP Failed:', e)));
+            dispatchMethods.push('WhatsApp');
         }
 
-        // 2. Email Dispatch (if institute has an email)
         const email = admin.institute?.email || (cleanIdentifier.includes('@') ? cleanIdentifier : null);
         if (email) {
             dispatchPromises.push(sendOtpEmail(email, otpCode).catch(e => console.error('Email OTP Failed:', e)));
+            dispatchMethods.push('Email');
+        }
+
+        if (dispatchPromises.length === 0) {
+            // Silent failure fix: Abort if no channels exist
+            return res.status(400).json({ error: 'No phone number or email is configured to receive the OTP for this account.' });
         }
 
         await Promise.allSettled(dispatchPromises);
 
-        // Optional Dev Mock Logging
-        console.log(`\n========================================`);
-        console.log(`🔑 OTP DISPATCH FIRED:`);
-        console.log(`🆔 FOR: ${cleanIdentifier}`);
-        console.log(`💬 WA?: ${!!waPhone} | 📧 EMAIL?: ${!!email}`);
-        console.log(`🔒 YOUR CODE IS: ${otpCode}`);
-        console.log(`========================================\n`);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`\n========================================`);
+            console.log(`🔑 OTP DISPATCH FIRED:`);
+            console.log(`🆔 FOR: ${cleanIdentifier}`);
+            console.log(`💬 WA?: ${!!waPhone} | 📧 EMAIL?: ${!!email}`);
+            console.log(`🔒 YOUR CODE IS: ${otpCode}`);
+            console.log(`========================================\n`);
+        } else {
+            console.log(`[OTP] Dispatched to ${cleanIdentifier} via WA:${!!waPhone} Email:${!!email}`);
+        }
 
-        res.json({ success: true, message: 'OTP sent successfully to your WhatsApp and Email.' });
+        res.json({ success: true, message: `OTP sent successfully to your ${dispatchMethods.join(' and ')}.` });
     } catch (error) {
         console.error('Send OTP Error:', error);
         res.status(500).json({ error: 'Failed to send OTP' });
@@ -272,25 +339,32 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
             }
         }
 
-        const storedData = otpStore.get(cleanIdentifier) || otpStore.get(phone.trim()); 
+        // Look up OTP from Postgres
+        const storedOtp = await prisma.otpToken.findUnique({
+            where: { identifier: cleanIdentifier }
+        });
         
-        if (!storedData) {
-            console.log(`[AUTH] OTP lookup failed for: ${cleanIdentifier} (raw: ${phone}). Available keys:`, Array.from(otpStore.keys()));
+        if (!storedOtp) {
+            console.log(`[AUTH] OTP lookup failed for: ${cleanIdentifier} (raw: ${phone})`);
             return res.status(400).json({ error: 'OTP expired or not requested' });
         }
         
-        if (storedData.expires < Date.now()) {
-            otpStore.delete(cleanIdentifier);
-            otpStore.delete(phone.trim());
+        if (storedOtp.expiresAt < new Date()) {
+            await prisma.otpToken.delete({ where: { identifier: cleanIdentifier } }).catch(() => {});
             return res.status(400).json({ error: 'OTP has expired' });
         }
 
-        if (storedData.otp !== otp && otp !== "000000") { 
+        if (storedOtp.verified) {
+            return res.status(400).json({ error: 'OTP has already been used' });
+        }
+
+        const isDevBypass = process.env.NODE_ENV !== 'production' && otp === "000000";
+        if (storedOtp.otp !== otp && !isDevBypass) { 
             return res.status(400).json({ error: 'Invalid OTP code' });
         }
 
-        otpStore.delete(cleanIdentifier);
-        otpStore.delete(phone.trim());
+        // Delete OTP atomically (prevents reuse)
+        await prisma.otpToken.delete({ where: { identifier: cleanIdentifier } });
 
         const admin = await prisma.admin.findFirst({
             where: {
@@ -317,17 +391,55 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
             });
         }
 
-        const token = jwt.sign({
-            id: admin.id,
-            username: admin.username,
-            passwordVersion: admin.passwordVersion,
-            instituteId: admin.instituteId,
-            role: admin.role
-        }, JWT_SECRET, { expiresIn: '30d' });
+        const tokens = await generateAuthTokens(admin);
 
-        res.json({ success: true, adminId: admin.id, token, role: admin.role, message: "Login successful" });
+        res.json({ success: true, adminId: admin.id, token: tokens.token, refreshToken: tokens.refreshToken, role: admin.role, message: "Login successful" });
     } catch (error) {
         console.error('Verify OTP Error:', error);
         res.status(500).json({ error: 'Failed to verify OTP' });
+    }
+};
+
+export const refreshTokenUser = async (req: Request, res: Response) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+        return res.status(400).json({ error: 'Refresh token is required' });
+    }
+
+    try {
+        const storedToken = await prisma.refreshToken.findUnique({
+            where: { token: refreshToken },
+            include: { admin: { include: { institute: true } } }
+        });
+
+        if (!storedToken) {
+            return res.status(401).json({ error: 'Invalid refresh token' });
+        }
+
+        if (storedToken.expiresAt < new Date()) {
+            await prisma.refreshToken.delete({ where: { id: storedToken.id } });
+            return res.status(401).json({ error: 'Refresh token expired' });
+        }
+
+        const admin = storedToken.admin;
+
+        if (admin.institute && admin.institute.status === 'SUSPENDED') {
+            return res.status(403).json({
+                error: 'Your institute account has been suspended.',
+                reason: admin.institute.suspensionReason
+            });
+        }
+
+        // Token rotation: destroy the old refresh token immediately
+        await prisma.refreshToken.delete({ where: { id: storedToken.id } });
+
+        // Generate a fresh pair
+        const tokens = await generateAuthTokens(admin);
+
+        res.json({ success: true, token: tokens.token, refreshToken: tokens.refreshToken });
+    } catch (error) {
+        console.error('Refresh Token Error:', error);
+        res.status(500).json({ error: 'Failed to refresh token' });
     }
 };

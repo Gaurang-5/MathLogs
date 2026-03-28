@@ -400,51 +400,55 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
             }
         });
 
-        // --- Auto-Send Fee Reminder Logic ---
+        // --- Auto-Send Fee Reminder Logic (Throttled, Background) ---
+        // PERF FIX: Previous code fired all reminders in parallel via Promise.allSettled,
+        // which slammed MSG91 with 100+ concurrent requests.
+        // Now we send sequentially with 200ms gaps in the background (after response).
         const { sendFeeReminderWhatsApp } = await import('../utils/whatsapp');
         const instituteName = batch.institute?.name || 'Coaching Institute';
-        
         const allInstallments = [...batch.feeInstallments, installment];
-        
-        const notifyPromises = batch.students.map(async (student) => {
-            if (!student.parentWhatsapp) return;
-            
-            let totalDue = 0;
-            const breakupLines: string[] = [];
-            
-            for (const inst of allInstallments) {
-                const payments = student.feePayments.filter(p => p.installmentId === inst.id);
-                const paidForInst = payments.reduce((sum, p) => sum + p.amountPaid, 0);
-                
-                const dueForInst = inst.amount - paidForInst;
-                if (dueForInst > 0) {
-                    totalDue += dueForInst;
-                    breakupLines.push(`- ${inst.name}: ₹${dueForInst}`);
+        const studentsToNotify = batch.students.filter(s => s.parentWhatsapp);
+        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+        // Fire in background — don't block the HTTP response
+        setImmediate(async () => {
+            let sent = 0, failed = 0;
+            for (const student of studentsToNotify) {
+                let totalDue = 0;
+                const breakupLines: string[] = [];
+
+                for (const inst of allInstallments) {
+                    const payments = student.feePayments.filter(p => p.installmentId === inst.id);
+                    const paidForInst = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+                    const dueForInst = inst.amount - paidForInst;
+                    if (dueForInst > 0) {
+                        totalDue += dueForInst;
+                        breakupLines.push(`- ${inst.name}: ₹${dueForInst}`);
+                    }
+                }
+
+                if (totalDue > 0) {
+                    let phone = student.parentWhatsapp!.replace(/[^0-9+]/g, '');
+                    if (!phone.startsWith('+') && phone.length === 10) phone = '+91' + phone;
+
+                    try {
+                        await sendFeeReminderWhatsApp(phone, {
+                            studentName: student.name,
+                            batchName: batch.name,
+                            feeBreakup: breakupLines.join('\n'),
+                            totalAmount: totalDue.toString(),
+                            instituteName
+                        });
+                        sent++;
+                    } catch (err) {
+                        failed++;
+                        console.error(`WhatsApp fee reminder failed for ${phone}:`, err);
+                    }
+
+                    await delay(200); // Throttle: ~5 msgs/sec
                 }
             }
-            
-            if (totalDue > 0) {
-                let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
-                if (!phone.startsWith('+') && phone.length === 10) phone = '+91' + phone;
-                
-                return sendFeeReminderWhatsApp(phone, {
-                    studentName: student.name,
-                    batchName: batch.name,
-                    feeBreakup: breakupLines.join('\n'),
-                    totalAmount: totalDue.toString(),
-                    instituteName
-                }).catch(err => console.error(`WhatsApp fee reminder failed for ${phone}:`, err));
-            }
-        });
-        
-        // H4 fix: Log results of background notification sends
-        Promise.allSettled(notifyPromises).then(results => {
-            const failed = results.filter(r => r.status === 'rejected').length;
-            if (failed > 0) {
-                console.error(`[Fee Reminder] ${failed}/${results.length} failed for batch ${id}`);
-            } else {
-                console.log(`[Fee Reminder] ${results.length} reminders dispatched for batch ${id}`);
-            }
+            console.log(`[Fee Reminder] batch ${id}: ${sent} sent, ${failed} failed out of ${studentsToNotify.length}`);
         });
 
         res.json(installment);
@@ -716,6 +720,8 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
         // 2. Send Welcome WhatsApp API via MSG91 directly for students with phone numbers
         const { sendWelcomeWhatsApp } = await import('../utils/whatsapp');
         let whatsappCount = 0;
+        let whatsappFailed = 0;
+        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
         for (const student of batch.students) {
             if (!student.parentWhatsapp) continue;
@@ -726,7 +732,6 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
             }
 
             try {
-                // Wait for the promise to resolve so we don't spam the MSG91 API too quickly
                 await sendWelcomeWhatsApp(phone, {
                     studentName: student.name,
                     batchName: batch.name,
@@ -735,8 +740,15 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
                 });
                 whatsappCount++;
             } catch (err) {
+                whatsappFailed++;
                 console.error(`Failed to send Welcome WhatsApp to ${phone}`, err);
             }
+
+            await delay(200); // Throttle: 200ms between calls (~5 msg/sec)
+        }
+
+        if (whatsappFailed > 0) {
+            console.warn(`[Batch Invite WA] ${whatsappCount} sent, ${whatsappFailed} failed for batch ${id}`);
         }
 
         res.json({

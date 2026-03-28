@@ -3,6 +3,9 @@ import { PrismaClient } from '@prisma/client';
 import { queryPerformanceMiddleware } from './middleware/queryMonitor';
 
 // Production-grade Prisma configuration with connection pooling and query logging
+const CONNECTION_LIMIT = parseInt(process.env.DB_CONNECTION_LIMIT || '25', 10);
+const POOL_TIMEOUT = parseInt(process.env.DB_POOL_TIMEOUT || '20', 10);
+
 export const prisma = new PrismaClient({
     log: process.env.NODE_ENV === 'production'
         ? [
@@ -13,7 +16,7 @@ export const prisma = new PrismaClient({
     datasources: {
         db: {
             url: process.env.DATABASE_URL
-                ? `${process.env.DATABASE_URL}${process.env.DATABASE_URL.includes('?') ? '&' : '?'}connection_limit=10&pool_timeout=20`
+                ? `${process.env.DATABASE_URL}${process.env.DATABASE_URL.includes('?') ? '&' : '?'}connection_limit=${CONNECTION_LIMIT}&pool_timeout=${POOL_TIMEOUT}`
                 : undefined
         }
     }

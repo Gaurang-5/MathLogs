@@ -1,6 +1,23 @@
-
 import axios from 'axios';
 import { prisma } from '../prisma';
+
+/**
+ * ============================================================================
+ * WHATSAPP CONSOLIDATION NOTE (Sprint 3)
+ * ============================================================================
+ * ROLE: This file is a BACKGROUND WORKER designed for the official Meta Graph API.
+ * It polls the `WhatsappJob` database table to process messages concurrently.
+ * 
+ * WHY IS THIS DISTINCT FROM `whatsapp.ts`?
+ * - `whatsapp.ts`: Used currently for direct, synchronous MSG91 partner API calls.
+ * - `whatsappWorker.ts` (This file): Operates strictly on DB queue (`WhatsappJob`)
+ *   and uses the Meta `v22.0` Graph API endpoint.
+ * 
+ * STATUS: This worker provides robust, lock-based concurrency control
+ * (`FOR UPDATE SKIP LOCKED`) safe for horizontal scaling (e.g. multiple dynos).
+ * However, the application currently uses MSG91 (`whatsapp.ts`) for primary sends.
+ * ============================================================================
+ */
 
 const META_API_VERSION = 'v22.0';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;

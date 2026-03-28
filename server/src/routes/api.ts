@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
-import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter } from '../middleware/security';
+import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
 import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
 import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, updateFeeInstallment, deleteFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF } from '../controllers/batchController';
@@ -218,9 +218,10 @@ router.post('/auth/setup', authLimiter, validateRequest(setupSchema), createInit
 router.post('/auth/change-password', authenticateToken as any, validateRequest(changePasswordSchema), changePassword as any);
 router.get('/auth/me', authenticateToken as any, getProfile as any);
 
-import { sendMobileOtp, verifyMobileOtp } from '../controllers/authController';
+import { sendMobileOtp, verifyMobileOtp, refreshTokenUser } from '../controllers/authController';
 router.post('/auth/send-otp', authLimiter, sendMobileOtp as any);
 router.post('/auth/verify-otp', authLimiter, verifyMobileOtp as any);
+router.post('/auth/refresh', authLimiter, refreshTokenUser as any);
 
 // Batches
 router.get('/batches', authenticateToken as any, getBatches as any);
@@ -235,7 +236,7 @@ router.put('/batches/:id/end-registration', authenticateToken as any, endBatchRe
 router.post('/batches/:id/installments', authenticateToken as any, validateRequest(createInstallmentSchema), createFeeInstallment as any);
 router.put('/installments/:id', authenticateToken as any, updateFeeInstallment as any);
 router.delete('/installments/:id', authenticateToken as any, deleteFeeInstallment as any);
-router.post('/batches/:id/whatsapp-invite', authenticateToken as any, sendBatchWhatsappInvite as any);
+router.post('/batches/:id/whatsapp-invite', authenticateToken as any, bulkNotifyLimiter, sendBatchWhatsappInvite as any);
 router.post('/students/:id/whatsapp-invite', authenticateToken as any, sendStudentWhatsappInvite as any);
 
 // Students
@@ -258,7 +259,7 @@ router.post('/tests', authenticateToken as any, validateRequest(createTestSchema
 router.get('/tests/:id', authenticateToken as any, getTestDetails as any);
 router.put('/tests/:id', authenticateToken as any, validateRequest(updateTestSchema), updateTest as any);
 router.delete('/tests/:id', authenticateToken as any, deleteTest as any);
-router.post('/tests/:id/send-results', authenticateToken as any, sendTestResultsEmail as any);
+router.post('/tests/:id/send-results', authenticateToken as any, bulkNotifyLimiter, sendTestResultsEmail as any);
 router.get('/tests/:id/download', authenticateToken as any, downloadTestReport as any);
 router.get('/tests/:id/eligible-students', authenticateToken as any, getTestEligibleStudents as any);
 router.post('/marks', authenticateToken as any, validateRequest(submitMarkSchema), submitMark as any);
@@ -272,7 +273,7 @@ router.post('/fees/pay', authenticateToken as any, paymentLimiter, validateReque
 router.post('/fees/pay-installment', authenticateToken as any, paymentLimiter, validateRequest(payInstallmentSchema), payInstallment as any);
 router.get('/fees/recent', authenticateToken as any, getRecentTransactions as any);
 router.get('/fees/download-transactions', authenticateToken as any, downloadMonthlyReport as any);
-router.post('/fees/remind', authenticateToken as any, sendFeeReminder as any);
+router.post('/fees/remind', authenticateToken as any, bulkNotifyLimiter, sendFeeReminder as any);
 
 // Stats
 router.get('/stats/growth', authenticateToken as any, getStudentGrowthStats as any);

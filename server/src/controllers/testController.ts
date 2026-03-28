@@ -482,35 +482,47 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
 
 
         // WhatsApp Integration (MSG91)
-        const whatsappPromises: Promise<any>[] = [];
+        // PERF FIX: Send sequentially with delay instead of 100+ parallel requests
+        // Promise.all on 200 students would fire 200 simultaneous HTTP calls to MSG91,
+        // saturating the connection pool and triggering MSG91 rate limits.
         const { sendTestMarksWhatsApp } = await import('../utils/whatsapp');
+        let whatsappSent = 0;
+        let whatsappFailed = 0;
+        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-        students.forEach(student => {
-            if (student.parentWhatsapp) {
-                // Clean number
-                let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
-                if (!phone.startsWith('+')) {
-                    if (phone.length === 10) phone = '+91' + phone;
-                }
+        // Fire sequentially with 200ms gap (~5 msgs/sec, safe for MSG91)
+        for (const student of students) {
+            if (!student.parentWhatsapp) continue;
 
-                const mark = student.marks[0];
-                const scoreValue = mark ? String(mark.score) : "ABSENT";
-
-                whatsappPromises.push(sendTestMarksWhatsApp(
-                    phone,
-                    {
-                        studentName: student.name,
-                        instituteName: (test as any).institute?.name || "our institute",
-                        testName: test.name,
-                        totalMarks: String(test.maxMarks),
-                        marksObtained: scoreValue
-                    }
-                ));
+            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
+            if (!phone.startsWith('+')) {
+                if (phone.length === 10) phone = '+91' + phone;
             }
-        });
 
-        // Fire and forget WhatsApp (or await if critical)
-        Promise.all(whatsappPromises).catch(err => console.error('WhatsApp Queue Error:', err));
+            const mark = student.marks[0];
+            const scoreValue = mark ? String(mark.score) : "ABSENT";
+
+            try {
+                const result = await sendTestMarksWhatsApp(phone, {
+                    studentName: student.name,
+                    instituteName: (test as any).institute?.name || "our institute",
+                    testName: test.name,
+                    totalMarks: String(test.maxMarks),
+                    marksObtained: scoreValue
+                });
+                if (result !== false) whatsappSent++;
+                else whatsappFailed++;
+            } catch (err) {
+                whatsappFailed++;
+                console.error(`WhatsApp failed for ${phone}:`, err);
+            }
+
+            await delay(200); // Throttle: 200ms between calls
+        }
+
+        if (whatsappFailed > 0) {
+            console.warn(`[Test Results WA] ${whatsappSent} sent, ${whatsappFailed} failed for test ${test.id}`);
+        }
 
         await prisma.emailJob.createMany({
             data: emailJobs.map(job => ({

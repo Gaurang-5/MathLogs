@@ -1,5 +1,26 @@
 import axios from 'axios';
 
+/**
+ * ============================================================================
+ * WHATSAPP CONSOLIDATION NOTE (Sprint 3)
+ * ============================================================================
+ * ROLE: This file is the PRIMARY WhatsApp integration file for the system.
+ * It uses the MSG91 API (which is a partner API for Meta WA) for sending 
+ * instantaneous transactional messages (OTPs, fee receipts, welcome messages).
+ * 
+ * WHY IS THIS DISTINCT FROM `whatsappWorker.ts`?
+ * - `whatsapp.ts` (This file): Active in production. Direct HTTP calls to MSG91.
+ * - `whatsappWorker.ts`: Relentless background queue processor explicitly built 
+ *   for the Meta Graph API payload structure.
+ * 
+ * FUTURE ROADMAP:
+ * - If migrating entirely away from MSG91 to direct Meta Graph API, all methods 
+ *   in this file must be rewritten to enqueue to the `WhatsappJob` database table
+ *   instead of sending direct synchronous `axios.post` calls, thereby utilizing
+ *   the robust, lock-based worker logic inside `whatsappWorker.ts`.
+ * ============================================================================
+ */
+
 export interface WelcomeWAData {
     studentName: string;
     batchName: string;
@@ -109,7 +130,7 @@ export const sendWelcomeWhatsApp = async (mobileNumber: string, data: WelcomeWAD
         return false;
     }
 
-    // MSG91 WhatsApp API format based on cURL example
+    // MSG91 WhatsApp API format (matches official MSG91 cURL)
     const components = {
         body_var_1: {
             type: "text",
