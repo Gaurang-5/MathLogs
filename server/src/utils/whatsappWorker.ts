@@ -3,25 +3,26 @@ import { prisma } from '../prisma';
 
 /**
  * ============================================================================
- * WHATSAPP CONSOLIDATION NOTE (Sprint 3)
+ * WHATSAPP WORKER (Meta Graph API)
  * ============================================================================
  * ROLE: This file is a BACKGROUND WORKER designed for the official Meta Graph API.
  * It polls the `WhatsappJob` database table to process messages concurrently.
  * 
  * WHY IS THIS DISTINCT FROM `whatsapp.ts`?
- * - `whatsapp.ts`: Used currently for direct, synchronous MSG91 partner API calls.
+ * - `whatsapp.ts`: Used currently by controllers to push messages into the DB queue.
  * - `whatsappWorker.ts` (This file): Operates strictly on DB queue (`WhatsappJob`)
  *   and uses the Meta `v22.0` Graph API endpoint.
  * 
  * STATUS: This worker provides robust, lock-based concurrency control
  * (`FOR UPDATE SKIP LOCKED`) safe for horizontal scaling (e.g. multiple dynos).
- * However, the application currently uses MSG91 (`whatsapp.ts`) for primary sends.
  * ============================================================================
  */
 
 const META_API_VERSION = 'v22.0';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+
+console.log(`[Worker Boot] Loaded Access Token starting with: ${WHATSAPP_ACCESS_TOKEN ? WHATSAPP_ACCESS_TOKEN.substring(0, 15) : 'UNDEFINED'}`);
 
 const BATCH_SIZE = 25; // Safely increased to 25 for higher throughput without hitting rate limits
 
@@ -95,6 +96,65 @@ const processJob = async (job: any) => {
             throw new Error('Missing recipient or template ID');
         }
 
+        // Meta Graph API mapping for named variables across different templates.
+        const TEMPLATE_VAR_MAP: Record<string, { body: string[], buttonIndex?: number }> = {
+            'welcome_approval_1': { body: ['var_1', 'var_2', 'var_3', 'var_4'] },
+            'payment_receipt_1': { body: ['student_name', 'amount_paid', 'installment_name', 'institute_name'] },
+            'test_marks_update': { body: ['student_name', 'institute_name', 'test_name', 'total_marks', 'marks_obtained'] },
+            'onboarding_invite': { body: ['owner_name', 'tuition_name'], buttonIndex: 2 },
+            'onboarding_setup_link': { body: ['owner_name', 'tuition_name'], buttonIndex: 2 },
+            'fee_breakup_alert_1': { body: ['student_name', 'amount_due', 'due_date', 'institute_name'] },
+            'mathlogs_login_otp': { body: ['otp'] } // or 'var_1' if standard
+        };
+
+        const mapConfig = TEMPLATE_VAR_MAP[job.templateId];
+        const bodyValues = job.data as string[];
+        const components: any[] = [];
+
+        if (mapConfig) {
+            // 1. Build the Body Component
+            components.push({
+                type: 'body',
+                parameters: mapConfig.body.map((paramName, index) => ({
+                    type: 'text',
+                    parameter_name: paramName,
+                    text: bodyValues[index] ? bodyValues[index].toString() : ''
+                }))
+            });
+
+            // 2. Build the CTA Button Component (if configured)
+            if (mapConfig.buttonIndex !== undefined && mapConfig.buttonIndex < bodyValues.length) {
+                let buttonVal = bodyValues[mapConfig.buttonIndex]?.toString() || '';
+                
+                try {
+                    // Meta strictly expects ONLY the suffix (e.g. from https://mathlogs.app/setup?token=123 -> setup?token=123)
+                    const urlObj = new URL(buttonVal);
+                    buttonVal = (urlObj.pathname + urlObj.search).replace(/^\/+/, '');
+                } catch (e) {
+                    buttonVal = buttonVal.replace(/^\/+/, '');
+                }
+
+                components.push({
+                    type: 'button',
+                    sub_type: 'url',
+                    index: '0', 
+                    parameters: [
+                        { type: 'text', text: buttonVal }
+                    ]
+                });
+            }
+        } else {
+            // Strict default mapping for completely unknown templates
+            components.push({
+                type: 'body',
+                parameters: bodyValues.map((val, index) => ({
+                    type: 'text',
+                    parameter_name: `var_${index + 1}`,
+                    text: val ? val.toString() : ''
+                }))
+            });
+        }
+
         const payload = {
             messaging_product: 'whatsapp',
             to: job.recipient,
@@ -102,15 +162,7 @@ const processJob = async (job: any) => {
             template: {
                 name: job.templateId,
                 language: { code: 'en' },
-                components: [
-                    {
-                        type: 'body',
-                        parameters: (job.data as string[]).map(val => ({
-                            type: 'text',
-                            text: val.toString()
-                        }))
-                    }
-                ]
+                components: components
             }
         };
 
