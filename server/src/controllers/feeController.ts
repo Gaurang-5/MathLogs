@@ -698,13 +698,13 @@ ${senderName}`;
             } as any
         });
 
-        // WhatsApp Integration (MSG91)
+        // WhatsApp Integration
         if (student.parentWhatsapp) {
             let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
             if (phone.length === 10) phone = '+91' + phone;
 
             import('../utils/whatsapp').then(({ sendFeeReminderWhatsApp }) => {
-                // MSG91 WhatsApp templates reject newline (\n) characters inside variables.
+                // WhatsApp templates reject newline (\n) characters inside variables.
                 const feeBreakupText = breakdownLines.join(' | ');
 
                 sendFeeReminderWhatsApp(

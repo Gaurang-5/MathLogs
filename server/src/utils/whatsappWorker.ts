@@ -103,7 +103,7 @@ const processJob = async (job: any) => {
             'test_marks_update': { body: ['student_name', 'institute_name', 'test_name', 'total_marks', 'marks_obtained'] },
             'onboarding_invite': { body: ['owner_name', 'tuition_name', 'setup_link'], buttonIndex: 2 },
             'onboarding_setup_link': { body: ['owner_name', 'tuition_name', 'setup_link'], buttonIndex: 2 },
-            'fee_breakup_alert_1': { body: ['student_name', 'batch_name', 'fee_breakup', 'amount_due', 'institute_name'] },
+            'fee_breakup_alert_1': { body: ['student_name', 'batch_name', 'fee_breakup', 'total_amount', 'institute_name'] },
             'mathlogs_login_otp': { body: ['otp'] } // or 'var_1' if standard
         };
 

@@ -400,15 +400,12 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
             }
         });
 
-        // --- Auto-Send Fee Reminder Logic (Throttled, Background) ---
-        // PERF FIX: Previous code fired all reminders in parallel via Promise.allSettled,
-        // which slammed MSG91 with 100+ concurrent requests.
-        // Now we send sequentially with 200ms gaps in the background (after response).
+        // --- Auto-Send Fee Reminder Logic (Background Queue) ---
+        // Sending directly to DB queue, no throttling required.
         const { sendFeeReminderWhatsApp } = await import('../utils/whatsapp');
         const instituteName = batch.institute?.name || 'Coaching Institute';
         const allInstallments = [...batch.feeInstallments, installment];
         const studentsToNotify = batch.students.filter(s => s.parentWhatsapp);
-        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
         // Fire in background — don't block the HTTP response
         setImmediate(async () => {
@@ -445,7 +442,6 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
                         console.error(`WhatsApp fee reminder failed for ${phone}:`, err);
                     }
 
-                    await delay(200); // Throttle: ~5 msgs/sec
                 }
             }
             console.log(`[Fee Reminder] batch ${id}: ${sent} sent, ${failed} failed out of ${studentsToNotify.length}`);
@@ -717,11 +713,10 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
             await prisma.emailJob.createMany({ data: emailJobs as any });
         }
 
-        // 2. Send Welcome WhatsApp API via MSG91 directly for students with phone numbers
+        // 2. Send Welcome WhatsApp API via Meta (Queue) for students with phone numbers
         const { sendWelcomeWhatsApp } = await import('../utils/whatsapp');
         let whatsappCount = 0;
         let whatsappFailed = 0;
-        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
         for (const student of batch.students) {
             if (!student.parentWhatsapp) continue;
@@ -744,7 +739,6 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
                 console.error(`Failed to send Welcome WhatsApp to ${phone}`, err);
             }
 
-            await delay(200); // Throttle: 200ms between calls (~5 msg/sec)
         }
 
         if (whatsappFailed > 0) {
@@ -825,7 +819,7 @@ Please join the group to stay informed.
             } as any
         });
 
-        // Also send WhatsApp via MSG91 if parent has a phone number
+        // Also send WhatsApp if parent has a phone number
         if (student.parentWhatsapp) {
             const { sendWelcomeWhatsApp } = await import('../utils/whatsapp');
             let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');

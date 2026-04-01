@@ -27,7 +27,7 @@ interface AutoInviteBatch {
 
 const autoSendWelcomeInvite = async (student: AutoInviteStudent, batch: AutoInviteBatch) => {
     if (!batch.autoSendWelcome) return;
-    
+
     try {
         const link = batch.whatsappGroupLink;
         const senderName = batch.institute?.name || 'Coaching Centre';
@@ -174,7 +174,7 @@ const MAX_RETRIES = 15;
 
 export const registerStudent = async (req: Request, res: Response) => {
     let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName } = req.body;
-    
+
     // Data Normalization (Fix for typical duplications)
     if (typeof name === 'string') name = name.trim();
     if (typeof parentWhatsapp === 'string') {
@@ -311,11 +311,11 @@ export const registerStudent = async (req: Request, res: Response) => {
 
 export const addStudentManually = async (req: Request, res: Response) => {
     let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName } = req.body;
-    
+
     // Data Normalization
     if (typeof name === 'string') name = name.trim();
     if (typeof parentWhatsapp === 'string') {
-        parentWhatsapp = parentWhatsapp.replace(/\D/g, ''); 
+        parentWhatsapp = parentWhatsapp.replace(/\D/g, '');
         if (parentWhatsapp.length > 10) parentWhatsapp = parentWhatsapp.slice(-10);
     }
 

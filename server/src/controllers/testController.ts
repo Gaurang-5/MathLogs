@@ -481,16 +481,12 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
 
 
 
-        // WhatsApp Integration (MSG91)
-        // PERF FIX: Send sequentially with delay instead of 100+ parallel requests
-        // Promise.all on 200 students would fire 200 simultaneous HTTP calls to MSG91,
-        // saturating the connection pool and triggering MSG91 rate limits.
+        // WhatsApp Integration (Meta Graph API via DB Queue)
+        // Enqueueing to DB happens rapidly without blocking or rate-limit concerns.
         const { sendTestMarksWhatsApp } = await import('../utils/whatsapp');
         let whatsappSent = 0;
         let whatsappFailed = 0;
-        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-        // Fire sequentially with 200ms gap (~5 msgs/sec, safe for MSG91)
         for (const student of students) {
             if (!student.parentWhatsapp) continue;
 
@@ -517,7 +513,6 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                 console.error(`WhatsApp failed for ${phone}:`, err);
             }
 
-            await delay(200); // Throttle: 200ms between calls
         }
 
         if (whatsappFailed > 0) {
