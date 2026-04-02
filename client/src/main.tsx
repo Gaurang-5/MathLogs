@@ -7,8 +7,6 @@ import { initializeSentry } from './monitoring/sentry'
 // Initialize error monitoring FIRST
 initializeSentry();
 
-// Initialize analytics
-initializePostHog();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
