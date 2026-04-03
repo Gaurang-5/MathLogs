@@ -1,6 +1,6 @@
 
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { motion } from 'framer-motion';
 import { User, Users, Smartphone, Mail, ArrowRight, CheckCircle, School, GraduationCap, BookOpen, AlertCircle } from 'lucide-react';
@@ -43,8 +43,32 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
     const [loading, setLoading] = useState(true);
 
+    const [searchParams] = useSearchParams();
+    const token = searchParams.get('token');
+    const [isPhoneLocked, setIsPhoneLocked] = useState(false);
+
+    useEffect(() => {
+        if (token) {
+            try {
+                const payloadStr = atob(token.split('.')[1]);
+                const payload = JSON.parse(payloadStr);
+
+                // Check expiration
+                if (payload.exp && payload.exp * 1000 < Date.now()) {
+                    toast.error("Invite link has expired!");
+                } else if (payload.whatsapp) {
+                    setWhatsapp(payload.whatsapp);
+                    setIsPhoneLocked(true);
+                }
+            } catch (e) {
+                console.error("Invalid token format");
+                toast.error("Invalid invite link.");
+            }
+        }
+    }, [token]);
+
     // Fetch batch status with timeout protection
-    useState(() => {
+    useEffect(() => {
         if (batchId) {
             apiRequest<BatchStatus>(`/public/batch/${batchId}`, 'GET')
                 .then(data => {
@@ -57,7 +81,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                     setLoading(false);
                 });
         }
-    });
+    }, [batchId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -91,7 +115,8 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                 parentName,
                 parentWhatsapp: whatsapp,
                 parentEmail: email,
-                schoolName
+                schoolName,
+                token
             });
 
             clearFeedback();
@@ -447,10 +472,12 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                                     type="tel"
                                     inputMode="numeric"
                                     maxLength={10}
-                                    className={inputClass}
+                                    readOnly={isPhoneLocked}
+                                    className={`${inputClass} ${isPhoneLocked ? 'opacity-70 bg-neutral-100 cursor-not-allowed' : ''}`}
                                     placeholder="10-digit mobile number"
                                     value={whatsapp}
                                     onChange={e => {
+                                        if (isPhoneLocked) return;
                                         const val = e.target.value.replace(/\D/g, '');
                                         if (val.length <= 10) setWhatsapp(val);
                                     }}

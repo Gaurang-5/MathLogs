@@ -6,6 +6,8 @@ import bwipjs from 'bwip-js';
 import { secureLogger } from '../utils/secureLogger';
 import { sendEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
+import jwt from 'jsonwebtoken';
+import { sendStudentInviteWhatsApp } from '../utils/whatsapp';
 
 export const createBatch = async (req: Request, res: Response) => {
     const { timeSlot, feeAmount, className, batchNumber, subject, customName } = req.body;
@@ -917,6 +919,53 @@ export const downloadBatchQRPDF = async (req: Request, res: Response) => {
     } catch (e) {
         console.error('Error generating QR PDF:', e);
         res.status(500).json({ error: 'Failed to generate PDF' });
+    }
+};
+
+export const inviteStudentToBatch = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    let { whatsappNumber } = req.body;
+
+    if (!whatsappNumber) {
+        return res.status(400).json({ error: "WhatsApp number is required" });
+    }
+
+    if (typeof whatsappNumber === 'string') {
+        whatsappNumber = whatsappNumber.replace(/\D/g, '');
+        if (whatsappNumber.length > 10) whatsappNumber = whatsappNumber.slice(-10);
+    }
+
+    try {
+        const batch = await prisma.batch.findUnique({
+            where: { id: String(id) },
+            include: { institute: true }
+        });
+
+        if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+        const user = (req as any).user;
+        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+
+        // Generate 24hr JWT invite token
+        const token = jwt.sign(
+            { batchId: String(id), whatsapp: whatsappNumber },
+            process.env.JWT_SECRET || 'fallback-secret-123',
+            { expiresIn: '24h' }
+        );
+
+        const registrationLink = `${getClientUrl(req)}/register/${batch.id}?token=${token}`;
+
+        // Send via WhatsApp
+        await sendStudentInviteWhatsApp(whatsappNumber, {
+            instituteName: batch.institute?.name || "Education Center",
+            batchName: batch.name,
+            registrationLink
+        });
+
+        res.json({ success: true, message: "Registration link sent successfully to WhatsApp." });
+    } catch (error) {
+        console.error("Error creating student invite:", error);
+        res.status(500).json({ error: "Failed to send invite link" });
     }
 };
 

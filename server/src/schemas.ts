@@ -31,7 +31,8 @@ export const registerStudentSchema = z.object({
         parentName: z.string().min(1, "Parent Name is required").max(200),
         parentWhatsapp: z.string().regex(phoneRegex, "Invalid phone number (10-15 digits)"),
         parentEmail: z.string().email("Invalid Email").optional().or(z.literal('')),
-        schoolName: z.string().max(300).optional()
+        schoolName: z.string().max(300).optional(),
+        token: z.string().optional()
     })
 });
 

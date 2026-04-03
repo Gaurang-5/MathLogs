@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import logger from '../utils/logger';
 import { sendWelcomeWhatsApp } from '../utils/whatsapp';
 import { getCourseCode, getInstituteCode } from '../utils/studentIds';
+import jwt from 'jsonwebtoken';
 
 // H5 fix: Shared constant so both registerStudent and addStudentManually
 // always include the fields that autoSendWelcomeInvite depends on.
@@ -123,13 +124,26 @@ const generateHumanId = async (batch: any) => {
 const MAX_RETRIES = 15;
 
 export const registerStudent = async (req: Request, res: Response) => {
-    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName } = req.body;
+    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, token } = req.body;
 
     // Data Normalization (Fix for typical duplications)
     if (typeof name === 'string') name = name.trim();
     if (typeof parentWhatsapp === 'string') {
         parentWhatsapp = parentWhatsapp.replace(/\D/g, ''); // Extract all digits
         if (parentWhatsapp.length > 10) parentWhatsapp = parentWhatsapp.slice(-10); // Keep only the last 10 digits
+    }
+
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-123') as any;
+            if (decoded.batchId !== batchId) {
+                return res.status(403).json({ error: 'This invite link is for a different batch.' });
+            }
+            // Strongly override the whatsapp number to prevent tampering
+            parentWhatsapp = decoded.whatsapp; 
+        } catch (err) {
+            return res.status(403).json({ error: 'Registration link is expired or invalid.' });
+        }
     }
 
     const startTime = Date.now();
@@ -154,7 +168,8 @@ export const registerStudent = async (req: Request, res: Response) => {
             }
         }
 
-        if (!batch.isRegistrationOpen || batch.isRegistrationEnded) {
+        // If a valid signed token is present, it bypasses standard batch closure checks
+        if (!token && (!batch.isRegistrationOpen || batch.isRegistrationEnded)) {
             return res.status(403).json({ error: 'Registration for this batch is closed.' });
         }
 

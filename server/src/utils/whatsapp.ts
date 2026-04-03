@@ -158,3 +158,16 @@ export const sendPaymentReceiptWhatsApp = async (mobileNumber: string, data: Pay
 
     return await enqueueWhatsApp(mobileNumber, PAYMENT_TEMPLATE_NAME, componentValues);
 };
+
+export const sendStudentInviteWhatsApp = async (mobileNumber: string, data: { instituteName: string, batchName: string, registrationLink: string }) => {
+    const INVITE_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_INVITE || 'student_registration_link';
+
+    // The order of parameters should match your template defined in Meta Business Manager.
+    const componentValues = [
+        data.instituteName || "our institute",
+        data.batchName || "the batch",
+        data.registrationLink
+    ];
+
+    return await enqueueWhatsApp(mobileNumber, INVITE_TEMPLATE_NAME, componentValues);
+};
