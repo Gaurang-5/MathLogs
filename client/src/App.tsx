@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, type ReactNode } from 'react';
 import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
 import Onboarding from './pages/Onboarding';
+import { readTokenPayload } from './utils/auth';
 
 // Lazy Load Pages
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
@@ -28,28 +29,29 @@ const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
 const AboutUs = lazy(() => import('./pages/AboutUs'));
 
 // Protected Route Component
-function PrivateRoute({ children }: { children: any }) {
+function PrivateRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" />;
 }
 
 // Role Protected Route Component
-function RoleRoute({ children, allowedRole }: { children: any, allowedRole: string }) {
+function RoleRoute({ children, allowedRole }: { children: ReactNode, allowedRole: string }) {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" />;
 
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (payload.role !== allowedRole) {
-      if (allowedRole === 'SUPER_ADMIN') {
-        return <Navigate to="/dashboard" />;
-      }
-      return <Navigate to="/login" />;
-    }
-    return children;
-  } catch (e) {
+  const payload = readTokenPayload(token);
+  if (!payload) {
     return <Navigate to="/login" />;
   }
+
+  if (payload.role !== allowedRole) {
+    if (allowedRole === 'SUPER_ADMIN') {
+      return <Navigate to="/dashboard" />;
+    }
+    return <Navigate to="/login" />;
+  }
+
+  return children;
 }
 
 // Simple Loading Spinner

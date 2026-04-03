@@ -33,6 +33,38 @@ import { useNavigate } from 'react-router-dom';
 
 const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
 
+interface InstituteConfig {
+    maxStudents?: number;
+    [key: string]: unknown;
+}
+
+interface Lead {
+    id?: string;
+    phone?: string;
+    step?: string;
+    createdAt?: string;
+    [key: string]: unknown;
+}
+
+interface AnalyticsSummary {
+    [key: string]: unknown;
+}
+
+interface InstituteProfile extends Institute {
+    [key: string]: unknown;
+}
+
+interface ApiErrorResponse {
+    error?: string;
+}
+
+const getAxiosErrorMessage = (error: unknown, fallback: string) => {
+    if (axios.isAxiosError<ApiErrorResponse>(error)) {
+        return error.response?.data?.error || error.message || fallback;
+    }
+    return error instanceof Error ? error.message : fallback;
+};
+
 interface Institute {
     id: string;
     name: string;
@@ -42,7 +74,7 @@ interface Institute {
     createdAt: string;
     status: string; // ACTIVE or SUSPENDED
     suspensionReason?: string;
-    config?: any;
+    config?: InstituteConfig;
     _count: {
         batches: number;
         students: number;
@@ -55,8 +87,8 @@ export default function SuperAdminDashboard() {
 
     // State
     const [institutes, setInstitutes] = useState<Institute[]>([]);
-    const [leads, setLeads] = useState<any[]>([]);
-    const [analytics, setAnalytics] = useState<any>(null);
+    const [leads, setLeads] = useState<Lead[]>([]);
+    const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error] = useState<string | null>(null);
 
@@ -88,7 +120,7 @@ export default function SuperAdminDashboard() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     // Profile Modal State
-    const [selectedProfile, setSelectedProfile] = useState<any>(null);
+    const [selectedProfile, setSelectedProfile] = useState<InstituteProfile | Institute | null>(null);
 
     // Config Modal State
     const [selectedInstitute, setSelectedInstitute] = useState<Institute | null>(null);
@@ -119,15 +151,15 @@ export default function SuperAdminDashboard() {
             const headers = { Authorization: `Bearer ${token}` };
 
             const [institutesRes, analyticsRes, leadsRes] = await Promise.all([
-                axios.get(`${API_URL}/institutes`, { headers }),
-                axios.get(`${API_URL}/institutes/analytics`, { headers }).catch(() => null),
-                axios.get(`${API_URL}/onboarding/leads`, { headers }).catch(() => null)
+                axios.get<Institute[]>(`${API_URL}/institutes`, { headers }),
+                axios.get<AnalyticsSummary>(`${API_URL}/institutes/analytics`, { headers }).catch(() => null),
+                axios.get<Lead[]>(`${API_URL}/onboarding/leads`, { headers }).catch(() => null)
             ]);
 
             setInstitutes(institutesRes.data);
             if (analyticsRes) setAnalytics(analyticsRes.data);
             if (leadsRes) setLeads(leadsRes.data);
-        } catch (err) {
+        } catch {
             console.error('Failed to fetch dashboard data');
             // If 403, might redirect, but for now just log
         } finally {
@@ -138,11 +170,11 @@ export default function SuperAdminDashboard() {
     const handleViewProfile = async (id: string) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`${API_URL}/institute/${id}/details`, {
+            const res = await axios.get<InstituteProfile>(`${API_URL}/institute/${id}/details`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSelectedProfile(res.data);
-        } catch (e) {
+        } catch {
             const inst = institutes.find(i => i.id === id);
             setSelectedProfile(inst);
         }
@@ -150,7 +182,7 @@ export default function SuperAdminDashboard() {
 
     const handleOpenConfig = (inst: Institute) => {
         setSelectedInstitute(inst);
-        const cfg = inst.config as any || { classes: [] };
+        const cfg = inst.config || { classes: [] };
         setConfigJson(JSON.stringify(cfg, null, 2));
         setConfigMaxStudents(cfg.maxStudents || '');
     };
@@ -159,7 +191,7 @@ export default function SuperAdminDashboard() {
         if (!selectedInstitute) return;
         setIsSavingConfig(true);
         try {
-            const parsedConfig = JSON.parse(configJson);
+            const parsedConfig = JSON.parse(configJson) as InstituteConfig;
             if (configMaxStudents !== '') {
                 parsedConfig.maxStudents = Number(configMaxStudents);
             }
@@ -171,12 +203,12 @@ export default function SuperAdminDashboard() {
             });
             fetchData();
             setSelectedInstitute(null);
-        } catch (e: any) {
-            if (e instanceof SyntaxError) {
+        } catch (error: unknown) {
+            if (error instanceof SyntaxError) {
                 alert('Invalid JSON Syntax: Please check for missing commas or braces.');
             } else {
-                console.error(e);
-                alert(`Save Failed: ${e.response?.data?.error || e.message || 'Unknown Error'}`);
+                console.error(error);
+                alert(`Save Failed: ${getAxiosErrorMessage(error, 'Unknown Error')}`);
             }
         } finally {
             setIsSavingConfig(false);
@@ -206,7 +238,7 @@ export default function SuperAdminDashboard() {
             });
             fetchData();
             setEditDetailsModal(null);
-        } catch (e) {
+        } catch {
             alert('Failed to save details');
         } finally {
             setIsSavingDetails(false);
@@ -242,9 +274,9 @@ export default function SuperAdminDashboard() {
             fetchData();
             setEditPlanModal(null);
             alert(`Plan successfully ${action === 'REVOKE' ? 'revoked' : 'updated'}.`);
-        } catch (e: any) {
-            console.error(e);
-            alert(e.response?.data?.error || 'Failed to update plan');
+        } catch (error: unknown) {
+            console.error(error);
+            alert(getAxiosErrorMessage(error, 'Failed to update plan'));
         } finally {
             setIsSavingPlan(false);
         }
@@ -290,8 +322,8 @@ export default function SuperAdminDashboard() {
             setCustomMaxStudentsForInvite(100);
             setIsFreeTrial(false);
             setTrialDays(14);
-        } catch (err: any) {
-            alert(err.response?.data?.error || 'Failed to generate onboarding link');
+        } catch (error: unknown) {
+            alert(getAxiosErrorMessage(error, 'Failed to generate onboarding link'));
         } finally {
             setIsCreating(false);
         }
@@ -318,8 +350,8 @@ export default function SuperAdminDashboard() {
             setSuspendModal(null);
             setSuspensionReason('');
             fetchData();
-        } catch (err) {
-            console.error(err);
+        } catch (error) {
+            console.error(error);
             alert('Failed to update suspension status');
         } finally {
             setIsSuspending(false);
@@ -337,9 +369,9 @@ export default function SuperAdminDashboard() {
             });
             setDeleteModal(null);
             fetchData();
-        } catch (err: any) {
-            console.error(err);
-            alert(err.response?.data?.error || 'Failed to delete institute');
+        } catch (error: unknown) {
+            console.error(error);
+            alert(getAxiosErrorMessage(error, 'Failed to delete institute'));
         } finally {
             setIsDeleting(false);
         }
@@ -584,7 +616,7 @@ export default function SuperAdminDashboard() {
                                 <p className="text-xs text-gray-500 mb-3">Manually upgrade or downgrade their tier.</p>
                                 <select
                                     value={selectedNewPlan}
-                                    onChange={(e) => setSelectedNewPlan(e.target.value as any)}
+                                    onChange={(e) => setSelectedNewPlan(e.target.value as 'NO_PLAN' | 'BASIC' | 'PRO')}
                                     className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black outline-none font-medium text-sm"
                                 >
                                     <option value="NO_PLAN">NO_PLAN (Paused)</option>

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "JWT_SECRET=test-secret NODE_ENV=test node --test -r ts-node/register/transpile-only tests/**/*.test.ts",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js"

@@ -1,12 +1,21 @@
-const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor?.isNative;
+declare global {
+    interface Window {
+        Capacitor?: {
+            isNative?: boolean;
+        };
+    }
+}
+
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type QueueEntry = { resolve: (value: string | null) => void; reject: (reason?: unknown) => void };
+
+const isCapacitor = typeof window !== 'undefined' && window.Capacitor?.isNative;
 export const API_URL = isCapacitor
     ? 'https://mathlogs.app/api'
     : (import.meta.env.VITE_API_URL || '/api');
 
-
-
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (value?: any) => void, reject: (reason?: any) => void }> = [];
+let failedQueue: QueueEntry[] = [];
 
 const processQueue = (error: Error | null, token: string | null = null) => {
     failedQueue.forEach(prom => {
@@ -16,8 +25,28 @@ const processQueue = (error: Error | null, token: string | null = null) => {
     failedQueue = [];
 };
 
-async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?: number) {
-    const headers: any = {};
+function clearSessionAndRedirect() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('adminId');
+    window.location.href = '/login';
+}
+
+function createRequestInit(method: HttpMethod, headers: Record<string, string>, body?: unknown, signal?: AbortSignal): RequestInit {
+    return {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal,
+    };
+}
+
+async function parseJsonResponse<T>(res: Response): Promise<T> {
+    return res.json() as Promise<T>;
+}
+
+async function request<T = unknown>(endpoint: string, method: HttpMethod = 'GET', body?: unknown, timeoutMs?: number): Promise<T> {
+    const headers: Record<string, string> = {};
     if (method !== 'GET' && method !== 'DELETE') {
         headers['Content-Type'] = 'application/json';
     }
@@ -34,12 +63,7 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-        const res = await fetch(`${API_URL}${endpoint}`, {
-            method,
-            headers,
-            body: body ? JSON.stringify(body) : undefined,
-            signal: controller.signal,
-        });
+        const res = await fetch(`${API_URL}${endpoint}`, createRequestInit(method, headers, body, controller.signal));
 
         clearTimeout(timeoutId);
 
@@ -53,26 +77,22 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
                 const refreshToken = localStorage.getItem('refreshToken');
                 
                 if (!refreshToken) {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('refreshToken');
-                    localStorage.removeItem('adminId');
-                    window.location.href = '/login';
+                    clearSessionAndRedirect();
                     throw new Error('Session expired. Please login again.');
                 }
 
                 if (isRefreshing) {
-                    // Wait for the ongoing refresh to complete
-                    try {
-                        const newToken = await new Promise<string>((resolve, reject) => {
-                            failedQueue.push({ resolve, reject });
-                        });
-                        headers['Authorization'] = `Bearer ${newToken}`;
-                        const retryRes = await fetch(`${API_URL}${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-                        if (!retryRes.ok) throw new Error('Retry failed after token rotation');
-                        return retryRes.json();
-                    } catch (err) {
-                        throw err;
+                    const newToken = await new Promise<string | null>((resolve, reject) => {
+                        failedQueue.push({ resolve, reject });
+                    });
+                    if (!newToken) {
+                        throw new Error('Session refresh failed.');
                     }
+
+                    headers['Authorization'] = `Bearer ${newToken}`;
+                    const retryRes = await fetch(`${API_URL}${endpoint}`, createRequestInit(method, headers, body));
+                    if (!retryRes.ok) throw new Error('Retry failed after token rotation');
+                    return parseJsonResponse<T>(retryRes);
                 }
 
                 // Initiate refresh
@@ -86,7 +106,7 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
 
                     if (!refreshRes.ok) throw new Error('Refresh token invalid');
 
-                    const refreshData = await refreshRes.json();
+                    const refreshData = await parseJsonResponse<{ token: string; refreshToken: string }>(refreshRes);
                     localStorage.setItem('token', refreshData.token);
                     localStorage.setItem('refreshToken', refreshData.refreshToken);
                     
@@ -95,22 +115,19 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
 
                     // Re-fire original request
                     headers['Authorization'] = `Bearer ${refreshData.token}`;
-                    const retryRes = await fetch(`${API_URL}${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+                    const retryRes = await fetch(`${API_URL}${endpoint}`, createRequestInit(method, headers, body));
                     if (!retryRes.ok) throw new Error('Retry failed after token rotation');
-                    return retryRes.json();
+                    return parseJsonResponse<T>(retryRes);
                 } catch (err) {
                     processQueue(err as Error, null);
                     isRefreshing = false;
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('refreshToken');
-                    localStorage.removeItem('adminId');
-                    window.location.href = '/login';
+                    clearSessionAndRedirect();
                     throw new Error('Session expired securely. Please login again.');
                 }
             }
 
             // Extract error message from response
-            const errorData = await res.json().catch(() => ({}));
+            const errorData = await res.json().catch(() => ({} as { error?: string; message?: string }));
             const serverMessage = errorData.error || errorData.message || 'Request failed';
 
             // Special case for expired free trial / subscription
@@ -148,36 +165,38 @@ async function request(endpoint: string, method = 'GET', body?: any, timeoutMs?:
                     throw new Error(serverMessage);
             }
         }
-        return res.json();
-    } catch (error: any) {
+        return parseJsonResponse<T>(res);
+    } catch (error: unknown) {
         clearTimeout(timeoutId);
+
+        const requestError = error instanceof Error ? error : new Error('Unknown request failure');
 
         // --- MOBILE DIAGNOSTICS ---
         if (isCapacitor) {
-            alert(`NATIVE FETCH ERROR:\nURL: ${API_URL}${endpoint}\nMSG: ${error.message}\nNAME: ${error.name}`);
+            alert(`NATIVE FETCH ERROR:\nURL: ${API_URL}${endpoint}\nMSG: ${requestError.message}\nNAME: ${requestError.name}`);
         }
         // --------------------------
 
         // Handle timeout
-        if (error.name === 'AbortError') {
+        if (requestError.name === 'AbortError') {
             throw new Error('Request timeout. Please check your connection and try again.');
         }
 
         // Handle network errors
-        if (error.message === 'Failed to fetch') {
+        if (requestError.message === 'Failed to fetch') {
             throw new Error('Network error. Please check your internet connection and try again.');
         }
 
         // Re-throw with original message
-        throw error;
+        throw requestError;
     }
 }
 
 export const api = {
-    get: (endpoint: string) => request(endpoint, 'GET'),
-    post: (endpoint: string, body: any) => request(endpoint, 'POST', body),
-    put: (endpoint: string, body: any) => request(endpoint, 'PUT', body),
-    delete: (endpoint: string, body?: any) => request(endpoint, 'DELETE', body),
+    get: <T = unknown>(endpoint: string) => request<T>(endpoint, 'GET'),
+    post: <T = unknown>(endpoint: string, body: unknown) => request<T>(endpoint, 'POST', body),
+    put: <T = unknown>(endpoint: string, body: unknown) => request<T>(endpoint, 'PUT', body),
+    delete: <T = unknown>(endpoint: string, body?: unknown) => request<T>(endpoint, 'DELETE', body),
 };
 
 export const apiRequest = request;

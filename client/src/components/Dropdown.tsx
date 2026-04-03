@@ -14,6 +14,7 @@ interface DropdownProps {
 export default function Dropdown({ label, value, onChange, options, placeholder = 'Select...', disabled = false, required = false }: DropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    void required;
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

@@ -17,6 +17,29 @@ interface Batch {
     _count: { students: number };
 }
 
+interface InstituteConfig {
+    requiresGrades?: boolean;
+    allowedClasses?: string[];
+    subjects?: string[];
+}
+
+interface InstituteResponse {
+    config?: InstituteConfig;
+}
+
+interface CreateBatchPayload {
+    batchNumber: string;
+    customName: string;
+    subject: string;
+    timeSlot: string;
+    feeAmount: number;
+    className?: string;
+}
+
+interface ApiErrorLike {
+    message?: string;
+}
+
 export default function BatchList() {
     const [batches, setBatches] = useState<Batch[]>([]);
     const [showForm, setShowForm] = useState(false);
@@ -37,9 +60,9 @@ export default function BatchList() {
 
     const fetchBatches = async () => {
         try {
-            const data = await apiRequest('/batches');
+            const data = await apiRequest<Batch[]>('/batches');
             setBatches(data);
-        } catch (e) {
+        } catch {
             toast.error('Failed to load batches');
         } finally {
             setLoading(false);
@@ -53,7 +76,7 @@ export default function BatchList() {
 
             // Fetch Institute Config for Subjects and Grades
             try {
-                const institute = await apiRequest('/institute/me');
+                const institute = await apiRequest<InstituteResponse>('/institute/me');
                 const config = institute?.config || {};
 
                 // Set requiresGrades (default to true if not specified)
@@ -84,7 +107,7 @@ export default function BatchList() {
         const toastId = toast.loading('Creating batch...');
 
         try {
-            const payload: any = {
+            const payload: CreateBatchPayload = {
                 batchNumber,
                 customName,
                 subject,
@@ -103,9 +126,10 @@ export default function BatchList() {
             setBatchNumber(''); setCustomName(''); setTimeSlot(''); setClassName('');
             fetchBatches();
             toast.success('Batch created successfully!', { id: toastId });
-        } catch (e: any) {
-            console.error('❌ Batch creation failed:', e);
-            const errorMsg = e.response?.data?.error || e.message || 'Failed to create batch';
+        } catch (error: unknown) {
+            const apiError = error as ApiErrorLike;
+            console.error('❌ Batch creation failed:', error);
+            const errorMsg = apiError.message || 'Failed to create batch';
             toast.error(errorMsg, { id: toastId });
         }
     };

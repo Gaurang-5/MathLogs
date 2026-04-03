@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, Loader, IndianRupee, User, Wallet } from 'lucide-react';
 import { api } from '../utils/api';
@@ -41,7 +41,7 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
             if (students.length === 0) {
                 setLoading(true);
                 api.get('/fees').then(data => {
-                    setStudents(data);
+                    setStudents(data as Student[]);
                     setLoading(false);
                 }).catch(() => {
                     toast.error('Failed to load students');
@@ -49,7 +49,7 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
                 });
             }
         }
-    }, [isOpen]);
+    }, [isOpen, students.length]);
 
     const filteredStudents = search.trim()
         ? students.filter(s =>
@@ -74,7 +74,7 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
             window.dispatchEvent(new Event('fee-updated'));
 
             onClose();
-        } catch (error) {
+        } catch {
             toast.error('Failed to log fee');
         } finally {
             setSubmitting(false);

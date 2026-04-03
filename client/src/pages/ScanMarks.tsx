@@ -9,18 +9,53 @@ import { ChevronDown, Check, Loader2 } from 'lucide-react';
 import { extractMarksFromSticker } from '../utils/ocr';
 import { loadOpenCV, detectAndWarpSticker } from '../utils/cv';
 
+declare global {
+    interface Window {
+        cv?: unknown;
+    }
+}
+
+interface ScanTest {
+    id: string;
+    className?: string | null;
+}
+
+interface StudentMark {
+    testId: string;
+    score: number;
+}
+
+interface StudentLookupResponse {
+    id: string;
+    name: string;
+    batch?: {
+        className?: string | null;
+    };
+    marks?: StudentMark[];
+}
+
+interface OCRScanResult {
+    score: string;
+    confidence: number;
+    debugImage?: string | null;
+}
+
+interface FocusCapabilities extends MediaTrackCapabilities {
+    focusMode?: string[];
+}
+
 export default function ScanMarks() {
     const [searchParams] = useSearchParams();
     const [scanning, setScanning] = useState(false);
-    const [student, setStudent] = useState<any>(null);
+    const [student, setStudent] = useState<StudentLookupResponse | null>(null);
     const [score, setScore] = useState('');
-    const [tests, setTests] = useState<any[]>([]);
+    const [tests, setTests] = useState<ScanTest[]>([]);
     const [selectedTestId, setSelectedTestId] = useState(searchParams.get('testId') || '');
 
     // Restored State Variables
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [existingMark, setExistingMark] = useState<number | null>(null);
-    const [pendingStudent, setPendingStudent] = useState<any>(null);
+    const [pendingStudent, setPendingStudent] = useState<StudentLookupResponse | null>(null);
 
     // OCR State
     const [isProcessingOCR, setIsProcessingOCR] = useState(false);
@@ -29,6 +64,7 @@ export default function ScanMarks() {
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const mountedRef = useRef(true);
     const processingRef = useRef(false);
+    const testsRef = useRef<ScanTest[]>([]);
 
     // Helper function for toast notifications
     const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -43,7 +79,7 @@ export default function ScanMarks() {
     useEffect(() => {
         mountedRef.current = true;
         // Fetch available tests
-        apiRequest('/tests').then(setTests).catch(console.error);
+        apiRequest<ScanTest[]>('/tests').then(setTests).catch(console.error);
 
         return () => {
             mountedRef.current = false;
@@ -53,14 +89,16 @@ export default function ScanMarks() {
                     scannerRef.current.stop().catch(err => console.error("Failed to stop scanner", err));
                 }
                 // clear() returns Promise<void> usually, but let's be safe
-                try {
-                    scannerRef.current.clear();
-                } catch (e) {
-                    // console.error("Failed to clear scanner", e);
-                }
+                scannerRef.current.clear().catch((error: unknown) => {
+                    console.debug("Failed to clear scanner on unmount", error);
+                });
             }
         };
     }, []);
+
+    useEffect(() => {
+        testsRef.current = tests;
+    }, [tests]);
 
     // Load OpenCV on mount
     useEffect(() => {
@@ -124,14 +162,14 @@ export default function ScanMarks() {
                             console.log("✅ QR Matched: " + decodedText);
 
                             // Start student lookup immediately (doesn't need the frame)
-                            const studentLookupPromise = apiRequest('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
+                            const studentLookupPromise = apiRequest<StudentLookupResponse>('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
 
                             setIsProcessingOCR(true);
                             setDebugImage(null);
                             let extractedMark = "";
 
                             // OCR processing — brief settle then capture
-                            const ocrPromise = (async () => {
+                            const ocrPromise = (async (): Promise<OCRScanResult> => {
                                 try {
                                     // ⏳ Brief settle: QR fires instantly but sticker may
                                     // still be moving. 100ms is enough.
@@ -156,7 +194,9 @@ export default function ScanMarks() {
                                                 }
                                                 if (i < 2) await new Promise(r => setTimeout(r, 100));
                                             }
-                                        } catch { }
+                                        } catch (error) {
+                                            console.debug('CV warp attempt failed', error);
+                                        }
                                     }
 
                                     if (!smartImage) console.warn("⚠️ CV warp failed — using raw video fallback");
@@ -184,7 +224,7 @@ export default function ScanMarks() {
                                 setIsProcessingOCR(false);
 
                                 // Check if student belongs to the selected test's batch
-                                const selectedTest = tests.find(t => t.id === selectedTestId);
+                                const selectedTest = testsRef.current.find(t => t.id === selectedTestId);
                                 if (selectedTest && studentData.batch) {
                                     // Check if className matches (if test has className)
                                     if (selectedTest.className && studentData.batch.className !== selectedTest.className) {
@@ -196,7 +236,7 @@ export default function ScanMarks() {
                                     }
                                 }
 
-                                const existing = studentData.marks?.find((m: any) => m.testId === selectedTestId);
+                                const existing = studentData.marks?.find((mark) => mark.testId === selectedTestId);
 
                                 // Hide scanner overlay so modal can appear
                                 setScanning(false);
@@ -216,16 +256,16 @@ export default function ScanMarks() {
                                 // Reset processing flag so modal can appear and next scan can work
                                 processingRef.current = false;
                                 console.log("✅ Modal should appear now!");
-                            } catch (e: any) {
-                                console.error("❌ Error in scan processing:", e);
+                            } catch (error: unknown) {
+                                console.error("❌ Error in scan processing:", error);
                                 setIsProcessingOCR(false);
                                 setScanning(false);
-                                showToast(e.message || 'Student not found or Invalid QR Code', 'error');
+                                showToast(error instanceof Error ? error.message : 'Student not found or Invalid QR Code', 'error');
                                 processingRef.current = false;
                                 setTimeout(() => setScanning(true), 2000); // Auto-resume after 2s
                             }
                         },
-                        (_errorMessage: any) => { /* ignore */ }
+                        () => undefined
                     );
 
                     // Enable tap-to-focus on the video element
@@ -237,30 +277,30 @@ export default function ScanMarks() {
 
                             videoElement.addEventListener('click', async () => {
                                 try {
-                                    const capabilities = track.getCapabilities() as any;
+                                    const capabilities = track.getCapabilities() as FocusCapabilities;
                                     if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
                                         await track.applyConstraints({
-                                            advanced: [{ focusMode: 'continuous' } as any]
-                                        });
+                                            advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet]
+                                        } as MediaTrackConstraints);
                                         console.log('📷 Autofocus enabled');
                                     }
-                                } catch (e) {
-                                    console.warn('Tap-to-focus not supported:', e);
+                                } catch (error) {
+                                    console.warn('Tap-to-focus not supported:', error);
                                 }
                             });
                         }
                     }, 1000);
 
                     console.log("✅ Scanner started successfully!");
-                } catch (err: any) {
-                    console.error("❌ Error starting scanner:", err);
+                } catch (error: unknown) {
+                    console.error("❌ Error starting scanner:", error);
                     console.error("Error details:", {
-                        message: err.message,
-                        name: err.name,
-                        stack: err.stack
+                        message: error instanceof Error ? error.message : 'Unknown error',
+                        name: error instanceof Error ? error.name : 'UnknownError',
+                        stack: error instanceof Error ? error.stack : undefined
                     });
                     setScanning(false);
-                    showToast('Failed to start camera: ' + (err.message || 'Unknown error'), 'error');
+                    showToast('Failed to start camera: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
                 }
             }, 300); // Increased delay for safety
 
@@ -324,10 +364,10 @@ export default function ScanMarks() {
 
             // Keep scanning overlay visible
             setScanning(true);
-        } catch (e: any) {
-            console.error('Save mark error:', e);
+        } catch (error: unknown) {
+            console.error('Save mark error:', error);
             // Extract error message from backend response
-            const errorMsg = e.error || e.message || 'Failed to save mark';
+            const errorMsg = error instanceof Error ? error.message : 'Failed to save mark';
             showToast(errorMsg, 'error');
             // Don't resume scanning on error - let user fix the issue
         }
@@ -345,8 +385,8 @@ export default function ScanMarks() {
                 if (scannerRef.current.getState() === 2) { // State 2 = PAUSED
                     scannerRef.current.resume();
                 }
-            } catch (e) {
-                console.warn('Could not resume scanner on cancel:', e);
+            } catch (error) {
+                console.warn('Could not resume scanner on cancel:', error);
             }
         }
         setScanning(true); // Show scanner overlay again

@@ -1,6 +1,6 @@
 import { Express, Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 export const configureSecurityHeaders = (app: Express) => {
     // Hardened Helmet configuration with strict CSP
@@ -175,7 +175,7 @@ export const ocrLimiter = rateLimit({
     keyGenerator: (req) => {
         // Use User ID if available (authenticated), otherwise fallback to IP
         const user = (req as any).user;
-        return user?.id || req.ip || 'unknown';
+        return user?.id || ipKeyGenerator(req.ip || '127.0.0.1');
     },
     handler: (req: Request, res: Response) => {
         const user = (req as any).user;
@@ -206,7 +206,7 @@ export const bulkNotifyLimiter = rateLimit({
     validate: { ip: false },
     keyGenerator: (req) => {
         const user = (req as any).user;
-        return user?.id || req.ip || 'unknown';
+        return user?.id || ipKeyGenerator(req.ip || '127.0.0.1');
     },
     message: { error: 'Too many notifications sent. Please wait a minute before sending again.' },
     handler: (req: Request, res: Response) => {

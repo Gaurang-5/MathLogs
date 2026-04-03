@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
@@ -8,6 +8,7 @@ import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, 
 import toast from 'react-hot-toast';
 import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
+import { getInstallmentPaidMap, getStudentJoinDate, type LegacyFee } from '../utils/fees';
 
 interface Student {
     id: string;
@@ -19,8 +20,8 @@ interface Student {
     schoolName: string | null;
     status: string;
     feePayments: FeePayment[];
-    fees: any[];
-    marks?: any[];
+    fees: LegacyFee[];
+    marks?: StudentMark[];
     createdAt?: string;
 }
 
@@ -40,6 +41,19 @@ interface FeePayment {
     studentId: string;
 }
 
+interface MarkTest {
+    id: string;
+    name: string;
+    date: string;
+    maxMarks: number;
+}
+
+interface StudentMark {
+    id: string;
+    score: number;
+    test: MarkTest;
+}
+
 interface Batch {
     id: string;
     name: string;
@@ -53,6 +67,10 @@ interface Batch {
     isRegistrationEnded?: boolean;
     students: Student[];
     feeInstallments: FeeInstallment[];
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 export default function BatchDetails() {
@@ -73,12 +91,12 @@ export default function BatchDetails() {
         return batch.students.find(s => s.id === viewMarksId) || null;
     }, [viewMarksId, batch]);
 
-    const getStudentAverage = (student: any) => {
+    const getStudentAverage = (student: Pick<Student, 'marks'>) => {
         if (!student.marks || student.marks.length === 0) return '-';
         let totalNormalized = 0;
-        student.marks.forEach((m: any) => {
-            const max = m.test.maxMarks || 0;
-            const normalized = max > 0 ? (m.score / max) * 10 : 0;
+        student.marks.forEach((mark) => {
+            const max = mark.test.maxMarks || 0;
+            const normalized = max > 0 ? (mark.score / max) * 10 : 0;
             totalNormalized += normalized;
         });
         return (totalNormalized / student.marks.length).toFixed(1);
@@ -130,7 +148,7 @@ export default function BatchDetails() {
 
     // ... existing search logic ...
     const filteredStudents = useMemo(() => {
-        let students = (batch?.students || []).filter(student =>
+        const students = (batch?.students || []).filter(student =>
             student.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
             student.schoolName?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
             student.humanId?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
@@ -223,11 +241,11 @@ export default function BatchDetails() {
         }
     };
 
-    const fetchDetails = async (silent = false) => {
+    const fetchDetails = useCallback(async (silent = false) => {
         try {
-            const data = await apiRequest(`/batches/${id}?t=${Date.now()}`);
+            const data = await apiRequest<Batch>(`/batches/${id}?t=${Date.now()}`);
             setBatch(data);
-        } catch (e) {
+        } catch {
             if (!silent) {
                 toast.error('Failed to load batch details');
                 navigate('/batches');
@@ -235,7 +253,7 @@ export default function BatchDetails() {
         } finally {
             if (!silent) setLoading(false);
         }
-    };
+    }, [id, navigate]);
 
     useEffect(() => {
         // Initial load
@@ -247,7 +265,7 @@ export default function BatchDetails() {
         }, 15000);
 
         return () => clearInterval(interval);
-    }, [id, navigate]);
+    }, [fetchDetails]);
 
     const handleDownloadPDF = async () => {
         const toastId = toast.loading('Generating PDF...');
@@ -270,7 +288,7 @@ export default function BatchDetails() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
             toast.success('Downloaded!', { id: toastId });
-        } catch (e) {
+        } catch {
             toast.error('Failed to download PDF', { id: toastId });
         }
     };
@@ -282,7 +300,7 @@ export default function BatchDetails() {
             await apiRequest(`/batches/${id}/toggle-registration`, 'PUT', { isOpen: newState });
             setBatch({ ...batch, isRegistrationOpen: newState });
             toast.success(newState ? 'Registration Opened' : 'Registration Closed');
-        } catch (e) {
+        } catch {
             toast.error('Failed to update status');
         }
     };
@@ -311,14 +329,14 @@ export default function BatchDetails() {
         }
 
         try {
-            const res = await apiRequest(`/batches/${id}`, 'PUT', { 
+            const res = await apiRequest<Partial<Batch>>(`/batches/${id}`, 'PUT', {
                 whatsappGroupLink: whatsappLinkInput,
                 autoSendWelcome: autoSendWelcomeInput
             });
             setBatch(prev => prev ? { ...prev, ...res } : null);
             toast.success('WhatsApp Settings Updated');
             setShowWhatsAppModal(false);
-        } catch (e) {
+        } catch {
             toast.error('Failed to update link');
         }
     };
@@ -357,7 +375,7 @@ export default function BatchDetails() {
             try {
                 await apiRequest(`/students/${student.id}/whatsapp-invite`, 'POST');
                 successCount++;
-            } catch (e) {
+            } catch {
                 console.error(`Failed to send to ${student.name}`);
             }
 
@@ -389,7 +407,7 @@ export default function BatchDetails() {
             setShowAddStudent(false);
             setNewName(''); setNewParentName(''); setNewWhatsapp(''); setNewEmail(''); setNewSchoolName('');
             setTimeout(() => fetchDetails(), 300);
-        } catch (e) {
+        } catch {
             toast.error('Failed to add student', { id: toastId });
         }
     };
@@ -412,7 +430,7 @@ export default function BatchDetails() {
             toast.success('Student removed', { id: toastId });
             setStudentToDelete(null);
             setTimeout(() => fetchDetails(), 300);
-        } catch (e) {
+        } catch {
             toast.error('Failed to remove student', { id: toastId });
         }
     };
@@ -427,7 +445,7 @@ export default function BatchDetails() {
             toast.success('Student updated', { id: toastId });
             setEditingStudent(null);
             setTimeout(() => fetchDetails(), 300);
-        } catch (e) {
+        } catch {
             toast.error('Failed to update student', { id: toastId });
         }
     };
@@ -443,7 +461,7 @@ export default function BatchDetails() {
             setBatch(prev => prev ? { ...prev, isRegistrationEnded: true, isRegistrationOpen: false } : null);
             toast.success('Registration ended permanently', { id: toastId });
             setShowCloseConfirm(false);
-        } catch (e) {
+        } catch {
             toast.error('Failed to end registration', { id: toastId });
         }
     };
@@ -457,8 +475,8 @@ export default function BatchDetails() {
             setTimeout(() => {
                 window.location.href = '/batches';
             }, 1000);
-        } catch (e: any) {
-            toast.error(e.message || 'Failed to delete batch', { id: toastId });
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to delete batch'), { id: toastId });
         }
     };
 
@@ -497,7 +515,7 @@ export default function BatchDetails() {
             setShowAddInstallment(false);
             setNewInstallment({ name: '', amount: '' });
             setTimeout(() => fetchDetails(), 300);
-        } catch (e) {
+        } catch {
             toast.error('Failed to create installment', { id: toastId });
         }
     };
@@ -514,8 +532,8 @@ export default function BatchDetails() {
             toast.success('Fee column updated', { id: toastId });
             setEditingInstallment(null);
             fetchDetails();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to update fee column', { id: toastId });
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to update fee column'), { id: toastId });
         }
     };
 
@@ -527,8 +545,8 @@ export default function BatchDetails() {
             toast.success('Fee column deleted', { id: toastId });
             setInstallmentToDelete(null);
             fetchDetails();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to delete fee column. Maybe payments exist?', { id: toastId });
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to delete fee column. Maybe payments exist?'), { id: toastId });
         }
     };
 
@@ -577,9 +595,9 @@ export default function BatchDetails() {
             toast.success('Payment recorded', { id: toastId });
             setPaymentModal(null);
             setTimeout(() => fetchDetails(), 300); // Small delay to ensure backend processed
-        } catch (e: any) {
-            console.error("Payment Error:", e);
-            const errorMessage = e.message || 'Failed to record payment';
+        } catch (error: unknown) {
+            console.error("Payment Error:", error);
+            const errorMessage = getErrorMessage(error, 'Failed to record payment');
 
             // If payment already exists, treat as success/info and keep the UI state
             if (errorMessage.includes('already exists') || errorMessage.includes('409')) {
@@ -787,7 +805,7 @@ export default function BatchDetails() {
                                             a.click();
                                             window.URL.revokeObjectURL(url);
                                             document.body.removeChild(a);
-                                        } catch (e) {
+                                        } catch {
                                             toast.error('Failed to download QR PDF');
                                         }
                                     }}
@@ -901,25 +919,7 @@ export default function BatchDetails() {
                         <tbody className="divide-y divide-app-border text-app-text">
                             {filteredStudents.map((student) => {
                                 // Dynamic Fee Logic (Virtual Allocation)
-                                const genericPaid = student.fees?.filter((f: any) => f.status === 'PAID').reduce((sum: number, f: any) => sum + f.amount, 0) || 0;
-                                let currentBuffer = genericPaid;
-                                // Sort installments (immutable copy) -> older first
-                                const studentJoinDateForAllocation = student.createdAt ? new Date(student.createdAt).setHours(0, 0, 0, 0) : 0;
-                                const sortedInsts = [...(batch.feeInstallments || [])]
-                                    .filter(inst => new Date(inst.createdAt).setHours(0,0,0,0) >= studentJoinDateForAllocation)
-                                    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-                                const instPaidMap: Record<string, number> = {};
-                                sortedInsts.forEach(inst => {
-                                    const directPayments = student.feePayments?.filter((p: any) => p.installmentId === inst.id) || [];
-                                    let paid = directPayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-                                    const remaining = inst.amount - paid;
-                                    if (remaining > 0 && currentBuffer > 0) {
-                                        const coverage = Math.min(remaining, currentBuffer);
-                                        paid += coverage;
-                                        currentBuffer -= coverage;
-                                    }
-                                    instPaidMap[inst.id] = paid;
-                                });
+                                const instPaidMap = getInstallmentPaidMap(student, batch.feeInstallments || []);
 
                                 return (
                                     <tr key={student.id} className="hover:bg-app-surface transition-colors group">
@@ -946,7 +946,7 @@ export default function BatchDetails() {
                                             const isFullyPaid = paidAmount >= inst.amount;
                                             const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
 
-                                            const studentJoinDate = student.createdAt ? new Date(student.createdAt).setHours(0, 0, 0, 0) : 0;
+                                            const studentJoinDate = getStudentJoinDate(student.createdAt);
                                             const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
                                             const isNotApplicable = instDate < studentJoinDate;
 
@@ -1043,24 +1043,7 @@ export default function BatchDetails() {
                     <div className="divide-y divide-app-border">
                         {filteredStudents.map((student) => {
                             // Dynamic Fee Logic (Virtual Allocation) - Mobile
-                            const genericPaid = student.fees?.filter((f: any) => f.status === 'PAID').reduce((sum: number, f: any) => sum + f.amount, 0) || 0;
-                            let currentBuffer = genericPaid;
-                            const studentJoinDateForAllocation = student.createdAt ? new Date(student.createdAt).setHours(0, 0, 0, 0) : 0;
-                            const sortedInsts = [...(batch.feeInstallments || [])]
-                                .filter(inst => new Date(inst.createdAt).setHours(0,0,0,0) >= studentJoinDateForAllocation)
-                                .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-                            const instPaidMap: Record<string, number> = {};
-                            sortedInsts.forEach(inst => {
-                                const directPayments = student.feePayments?.filter((p: any) => p.installmentId === inst.id) || [];
-                                let paid = directPayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-                                const remaining = inst.amount - paid;
-                                if (remaining > 0 && currentBuffer > 0) {
-                                    const coverage = Math.min(remaining, currentBuffer);
-                                    paid += coverage;
-                                    currentBuffer -= coverage;
-                                }
-                                instPaidMap[inst.id] = paid;
-                            });
+                            const instPaidMap = getInstallmentPaidMap(student, batch.feeInstallments || []);
 
                             return (
                                 <div key={student.id} className="p-4 flex flex-col gap-3 bg-app-surface-opaque hover:bg-app-surface transition-colors">
@@ -1104,7 +1087,7 @@ export default function BatchDetails() {
                                             <div className="mt-2 pt-3 border-t border-app-border/50">
                                                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
                                                     {batch.feeInstallments.filter((inst) => {
-                                                        const studentJoinDate = student.createdAt ? new Date(student.createdAt).setHours(0, 0, 0, 0) : 0;
+                                                        const studentJoinDate = getStudentJoinDate(student.createdAt);
                                                         const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
                                                         return instDate >= studentJoinDate;
                                                     }).map((inst) => {
@@ -1357,7 +1340,7 @@ export default function BatchDetails() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-app-border">
-                                            {viewMarks.marks && viewMarks.marks.map((mark: any) => {
+                                            {viewMarks.marks && viewMarks.marks.map((mark) => {
                                                 const max = mark.test.maxMarks || 0;
                                                 const normalized = max > 0 ? (mark.score / max) * 10 : 0;
                                                 return (

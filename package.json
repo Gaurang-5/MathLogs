@@ -5,6 +5,9 @@
     "author": "",
     "license": "ISC",
     "scripts": {
+        "setup": "npm install && cd server && npm install && cd ../client && npm install && cd ../mobile && npm install",
+        "dev": "./dev.sh",
+        "build": "cd client && npm run build && cd ../server && npm run build",
         "start": "cd server && npm start",
         "heroku-postbuild": "echo 'Installing Client...' && cd client && npm install --production=false && npm run build && echo 'Installing Server...' && cd ../server && npm install --production=false && npm run build"
     },

@@ -9,12 +9,43 @@ export interface StickerCoordinates {
     bottomLeft: { x: number, y: number };
 }
 
+interface PendingTask {
+    resolve: (val: string | null) => void;
+    reject: (err: unknown) => void;
+}
+
+interface WorkerInitSuccessMessage {
+    type: 'INIT_SUCCESS';
+    id?: number;
+}
+
+interface WorkerDetectSuccessMessage {
+    type: 'DETECT_SUCCESS';
+    id: number;
+    data: Uint8Array;
+    width: number;
+    height: number;
+}
+
+interface WorkerDetectFailMessage {
+    type: 'DETECT_FAIL';
+    id: number;
+}
+
+interface WorkerErrorMessage {
+    type: 'ERROR';
+    id?: number;
+    error?: string;
+}
+
+type WorkerMessage = WorkerInitSuccessMessage | WorkerDetectSuccessMessage | WorkerDetectFailMessage | WorkerErrorMessage;
+
 class CVWorkerManager {
     private worker: Worker | null = null;
     private initialized = false;
     private processing = false;
     private idCounter = 0;
-    private pending: Record<number, { resolve: (val: any) => void, reject: (err: any) => void }> = {};
+    private pending: Record<number, PendingTask> = {};
 
     constructor() {
         if (typeof Worker !== 'undefined') {
@@ -24,8 +55,8 @@ class CVWorkerManager {
         }
     }
 
-    private handleMessage(e: MessageEvent) {
-        const { type, id, data, width, height, error } = e.data;
+    private handleMessage(e: MessageEvent<WorkerMessage>) {
+        const { type, id } = e.data;
         const task = this.pending[id];
 
         if (type === 'INIT_SUCCESS') {
@@ -35,6 +66,7 @@ class CVWorkerManager {
             delete this.pending[id];
 
             if (type === 'DETECT_SUCCESS') {
+                const { data, width, height } = e.data;
                 // Reconstruct ImageData or use Canvas to get Base64
                 // For now, let's create a temporary canvas to get the data URL
                 const canvas = document.createElement('canvas');
@@ -52,6 +84,7 @@ class CVWorkerManager {
             } else if (type === 'DETECT_FAIL') {
                 task.resolve(null);
             } else {
+                const { error } = e.data;
                 task.reject(new Error(error || "Worker Error"));
             }
         }
@@ -85,12 +118,13 @@ class CVWorkerManager {
         return (new Promise<string | null>((resolve, reject) => {
             const id = ++this.idCounter;
             this.pending[id] = { resolve, reject };
+            const transferable = imageData.data.buffer as ArrayBuffer;
 
             this.worker!.postMessage({
                 type: 'DETECT',
                 id,
                 imageData: imageData
-            }, [imageData.data.buffer]);
+            }, [transferable]);
         })).finally(() => {
             this.processing = false;
         });
@@ -110,7 +144,8 @@ export function loadOpenCV(): Promise<void> {
  */
 export async function detectAndWarpSticker(
     video: HTMLVideoElement,
-    _canvas?: HTMLCanvasElement // Deprecated, kept for signature compat
+    canvas?: HTMLCanvasElement // Deprecated, kept for signature compat
 ): Promise<string | null> {
+    void canvas;
     return cvManager.detect(video);
 }

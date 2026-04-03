@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import logger from '../utils/logger';
 import { sendWelcomeWhatsApp } from '../utils/whatsapp';
+import { getCourseCode, getInstituteCode } from '../utils/studentIds';
 
 // H5 fix: Shared constant so both registerStudent and addStudentManually
 // always include the fields that autoSendWelcomeInvite depends on.
@@ -72,57 +73,6 @@ const autoSendWelcomeInvite = async (student: AutoInviteStudent, batch: AutoInvi
     } catch (inviteErr) {
         console.error("Auto-invite error:", inviteErr);
     }
-};
-
-// Helper to generate Course Code
-const getCourseCode = (subject: string | null) => {
-    if (!subject) return 'GEN'; // Generic
-    const map: Record<string, string> = {
-        'Mathematics': 'MTH', 'Maths': 'MTH', 'Math': 'MTH',
-        'Physics': 'PHY',
-        'Chemistry': 'CHE',
-        'Biology': 'BIO',
-        'English': 'ENG',
-        'Science': 'SCI',
-        'History': 'HIS',
-        'Geography': 'GEO',
-        'Accounts': 'ACC', 'Accountancy': 'ACC',
-        'Economics': 'ECO',
-        'Business Studies': 'BUS',
-        'Computer Science': 'CSC',
-        'Abacus': 'ABA', 'Vedic Maths': 'VED',
-        'C Programming': 'CPR', 'C++': 'CPP', 'Java': 'JAV', 'Python': 'PYT',
-        'Tally': 'TAL',
-        'Social Science': 'SST'
-    };
-
-    if (map[subject]) return map[subject];
-
-    // Fallback: Remove non-alphanumeric, take first 3 chars uppercase
-    const cleanSubject = subject.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    return cleanSubject.substring(0, 3) || 'GEN';
-};
-
-// Helper to generate Institute Code from name
-// Takes first letter of first two words
-// Examples: "IT SKILLS MZN" → "IS", "MANOJ BHATIA COACHING" → "MB"
-const getInstituteCode = (instituteName: string) => {
-    if (!instituteName) return 'XX';
-
-    // Split by spaces and filter out empty strings
-    const words = instituteName.trim().split(/\s+/).filter(Boolean);
-
-    if (words.length === 0) return 'XX';
-    if (words.length === 1) {
-        // Single word: take first 2 chars
-        return words[0].substring(0, 2).toUpperCase();
-    }
-
-    // Take first letter of first two words
-    const firstLetter = words[0][0] || 'X';
-    const secondLetter = words[1][0] || 'X';
-
-    return (firstLetter + secondLetter).toUpperCase();
 };
 
 const generateHumanId = async (batch: any) => {

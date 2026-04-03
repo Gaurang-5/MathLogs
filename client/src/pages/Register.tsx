@@ -1,19 +1,30 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { motion } from 'framer-motion';
 import { User, Users, Smartphone, Mail, ArrowRight, CheckCircle, School } from 'lucide-react';
 import ToastProvider from '../components/ToastProvider';
 import toast from 'react-hot-toast';
+import { getCachedRegistration, type RegisteredStudent } from '../utils/registration';
 
 interface RegisterProps {
     mode?: 'kiosk' | 'standard';
 }
 
+interface BatchStatus {
+    error?: boolean;
+    name?: string;
+    isRegistrationEnded?: boolean;
+    isRegistrationOpen?: boolean;
+    autoSendWelcome?: boolean;
+    whatsappGroupLink?: string;
+}
+
 export default function Register({ mode = 'standard' }: RegisterProps) {
     const { batchId } = useParams();
-    const [submitted, setSubmitted] = useState(false);
+    const cachedRegistration = getCachedRegistration(batchId, mode);
+    const [submitted, setSubmitted] = useState(() => cachedRegistration !== null);
 
     const [parentName, setParentName] = useState('');
     const [studentName, setStudentName] = useState('');
@@ -21,31 +32,16 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     const [email, setEmail] = useState('');
     const [schoolName, setSchoolName] = useState('');
 
-    const [submittedData, setSubmittedData] = useState<any>(null);
+    const [submittedData, setSubmittedData] = useState<RegisteredStudent | null>(() => cachedRegistration);
 
     // Status Check
-    const [batchStatus, setBatchStatus] = useState<any>(null);
+    const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
     const [loading, setLoading] = useState(true);
-
-    // Prevent re-registration UI if already registered on this device
-    useEffect(() => {
-        if (mode === 'standard' && batchId) {
-            const cachedData = localStorage.getItem(`registered_batch_${batchId}`);
-            if (cachedData) {
-                try {
-                    setSubmittedData(JSON.parse(cachedData));
-                    setSubmitted(true);
-                } catch (e) {
-                    console.error("Local storage parse error", e);
-                }
-            }
-        }
-    }, [batchId, mode]);
 
     // Fetch batch status with timeout protection
     useState(() => {
         if (batchId) {
-            apiRequest(`/public/batch/${batchId}`, 'GET')
+            apiRequest<BatchStatus>(`/public/batch/${batchId}`, 'GET')
                 .then(data => {
                     setBatchStatus(data);
                     setLoading(false);
@@ -84,7 +80,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
         };
 
         try {
-            const student = await apiRequest('/public/register', 'POST', {
+            const student = await apiRequest<RegisteredStudent>('/public/register', 'POST', {
                 batchId,
                 name: studentName,
                 parentName,
@@ -121,18 +117,18 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                 localStorage.setItem(`registered_batch_${batchId}`, JSON.stringify(finalData));
             }
 
-        } catch (e: any) {
+        } catch (error: unknown) {
             clearFeedback();
 
             const latencyMs = Date.now() - startTime;
             console.error('[REGISTRATION_ERROR_LATENCY]', {
                 latency: latencyMs,
                 studentName,
-                error: e.message,
+                error: error instanceof Error ? error.message : 'Unknown error',
                 timestamp: new Date().toISOString()
             });
 
-            const errorMessage = e.message || 'Failed to register. Please try again.';
+            const errorMessage = error instanceof Error ? error.message : 'Failed to register. Please try again.';
             toast.error(errorMessage, { id: toastId });
         }
     };

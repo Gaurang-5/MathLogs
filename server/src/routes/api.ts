@@ -86,20 +86,23 @@ async function setOcrCache(hash: string, result: any): Promise<void> {
 }
 
 // Clean up expired cache records every 5 minutes to prevent table bloat
-setInterval(async () => {
-    try {
-        const cutoff = new Date(Date.now() - OCR_CACHE_TTL_SECONDS * 1000);
-        await prisma.ocrScanCache.deleteMany({
-            where: { createdAt: { lt: cutoff } }
-        });
-    } catch (err: any) {
-        // Non-critical — OCR works without the cache table.
-        // Log in dev to surface migration drift; suppress in prod to avoid Sentry noise.
-        if (process.env.NODE_ENV !== 'production') {
-            console.warn('[OcrScanCache] TTL cleanup failed (migration pending?):', err?.message);
+if (process.env.NODE_ENV !== 'test') {
+    const ocrCacheCleanupInterval = setInterval(async () => {
+        try {
+            const cutoff = new Date(Date.now() - OCR_CACHE_TTL_SECONDS * 1000);
+            await prisma.ocrScanCache.deleteMany({
+                where: { createdAt: { lt: cutoff } }
+            });
+        } catch (err: any) {
+            // Non-critical — OCR works without the cache table.
+            // Log in dev to surface migration drift; suppress in prod to avoid Sentry noise.
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('[OcrScanCache] TTL cleanup failed (migration pending?):', err?.message);
+            }
         }
-    }
-}, 5 * 60 * 1000);
+    }, 5 * 60 * 1000);
+    ocrCacheCleanupInterval.unref();
+}
 
 // OCR Scan Endpoint
 router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('image'), async (req, res) => {

@@ -6,13 +6,62 @@
 // self.importScripts is standard in workers
 declare function importScripts(...urls: string[]): void;
 
-// Define OpenCV global variable for TS
-declare global {
-    interface Window {
-        cv: any;
-    }
+interface OpenCVMat {
+    rows: number;
+    cols: number;
+    data: Uint8Array;
+    delete(): void;
 }
-let cv: any = null;
+
+interface OpenCVMatVector {
+    size(): number;
+    get(index: number): OpenCVMat;
+    delete(): void;
+}
+
+interface OpenCVMoments {
+    m00: number;
+    m10: number;
+    m01: number;
+}
+
+interface OpenCVModule {
+    Mat: new () => OpenCVMat;
+    MatVector: new () => OpenCVMatVector;
+    Size: new (width: number, height: number) => unknown;
+    Scalar: new () => unknown;
+    COLOR_RGBA2GRAY: number;
+    ADAPTIVE_THRESH_GAUSSIAN_C: number;
+    THRESH_BINARY: number;
+    RETR_TREE: number;
+    CHAIN_APPROX_SIMPLE: number;
+    CV_32FC2: number;
+    INTER_LINEAR: number;
+    BORDER_CONSTANT: number;
+    onRuntimeInitialized?: () => void;
+    getBuildInformation?: () => string;
+    matFromImageData(imageData: ImageData): OpenCVMat;
+    cvtColor(src: OpenCVMat, dst: OpenCVMat, code: number, dstCn: number): void;
+    GaussianBlur(src: OpenCVMat, dst: OpenCVMat, ksize: unknown, sigmaX: number): void;
+    adaptiveThreshold(src: OpenCVMat, dst: OpenCVMat, maxValue: number, adaptiveMethod: number, thresholdType: number, blockSize: number, c: number): void;
+    findContours(image: OpenCVMat, contours: OpenCVMatVector, hierarchy: OpenCVMat, mode: number, method: number): void;
+    contourArea(contour: OpenCVMat): number;
+    boundingRect(contour: OpenCVMat): { width: number; height: number };
+    convexHull(curve: OpenCVMat, hull: OpenCVMat, clockwise: boolean, returnPoints: boolean): void;
+    arcLength(curve: OpenCVMat, closed: boolean): number;
+    approxPolyDP(curve: OpenCVMat, approxCurve: OpenCVMat, epsilon: number, closed: boolean): void;
+    moments(array: OpenCVMat, binaryImage: boolean): OpenCVMoments;
+    matFromArray(rows: number, cols: number, type: number, data: number[]): OpenCVMat;
+    getPerspectiveTransform(src: OpenCVMat, dst: OpenCVMat): OpenCVMat;
+    warpPerspective(src: OpenCVMat, dst: OpenCVMat, m: OpenCVMat, dsize: unknown, flags: number, borderMode: number, borderValue: unknown): void;
+}
+
+interface WorkerWithCv extends DedicatedWorkerGlobalScope {
+    cv?: OpenCVModule;
+}
+
+let cv: OpenCVModule | null = null;
+const workerScope = self as WorkerWithCv;
 
 // Initialize OpenCV
 function loadOpenCV() {
@@ -25,8 +74,8 @@ function loadOpenCV() {
             importScripts('https://docs.opencv.org/4.8.0/opencv.js');
 
             // Wait for runtime initialization
-            if (self.cv) {
-                cv = self.cv;
+            if (workerScope.cv) {
+                cv = workerScope.cv;
                 if (cv.getBuildInformation) {
                     resolve();
                 } else {
@@ -37,8 +86,8 @@ function loadOpenCV() {
             } else {
                 reject(new Error("Failed to load OpenCV script in worker"));
             }
-        } catch (e) {
-            reject(e);
+        } catch (error: unknown) {
+            reject(error);
         }
     });
 }
@@ -200,8 +249,8 @@ self.onmessage = async (e: MessageEvent) => {
         try {
             await loadOpenCV();
             postMessage({ type: 'INIT_SUCCESS', id });
-        } catch (err: any) {
-            postMessage({ type: 'ERROR', error: err.message, id });
+        } catch (error: unknown) {
+            postMessage({ type: 'ERROR', error: error instanceof Error ? error.message : 'OpenCV init failed', id });
         }
     } else if (type === 'DETECT') {
         if (!cv) {
@@ -219,7 +268,7 @@ self.onmessage = async (e: MessageEvent) => {
                 width: result.width,
                 height: result.height,
                 data: result.data
-            }, [result.data.buffer] as any);
+            }, [result.data.buffer as ArrayBuffer]);
         } else {
             postMessage({ type: 'DETECT_FAIL', id });
         }

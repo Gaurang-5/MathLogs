@@ -6,12 +6,48 @@ import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee } from 'l
 import { motion, AnimatePresence } from 'framer-motion';
 import CountUp from 'react-countup';
 
+interface GrowthPoint {
+    name: string;
+    students: number;
+}
+
+interface FinanceGrowthPoint {
+    name: string;
+    collected: number;
+    remaining: number;
+}
+
+interface Defaulter {
+    name: string;
+    amount: number;
+}
+
+interface DashboardSummaryResponse {
+    stats: {
+        batches: number;
+        students: number;
+    };
+    finances: {
+        collected: number;
+        totalCollected: number;
+        pending: number;
+    };
+    defaulters: Defaulter[];
+    userName?: string;
+}
+
+const DASHBOARD_INSIGHTS = [
+    { text: 'Monitor fee collection regularly', type: 'warning' },
+    { text: 'Student growth trending upward', type: 'success' },
+    { text: 'Keep track of batch performance', type: 'info' }
+] as const;
+
 export default function Dashboard() {
     const [stats, setStats] = useState({ batches: 0, students: 0 });
-    const [growthData, setGrowthData] = useState([]);
-    const [financeGrowthData, setFinanceGrowthData] = useState([]);
+    const [growthData, setGrowthData] = useState<GrowthPoint[]>([]);
+    const [financeGrowthData, setFinanceGrowthData] = useState<FinanceGrowthPoint[]>([]);
     const [finances, setFinances] = useState({ collected: 0, totalCollected: 0, pending: 0 });
-    const [defaulters, setDefaulters] = useState<any[]>([]);
+    const [defaulters, setDefaulters] = useState<Defaulter[]>([]);
     const [userName, setUserName] = useState('');
 
     // Separate loading states for progressive rendering
@@ -33,17 +69,12 @@ export default function Dashboard() {
 
     // Rotating insights
     const [currentInsight, setCurrentInsight] = useState(0);
-    const insights = [
-        { text: 'Monitor fee collection regularly', type: 'warning' },
-        { text: 'Student growth trending upward', type: 'success' },
-        { text: 'Keep track of batch performance', type: 'info' }
-    ];
 
     useEffect(() => {
         // OPTIMIZATION 1: Load critical summary data FIRST (non-blocking)
         const loadSummary = async () => {
             try {
-                const data = await api.get('/dashboard/summary');
+                const data = await api.get<DashboardSummaryResponse>('/dashboard/summary');
 
                 setStats(data.stats);
                 setFinances(data.finances);
@@ -64,8 +95,8 @@ export default function Dashboard() {
                 requestIdleCallback(async () => {
                     try {
                         const [growth, financeGrowth] = await Promise.all([
-                            api.get('/stats/growth'),
-                            api.get('/stats/finance-growth')
+                            api.get<GrowthPoint[]>('/stats/growth'),
+                            api.get<FinanceGrowthPoint[]>('/stats/finance-growth')
                         ]);
                         setGrowthData(growth);
                         setFinanceGrowthData(financeGrowth);
@@ -80,8 +111,8 @@ export default function Dashboard() {
                 setTimeout(async () => {
                     try {
                         const [growth, financeGrowth] = await Promise.all([
-                            api.get('/stats/growth'),
-                            api.get('/stats/finance-growth')
+                            api.get<GrowthPoint[]>('/stats/growth'),
+                            api.get<FinanceGrowthPoint[]>('/stats/finance-growth')
                         ]);
                         setGrowthData(growth);
                         setFinanceGrowthData(financeGrowth);
@@ -101,7 +132,7 @@ export default function Dashboard() {
     // Rotate insights every 4 seconds
     useEffect(() => {
         const interval = setInterval(() => {
-            setCurrentInsight((prev) => (prev + 1) % insights.length);
+            setCurrentInsight((prev) => (prev + 1) % DASHBOARD_INSIGHTS.length);
         }, 4000);
         return () => clearInterval(interval);
     }, []);
@@ -141,11 +172,11 @@ export default function Dashboard() {
                         transition={{ duration: 0.4 }}
                         className="flex items-center gap-3 relative z-10"
                     >
-                        <p className="text-sm font-medium text-gray-800">{insights[currentInsight].text}</p>
+                        <p className="text-sm font-medium text-gray-800">{DASHBOARD_INSIGHTS[currentInsight].text}</p>
                     </motion.div>
                 </AnimatePresence>
                 <div className="absolute bottom-2 right-4 flex gap-1">
-                    {insights.map((_, i) => (
+                    {DASHBOARD_INSIGHTS.map((_, i) => (
                         <div
                             key={i}
                             className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentInsight ? 'bg-gray-900 w-4' : 'bg-gray-400'
@@ -388,10 +419,10 @@ export default function Dashboard() {
                                                 backdropFilter: 'blur(10px)',
                                                 padding: '12px 16px'
                                             }}
-                                            formatter={((value: number | undefined, name: string | undefined) => [
+                                            formatter={(value: number | string, name: string) => [
                                                 showFeeData ? `₹${(value ?? 0).toLocaleString()}` : '₹••••••',
                                                 name === 'collected' ? 'Collected' : 'Remaining'
-                                            ]) as any}
+                                            ]}
                                         />
                                         <Bar dataKey="collected" name="Collected" fill="#111827" radius={[4, 4, 0, 0]} maxBarSize={40} />
                                         <Bar dataKey="remaining" name="Remaining" fill="#d1d5db" radius={[4, 4, 0, 0]} maxBarSize={40} />

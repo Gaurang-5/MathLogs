@@ -23,6 +23,10 @@ interface Batch {
     subject: string;
 }
 
+interface CreateTestResponse {
+    id: string;
+}
+
 export default function TestList() {
     const [tests, setTests] = useState<Test[]>([]);
     const [batches, setBatches] = useState<Batch[]>([]);
@@ -40,13 +44,13 @@ export default function TestList() {
         const fetchData = async () => {
             try {
                 const [testsData, batchesData] = await Promise.all([
-                    apiRequest('/tests'),
-                    apiRequest('/batches')
+                    apiRequest<Test[]>('/tests'),
+                    apiRequest<Batch[]>('/batches')
                 ]);
                 setTests(testsData);
                 setBatches(batchesData);
-            } catch (e) {
-                console.error(e);
+            } catch (error) {
+                console.error(error);
             } finally {
                 setLoading(false);
             }
@@ -61,7 +65,7 @@ export default function TestList() {
         const className = batch?.className;
 
         try {
-            const res = await apiRequest('/tests', 'POST', {
+            const res = await apiRequest<CreateTestResponse>('/tests', 'POST', {
                 name,
                 subject,
                 date,
@@ -70,7 +74,7 @@ export default function TestList() {
             });
             // Navigate to Dashboard immediately
             navigate(`/tests/${res.id}`);
-        } catch (e) {
+        } catch {
             alert('Failed to create test');
         }
     };

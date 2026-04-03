@@ -22,7 +22,8 @@ Welcome to the team! To run the project locally:
 3. **Install Dependencies:**
    ```bash
    npm run setup
-   # Or manually:
+   # Or manually install each workspace:
+   # npm install
    # cd server && npm install
    # cd client && npm install
    # cd mobile && npm install
@@ -31,7 +32,7 @@ Welcome to the team! To run the project locally:
 4. **Run the Application locally:**
    ```bash
    # Start the entire development environment (Web, API Server)
-   ./dev.sh
+   npm run dev
    ```
 
 ## 👥 How to Contribute

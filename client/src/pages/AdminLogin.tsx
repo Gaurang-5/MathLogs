@@ -5,6 +5,24 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, User, ArrowRight, ShieldCheck, AlertOctagon, ArrowLeft } from 'lucide-react';
 
+interface LoginResponse {
+    success: boolean;
+    adminId?: string;
+    token?: string;
+    refreshToken?: string;
+    role?: string;
+    error?: string;
+}
+
+interface ApiErrorLike {
+    message?: string;
+    response?: {
+        data?: {
+            reason?: string;
+        };
+    };
+}
+
 export default function AdminLogin() {
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
@@ -17,11 +35,11 @@ export default function AdminLogin() {
         setLoading(true);
         setError('');
         try {
-            const data = await apiRequest('/auth/login', 'POST', { username: identifier, password });
+            const data = await apiRequest<LoginResponse>('/auth/login', 'POST', { username: identifier, password });
             if (data.success) {
-                localStorage.setItem('adminId', data.adminId);
-                localStorage.setItem('token', data.token); // Store JWT
-                localStorage.setItem('refreshToken', data.refreshToken); // Store Refresh Token
+                localStorage.setItem('adminId', data.adminId ?? '');
+                localStorage.setItem('token', data.token ?? '');
+                localStorage.setItem('refreshToken', data.refreshToken ?? '');
                 if (data.role === 'SUPER_ADMIN') {
                     navigate('/super-admin');
                 } else {
@@ -30,17 +48,18 @@ export default function AdminLogin() {
             } else {
                 setError(data.error || 'Login failed');
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const error = err as ApiErrorLike;
             // Handle suspension errors with reason
-            if (err.message?.includes('suspended')) {
-                const errorData = err.response?.data;
+            if (error.message?.includes('suspended')) {
+                const errorData = error.response?.data;
                 const reason = errorData?.reason;
                 setError(reason ?
-                    `🚫 ${err.message}\n\n📋 Reason: ${reason}\n\n📧 Contact support for assistance.` :
-                    err.message
+                    `🚫 ${error.message}\n\n📋 Reason: ${reason}\n\n📧 Contact support for assistance.` :
+                    error.message ?? 'Login failed'
                 );
             } else {
-                setError(err.message || 'Login failed');
+                setError(error.message || 'Login failed');
             }
         } finally {
             setLoading(false);

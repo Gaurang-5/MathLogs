@@ -7,10 +7,41 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save, Mail, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+interface StudentSummary {
+    id: string;
+    name: string;
+    batchName?: string | null;
+}
+
+interface TestMark {
+    id: string;
+    score: number;
+    studentId: string;
+    student?: {
+        name?: string;
+    };
+}
+
+interface TestDetailsResponse {
+    id: string;
+    name: string;
+    subject: string;
+    className?: string | null;
+    date: string;
+    maxMarks: number;
+    marks: TestMark[];
+}
+
+interface MessageResponse {
+    message?: string;
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
 export default function TestDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [test, setTest] = useState<any>(null);
+    const [test, setTest] = useState<TestDetailsResponse | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Edit State
@@ -28,7 +59,7 @@ export default function TestDetails() {
 
     // Add Result State
     const [showAddResult, setShowAddResult] = useState(false);
-    const [eligibleStudents, setEligibleStudents] = useState<any[]>([]);
+    const [eligibleStudents, setEligibleStudents] = useState<StudentSummary[]>([]);
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [newScore, setNewScore] = useState('');
     const [loadingStudents, setLoadingStudents] = useState(false);
@@ -36,24 +67,44 @@ export default function TestDetails() {
     const [showEmailConfirm, setShowEmailConfirm] = useState(false);
 
     useEffect(() => {
-        fetchTest();
+        if (!id) {
+            setLoading(false);
+            return;
+        }
+
+        const loadTest = async () => {
+            try {
+                const data = await apiRequest<TestDetailsResponse>(`/tests/${id}`);
+                setTest(data);
+            } catch (error) {
+                console.error(error);
+                toast.error('Failed to load test details');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        void loadTest();
     }, [id]);
 
-    const fetchTest = async () => {
+    const refreshTest = async () => {
+        if (!id) return;
+
         try {
-            const data = await apiRequest(`/tests/${id}`);
+            const data = await apiRequest<TestDetailsResponse>(`/tests/${id}`);
             setTest(data);
-        } catch (e) {
-            console.error(e);
+        } catch (error) {
+            console.error(error);
             toast.error('Failed to load test details');
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     const handleOpenEdit = () => {
+        if (!test) return;
         setEditName(test.name);
-        setEditMaxMarks(test.maxMarks);
+        setEditMaxMarks(test.maxMarks.toString());
         setEditDate(new Date(test.date).toISOString().split('T')[0]);
         setShowEdit(true);
     };
@@ -68,8 +119,8 @@ export default function TestDetails() {
             });
             toast.success('Test updated successfully');
             setShowEdit(false);
-            fetchTest();
-        } catch (e) {
+            refreshTest();
+        } catch {
             toast.error('Failed to update test');
         }
     };
@@ -83,11 +134,11 @@ export default function TestDetails() {
             await apiRequest(`/tests/${id}`, 'DELETE');
             toast.success('Test deleted successfully');
             navigate('/tests');
-        } catch (e: any) {
+        } catch (error: unknown) {
             // Show the actual backend error message
-            const errorMsg = e.error || e.message || 'Failed to delete test';
+            const errorMsg = getErrorMessage(error, 'Failed to delete test');
             toast.error(errorMsg);
-            console.error('Delete test error:', e);
+            console.error('Delete test error:', error);
         }
     };
 
@@ -122,22 +173,22 @@ export default function TestDetails() {
         const toastId = toast.loading('Sending emails...');
         setSendingResults(true);
         try {
-            const res = await apiRequest(`/tests/${id}/send-results`, 'POST');
+            const res = await apiRequest<MessageResponse>(`/tests/${id}/send-results`, 'POST');
             if (res.message) {
                 toast.success(res.message, { id: toastId });
             } else {
                 toast.success('Emails queued successfully', { id: toastId });
             }
             setShowEmailConfirm(false);
-        } catch (e: any) {
-            toast.error(e.message || 'Failed to send emails', { id: toastId });
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to send emails'), { id: toastId });
         } finally {
             setSendingResults(false);
         }
     };
 
     // --- Mark Editing Logic ---
-    const handleEditClick = (mark: any) => {
+    const handleEditClick = (mark: TestMark) => {
         setEditingMarkId(mark.id);
         setEditScore(mark.score.toString());
     };
@@ -156,9 +207,9 @@ export default function TestDetails() {
             });
             toast.success('Mark updated');
             setEditingMarkId(null);
-            fetchTest();
-        } catch (e: any) {
-            toast.error(e.message || 'Failed to update mark');
+            refreshTest();
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to update mark'));
         }
     };
 
@@ -167,9 +218,9 @@ export default function TestDetails() {
         setShowAddResult(true);
         setLoadingStudents(true);
         try {
-            const students = await apiRequest(`/tests/${id}/eligible-students`);
+            const students = await apiRequest<StudentSummary[]>(`/tests/${id}/eligible-students`);
             setEligibleStudents(students);
-        } catch (e) {
+        } catch {
             toast.error('Failed to load students');
         } finally {
             setLoadingStudents(false);
@@ -193,9 +244,9 @@ export default function TestDetails() {
             setShowAddResult(false);
             setSelectedStudentId('');
             setNewScore('');
-            fetchTest();
-        } catch (e: any) {
-            toast.error(e.message || 'Failed to add result');
+            refreshTest();
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to add result'));
         }
     };
 
@@ -212,11 +263,11 @@ export default function TestDetails() {
     if (!test) return <Layout title="Error">Test not found</Layout>;
 
     const averageScore = test.marks.length > 0
-        ? (test.marks.reduce((a: any, b: any) => a + b.score, 0) / test.marks.length).toFixed(1)
+        ? (test.marks.reduce((total, mark) => total + mark.score, 0) / test.marks.length).toFixed(1)
         : '-';
 
     const highestScore = test.marks.length > 0
-        ? Math.max(...test.marks.map((m: any) => m.score))
+        ? Math.max(...test.marks.map((mark) => mark.score))
         : '-';
 
     return (
@@ -332,7 +383,7 @@ export default function TestDetails() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {test.marks.map((mark: any) => (
+                                {test.marks.map((mark) => (
                                     <tr key={mark.id} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="px-6 py-4 font-medium text-slate-800">{mark.student?.name || 'Unknown Student'}</td>
                                         <td className="px-6 py-4 font-bold text-slate-800">

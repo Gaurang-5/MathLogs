@@ -75,9 +75,9 @@ const Fees: React.FC = () => {
 
     const fetchFees = async () => {
         try {
-            const data = await api.get(`/fees?t=${Date.now()}`);
+            const data = await api.get<FeeSummary[]>(`/fees?t=${Date.now()}`);
             setStudents(data);
-        } catch (error) {
+        } catch {
             toast.error("Failed to load fee records");
         } finally {
             setLoading(false);
@@ -86,10 +86,10 @@ const Fees: React.FC = () => {
 
     const fetchTransactions = async () => {
         try {
-            const data = await api.get(`/fees/recent?t=${Date.now()}`);
+            const data = await api.get<Transaction[]>(`/fees/recent?t=${Date.now()}`);
             setTransactions(data);
-        } catch (e) {
-            console.error(e);
+        } catch (error) {
+            console.error(error);
         }
     };
 
@@ -110,7 +110,7 @@ const Fees: React.FC = () => {
             toast.success(`Payment of ₹${paymentAmount} recorded!`, { id: toastId });
             setSelectedStudent(null);
             setPaymentAmount('');
-        } catch (error) {
+        } catch {
             toast.error('Payment failed. Please try again.', { id: toastId });
         } finally {
             setProcessing(false);
@@ -125,7 +125,7 @@ const Fees: React.FC = () => {
                 amountDue: student.balance
             });
             toast.success('Email reminder sent!', { id: toastId });
-        } catch (e) {
+        } catch {
             toast.error('Failed to send reminder. Check email setup.', { id: toastId });
         }
     };
@@ -679,7 +679,7 @@ const Fees: React.FC = () => {
                                                 document.body.appendChild(a);
                                                 a.click();
                                                 toast.success('Downloaded!', { id: toastId });
-                                            } catch (error) {
+                                            } catch {
                                                 toast.error('Download failed', { id: toastId });
                                             }
                                         }}
@@ -781,7 +781,7 @@ const Fees: React.FC = () => {
                                                 document.body.appendChild(a);
                                                 a.click();
                                                 toast.success('Downloaded!', { id: toastId });
-                                            } catch (error) {
+                                            } catch {
                                                 toast.error('Failed', { id: toastId });
                                             }
                                         }}

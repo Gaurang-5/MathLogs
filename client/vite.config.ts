@@ -20,6 +20,15 @@ function perfOptimizer(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    environmentOptions: {
+      jsdom: {
+        url: 'http://localhost/',
+      },
+    },
+  },
   plugins: [
     react(),
     perfOptimizer(),

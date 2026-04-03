@@ -218,18 +218,21 @@ export const getProfile = async (req: Request, res: Response) => {
 // Now uses the OtpToken table with upsert (one active OTP per identifier).
 
 // Periodic cleanup of expired OTP tokens (runs every 5 minutes)
-setInterval(async () => {
-    try {
-        const result = await prisma.otpToken.deleteMany({
-            where: { expiresAt: { lt: new Date() } }
-        });
-        if (result.count > 0) {
-            console.log(`[OTP] Cleaned ${result.count} expired tokens from DB`);
+if (process.env.NODE_ENV !== 'test') {
+    const otpCleanupInterval = setInterval(async () => {
+        try {
+            const result = await prisma.otpToken.deleteMany({
+                where: { expiresAt: { lt: new Date() } }
+            });
+            if (result.count > 0) {
+                console.log(`[OTP] Cleaned ${result.count} expired tokens from DB`);
+            }
+        } catch (e) {
+            console.error('[OTP] Cleanup error:', e);
         }
-    } catch (e) {
-        console.error('[OTP] Cleanup error:', e);
-    }
-}, 5 * 60_000);
+    }, 5 * 60_000);
+    otpCleanupInterval.unref();
+}
 
 export const sendMobileOtp = async (req: Request, res: Response) => {
     const { phone: identifier } = req.body;

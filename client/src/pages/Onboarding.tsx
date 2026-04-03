@@ -4,7 +4,81 @@ import { CheckCircle2, ChevronDown, Check, Building2, User, Phone, Mail, CreditC
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 
-const loadScript = (src: string) => {
+type PlanId = 'basic' | 'pro';
+type BillingCycle = 'monthly' | 'yearly';
+
+interface TrialResponse {
+    success: boolean;
+    error?: string;
+    setupLink?: string;
+}
+
+interface CreateOrderResponse {
+    success: boolean;
+    error?: string;
+    keyId?: string;
+    orderId?: string;
+    amount?: number;
+    currency?: string;
+    subscriptionId?: string;
+}
+
+interface VerifyPaymentResponse {
+    success: boolean;
+    setupLink?: string;
+}
+
+interface ResendSetupResponse {
+    message?: string;
+}
+
+interface RazorpayHandlerResponse {
+    razorpay_order_id?: string;
+    razorpay_payment_id?: string;
+    razorpay_signature?: string;
+    razorpay_subscription_id?: string;
+}
+
+interface RazorpayFailureResponse {
+    error?: {
+        description?: string;
+    };
+}
+
+interface RazorpayOptions {
+    key?: string;
+    name: string;
+    description: string;
+    handler: (response: RazorpayHandlerResponse) => Promise<void>;
+    prefill: {
+        name: string;
+        email: string;
+        contact: string;
+    };
+    theme: {
+        color: string;
+    };
+    modal: {
+        ondismiss: () => void;
+    };
+    order_id?: string;
+    amount?: number;
+    currency?: string;
+    subscription_id?: string;
+}
+
+interface RazorpayInstance {
+    on: (event: 'payment.failed', handler: (response: RazorpayFailureResponse) => void) => void;
+    open: () => void;
+}
+
+interface WindowWithRazorpay extends Window {
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
+const loadScript = (src: string): Promise<boolean> => {
     return new Promise((resolve) => {
         const script = document.createElement('script');
         script.src = src;
@@ -49,8 +123,8 @@ export default function Onboarding() {
     const [email, setEmail] = useState('');
 
     // Step 2: Plan
-    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
-    const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | null>(null);
+    const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
+    const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
 
     // UI State
     const [activeStep, setActiveStep] = useState(1);
@@ -95,7 +169,7 @@ export default function Onboarding() {
         scrollToRef(planRef);
     };
 
-    const handleSelectPlan = async (planId: 'basic' | 'pro') => {
+    const handleSelectPlan = async (planId: PlanId) => {
         setSelectedPlan(planId);
 
         // Track plan selection
@@ -103,7 +177,9 @@ export default function Onboarding() {
             await api.post('/onboarding/lead', {
                 tuitionName, ownerName, phone, email, planId, billingCycle, step: 'PLAN_SELECTED'
             });
-        } catch (err) { }
+        } catch (error) {
+            console.debug('Lead tracking skipped at plan selection', error);
+        }
 
         setActiveStep(3);
         scrollToRef(checkoutRef);
@@ -114,7 +190,7 @@ export default function Onboarding() {
 
         if (isFreeTrial) {
             try {
-                const res = await api.post('/onboarding/start-trial', {
+                const res = await api.post<TrialResponse>('/onboarding/start-trial', {
                     tuitionName,
                     ownerName,
                     phone,
@@ -127,7 +203,9 @@ export default function Onboarding() {
                     toast.success('Trial started! Redirecting to setup...');
                     try {
                         await api.post('/onboarding/lead', { phone, step: 'CONVERTED' });
-                    } catch (err) { }
+                    } catch (error) {
+                        console.debug('Lead tracking skipped at trial conversion', error);
+                    }
                     setTimeout(() => {
                         window.location.href = res.setupLink;
                     }, 1500);
@@ -135,8 +213,8 @@ export default function Onboarding() {
                     toast.error(res.error || 'Failed to start trial.');
                     setIsLoading(false);
                 }
-            } catch (err: any) {
-                toast.error(err.message || 'Trial initialization failed.');
+            } catch (error: unknown) {
+                toast.error(getErrorMessage(error, 'Trial initialization failed.'));
                 setIsLoading(false);
             }
             return;
@@ -150,7 +228,7 @@ export default function Onboarding() {
                 return;
             }
 
-            const orderRes = await api.post('/onboarding/create-order', {
+            const orderRes = await api.post<CreateOrderResponse>('/onboarding/create-order', {
                 tuitionName,
                 ownerName,
                 phone,
@@ -170,15 +248,17 @@ export default function Onboarding() {
                 await api.post('/onboarding/lead', {
                     tuitionName, ownerName, phone, email, planId: selectedPlan, billingCycle, step: 'PAYMENT_STARTED'
                 });
-            } catch (err) { }
+            } catch (error) {
+                console.debug('Lead tracking skipped at payment start', error);
+            }
 
-            const options: any = {
+            const options: RazorpayOptions = {
                 key: orderRes.keyId,
                 name: 'MathLogs',
                 description: 'MathLogs License',
-                handler: async function (response: any) {
+                handler: async (response: RazorpayHandlerResponse) => {
                     try {
-                        const verifyRes = await api.post('/onboarding/verify-payment', {
+                        const verifyRes = await api.post<VerifyPaymentResponse>('/onboarding/verify-payment', {
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
@@ -198,15 +278,17 @@ export default function Onboarding() {
                                 await api.post('/onboarding/lead', {
                                     phone, step: 'CONVERTED'
                                 });
-                            } catch (err) { }
+                            } catch (error) {
+                                console.debug('Lead tracking skipped after payment conversion', error);
+                            }
                             setTimeout(() => {
                                 window.location.href = verifyRes.setupLink;
                             }, 1500);
                         } else {
                             toast.error('Payment verification failed.');
                         }
-                    } catch (err: any) {
-                        toast.error(err.message || 'Verification Error');
+                    } catch (error: unknown) {
+                        toast.error(getErrorMessage(error, 'Verification Error'));
                     }
                 },
                 prefill: {
@@ -218,7 +300,7 @@ export default function Onboarding() {
                     color: '#0071e3',
                 },
                 modal: {
-                    ondismiss: function () {
+                    ondismiss: () => {
                         setIsLoading(false);
                     }
                 }
@@ -232,20 +314,29 @@ export default function Onboarding() {
                 options.subscription_id = orderRes.subscriptionId;
             }
 
-            const paymentObject = new (window as any).Razorpay(options);
+            const razorpayWindow = window as WindowWithRazorpay;
+            if (!razorpayWindow.Razorpay) {
+                toast.error('Payment gateway is unavailable.');
+                setIsLoading(false);
+                return;
+            }
 
-            paymentObject.on('payment.failed', async function (response: any) {
+            const paymentObject = new razorpayWindow.Razorpay(options);
+
+            paymentObject.on('payment.failed', async (response: RazorpayFailureResponse) => {
                 try {
                     await api.post('/onboarding/lead', {
-                        phone, step: 'PAYMENT_FAILED', failureReason: response.error.description || 'Unknown Error'
+                        phone, step: 'PAYMENT_FAILED', failureReason: response.error?.description || 'Unknown Error'
                     });
-                } catch (err) { }
+                } catch (error) {
+                    console.debug('Lead tracking skipped after payment failure', error);
+                }
             });
 
             paymentObject.open();
 
-        } catch (err: any) {
-            toast.error(err.message || 'Payment initialization failed.');
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Payment initialization failed.'));
             setIsLoading(false);
         }
     };
@@ -595,11 +686,11 @@ export default function Onboarding() {
                                                 setResendLoading(true);
                                                 setResendMessage(null);
                                                 try {
-                                                    const res = await api.post('/onboarding/resend-setup-link', { phone: resendPhone });
+                                                    const res = await api.post<ResendSetupResponse>('/onboarding/resend-setup-link', { phone: resendPhone });
                                                     setResendMessage({ type: 'success', text: res.message || 'Setup link resent! Check your WhatsApp and email.' });
                                                     toast.success('Setup link resent!');
-                                                } catch (err: any) {
-                                                    const msg = err?.message || 'Failed to resend. Please try again.';
+                                                } catch (error: unknown) {
+                                                    const msg = getErrorMessage(error, 'Failed to resend. Please try again.');
                                                     setResendMessage({ type: 'error', text: msg });
                                                     toast.error(msg);
                                                 } finally {

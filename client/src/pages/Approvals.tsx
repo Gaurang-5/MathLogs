@@ -22,9 +22,9 @@ export default function Approvals() {
 
     const fetchPending = async () => {
         try {
-            const data = await apiRequest('/students/pending');
+            const data = await apiRequest<Student[]>('/students/pending');
             setStudents(data);
-        } catch (e) {
+        } catch {
             toast.error("Failed to fetch pending requests");
         } finally {
             setLoading(false);
@@ -36,7 +36,7 @@ export default function Approvals() {
     const handleApprove = async (id: string, name: string) => {
         const promise = apiRequest(`/students/${id}/approve`, 'POST', {});
 
-        toast.promise(promise, {
+        toast.promise<{ humanId?: string }>(promise, {
             loading: 'Approving student...',
             success: (data) => {
                 setStudents(prev => prev.filter(s => s.id !== id));
@@ -59,7 +59,7 @@ export default function Approvals() {
             },
             error: 'Failed to reject student',
         });
-    }
+    };
 
     const container = {
         hidden: { opacity: 0 },

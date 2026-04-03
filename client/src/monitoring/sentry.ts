@@ -4,6 +4,7 @@
  */
 
 import * as Sentry from '@sentry/react';
+import type { Breadcrumb } from '@sentry/react';
 
 const IS_PRODUCTION = import.meta.env.PROD;
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
@@ -104,7 +105,7 @@ export const captureException = (error: Error, context?: {
 };
 
 // Helper to add breadcrumbs
-export const addBreadcrumb = (message: string, category: string, data?: any) => {
+export const addBreadcrumb = (message: string, category: string, data?: Breadcrumb['data']) => {
     if (!SENTRY_DSN) return;
 
     Sentry.addBreadcrumb({

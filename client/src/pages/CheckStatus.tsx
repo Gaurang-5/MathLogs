@@ -5,12 +5,29 @@ import { motion } from 'framer-motion';
 import { Search, CheckCircle, XCircle, ArrowLeft, Smartphone } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
+interface RegistrationStatusStudent {
+    id?: string;
+    humanId?: string | null;
+    name: string;
+    schoolName?: string | null;
+    status: string;
+    registeredAt: string;
+}
+
+interface RegistrationStatusResult {
+    error?: boolean;
+    registered?: boolean;
+    student?: RegistrationStatusStudent;
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
 export default function CheckStatus() {
     const { batchId } = useParams();
     const navigate = useNavigate();
     const [whatsapp, setWhatsapp] = useState('');
     const [checking, setChecking] = useState(false);
-    const [result, setResult] = useState<any>(null);
+    const [result, setResult] = useState<RegistrationStatusResult | null>(null);
 
     const handleCheck = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -18,7 +35,7 @@ export default function CheckStatus() {
         setResult(null);
 
         try {
-            const data = await apiRequest(`/public/check-status?whatsapp=${encodeURIComponent(whatsapp)}&batchId=${batchId}`, 'GET');
+            const data = await apiRequest<RegistrationStatusResult>(`/public/check-status?whatsapp=${encodeURIComponent(whatsapp)}&batchId=${batchId}`, 'GET');
             setResult(data);
 
             if (data.registered) {
@@ -26,8 +43,8 @@ export default function CheckStatus() {
             } else {
                 toast.error('No registration found');
             }
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to check status');
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to check status'));
             setResult({ error: true });
         } finally {
             setChecking(false);

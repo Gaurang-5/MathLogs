@@ -144,7 +144,7 @@ export async function extractMarksFromSticker(
 
         // Preprocess raw capture, THEN crop marks region so it behaves identically to warped version
         try {
-            let prepped = await preprocessImage(imageBase64);
+            const prepped = await preprocessImage(imageBase64);
             processedImage = await cropMarksRegion(prepped);
             console.log("📸 Using raw fallback → preprocessed → marks-region crop for OCR");
         } catch (e) {
@@ -202,5 +202,4 @@ export async function extractMarksFromSticker(
 
     return { score: "", confidence: 0, debugImage: processedImage };
 }
-
 

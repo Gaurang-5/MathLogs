@@ -6,61 +6,14 @@ import compression from 'compression';
 import apiRoutes from './routes/api';
 import { prisma } from './prisma';
 import { configureSecurityHeaders, apiLimiter } from './middleware/security';
+import { authenticateToken } from './middleware/auth';
 import { initializeSentry } from './monitoring/sentry';
 import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
-
-const app = express();
-const PORT = process.env.PORT || 3001;
 import { emailWorker } from './utils/emailWorker';
-
-// ✅ MONITORING: Initialize Sentry FIRST (before all other middleware)
-initializeSentry(app);
 
 import * as Sentry from '@sentry/node';
 
-// CRITICAL FIX: Prevent uncaught async errors from crashing the process.
-// Fire-and-forget WhatsApp/email calls can produce unhandled rejections
-// if their .catch() callback itself throws.
-process.on('unhandledRejection', (reason: any, promise) => {
-    console.error('[FATAL] Unhandled Promise Rejection:', reason?.message || reason);
-    Sentry.captureException(reason, { tags: { type: 'unhandled_rejection' } });
-});
-
-process.on('uncaughtException', (error) => {
-    console.error('[FATAL] Uncaught Exception:', error);
-    Sentry.captureException(error, { tags: { type: 'uncaught_exception' } });
-    // Give Sentry time to flush, then exit
-    setTimeout(() => process.exit(1), 2000);
-});
-
-configureSecurityHeaders(app);
-
-app.set('trust proxy', 1); // Trust first proxy (necessary for rate limiting behind load balancers)
-
-// PERF: Optimize compression for JSON API responses (70-80% size reduction)
-app.use(compression({
-    level: 9,  // Maximum compression - JSON compresses extremely well
-    threshold: 1024,  // Only compress responses > 1KB
-    filter: (req, res) => {
-        // Always compress JSON API responses
-        if (res.getHeader('Content-Type')?.toString().includes('json')) {
-            return true;
-        }
-        return compression.filter(req, res);
-    }
-}));
-
-// PERF: Request timing middleware for observability
-app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-        const duration = Date.now() - start;
-        if (duration > 1000) {  // Log slow requests
-            console.warn(`[SLOW_REQUEST] ${req.method} ${req.path} took ${duration}ms`);
-        }
-    });
-    next();
-});
+const PORT = process.env.PORT || 3001;
 
 // CORS Configuration - Security hardened
 // SECURITY: Strict allowlist — no substring matching (prevents evilmathlogs.app attacks)
@@ -91,138 +44,179 @@ const DEVELOPMENT_ORIGINS = new Set([
     'http://10.100.3.216:8081',
 ]);
 
-app.use(cors({
-    origin: (origin, callback) => {
-        // Allow same-origin and non-browser requests (curl, health checks)
-        if (!origin) {
-            return callback(null, true);
-        }
+export function createApp() {
+    const app = express();
 
-        // SECURITY: Strict exact-match allowlist. No substring/endsWith.
-        // endsWith('mathlogs.app') was exploitable via evilmathlogs.app
-        const isDev = process.env.NODE_ENV !== 'production';
-        const isCloudflareTunnel = origin.endsWith('.trycloudflare.com');
-        const isAllowed = PRODUCTION_ORIGINS.has(origin) || (isDev && (DEVELOPMENT_ORIGINS.has(origin) || isCloudflareTunnel));
-
-        if (isAllowed) {
-            callback(null, true);
-        } else {
-            console.warn(`[SECURITY] Blocked CORS request from unauthorized origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Content-Disposition'], // For file downloads
-    maxAge: 86400 // 24 hours
-}));
-
-// SECURITY: 100kb global limit prevents JSON-parse OOM attacks.
-// The /scan-ocr route uses multer for binary uploads, so it doesn't need this raised.
-app.use(express.json({ limit: '100kb' }));
-
-// Global API rate limiter (can be overridden/tightened in specific routes)
-app.use('/api', apiLimiter);
-
-// ✅ MONITORING: Health check endpoints
-app.get('/health', async (req, res) => {
-    try {
-        const health = await getSimpleHealth();
-        res.status(health.status === 'ok' ? 200 : 503).json(health);
-    } catch (error) {
-        res.status(503).json({ status: 'error', timestamp: new Date().toISOString() });
+    if (process.env.NODE_ENV !== 'test') {
+        initializeSentry(app);
     }
-});
 
-app.get('/health/detailed', async (req, res) => {
-    try {
-        const health = await getHealthStatus();
-        const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
-        res.status(statusCode).json(health);
-    } catch (error) {
-        res.status(503).json({ status: 'unhealthy', error: 'Health check failed' });
-    }
-});
+    configureSecurityHeaders(app);
 
-app.get('/metrics', async (req, res) => {
-    try {
-        const [systemMetrics, dbStats] = await Promise.all([
-            Promise.resolve(getSystemMetrics()),
-            getDatabaseStats()
-        ]);
+    app.set('trust proxy', 1);
+
+    app.use(compression({
+        level: 9,
+        threshold: 1024,
+        filter: (req, res) => {
+            if (res.getHeader('Content-Type')?.toString().includes('json')) {
+                return true;
+            }
+            return compression.filter(req, res);
+        }
+    }));
+
+    app.use((req, res, next) => {
+        const start = Date.now();
+        res.on('finish', () => {
+            const duration = Date.now() - start;
+            if (duration > 1000) {
+                console.warn(`[SLOW_REQUEST] ${req.method} ${req.path} took ${duration}ms`);
+            }
+        });
+        next();
+    });
+
+    app.use(cors({
+        origin: (origin, callback) => {
+            if (!origin) {
+                return callback(null, true);
+            }
+
+            const isDev = process.env.NODE_ENV !== 'production';
+            const isCloudflareTunnel = origin.endsWith('.trycloudflare.com');
+            const isAllowed = PRODUCTION_ORIGINS.has(origin) || (isDev && (DEVELOPMENT_ORIGINS.has(origin) || isCloudflareTunnel));
+
+            if (isAllowed) {
+                callback(null, true);
+            } else {
+                console.warn(`[SECURITY] Blocked CORS request from unauthorized origin: ${origin}`);
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        exposedHeaders: ['Content-Disposition'],
+        maxAge: 86400
+    }));
+
+    app.use(express.json({ limit: '100kb' }));
+    app.use('/api', apiLimiter);
+
+    app.get('/health', async (req, res) => {
+        try {
+            const health = await getSimpleHealth();
+            res.status(health.status === 'ok' ? 200 : 503).json(health);
+        } catch (error) {
+            res.status(503).json({ status: 'error', timestamp: new Date().toISOString() });
+        }
+    });
+
+    app.get('/health/detailed', async (req, res) => {
+        try {
+            const health = await getHealthStatus();
+            const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
+            res.status(statusCode).json(health);
+        } catch (error) {
+            res.status(503).json({ status: 'unhealthy', error: 'Health check failed' });
+        }
+    });
+
+    app.get('/metrics', authenticateToken as any, async (req, res) => {
+        try {
+            const [systemMetrics, dbStats] = await Promise.all([
+                Promise.resolve(getSystemMetrics()),
+                getDatabaseStats()
+            ]);
+            res.json({
+                system: systemMetrics,
+                database: dbStats,
+                timestamp: new Date().toISOString()
+            });
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to fetch metrics' });
+        }
+    });
+
+    app.get('/health/query-stats', authenticateToken as any, async (req, res) => {
+        const { getQueryStats, getTopSlowQueries } = await import('./middleware/queryMonitor');
+
         res.json({
-            system: systemMetrics,
-            database: dbStats,
+            stats: getQueryStats(),
+            slowestQueries: getTopSlowQueries(10),
             timestamp: new Date().toISOString()
         });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch metrics' });
-    }
-});
-
-// Query performance stats endpoint (development/debugging)
-app.get('/health/query-stats', async (req, res) => {
-    const { getQueryStats, getTopSlowQueries } = await import('./middleware/queryMonitor');
-
-    res.json({
-        stats: getQueryStats(),
-        slowestQueries: getTopSlowQueries(10),
-        timestamp: new Date().toISOString()
     });
-});
 
-// Sentry test endpoint (only for testing error tracking)
-app.get('/debug-sentry', (req, res) => {
-    throw new Error('🧪 Sentry Test Error - If you see this in Sentry, it works!');
-});
-
-
-app.use(express.static(path.join(__dirname, '../../client/dist')));
-
-// API Routes
-app.use('/api', apiRoutes);
-
-// Generic error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error('[ERROR]', err);
-    const statusCode = err.statusCode || 500;
-    const message = process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message;
-    res.status(statusCode).json({ error: message });
-});
-
-// Catch-all route to serve React frontend for any unmatched routes
-app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
-});
-
-app.listen(PORT, () => {
-    // Initialize background workers
-    emailWorker.start();
-
-    // Start WhatsApp Worker (Smart Polling) — production only
-    if (process.env.NODE_ENV === 'production') {
-        import('./utils/whatsappWorker').then(({ processWhatsappQueue }) => {
-            console.log('✅ WhatsApp Worker Initialized');
-            
-            const pollQueue = async () => {
-                try {
-                    const processedCount = await processWhatsappQueue();
-                    setTimeout(pollQueue, processedCount && processedCount > 0 ? 100 : 2000);
-                } catch (err) {
-                    setTimeout(pollQueue, 5000);
-                }
-            };
-            
-            pollQueue();
+    if (process.env.NODE_ENV !== 'production') {
+        app.get('/debug-sentry', (req, res) => {
+            throw new Error('🧪 Sentry Test Error - If you see this in Sentry, it works!');
         });
-    } else {
-        console.log('⏭️  WhatsApp Worker skipped (development mode)');
     }
 
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Health check: http://localhost:${PORT}/health`);
-    console.log(`Detailed health: http://localhost:${PORT}/health/detailed`);
-    console.log(`Metrics: http://localhost:${PORT}/metrics`);
-});
+    app.use(express.static(path.join(__dirname, '../../client/dist')));
+    app.use('/api', apiRoutes);
+
+    app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+        console.error('[ERROR]', err);
+        const statusCode = err.statusCode || 500;
+        const message = process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message;
+        res.status(statusCode).json({ error: message });
+    });
+
+    app.get(/.*/, (req, res) => {
+        res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
+    });
+
+    return app;
+}
+
+export const app = createApp();
+
+function startServer() {
+    process.on('unhandledRejection', (reason: any) => {
+        console.error('[FATAL] Unhandled Promise Rejection:', reason?.message || reason);
+        Sentry.captureException(reason, { tags: { type: 'unhandled_rejection' } });
+    });
+
+    process.on('uncaughtException', (error) => {
+        console.error('[FATAL] Uncaught Exception:', error);
+        Sentry.captureException(error, { tags: { type: 'uncaught_exception' } });
+        setTimeout(() => process.exit(1), 2000);
+    });
+
+    app.listen(PORT, () => {
+    // Initialize background workers
+        emailWorker.start();
+
+        if (process.env.NODE_ENV === 'production') {
+            import('./utils/whatsappWorker').then(({ processWhatsappQueue }) => {
+                console.log('✅ WhatsApp Worker Initialized');
+
+                const pollQueue = async () => {
+                    try {
+                        const processedCount = await processWhatsappQueue();
+                        setTimeout(pollQueue, processedCount && processedCount > 0 ? 100 : 2000);
+                    } catch (err) {
+                        setTimeout(pollQueue, 5000);
+                    }
+                };
+
+                pollQueue();
+            });
+        } else {
+            console.log('⏭️  WhatsApp Worker skipped (development mode)');
+        }
+
+        console.log(`Server running on http://localhost:${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`Health check: http://localhost:${PORT}/health`);
+        console.log(`Detailed health: http://localhost:${PORT}/health/detailed`);
+        console.log(`Metrics: http://localhost:${PORT}/metrics`);
+    });
+}
+
+if (require.main === module && process.env.NODE_ENV !== 'test') {
+    startServer();
+}

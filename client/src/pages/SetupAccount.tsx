@@ -11,6 +11,32 @@ const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL ||
 
 type Step = 'loading' | 'invalid' | 'configure' | 'credentials' | 'done';
 
+interface ApiErrorResponse {
+    error?: string;
+}
+
+interface InviteValidationResponse {
+    instituteName: string;
+}
+
+interface ResendSetupLinkResponse {
+    message?: string;
+}
+
+interface SetupAccountResponse {
+    success: boolean;
+    adminId: string;
+    token: string;
+    refreshToken: string;
+}
+
+const getAxiosErrorMessage = (error: unknown, fallback: string) => {
+    if (axios.isAxiosError<ApiErrorResponse>(error)) {
+        return error.response?.data?.error || fallback;
+    }
+    return fallback;
+};
+
 export default function SetupAccount() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -44,31 +70,32 @@ export default function SetupAccount() {
             setError('Missing invite token.');
             return;
         }
-        validateToken();
-    }, [token]);
 
-    const validateToken = async () => {
-        try {
-            const res = await axios.get(`${API_URL}/invites/${token}`);
-            setInstituteName(res.data.instituteName);
-            setStep('configure');
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Invalid or expired invite link.');
-            setStep('invalid');
-        }
-    };
+        const validateToken = async () => {
+            try {
+                const res = await axios.get<InviteValidationResponse>(`${API_URL}/invites/${token}`);
+                setInstituteName(res.data.instituteName);
+                setStep('configure');
+            } catch (error: unknown) {
+                setError(getAxiosErrorMessage(error, 'Invalid or expired invite link.'));
+                setStep('invalid');
+            }
+        };
+
+        void validateToken();
+    }, [token]);
 
     const handleResendLink = async () => {
         if (resendPhone.length < 10) return;
         setResendLoading(true);
         setResendResult(null);
         try {
-            const res = await axios.post(`${API_URL}/onboarding/resend-setup-link`, { phone: resendPhone });
+            const res = await axios.post<ResendSetupLinkResponse>(`${API_URL}/onboarding/resend-setup-link`, { phone: resendPhone });
             setResendResult({ type: 'success', text: res.data.message || 'Setup link resent! Check your WhatsApp and email.' });
-        } catch (err: any) {
+        } catch (error: unknown) {
             setResendResult({
                 type: 'error',
-                text: err.response?.data?.error || 'Failed to resend. Please try again.'
+                text: getAxiosErrorMessage(error, 'Failed to resend. Please try again.')
             });
         } finally {
             setResendLoading(false);
@@ -107,7 +134,7 @@ export default function SetupAccount() {
         setError('');
 
         try {
-            const res = await axios.post(`${API_URL}/auth/setup-account`, {
+            const res = await axios.post<SetupAccountResponse>(`${API_URL}/auth/setup-account`, {
                 token,
                 username,
                 password,
@@ -123,8 +150,8 @@ export default function SetupAccount() {
                 setStep('done');
                 setTimeout(() => navigate('/dashboard'), 1500);
             }
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Setup failed. Please try again.');
+        } catch (error: unknown) {
+            setError(getAxiosErrorMessage(error, 'Setup failed. Please try again.'));
         } finally {
             setIsSubmitting(false);
         }

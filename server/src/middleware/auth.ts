@@ -27,17 +27,20 @@ const AUTH_CACHE_MAX_SIZE = 500;
 const authCache = new Map<string, CachedUser>();
 
 // Cleanup stale entries every 5 minutes
-setInterval(() => {
-    const now = Date.now();
-    let cleaned = 0;
-    for (const [key, val] of authCache.entries()) {
-        if (now - val.fetchedAt > AUTH_CACHE_TTL_MS * 2) {
-            authCache.delete(key);
-            cleaned++;
+if (process.env.NODE_ENV !== 'test') {
+    const cacheCleanupInterval = setInterval(() => {
+        const now = Date.now();
+        let cleaned = 0;
+        for (const [key, val] of authCache.entries()) {
+            if (now - val.fetchedAt > AUTH_CACHE_TTL_MS * 2) {
+                authCache.delete(key);
+                cleaned++;
+            }
         }
-    }
-    if (cleaned > 0) console.log(`[AUTH_CACHE] Cleaned ${cleaned} stale entries. Size: ${authCache.size}`);
-}, 5 * 60_000);
+        if (cleaned > 0) console.log(`[AUTH_CACHE] Cleaned ${cleaned} stale entries. Size: ${authCache.size}`);
+    }, 5 * 60_000);
+    cacheCleanupInterval.unref();
+}
 
 /** Call this when user changes password or critical settings */
 export const invalidateAuthCache = (userId: string) => {

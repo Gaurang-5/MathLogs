@@ -4,6 +4,39 @@ import { api } from '../utils/api';
 import { Calendar, Plus, Download, RefreshCcw, Trash2, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+interface ChangePasswordResponse {
+    token?: string;
+    refreshToken?: string;
+}
+
+interface Profile {
+    username: string;
+    email?: string;
+    phone?: string;
+    planName?: string;
+    maxStudents?: number;
+}
+
+interface AcademicYear {
+    id: string;
+    name: string;
+    isDefault?: boolean;
+    startDate?: string | null;
+    endDate?: string | null;
+}
+
+interface AcademicYearsResponse {
+    years: AcademicYear[];
+    currentAcademicYearId: string | null;
+}
+
+interface SwitchAcademicYearResponse {
+    currentAcademicYearId: string;
+    name: string;
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
 function ChangePasswordForm() {
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -25,7 +58,7 @@ function ChangePasswordForm() {
 
         setLoading(true);
         try {
-            const res = await api.post('/auth/change-password', {
+            const res = await api.post<ChangePasswordResponse>('/auth/change-password', {
                 currentPassword,
                 newPassword
             });
@@ -41,9 +74,9 @@ function ChangePasswordForm() {
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
-        } catch (e: any) {
-            console.error(e);
-            toast.error(e.message || 'Failed to change password');
+        } catch (error: unknown) {
+            console.error(error);
+            toast.error(getErrorMessage(error, 'Failed to change password'));
         } finally {
             setLoading(false);
         }
@@ -108,10 +141,10 @@ function ChangePasswordForm() {
 
 
 function ProfileSection() {
-    const [profile, setProfile] = useState<any>(null);
+    const [profile, setProfile] = useState<Profile | null>(null);
 
     useEffect(() => {
-        api.get('/auth/me').then(setProfile).catch(console.error);
+        api.get<Profile>('/auth/me').then(setProfile).catch(console.error);
     }, []);
 
     if (!profile) return <div className="animate-pulse bg-gray-100 h-48 rounded-[24px] mb-12" />;
@@ -162,7 +195,7 @@ function ProfileSection() {
 
 
 export default function Settings() {
-    const [years, setYears] = useState<any[]>([]);
+    const [years, setYears] = useState<AcademicYear[]>([]);
     const [currentYearId, setCurrentYearId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [newYearName, setNewYearName] = useState('');
@@ -170,12 +203,12 @@ export default function Settings() {
     const fetchYears = async () => {
         try {
             console.log('Fetching academic years...');
-            const data = await api.get('/academic-years');
+            const data = await api.get<AcademicYearsResponse>('/academic-years');
             console.log('Received academic years:', data);
             setYears(data.years);
             setCurrentYearId(data.currentAcademicYearId);
-        } catch (e) {
-            console.error('Fetch error:', e);
+        } catch (error) {
+            console.error('Fetch error:', error);
             toast.error('Failed to load academic years');
         }
     };
@@ -192,7 +225,7 @@ export default function Settings() {
             setNewYearName('');
             setIsCreating(false);
             fetchYears();
-        } catch (e) {
+        } catch {
             toast.error('Failed to create academic year');
         }
     };
@@ -220,7 +253,7 @@ export default function Settings() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
             toast.success('Backup downloaded');
-        } catch (e) {
+        } catch {
             toast.error('Failed to download backup');
         }
     };
@@ -241,13 +274,13 @@ export default function Settings() {
     const confirmSwitch = async () => {
         if (!switchModal?.id) return;
         try {
-            const res = await api.post('/academic-years/switch', { id: switchModal.id });
+            const res = await api.post<SwitchAcademicYearResponse>('/academic-years/switch', { id: switchModal.id });
             setCurrentYearId(res.currentAcademicYearId);
             toast.success(`Switched to ${res.name}`);
             setSwitchModal({ isOpen: false, id: null, name: '' });
             // Force reload to clear client cache/state
             window.location.href = '/dashboard';
-        } catch (e) {
+        } catch {
             toast.error('Failed to switch academic year');
         }
     };
@@ -265,9 +298,9 @@ export default function Settings() {
             setDeleteModal({ isOpen: false, id: null, name: '' });
             setDeletePassword('');
             fetchYears();
-        } catch (e: any) {
-            console.error('Delete error:', e);
-            const errorMessage = e.message || e.response?.data?.error || 'Failed to delete. Please check your password.';
+        } catch (error: unknown) {
+            console.error('Delete error:', error);
+            const errorMessage = getErrorMessage(error, 'Failed to delete. Please check your password.');
             toast.error(errorMessage, { id: toastId });
         }
     };

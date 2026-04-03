@@ -9,47 +9,44 @@ interface BeforeInstallPromptEvent extends Event {
 
 export default function PWAInstallPrompt() {
     const location = useLocation();
-    const [showPrompt, setShowPrompt] = useState(false);
+    const [showPrompt, setShowPrompt] = useState(() => false);
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-    const [isIOS, setIsIOS] = useState(false);
-    const [isStandalone, setIsStandalone] = useState(false);
+    const [isIOS] = useState(() => /iPad|iPhone|iPod/.test(navigator.userAgent));
+    const [isStandalone] = useState(() => window.matchMedia('(display-mode: standalone)').matches);
 
     useEffect(() => {
-        // Check if already installed (standalone mode)
-        const standalone = window.matchMedia('(display-mode: standalone)').matches;
-        setIsStandalone(standalone);
-
-        // Check if iOS
-        const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        setIsIOS(iOS);
-
         // Check if user has dismissed before
         const dismissed = localStorage.getItem('pwa-install-dismissed');
+        if (isStandalone || dismissed) {
+            return;
+        }
+
+        let timeoutId: number | null = null;
 
         // Show prompt if:
         // - Not in standalone mode (not installed)
         // - Not previously dismissed
         // - iOS (always show manual instructions) OR has install capability
-        if (!standalone && !dismissed) {
-            // Listen for beforeinstallprompt event (Chrome/Edge)
-            const handler = (e: Event) => {
-                e.preventDefault();
-                setDeferredPrompt(e as BeforeInstallPromptEvent);
-                setShowPrompt(true);
-            };
+        const handler = (e: Event) => {
+            e.preventDefault();
+            setDeferredPrompt(e as BeforeInstallPromptEvent);
+            setShowPrompt(true);
+        };
 
-            window.addEventListener('beforeinstallprompt', handler);
+        window.addEventListener('beforeinstallprompt', handler);
 
-            // For iOS, show prompt after 2 seconds (no beforeinstallprompt)
-            if (iOS) {
-                setTimeout(() => setShowPrompt(true), 2000);
-            }
-
-            return () => {
-                window.removeEventListener('beforeinstallprompt', handler);
-            };
+        // For iOS, show prompt after 2 seconds (no beforeinstallprompt)
+        if (isIOS) {
+            timeoutId = window.setTimeout(() => setShowPrompt(true), 2000);
         }
-    }, []);
+
+        return () => {
+            if (timeoutId !== null) {
+                window.clearTimeout(timeoutId);
+            }
+            window.removeEventListener('beforeinstallprompt', handler);
+        };
+    }, [isIOS, isStandalone]);
 
     const handleInstall = async () => {
         if (!deferredPrompt) return;

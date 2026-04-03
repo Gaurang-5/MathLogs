@@ -4,6 +4,7 @@ import PDFDocument from 'pdfkit';
 import { secureLogger } from '../utils/secureLogger';
 import { sendEmail } from '../utils/email';
 import { addMathLogsHeader } from '../utils/pdfUtils';
+import { calculateStudentFeeSnapshot } from '../utils/feeCalculations';
 
 // Email handling moved to utils/email.ts
 
@@ -30,63 +31,7 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
 
         // PERF OPTIMIZATION: Calculate dues and filter defaulters (O(n) instead of O(n²))
         let defaulters = students.map((student: any) => {
-            // Calculate Total Paid first to use for dynamic allocation
-            const paidSimple = student.fees
-                .filter((f: any) => f.status === 'PAID')
-                .reduce((sum: number, fee: any) => sum + fee.amount, 0);
-
-            // Available "generic" cash to cover installments
-            let unallocatedCash = paidSimple;
-
-            // Balance Calc
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const sortedInstallments = student.batch?.feeInstallments
-                ?.filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate)
-                ?.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) || [];
-            const installmentTotal = sortedInstallments.reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
-            const totalFee = installmentTotal > 0 ? installmentTotal : (student.batch?.feeAmount || 0);
-
-            const paidInstallments = student.feePayments
-                .reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-
-            const totalPaid = paidSimple + paidInstallments;
-            const balance = totalFee - totalPaid;
-
-            // PERF: Pre-build payment lookup map - O(n) instead of O(n²)
-            // This eliminates nested .find() which was causing O(n²) complexity
-            const paymentsByInstallment = new Map<string, number>();
-            student.feePayments?.forEach((p: any) => {
-                const current = paymentsByInstallment.get(p.installmentId) || 0;
-                paymentsByInstallment.set(p.installmentId, current + p.amountPaid);
-            });
-
-            // Oldest Due Date Calc (now O(n) with Map lookup)
-            let oldestDue = new Date(); // Fallback
-            if (sortedInstallments.length > 0) {
-                let found = false;
-                for (const inst of sortedInstallments) {
-                    // O(1) map lookup instead of O(n) find()
-                    const paidDirectly = paymentsByInstallment.get(inst.id) || 0;
-                    let remainingCost = inst.amount - paidDirectly;
-
-                    // Use unallocated cash if available
-                    if (remainingCost > 0 && unallocatedCash > 0) {
-                        const coverage = Math.min(remainingCost, unallocatedCash);
-                        remainingCost -= coverage;
-                        unallocatedCash -= coverage;
-                    }
-
-                    if (remainingCost > 0) {
-                        oldestDue = new Date(inst.createdAt);
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found && balance > 0) oldestDue = new Date();
-            } else {
-                // Flat fee: use student creation date roughly or simply 'now'
-                oldestDue = student.createdAt ? new Date(student.createdAt) : new Date();
-            }
+            const { balance, oldestDue } = calculateStudentFeeSnapshot(student);
 
             return {
                 humanId: student.humanId || '-',

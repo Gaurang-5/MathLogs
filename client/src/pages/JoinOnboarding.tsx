@@ -4,7 +4,67 @@ import { Building2, User, Phone, Mail, CreditCard, Shield, CheckCircle2, Loader2
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 
-const loadScript = (src: string) => {
+interface CreateOrderResponse {
+    success: boolean;
+    error?: string;
+    freeSetup?: boolean;
+    setupLink?: string;
+    keyId?: string;
+    orderId?: string;
+    amount?: number;
+    currency?: string;
+}
+
+interface VerifyPaymentResponse {
+    success: boolean;
+    setupLink?: string;
+}
+
+interface RazorpayHandlerResponse {
+    razorpay_order_id?: string;
+    razorpay_payment_id?: string;
+    razorpay_signature?: string;
+}
+
+interface RazorpayFailureResponse {
+    error?: {
+        description?: string;
+    };
+}
+
+interface RazorpayOptions {
+    key?: string;
+    order_id?: string;
+    amount?: number;
+    currency?: string;
+    name: string;
+    description: string;
+    handler: (response: RazorpayHandlerResponse) => Promise<void>;
+    prefill: {
+        name: string;
+        email: string;
+        contact: string;
+    };
+    theme: {
+        color: string;
+    };
+    modal: {
+        ondismiss: () => void;
+    };
+}
+
+interface RazorpayInstance {
+    on: (event: 'payment.failed', handler: (response: RazorpayFailureResponse) => void) => void;
+    open: () => void;
+}
+
+interface WindowWithRazorpay extends Window {
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
+const loadScript = (src: string): Promise<boolean> => {
     return new Promise((resolve) => {
         const script = document.createElement('script');
         script.src = src;
@@ -51,14 +111,14 @@ export default function JoinOnboarding() {
 
         const fetchLink = async () => {
             try {
-                const res = await api.get(`/admin-onboarding/${token}`);
+                const res = await api.get<LinkData>(`/admin-onboarding/${token}`);
                 if (res.valid) {
                     setLinkData(res);
                 } else {
                     setError('This link is invalid or has expired.');
                 }
-            } catch (err: any) {
-                setError(err?.message || 'Failed to load onboarding link.');
+            } catch (error: unknown) {
+                setError(getErrorMessage(error, 'Failed to load onboarding link.'));
             } finally {
                 setLoading(false);
             }
@@ -80,7 +140,7 @@ export default function JoinOnboarding() {
 
         try {
             // First, create the order (or handle free setup)
-            const orderRes = await api.post('/admin-onboarding/create-order', {
+            const orderRes = await api.post<CreateOrderResponse>('/admin-onboarding/create-order', {
                 token,
                 billingCycle,
                 instituteName,
@@ -113,16 +173,16 @@ export default function JoinOnboarding() {
                 return;
             }
 
-            const options: any = {
+            const options: RazorpayOptions = {
                 key: orderRes.keyId,
                 order_id: orderRes.orderId,
                 amount: orderRes.amount,
                 currency: orderRes.currency,
                 name: 'MathLogs',
                 description: `MathLogs ${linkData.plan} Plan - ${billingCycle}`,
-                handler: async function (response: any) {
+                handler: async (response: RazorpayHandlerResponse) => {
                     try {
-                        const verifyRes = await api.post('/admin-onboarding/verify-payment', {
+                        const verifyRes = await api.post<VerifyPaymentResponse>('/admin-onboarding/verify-payment', {
                             token,
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
@@ -144,8 +204,8 @@ export default function JoinOnboarding() {
                             toast.error('Payment verification failed.');
                             setIsProcessing(false);
                         }
-                    } catch (err: any) {
-                        toast.error(err.message || 'Verification Error');
+                    } catch (error: unknown) {
+                        toast.error(getErrorMessage(error, 'Verification Error'));
                         setIsProcessing(false);
                     }
                 },
@@ -158,23 +218,30 @@ export default function JoinOnboarding() {
                     color: '#0071e3',
                 },
                 modal: {
-                    ondismiss: function () {
+                    ondismiss: () => {
                         setIsProcessing(false);
                     }
                 }
             };
 
-            const paymentObject = new (window as any).Razorpay(options);
+            const razorpayWindow = window as WindowWithRazorpay;
+            if (!razorpayWindow.Razorpay) {
+                toast.error('Payment gateway is unavailable.');
+                setIsProcessing(false);
+                return;
+            }
 
-            paymentObject.on('payment.failed', function (response: any) {
+            const paymentObject = new razorpayWindow.Razorpay(options);
+
+            paymentObject.on('payment.failed', (response: RazorpayFailureResponse) => {
                 toast.error(response.error?.description || 'Payment Failed');
                 setIsProcessing(false);
             });
 
             paymentObject.open();
 
-        } catch (err: any) {
-            toast.error(err.message || 'Payment initialization failed.');
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Payment initialization failed.'));
             setIsProcessing(false);
         }
     };

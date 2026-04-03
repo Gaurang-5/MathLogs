@@ -4,7 +4,91 @@ import Layout from '../components/Layout';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 
-const loadScript = (src: string) => {
+type PlanId = 'basic' | 'pro';
+type BillingCycle = 'monthly' | 'yearly';
+
+interface BillingConfig {
+    planName?: string;
+    customPriceMonthly?: number;
+    customPriceYearly?: number;
+    maxStudents?: number;
+}
+
+interface InstituteBilling {
+    plan?: string;
+    config?: BillingConfig;
+    teacherName?: string;
+    email?: string;
+    phoneNumber?: string;
+    planExpiryDate?: string | null;
+}
+
+interface BillingCreateResponse {
+    success: boolean;
+    error?: string;
+    keyId?: string;
+    orderId?: string;
+    amount?: number;
+    currency?: string;
+    subscriptionId?: string;
+}
+
+interface BillingVerifyResponse {
+    success: boolean;
+}
+
+interface BillingCancelResponse {
+    success: boolean;
+    error?: string;
+}
+
+interface RazorpayHandlerResponse {
+    razorpay_order_id?: string;
+    razorpay_payment_id?: string;
+    razorpay_signature?: string;
+    razorpay_subscription_id?: string;
+}
+
+interface RazorpayFailureResponse {
+    error?: {
+        description?: string;
+    };
+}
+
+interface RazorpayOptions {
+    key?: string;
+    name: string;
+    description: string;
+    handler: (response: RazorpayHandlerResponse) => Promise<void>;
+    prefill: {
+        name: string;
+        email: string;
+        contact: string;
+    };
+    theme: {
+        color: string;
+    };
+    modal: {
+        ondismiss: () => void;
+    };
+    order_id?: string;
+    amount?: number;
+    currency?: string;
+    subscription_id?: string;
+}
+
+interface RazorpayInstance {
+    on: (event: 'payment.failed', handler: (response: RazorpayFailureResponse) => void) => void;
+    open: () => void;
+}
+
+interface WindowWithRazorpay extends Window {
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
+const loadScript = (src: string): Promise<boolean> => {
     return new Promise((resolve) => {
         const script = document.createElement('script');
         script.src = src;
@@ -42,12 +126,12 @@ const pricingPlans = [
 ];
 
 export default function Billing() {
-    const [institute, setInstitute] = useState<any>(null);
+    const [institute, setInstitute] = useState<InstituteBilling | null>(null);
     const [loading, setLoading] = useState(true);
     const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
     
-    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
-    const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | null>(null);
+    const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
+    const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
     const [showUpgradePlans, setShowUpgradePlans] = useState(false);
     const [showCancelModal, setShowCancelModal] = useState(false);
     const plansRef = useRef<HTMLDivElement>(null);
@@ -67,13 +151,13 @@ export default function Billing() {
 
     const fetchInstituteDetails = async () => {
         try {
-            const res = await api.get('/institute/me');
+            const res = await api.get<InstituteBilling>('/institute/me');
             if (res) {
                 setInstitute(res);
                 if (res.plan === 'PRO') setSelectedPlan('pro');
                 else setSelectedPlan('basic');
             }
-        } catch (error) {
+        } catch {
             toast.error('Failed to load billing details.');
         } finally {
             setLoading(false);
@@ -99,7 +183,7 @@ export default function Billing() {
                 return;
             }
 
-            const orderRes = await api.post('/billing/create', {
+            const orderRes = await api.post<BillingCreateResponse>('/billing/create', {
                 planId: isCustomPlan ? 'custom' : selectedPlan,
                 billingCycle,
             });
@@ -110,13 +194,13 @@ export default function Billing() {
                 return;
             }
 
-            const options: any = {
+            const options: RazorpayOptions = {
                 key: orderRes.keyId,
                 name: 'MathLogs',
                 description: isCustomPlan ? 'MathLogs Custom Plan Renewal' : 'MathLogs License Upgrade',
-                handler: async function (response: any) {
+                handler: async (response: RazorpayHandlerResponse) => {
                     try {
-                        const verifyRes = await api.post('/billing/verify', {
+                        const verifyRes = await api.post<BillingVerifyResponse>('/billing/verify', {
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
@@ -131,8 +215,8 @@ export default function Billing() {
                         } else {
                             toast.error('Payment verification failed.');
                         }
-                    } catch (err: any) {
-                        toast.error(err.message || 'Verification Error');
+                    } catch (error: unknown) {
+                        toast.error(getErrorMessage(error, 'Verification Error'));
                     }
                 },
                 prefill: {
@@ -144,7 +228,7 @@ export default function Billing() {
                     color: '#0071e3',
                 },
                 modal: {
-                    ondismiss: function () {
+                    ondismiss: () => {
                         setIsCheckoutLoading(false);
                     }
                 }
@@ -158,16 +242,23 @@ export default function Billing() {
                 options.subscription_id = orderRes.subscriptionId;
             }
 
-            const paymentObject = new (window as any).Razorpay(options);
+            const razorpayWindow = window as WindowWithRazorpay;
+            if (!razorpayWindow.Razorpay) {
+                toast.error('Razorpay SDK is unavailable.');
+                setIsCheckoutLoading(false);
+                return;
+            }
 
-            paymentObject.on('payment.failed', async function (response: any) {
+            const paymentObject = new razorpayWindow.Razorpay(options);
+
+            paymentObject.on('payment.failed', (response: RazorpayFailureResponse) => {
                 toast.error(response.error.description || 'Payment Failed');
             });
 
             paymentObject.open();
 
-        } catch (err: any) {
-            toast.error(err.message || 'Payment initialization failed.');
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Payment initialization failed.'));
             setIsCheckoutLoading(false);
         }
     };
@@ -175,15 +266,15 @@ export default function Billing() {
     const executeCancelSubscription = async () => {
         setIsCheckoutLoading(true);
         try {
-            const res = await api.delete('/billing/cancel');
+            const res = await api.delete<BillingCancelResponse>('/billing/cancel');
             if (res.success) {
                 toast.success('Subscription cancelled successfully.');
                 fetchInstituteDetails(); 
             } else {
                 toast.error(res.error || 'Failed to cancel subscription.');
             }
-        } catch (err: any) {
-            toast.error(err.message || 'An error occurred.');
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'An error occurred.'));
         } finally {
             setIsCheckoutLoading(false);
             setShowCancelModal(false);
