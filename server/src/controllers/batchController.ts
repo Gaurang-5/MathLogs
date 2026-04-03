@@ -514,56 +514,59 @@ const CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
 export const getBatchPublicStatus = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
+    const token = req.query.token as string | undefined;
+
     try {
         const now = Date.now();
         const cached = publicBatchCache.get(id);
+        let safeBatchData;
 
         if (cached && now - cached.timestamp < CACHE_TTL_MS) {
-            return res.json(cached.data);
-        }
+            safeBatchData = cached.data;
+        } else {
+            const batch = await prisma.batch.findUnique({
+                where: { id },
+                select: {
+                    name: true,
+                    subject: true,
+                    isRegistrationOpen: true,
+                    isRegistrationEnded: true,
+                    whatsappGroupLink: true,
+                    autoSendWelcome: true,
+                    institute: {
+                        select: { name: true, areRegistrationsPaused: true, plan: true, planExpiryDate: true, config: true }
+                    }
+                }
+            });
 
-        const batch = await prisma.batch.findUnique({
-            where: { id },
-            select: {
-                name: true,
-                subject: true,
-                isRegistrationOpen: true,
-                isRegistrationEnded: true,
-                whatsappGroupLink: true,
-                autoSendWelcome: true,
+            if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+            // Extract logo safely without sending whole config
+            let logoUrl = null;
+            if (batch.institute && (batch.institute.config as any)?.logo) {
+                logoUrl = (batch.institute.config as any).logo;
+            }
+
+            safeBatchData = {
+                ...batch,
                 institute: {
-                    select: { name: true, areRegistrationsPaused: true, plan: true, planExpiryDate: true, config: true }
+                    ...batch.institute,
+                    logoUrl,
+                    config: undefined // Remove sensitive config
+                }
+            };
+
+            // Overwrite so frontend disables registration natively if sub is cancelled or expired
+            if (safeBatchData.institute) {
+                const isPlanExpired = safeBatchData.institute.planExpiryDate && new Date(batch.institute!.planExpiryDate!).getTime() < Date.now();
+                if (safeBatchData.institute.areRegistrationsPaused || (safeBatchData.institute as any).plan === 'NO_PLAN' || isPlanExpired) {
+                    safeBatchData.isRegistrationOpen = false;
                 }
             }
-        });
 
-        if (!batch) return res.status(404).json({ error: 'Batch not found' });
-
-        // Extract logo safely without sending whole config
-        let logoUrl = null;
-        if (batch.institute && (batch.institute.config as any)?.logo) {
-            logoUrl = (batch.institute.config as any).logo;
+            // Save to cache
+            publicBatchCache.set(id, { data: safeBatchData, timestamp: now });
         }
-
-        const safeBatchData = {
-            ...batch,
-            institute: {
-                ...batch.institute,
-                logoUrl,
-                config: undefined // Remove sensitive config
-            }
-        };
-
-        // Overwrite so frontend disables registration natively if sub is cancelled or expired
-        if (safeBatchData.institute) {
-            const isPlanExpired = safeBatchData.institute.planExpiryDate && new Date(batch.institute!.planExpiryDate!).getTime() < Date.now();
-            if (safeBatchData.institute.areRegistrationsPaused || (safeBatchData.institute as any).plan === 'NO_PLAN' || isPlanExpired) {
-                safeBatchData.isRegistrationOpen = false;
-            }
-        }
-
-        // Save to cache
-        publicBatchCache.set(id, { data: safeBatchData, timestamp: now });
 
         // Clean up old cache entries occasionally
         if (publicBatchCache.size > 100) {
@@ -572,7 +575,40 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
             }
         }
 
-        res.json(safeBatchData);
+        // Check if token (invite link) has already been used to register
+        let isAlreadyRegistered = false;
+        let registeredStudentData = null;
+
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-123') as any;
+                if (decoded.batchId === id && decoded.whatsapp) {
+                    const existingStudent = await prisma.student.findFirst({
+                        where: { batchId: id, parentWhatsapp: decoded.whatsapp }
+                    });
+
+                    if (existingStudent) {
+                        isAlreadyRegistered = true;
+                        registeredStudentData = {
+                            id: existingStudent.id,
+                            humanId: existingStudent.humanId,
+                            name: existingStudent.name,
+                            schoolName: existingStudent.schoolName,
+                            batchId: existingStudent.batchId,
+                            parentWhatsapp: existingStudent.parentWhatsapp
+                        };
+                    }
+                }
+            } catch (err) {
+                // If token is invalid/expired, ignore it for now. The frontend /register route will block it.
+            }
+        }
+
+        res.json({
+            ...safeBatchData,
+            alreadyRegistered: isAlreadyRegistered,
+            registeredStudent: registeredStudentData
+        });
     } catch (e) {
         res.status(500).json({ error: 'Failed to fetch status' });
     }

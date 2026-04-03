@@ -20,6 +20,8 @@ interface BatchStatus {
     isRegistrationOpen?: boolean;
     autoSendWelcome?: boolean;
     whatsappGroupLink?: string;
+    alreadyRegistered?: boolean;
+    registeredStudent?: any;
     institute?: {
         name: string;
         logoUrl?: string | null;
@@ -70,9 +72,23 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     // Fetch batch status with timeout protection
     useEffect(() => {
         if (batchId) {
-            apiRequest<BatchStatus>(`/public/batch/${batchId}`, 'GET')
+            const url = token ? `/public/batch/${batchId}?token=${encodeURIComponent(token)}` : `/public/batch/${batchId}`;
+            apiRequest<BatchStatus & { alreadyRegistered?: boolean, registeredStudent?: any }>(url, 'GET')
                 .then(data => {
                     setBatchStatus(data);
+                    
+                    // Priority 1: If backend says token is already registered, force success state
+                    if (data.alreadyRegistered && data.registeredStudent) {
+                        setSubmittedData({ ...data.registeredStudent, batchId });
+                        setSubmitted(true);
+                    } else if (token) {
+                        // Priority 2: If we have a token but backend says NOT already registered,
+                        // clear any stale cached registration that might belong to another student.
+                        if (submitted && cachedRegistration && cachedRegistration.batchId === batchId) {
+                            setSubmitted(false);
+                            setSubmittedData(null);
+                        }
+                    }
                     setLoading(false);
                 })
                 .catch((error) => {
@@ -81,7 +97,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                     setLoading(false);
                 });
         }
-    }, [batchId]);
+    }, [batchId, token]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -288,7 +304,9 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                         <CheckCircle className="w-8 h-8 text-success" />
                     </motion.div>
 
-                    <h2 className="text-2xl font-bold text-app-text tracking-tight">Registration Sent!</h2>
+                    <h2 className="text-2xl font-bold text-app-text tracking-tight">
+                        {batchStatus?.alreadyRegistered ? 'Already Registered' : 'Registration Sent!'}
+                    </h2>
 
                     {batchStatus?.institute?.name && (
                         <p className="text-app-text-secondary text-sm mt-1">{batchStatus.institute.name}</p>
