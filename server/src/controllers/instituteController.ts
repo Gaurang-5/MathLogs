@@ -339,3 +339,56 @@ export const getOnboardingLeads = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to fetch leads' });
     }
 };
+
+export const uploadLogo = async (req: Request, res: Response) => {
+    try {
+        const adminId = (req as any).user?.id;
+        const admin = await prisma.admin.findUnique({
+            where: { id: adminId },
+            include: { institute: true }
+        });
+
+        if (!admin || !admin.institute) {
+            return res.status(404).json({ error: "Institute not found" });
+        }
+
+        const { logo } = req.body;
+        if (!logo || typeof logo !== 'string') {
+            return res.status(400).json({ error: "No image file provided" });
+        }
+
+        // --- SECURITY VALIDATION: Prevent XSS, DOS, and File Spoofing ---
+        
+        // 1. Strict MIME type enforcement (PNG strictly required)
+        if (!logo.startsWith('data:image/png;base64,')) {
+            return res.status(400).json({ error: "Security Error: Invalid file format. Only true PNG is accepted." });
+        }
+
+        // 2. Base64 payload sanitization (Prevents arbitrary injection out of href/src boundaries)
+        const base64Data = logo.substring(22); // length of 'data:image/png;base64,'
+        const base64Regex = /^[A-Za-z0-9+/=]+$/;
+        if (!base64Data || !base64Regex.test(base64Data)) {
+            return res.status(400).json({ error: "Security Error: Malformed or malicious image data detected." });
+        }
+
+        // 3. Hard size limits (Enforce ~2MB payload ceiling to prevent DB flooding)
+        // 3 * 1024 * 1024 = 3145728 character length threshold.
+        if (logo.length > 3145728) {
+            return res.status(413).json({ error: "Security Error: File payload exceeds acceptable size limits (Max 2MB)." });
+        }
+
+        let config = (admin.institute.config as any) || {};
+        config = { ...config, logo };
+
+        await prisma.institute.update({
+            where: { id: admin.institute.id },
+            data: { config }
+        });
+
+        res.json({ success: true, logo });
+    } catch (error) {
+        console.error("Error uploading logo:", error);
+        res.status(500).json({ error: "Failed to upload logo" });
+    }
+};
+

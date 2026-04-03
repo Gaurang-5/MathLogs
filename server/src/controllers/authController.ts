@@ -201,7 +201,8 @@ export const getProfile = async (req: Request, res: Response) => {
             planName: (admin.institute?.config as any)?.planName || 'Basic',
             maxStudents: (admin.institute?.config as any)?.maxStudents || 100,
             planStartDate: admin.institute?.planStartDate || null,
-            planExpiryDate: admin.institute?.planExpiryDate || null
+            planExpiryDate: admin.institute?.planExpiryDate || null,
+            logo: (admin.institute?.config as any)?.logo || null
         });
     } catch (e) {
         console.error('Profile fetch error:', e);

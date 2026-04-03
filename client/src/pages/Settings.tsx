@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { api } from '../utils/api';
-import { Calendar, Plus, Download, RefreshCcw, Trash2, Lock } from 'lucide-react';
+import { Calendar, Plus, Download, RefreshCcw, Trash2, Lock, ImagePlus, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface ChangePasswordResponse {
@@ -15,6 +15,7 @@ interface Profile {
     phone?: string;
     planName?: string;
     maxStudents?: number;
+    logo?: string | null;
 }
 
 interface AcademicYear {
@@ -23,6 +24,7 @@ interface AcademicYear {
     isDefault?: boolean;
     startDate?: string | null;
     endDate?: string | null;
+    createdAt: string;
 }
 
 interface AcademicYearsResponse {
@@ -142,10 +144,49 @@ function ChangePasswordForm() {
 
 function ProfileSection() {
     const [profile, setProfile] = useState<Profile | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         api.get<Profile>('/auth/me').then(setProfile).catch(console.error);
     }, []);
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.type !== 'image/png') {
+            toast.error('Please upload a valid PNG image');
+            return;
+        }
+
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error('Image must be less than 2MB');
+            return;
+        }
+
+        setIsUploading(true);
+        const loadingToast = toast.loading('Uploading logo...');
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async () => {
+            const base64String = reader.result as string;
+            try {
+                const res = await api.put<{ success: boolean; logo: string }>('/institute/me/logo', { logo: base64String });
+                setProfile(prev => prev ? { ...prev, logo: res.logo } : null);
+                toast.success('Logo updated successfully', { id: loadingToast });
+            } catch (error) {
+                console.error('Failed to upload logo:', error);
+                toast.error('Failed to upload logo', { id: loadingToast });
+            } finally {
+                setIsUploading(false);
+            }
+        };
+        reader.onerror = () => {
+            toast.error('Failed to read image', { id: loadingToast });
+            setIsUploading(false);
+        };
+    };
 
     if (!profile) return <div className="animate-pulse bg-gray-100 h-48 rounded-[24px] mb-12" />;
 
@@ -159,6 +200,37 @@ function ProfileSection() {
             <div className="bg-app-surface-opaque border border-app-border rounded-[24px] p-8 grid grid-cols-1 md:grid-cols-2 gap-6 relative overflow-hidden">
                 {/* Decorative background */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-gray-100 to-transparent rounded-bl-[100px] opacity-50 pointer-events-none" />
+
+                <div className="relative z-10 md:col-span-2 mb-2 flex items-center gap-6">
+                    <div className="relative group shrink-0">
+                        <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden relative transition-all group-hover:border-black group-hover:bg-gray-50 shadow-sm">
+                            {profile.logo ? (
+                                <img src={profile.logo} alt="Institute Logo" className="w-full h-full object-contain p-2" />
+                            ) : (
+                                <ImagePlus className="text-gray-400 group-hover:text-black transition-colors" size={28} />
+                            )}
+                            
+                            {isUploading && (
+                                <div className="absolute inset-0 bg-white/80 flex items-center justify-center backdrop-blur-sm">
+                                    <Loader2 className="animate-spin text-black" size={24} />
+                                </div>
+                            )}
+
+                            <input 
+                                type="file" 
+                                accept="image/png" 
+                                onChange={handleLogoUpload}
+                                disabled={isUploading}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-app-text text-lg mb-1">Institute Logo</h3>
+                        <p className="text-sm text-app-text-secondary mb-2 border-b border-app-border pb-2 inline-block">This logo will be displayed on your student registration page.</p>
+                        <p className="text-xs text-app-text-tertiary">Recommended: Square, transparent PNG under 2MB.</p>
+                    </div>
+                </div>
 
                 <div className="relative z-10">
                     <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-2 pl-1">Teacher Name</label>

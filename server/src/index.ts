@@ -101,7 +101,7 @@ export function createApp() {
         maxAge: 86400
     }));
 
-    app.use(express.json({ limit: '100kb' }));
+    app.use(express.json({ limit: '5mb' })); // Increased to 5MB to support base64 logo uploads
     app.use('/api', apiLimiter);
 
     app.get('/health', async (req, res) => {
@@ -187,7 +187,7 @@ function startServer() {
     });
 
     app.listen(PORT, () => {
-    // Initialize background workers
+        // Initialize background workers
         emailWorker.start();
 
         if (process.env.NODE_ENV === 'production') {

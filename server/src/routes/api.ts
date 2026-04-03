@@ -292,12 +292,13 @@ router.delete('/billing/cancel', authenticateToken as any, cancelSubscription as
 
 // New Analytics & Config Routes
 // New Analytics & Config Routes
-import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute } from '../controllers/instituteController';
+import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo } from '../controllers/instituteController';
 router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
 router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
 router.put('/institutes/:id/details', authenticateToken as any, updateInstituteDetails as any);
 router.put('/institutes/:id/plan', authenticateToken as any, updateInstitutePlan as any);
 router.get('/institute/me', authenticateToken as any, getMyInstitute as any);
+router.put('/institute/me/logo', authenticateToken as any, uploadLogo as any);
 router.get('/institute/:id/details', authenticateToken as any, getInstituteDetails as any);
 router.put('/institutes/:id/suspend', authenticateToken as any, suspendInstitute as any);
 router.delete('/institutes/:id', authenticateToken as any, deleteInstitute as any);

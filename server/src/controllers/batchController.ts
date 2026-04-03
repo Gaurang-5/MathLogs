@@ -530,23 +530,38 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
                 whatsappGroupLink: true,
                 autoSendWelcome: true,
                 institute: {
-                    select: { name: true, areRegistrationsPaused: true, plan: true, planExpiryDate: true }
+                    select: { name: true, areRegistrationsPaused: true, plan: true, planExpiryDate: true, config: true }
                 }
             }
         });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
+        // Extract logo safely without sending whole config
+        let logoUrl = null;
+        if (batch.institute && (batch.institute.config as any)?.logo) {
+            logoUrl = (batch.institute.config as any).logo;
+        }
+
+        const safeBatchData = {
+            ...batch,
+            institute: {
+                ...batch.institute,
+                logoUrl,
+                config: undefined // Remove sensitive config
+            }
+        };
+
         // Overwrite so frontend disables registration natively if sub is cancelled or expired
-        if (batch.institute) {
-            const isPlanExpired = batch.institute.planExpiryDate && new Date(batch.institute.planExpiryDate).getTime() < Date.now();
-            if (batch.institute.areRegistrationsPaused || (batch.institute as any).plan === 'NO_PLAN' || isPlanExpired) {
-                batch.isRegistrationOpen = false;
+        if (safeBatchData.institute) {
+            const isPlanExpired = safeBatchData.institute.planExpiryDate && new Date(batch.institute!.planExpiryDate!).getTime() < Date.now();
+            if (safeBatchData.institute.areRegistrationsPaused || (safeBatchData.institute as any).plan === 'NO_PLAN' || isPlanExpired) {
+                safeBatchData.isRegistrationOpen = false;
             }
         }
 
         // Save to cache
-        publicBatchCache.set(id, { data: batch, timestamp: now });
+        publicBatchCache.set(id, { data: safeBatchData, timestamp: now });
 
         // Clean up old cache entries occasionally
         if (publicBatchCache.size > 100) {
@@ -555,7 +570,7 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
             }
         }
 
-        res.json(batch);
+        res.json(safeBatchData);
     } catch (e) {
         res.status(500).json({ error: 'Failed to fetch status' });
     }
