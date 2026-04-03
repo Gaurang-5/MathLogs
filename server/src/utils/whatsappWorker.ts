@@ -104,7 +104,8 @@ const processJob = async (job: any) => {
             'onboarding_invite': { body: ['owner_name', 'tuition_name', 'setup_link'], buttonIndex: 2 },
             'onboarding_setup_link': { body: ['owner_name', 'tuition_name', 'setup_link'], buttonIndex: 2 },
             'fee_breakup_alert_1': { body: ['student_name', 'batch_name', 'fee_breakup', 'total_amount', 'institute_name'] },
-            'mathlogs_login_otp': { body: ['otp'] } // or 'var_1' if standard
+            'mathlogs_login_otp': { body: ['otp'] },
+            'student_registration_link': { body: ['var_1', 'var_2', 'var_3'], buttonIndex: 2 }
         };
 
         const mapConfig = TEMPLATE_VAR_MAP[job.templateId];
