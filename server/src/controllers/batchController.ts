@@ -579,10 +579,13 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
         let isAlreadyRegistered = false;
         let registeredStudentData = null;
 
+        let isTokenValid = false;
+
         if (token) {
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-123') as any;
                 if (decoded.batchId === id && decoded.whatsapp) {
+                    isTokenValid = true;
                     const existingStudent = await prisma.student.findFirst({
                         where: { batchId: id, parentWhatsapp: decoded.whatsapp }
                     });
@@ -604,11 +607,19 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
             }
         }
 
-        res.json({
+        let responseData = {
             ...safeBatchData,
             alreadyRegistered: isAlreadyRegistered,
             registeredStudent: registeredStudentData
-        });
+        };
+
+        // If the teacher provided a valid token, we bypass all paused/closed restrictions
+        if (isTokenValid) {
+            responseData.isRegistrationOpen = true;
+            responseData.isRegistrationEnded = false;
+        }
+
+        res.json(responseData);
     } catch (e) {
         res.status(500).json({ error: 'Failed to fetch status' });
     }

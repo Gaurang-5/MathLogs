@@ -161,7 +161,7 @@ export const registerStudent = async (req: Request, res: Response) => {
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        if (batch.institute) {
+        if (batch.institute && !token) {
             const isPlanExpired = batch.institute.planExpiryDate && new Date(batch.institute.planExpiryDate).getTime() < Date.now();
             if (batch.institute.areRegistrationsPaused || (batch.institute as any).plan === 'NO_PLAN' || isPlanExpired) {
                 return res.status(403).json({ error: 'Registrations are currently paused or the plan is inactive for this institute.' });
