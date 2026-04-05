@@ -130,9 +130,9 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                 name: studentName,
                 parentName,
                 parentWhatsapp: whatsapp,
-                parentEmail: email,
-                schoolName,
-                token
+                parentEmail: email || undefined,
+                schoolName: schoolName || undefined,
+                ...(token && { token })
             });
 
             clearFeedback();

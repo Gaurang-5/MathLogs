@@ -30,14 +30,13 @@ export const registerStudentSchema = z.object({
         name: z.string().min(1, "Name is required").max(200),
         parentName: z.string().min(1, "Parent Name is required").max(200),
         parentWhatsapp: z.string().regex(phoneRegex, "Invalid phone number (10-15 digits)"),
-        parentEmail: z.string().optional().transform(val => {
+        parentEmail: z.string().nullish().transform(val => {
             if (!val || val.trim() === '') return undefined;
-            // Silently strip invalid emails instead of rejecting the entire registration
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return emailRegex.test(val.trim()) ? val.trim() : undefined;
         }),
-        schoolName: z.string().max(300).optional(),
-        token: z.string().optional()
+        schoolName: z.string().max(300).nullish(),
+        token: z.string().nullish()
     })
 });
 
