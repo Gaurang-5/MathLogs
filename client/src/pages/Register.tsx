@@ -521,19 +521,18 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                             </div>
                         </div>
 
-                        {/* Parent Email */}
+                        {/* Parent Email (Optional) */}
                         <div>
-                            <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Parent Email</label>
+                            <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Parent Email <span className="text-app-text-tertiary font-normal">(Optional)</span></label>
                             <div className="relative group">
                                 <Mail className={iconClass} />
                                 <input
                                     type="email"
                                     className={inputClass}
-                                    placeholder="email@example.com"
+                                    placeholder="email@example.com (optional)"
                                     value={email}
                                     onChange={e => setEmail(e.target.value)}
                                     autoComplete="email"
-                                    required
                                 />
                             </div>
                         </div>
