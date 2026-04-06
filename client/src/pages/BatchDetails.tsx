@@ -809,6 +809,37 @@ export default function BatchDetails() {
                                     <p className="text-xs text-app-text-tertiary mb-2 px-2 uppercase font-bold tracking-wider">Actions</p>
                                     <div className="grid grid-cols-1 gap-3 text-center">
                                         <button
+                                            onClick={() => window.open(`/attendance/kiosk?batchId=${batch.id}`, '_blank')}
+                                            className="py-3.5 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-bold transition-all w-full"
+                                        >
+                                            Attendance Kiosk
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    const token = localStorage.getItem('token');
+                                                    const response = await fetch(`${API_URL}/batches/${batch.id}/id-cards`, {
+                                                        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                                                    });
+                                                    if (!response.ok) throw new Error('Failed to download');
+                                                    const blob = await response.blob();
+                                                    const url = window.URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = `ID-Cards-${batch.name.replace(/\s+/g, '-')}.pdf`;
+                                                    document.body.appendChild(a);
+                                                    a.click();
+                                                    window.URL.revokeObjectURL(url);
+                                                    document.body.removeChild(a);
+                                                } catch {
+                                                    toast.error('Failed to download ID cards');
+                                                }
+                                            }}
+                                            className="py-3.5 rounded-xl bg-app-surface hover:bg-app-surface-hover text-app-text border border-app-border text-xs font-bold transition-all w-full"
+                                        >
+                                            Export ID Cards
+                                        </button>
+                                        <button
                                             onClick={() => window.open(`/kiosk/register/${batch.id}`, '_blank')}
                                             className="py-3.5 rounded-xl bg-app-surface hover:bg-app-surface-hover text-app-text border border-app-border text-xs font-bold transition-all w-full"
                                         >

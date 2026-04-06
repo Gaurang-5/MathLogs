@@ -12,6 +12,9 @@ model Institute {
   name                   String
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
+  slug                   String?        @unique
+  aboutUs                String?
+  websiteConfig          Json?
   config                 Json?          @default("{\"subjects\": [\"Math\", \"Science\"], \"allowedClasses\": [\"9\", \"10\"], \"requiresGrades\": true}")
   plan                   Tier           @default(FREE)
   email                  String?
@@ -30,6 +33,10 @@ model Institute {
   invites                InviteToken[]
   students               Student[]
   tests                  Test[]
+  attendanceRecords      AttendanceRecord[]
+  attendanceSweepRuns    AttendanceSweepRun[]
+  studentLeads           StudentLead[]
+  systemLogs             SystemLog[]
 }
 
 model InviteToken {
@@ -56,6 +63,7 @@ model Admin {
   institute             Institute?     @relation(fields: [instituteId], references: [id])
   batches               Batch[]
   tests                 Test[]
+  manualAttendanceRecords AttendanceRecord[] @relation("ManualAttendanceBy")
   refreshTokens         RefreshToken[]
 }
 
@@ -75,6 +83,8 @@ model AcademicYear {
   batches         Batch[]
   students        Student[]
   tests           Test[]
+  attendanceRecords AttendanceRecord[]
+  attendanceSweepRuns AttendanceSweepRun[]
 
   @@unique([teacherId, name])
 }
@@ -102,6 +112,9 @@ model Batch {
   teacher             Admin?           @relation(fields: [teacherId], references: [id])
   feeInstallments     FeeInstallment[]
   students            Student[]
+  attendanceRecords   AttendanceRecord[]
+  attendanceSweepRuns AttendanceSweepRun[]
+  studentLeads        StudentLead[]
 
   @@index([teacherId, academicYearId, className])
   @@index([instituteId, academicYearId])
@@ -124,6 +137,7 @@ model Student {
   feePayments     FeePayment[]
   fees            FeeRecord[]
   marks           Mark[]
+  attendanceRecords AttendanceRecord[]
   academicYearRef AcademicYear?   @relation(fields: [academicYearId], references: [id])
   batch           Batch?          @relation(fields: [batchId], references: [id])
   institute       Institute?      @relation(fields: [instituteId], references: [id])
@@ -228,6 +242,51 @@ model StudentBalance {
 
   @@index([balance], map: "idx_balance_desc")
   @@index([updatedAt])
+}
+
+model AttendanceRecord {
+  id               String           @id @default(uuid())
+  studentId        String
+  batchId          String
+  instituteId      String
+  academicYearId   String?
+  attendanceDate   DateTime
+  checkedInAt      DateTime         @default(now())
+  photoUrl         String?
+  photoMimeType    String?
+  note             String?
+  source           AttendanceSource @default(KIOSK)
+  manualMarkedById String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  student          Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batch            Batch            @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  institute        Institute        @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  academicYearRef  AcademicYear?    @relation(fields: [academicYearId], references: [id])
+  manualMarkedBy   Admin?           @relation("ManualAttendanceBy", fields: [manualMarkedById], references: [id])
+
+  @@unique([studentId, attendanceDate])
+  @@index([batchId, attendanceDate, checkedInAt])
+  @@index([instituteId, attendanceDate, checkedInAt])
+}
+
+model AttendanceSweepRun {
+  id             String        @id @default(uuid())
+  batchId        String
+  instituteId    String
+  academicYearId String?
+  attendanceDate DateTime
+  scheduledFor   DateTime
+  status         String        @default("COMPLETED")
+  createdAt      DateTime      @default(now())
+  completedAt    DateTime?
+  batch          Batch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  institute      Institute     @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  academicYearRef AcademicYear? @relation(fields: [academicYearId], references: [id])
+
+  @@unique([batchId, attendanceDate])
+  @@index([scheduledFor])
+  @@index([instituteId, attendanceDate])
 }
 
 model IdCounter {
@@ -362,3 +421,51 @@ enum JobStatus {
   FAILED
 }
 
+enum AttendanceSource {
+  KIOSK
+  MANUAL
+}
+
+model SystemAlert {
+  id        String    @id @default(uuid())
+  title     String
+  message   String
+  type      String    @default("INFO") // INFO, WARNING, SUCCESS, ERROR
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@index([isActive])
+}
+
+model StudentLead {
+  id              String   @id @default(uuid())
+  studentName     String
+  parentName      String
+  parentPhone     String
+  batchInterestId String?
+  status          String   @default("NEW") // NEW, CONTACTED, CONVERTED, LOST
+  instituteId     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  institute       Institute @relation(fields: [instituteId], references: [id])
+  batch           Batch?    @relation(fields: [batchInterestId], references: [id])
+
+  @@index([instituteId])
+  @@index([status])
+}
+
+model SystemLog {
+  id          String   @id @default(uuid())
+  instituteId String
+  action      String   // E.g., STUDENT_JOIN, STUDENT_LEAVE, FEE_COLLECTED
+  entityId    String?  // Optional reference ID
+  entityName  String?  // Human readable name (e.g., Student Name, Batch Name)
+  details     Json?    // Optional structured details
+  createdAt   DateTime @default(now())
+
+  institute   Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+
+  @@index([instituteId, action])
+  @@index([createdAt])
+}

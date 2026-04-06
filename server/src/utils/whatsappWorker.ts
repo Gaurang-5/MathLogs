@@ -105,7 +105,9 @@ const processJob = async (job: any) => {
             'onboarding_setup_link': { body: ['owner_name', 'tuition_name', 'setup_link'], buttonIndex: 2 },
             'fee_breakup_alert_1': { body: ['student_name', 'batch_name', 'fee_breakup', 'total_amount', 'institute_name'] },
             'mathlogs_login_otp': { body: ['otp'] },
-            'student_registration_link': { body: ['var_1', 'var_2', 'var_3'], buttonIndex: 2 }
+            'student_registration_link': { body: ['var_1', 'var_2', 'var_3'], buttonIndex: 2 },
+            'attendance_checkin_alert': { body: ['student_name', 'batch_name', 'institute_name', 'checkin_time', 'photo_url'] },
+            'attendance_absent_alert': { body: ['student_name', 'batch_name', 'institute_name', 'scheduled_time'] }
         };
 
         const mapConfig = TEMPLATE_VAR_MAP[job.templateId];

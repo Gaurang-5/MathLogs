@@ -417,6 +417,16 @@ export const recordPayment = async (req: Request, res: Response) => {
                 });
             }
 
+            await tx.systemLog.create({
+                data: {
+                    instituteId: student.instituteId!,
+                    action: 'FEE_COLLECTED',
+                    entityId: student.id,
+                    entityName: student.name,
+                    details: { amount: parsedAmount, type: 'Automated Allocation' }
+                }
+            });
+
             return student; // Return for WhatsApp notification
         }, {
             isolationLevel: 'Serializable', // Prevents phantom reads / double-payment
@@ -443,7 +453,8 @@ export const recordPayment = async (req: Request, res: Response) => {
                     studentName: result.name,
                     amountPaid: `Rs. ${parsedAmount.toLocaleString()}`,
                     installmentName: allocatedInstallments,
-                    instituteName: result.batch?.institute?.name || 'our institute'
+                    instituteName: result.batch?.institute?.name || 'our institute',
+                    instituteId: result.instituteId || undefined
                 }).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
             });
         }
@@ -535,6 +546,16 @@ export const payInstallment = async (req: Request, res: Response) => {
             }
         });
 
+        await prisma.systemLog.create({
+            data: {
+                instituteId: student.instituteId!,
+                action: 'FEE_COLLECTED',
+                entityId: student.id,
+                entityName: student.name,
+                details: { amount: newPaymentAmount, installmentName: installment.name }
+            }
+        });
+
         console.log('[DEBUG] Payment created successfully:', {
             paymentId: payment.id,
             studentId: payment.studentId,
@@ -553,7 +574,8 @@ export const payInstallment = async (req: Request, res: Response) => {
                     studentName: student.name,
                     amountPaid: `Rs. ${newPaymentAmount.toLocaleString()}`,
                     installmentName: installment.name,
-                    instituteName: student.batch?.institute?.name || 'our institute'
+                    instituteName: student.batch?.institute?.name || 'our institute',
+                    instituteId: student.instituteId || undefined
                 }).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
             });
         }
@@ -659,7 +681,8 @@ ${senderName}`;
                         batchName: student.batch?.name || "the batch",
                         feeBreakup: feeBreakupText,
                         totalAmount: totalPendingCalc.toLocaleString(),
-                        instituteName: student.batch?.institute?.name || "our institute"
+                        instituteName: student.batch?.institute?.name || "our institute",
+                        instituteId: student.instituteId || undefined
                     }
                 ).catch(err => console.error("WhatsApp Fee Update Error:", err));
             });

@@ -3,6 +3,7 @@ import { Suspense, lazy, type ReactNode } from 'react';
 import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
 import Onboarding from './pages/Onboarding';
 import { readTokenPayload } from './utils/auth';
+import PublicInstituteProfile from './pages/PublicInstituteProfile';
 
 // Lazy Load Pages
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
@@ -22,6 +23,11 @@ const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
+const Leads = lazy(() => import('./pages/Leads'));
+const Logs = lazy(() => import('./pages/Logs'));
+const WebsiteBuilder = lazy(() => import('./pages/WebsiteBuilder'));
+const Attendance = lazy(() => import('./pages/Attendance'));
+const AttendanceKiosk = lazy(() => import('./pages/AttendanceKiosk'));
 // Onboarding is eagerly imported above (only 15KB) for instant navigation from Sign Up/Get Started
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -79,7 +85,10 @@ function App() {
                 <SuperAdminDashboard />
               </RoleRoute>
             } />
-
+            {/* Public facing routes */}
+            <Route path="/i/:slug" element={<PublicInstituteProfile />} />
+            
+            {/* Protected application routes */}
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
             <Route path="/batches" element={<PrivateRoute><BatchList /></PrivateRoute>} />
             <Route path="/batches/:id" element={<PrivateRoute><BatchDetails /></PrivateRoute>} />
@@ -89,6 +98,11 @@ function App() {
             <Route path="/fees" element={<PrivateRoute><Fees /></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
             <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+            <Route path="/attendance" element={<PrivateRoute><Attendance /></PrivateRoute>} />
+            <Route path="/attendance/kiosk" element={<PrivateRoute><AttendanceKiosk /></PrivateRoute>} />
+            <Route path="/leads" element={<PrivateRoute><Leads /></PrivateRoute>} />
+            <Route path="/logs" element={<PrivateRoute><Logs /></PrivateRoute>} />
+            <Route path="/website-builder" element={<PrivateRoute><WebsiteBuilder /></PrivateRoute>} />
 
             <Route path="/approvals" element={<PrivateRoute><Approvals /></PrivateRoute>} />
 

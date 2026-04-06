@@ -391,4 +391,67 @@ export const uploadLogo = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Failed to upload logo" });
     }
 };
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
+export const impersonateInstitute = async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const user = (req as any).user;
+
+    if (user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Unauthorized. Only SuperAdmins can impersonate.' });
+    }
+
+    try {
+        console.log(`[AUDIT] Impersonation Requested for Institute: ${id} by SuperAdmin: ${user.username}`);
+
+        const instituteAdmin = await prisma.admin.findFirst({
+            where: { instituteId: id },
+            orderBy: { id: 'asc' }
+        });
+
+        if (!instituteAdmin) {
+            return res.status(404).json({ error: 'Institute has no admin user attached.' });
+        }
+
+        const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+        
+        const token = jwt.sign({
+            id: instituteAdmin.id,
+            username: instituteAdmin.username,
+            passwordVersion: instituteAdmin.passwordVersion,
+            instituteId: instituteAdmin.instituteId,
+            role: instituteAdmin.role,
+            isImpersonated: true 
+        }, JWT_SECRET, { expiresIn: '1h' });
+
+        const refreshTokenString = crypto.randomBytes(40).toString('hex');
+        await prisma.refreshToken.create({
+            data: {
+                token: refreshTokenString,
+                adminId: instituteAdmin.id,
+                expiresAt: new Date(Date.now() + 1 * 60 * 60 * 1000)
+            }
+        });
+
+        const superAdminToken = jwt.sign({
+            id: user.id,
+            username: user.username,
+            passwordVersion: user.passwordVersion,
+            instituteId: user.instituteId,
+            role: user.role
+        }, JWT_SECRET, { expiresIn: '8h' });
+
+        res.json({
+            success: true,
+            message: 'Impersonation active. Logging you in as tenant...',
+            token,
+            refreshToken: refreshTokenString,
+            adminId: instituteAdmin.id,
+            superAdminReturnToken: superAdminToken
+        });
+    } catch (error) {
+        console.error('Failed to impersonate:', error);
+        res.status(500).json({ error: 'Failed to initiate impersonation' });
+    }
+};

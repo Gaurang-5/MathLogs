@@ -238,6 +238,7 @@ test('POST /api/fees/pay-installment records a payment for an authenticated teac
         amountPaid: data.amountPaid,
         date: data.date,
     }) as never) as typeof prisma.feePayment.create);
+    replaceMethod(prisma.systemLog, 'create', (async () => ({ id: 'log-route-1' }) as never) as typeof prisma.systemLog.create);
 
     const response = await postJson('/api/fees/pay-installment', {
         studentId: '123e4567-e89b-12d3-a456-426614174000',

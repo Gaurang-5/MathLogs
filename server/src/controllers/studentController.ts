@@ -68,7 +68,8 @@ const autoSendWelcomeInvite = async (student: AutoInviteStudent, batch: AutoInvi
                 studentName: student.name,
                 batchName: batch.name,
                 instituteName: senderName,
-                whatsappLink: link || ''
+                whatsappLink: link || '',
+                instituteId: batch.instituteId || undefined
             }).catch(err => console.error(`WhatsApp auto-invite failed for ${phone}:`, err));
         }
     } catch (inviteErr) {
@@ -266,6 +267,16 @@ export const registerStudent = async (req: Request, res: Response) => {
         // Auto-send welcome invite if enabled
         await autoSendWelcomeInvite(student!, batch);
 
+        await prisma.systemLog.create({
+            data: {
+                instituteId: batch.instituteId!,
+                action: 'STUDENT_JOIN',
+                entityId: student!.id,
+                entityName: student!.name,
+                details: { batchName: batch.name, phone: student!.parentWhatsapp }
+            }
+        });
+
         res.json(student);
     } catch (e: any) {
         const latencyMs = Date.now() - startTime;
@@ -369,6 +380,16 @@ export const addStudentManually = async (req: Request, res: Response) => {
 
         // Auto-send invite if enabled
         await autoSendWelcomeInvite(student!, batch);
+
+        await prisma.systemLog.create({
+            data: {
+                instituteId: batch.instituteId!,
+                action: 'STUDENT_JOIN',
+                entityId: student!.id,
+                entityName: student!.name,
+                details: { batchName: batch.name, phone: student!.parentWhatsapp }
+            }
+        });
 
         res.json(student);
     } catch (e) {
@@ -479,6 +500,16 @@ export const approveStudent = async (req: Request, res: Response) => {
         // Auto-send welcome invite if enabled
         await autoSendWelcomeInvite(student!, studentToApprove.batch);
 
+        await prisma.systemLog.create({
+            data: {
+                instituteId: studentToApprove.instituteId!,
+                action: 'STUDENT_JOIN',
+                entityId: student!.id,
+                entityName: student!.name,
+                details: { batchName: studentToApprove.batch.name, phone: student!.parentWhatsapp }
+            }
+        });
+
         res.json(student);
     } catch (e: any) {
         res.status(500).json({ error: 'Approval failed' });
@@ -503,6 +534,17 @@ export const rejectStudent = async (req: Request, res: Response) => {
         }
 
         await prisma.student.delete({ where: { id: String(id) } });
+
+        await prisma.systemLog.create({
+            data: {
+                instituteId: user.instituteId,
+                action: 'STUDENT_LEAVE',
+                entityId: student.id,
+                entityName: student.name,
+                details: { batchName: student.batch?.name || 'N/A', phone: student.parentWhatsapp }
+            }
+        });
+
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: 'Rejection failed' });

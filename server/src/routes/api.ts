@@ -11,6 +11,8 @@ import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail } from '../controllers/testController';
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
+import { getSystemLogs, getCommunicationLogs } from '../controllers/logController';
+import { checkInStudentAttendance, downloadBatchIdCards, getAttendanceFeed, markStudentPresentManually, searchAttendanceStudents, triggerAttendanceAbsenceSweep } from '../controllers/attendanceController';
 
 import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
@@ -20,7 +22,15 @@ import multer from 'multer';
 import { processOCR } from '../utils/ocr';
 import { processOCRTextract } from '../utils/ocrTextract';
 
+import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
+
 const router = Router();
+
+// ================= PUBLIC DOMAIN ROUTES =================
+// These routes do NOT require authentication and are used by parents/students.
+router.get('/public/i/:slug', publicLimiter, getPublicInstituteProfile as any);
+router.post('/public/i/:slug/lead', publicLimiter, submitPublicLead as any);
+// =========================================================
 
 // Configure multer for memory storage
 const upload = multer({
@@ -234,6 +244,7 @@ router.put('/batches/:id', authenticateToken as any, validateRequest(updateBatch
 router.delete('/batches/:id', authenticateToken as any, deleteBatch as any);
 router.get('/batches/:id/download', authenticateToken as any, downloadBatchPDF as any);
 router.get('/batches/:id/qr-pdf', authenticateToken as any, downloadBatchQRPDF as any);
+router.get('/batches/:id/id-cards', authenticateToken as any, downloadBatchIdCards as any);
 router.put('/batches/:id/toggle-registration', authenticateToken as any, toggleBatchRegistration as any);
 router.put('/batches/:id/end-registration', authenticateToken as any, endBatchRegistration as any);
 router.post('/batches/:id/installments', authenticateToken as any, validateRequest(createInstallmentSchema), createFeeInstallment as any);
@@ -253,6 +264,13 @@ router.post('/students/:id/approve', authenticateToken as any, approveStudent as
 router.post('/students/:id/reject', authenticateToken as any, rejectStudent as any);
 router.put('/students/:id', authenticateToken as any, validateRequest(updateStudentSchema), updateStudent as any);
 router.get('/students/lookup/:humanId', authenticateToken as any, getStudentByHumanId as any);
+
+// Attendance
+router.post('/attendance/check-in', authenticateToken as any, upload.single('image'), checkInStudentAttendance as any);
+router.get('/attendance/feed', authenticateToken as any, getAttendanceFeed as any);
+router.get('/attendance/students', authenticateToken as any, searchAttendanceStudents as any);
+router.post('/attendance/manual', authenticateToken as any, markStudentPresentManually as any);
+router.post('/attendance/absence-sweep', authenticateToken as any, triggerAttendanceAbsenceSweep as any);
 
 // Stickers
 router.get('/stickers/download', authenticateToken as any, generateStickerSheet as any);
@@ -291,9 +309,14 @@ router.post('/billing/create', authenticateToken as any, createBillingSession as
 router.post('/billing/verify', authenticateToken as any, verifyBillingPayment as any);
 router.delete('/billing/cancel', authenticateToken as any, cancelSubscription as any);
 
-// New Analytics & Config Routes
-// New Analytics & Config Routes
-import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo } from '../controllers/instituteController';
+import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo, impersonateInstitute } from '../controllers/instituteController';
+import { getSystemAlerts, createSystemAlert, dismissSystemAlert } from '../controllers/alertController';
+
+router.get('/alerts', authenticateToken as any, getSystemAlerts as any);
+router.post('/alerts', authenticateToken as any, createSystemAlert as any);
+router.put('/alerts/:id/dismiss', authenticateToken as any, dismissSystemAlert as any);
+
+router.post('/institutes/:id/impersonate', authenticateToken as any, impersonateInstitute as any);
 router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
 router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
 router.put('/institutes/:id/details', authenticateToken as any, updateInstituteDetails as any);
@@ -324,5 +347,17 @@ router.get('/admin-onboarding/links', authenticateToken as any, listAdminOnboard
 router.get('/admin-onboarding/:token', publicLimiter, getAdminOnboardingLink as any);
 router.post('/admin-onboarding/create-order', publicLimiter, createAdminOnboardingOrder as any);
 router.post('/admin-onboarding/verify-payment', publicLimiter, verifyAdminOnboardingPayment as any);
+
+// Leads Management (Teacher-facing)
+import { getLeads, updateLeadStatus, convertLead, getInstituteSlug, updateInstituteSlug } from '../controllers/leadController';
+router.get('/leads', authenticateToken as any, getLeads as any);
+router.put('/leads/:id/status', authenticateToken as any, updateLeadStatus as any);
+router.post('/leads/:id/convert', authenticateToken as any, convertLead as any);
+router.get('/institute/slug', authenticateToken as any, getInstituteSlug as any);
+router.put('/institute/slug', authenticateToken as any, updateInstituteSlug as any);
+
+// Logs
+router.get('/logs/system', authenticateToken as any, getSystemLogs as any);
+router.get('/logs/communications', authenticateToken as any, getCommunicationLogs as any);
 
 export default router;

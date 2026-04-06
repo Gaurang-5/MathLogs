@@ -2,7 +2,7 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, FileText, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, Zap, Settings, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, Zap, Settings, CreditCard, AlertTriangle, UserPlus, Activity, Camera } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../utils/cn';
 import ToastProvider from './ToastProvider';
@@ -26,8 +26,18 @@ export default function Layout({ children, title }: LayoutProps) {
         return false;
     });
     const [showQuickFeeModal, setShowQuickFeeModal] = useState(false);
+    const superAdminReturnToken = typeof window !== 'undefined' ? localStorage.getItem('superAdminReturnToken') : null;
 
-    const showMobileNav = ['/dashboard', '/batches', '/tests', '/fees', '/scan', '/settings', '/billing'].includes(location.pathname);
+    const handleEndImpersonation = () => {
+        if (superAdminReturnToken) {
+            localStorage.setItem('token', superAdminReturnToken);
+            localStorage.removeItem('superAdminReturnToken');
+            localStorage.removeItem('refreshToken');
+            window.location.href = '/super-admin';
+        }
+    };
+
+    const showMobileNav = ['/dashboard', '/batches', '/tests', '/fees', '/scan', '/settings', '/billing', '/logs', '/attendance'].includes(location.pathname);
 
     const handleLogout = () => {
         localStorage.clear();
@@ -38,8 +48,11 @@ export default function Layout({ children, title }: LayoutProps) {
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Batches', path: '/batches', icon: Users },
         { name: 'Tests', path: '/tests', icon: FileText },
+        { name: 'Attendance', path: '/attendance', icon: Camera },
         { name: 'Scan Marks', path: '/scan', icon: Scan },
         { name: 'Fees', path: '/fees', icon: Receipt },
+        { name: 'Leads', path: '/leads', icon: UserPlus },
+        { name: 'Logs', path: '/logs', icon: Activity },
         { name: 'Billing', path: '/billing', icon: CreditCard },
         { name: 'Settings', path: '/settings', icon: Settings },
     ];
@@ -48,6 +61,22 @@ export default function Layout({ children, title }: LayoutProps) {
         <div className="flex min-h-screen bg-app-bg text-app-text transition-colors duration-500 font-sans selection:bg-accent-subtle selection:text-accent">
             <ToastProvider />
             <QuickFeeModal isOpen={showQuickFeeModal} onClose={() => setShowQuickFeeModal(false)} />
+
+            {/* Impersonation Banner */}
+            {superAdminReturnToken && (
+                <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white px-4 py-2 flex items-center justify-between shadow-lg">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>You are currently in Impersonation Mode. Actions taken here will affect the tenant's real data.</span>
+                    </div>
+                    <button
+                        onClick={handleEndImpersonation}
+                        className="bg-white text-red-600 px-3 py-1 rounded text-sm font-bold shadow hover:bg-red-50 transition-colors"
+                    >
+                        End Impersonation & Return
+                    </button>
+                </div>
+            )}
 
             {/* Sidebar (Desktop) - Premium Glass Style */}
             <aside
@@ -185,6 +214,14 @@ export default function Layout({ children, title }: LayoutProps) {
                         <nav className="space-y-2">
                             {/* Navigation items are moved to Bottom Bar. Keeping menu for system actions only. */}
                             <div className="pt-2">
+                                <Link
+                                    to="/attendance"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center w-full px-4 py-4 text-base font-medium text-app-text-secondary hover:bg-black/5 hover:text-app-text rounded-2xl"
+                                >
+                                    <Camera className="w-6 h-6 mr-4" />
+                                    Attendance
+                                </Link>
                                 <Link
                                     to="/billing"
                                     onClick={() => setMobileMenuOpen(false)}

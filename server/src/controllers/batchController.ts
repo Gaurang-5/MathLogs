@@ -436,7 +436,8 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
                             batchName: batch.name,
                             feeBreakup: breakupLines.join('\n'),
                             totalAmount: totalDue.toString(),
-                            instituteName
+                            instituteName,
+                            instituteId: batch.instituteId || undefined
                         });
                         sent++;
                     } catch (err) {
@@ -795,7 +796,8 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
                     studentName: student.name,
                     batchName: batch.name,
                     instituteName: senderName,
-                    whatsappLink: link
+                    whatsappLink: link,
+                    instituteId: batch.instituteId || undefined
                 });
                 whatsappCount++;
             } catch (err) {
@@ -894,7 +896,8 @@ Please join the group to stay informed.
                 studentName: student.name,
                 batchName: batch.name,
                 instituteName: senderName,
-                whatsappLink: link || ''
+                whatsappLink: link || '',
+                instituteId: batch.instituteId || undefined
             }).catch(err => console.error(`WhatsApp invite failed for ${phone}:`, err));
         }
 
@@ -1006,7 +1009,8 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
         await sendStudentInviteWhatsApp(whatsappNumber, {
             instituteName: batch.institute?.name || "Education Center",
             batchName: batch.name,
-            registrationLink
+            registrationLink,
+            instituteId: batch.instituteId || undefined
         });
 
         res.json({ success: true, message: "Registration link sent successfully to WhatsApp." });

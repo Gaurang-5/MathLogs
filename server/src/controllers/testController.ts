@@ -504,7 +504,8 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                     instituteName: (test as any).institute?.name || "our institute",
                     testName: test.name,
                     totalMarks: String(test.maxMarks),
-                    marksObtained: scoreValue
+                    marksObtained: scoreValue,
+                    instituteId: test.instituteId || undefined
                 });
                 if (result !== false) whatsappSent++;
                 else whatsappFailed++;

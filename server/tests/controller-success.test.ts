@@ -178,6 +178,7 @@ test('payInstallment records a valid installment payment', async () => {
             date: data.date,
         } as never;
     }) as typeof prisma.feePayment.create);
+    replaceMethod(prisma.systemLog, 'create', (async () => ({ id: 'log-1' }) as never) as typeof prisma.systemLog.create);
 
     const req = {
         body: {

@@ -10,6 +10,7 @@ import { authenticateToken } from './middleware/auth';
 import { initializeSentry } from './monitoring/sentry';
 import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
 import { emailWorker } from './utils/emailWorker';
+import { processAttendanceAbsenceSweep } from './controllers/attendanceController';
 
 import * as Sentry from '@sentry/node';
 
@@ -155,6 +156,7 @@ export function createApp() {
         });
     }
 
+    app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
     app.use(express.static(path.join(__dirname, '../../client/dist')));
     app.use('/api', apiRoutes);
 
@@ -208,6 +210,16 @@ function startServer() {
         } else {
             console.log('⏭️  WhatsApp Worker skipped (development mode)');
         }
+
+        const attendanceSweepInterval = setInterval(() => {
+            processAttendanceAbsenceSweep().catch((error) => {
+                console.error('[Attendance] Background sweep failed:', error);
+            });
+        }, 60_000);
+        attendanceSweepInterval.unref();
+        processAttendanceAbsenceSweep().catch((error) => {
+            console.error('[Attendance] Startup sweep failed:', error);
+        });
 
         console.log(`Server running on http://localhost:${PORT}`);
         console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
