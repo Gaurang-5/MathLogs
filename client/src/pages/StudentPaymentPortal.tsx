@@ -21,25 +21,47 @@ export default function StudentPaymentPortal() {
     const [amount, setAmount] = useState('');
     const [file, setFile] = useState<File | null>(null);
 
+    const [manualPhone, setManualPhone] = useState('');
+    const [needsPhone, setNeedsPhone] = useState(false);
+
     useEffect(() => {
-        if (!slug || !phoneParam) {
-            setError('Invalid link. Please use the exact link sent on WhatsApp.');
+        if (!slug) {
+            setError('Invalid institute link.');
             setLoading(false);
             return;
         }
 
-        axios.get(`${API_URL}/public/i/${slug}/student-fees?phone=${phoneParam}`)
+        if (!phoneParam) {
+            setNeedsPhone(true);
+            setLoading(false);
+            return;
+        }
+
+        fetchStudentFees(phoneParam);
+    }, [slug, phoneParam]);
+
+    const fetchStudentFees = (phone: string) => {
+        setLoading(true);
+        axios.get(`${API_URL}/public/i/${slug}/student-fees?phone=${phone}`)
             .then(res => {
                 setData(res.data);
                 if (res.data.students.length === 1) {
                     setSelectedStudent(res.data.students[0]);
                 }
+                setNeedsPhone(false);
             })
             .catch(err => {
-                setError(err.response?.data?.error || 'Failed to load details. Your link might be incorrect.');
+                setError(err.response?.data?.error || 'Failed to load details. Your link or number might be incorrect.');
             })
             .finally(() => setLoading(false));
-    }, [slug, phoneParam]);
+    };
+
+    const handleManualPhoneSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (manualPhone.length >= 10) {
+            fetchStudentFees(manualPhone);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -72,6 +94,33 @@ export default function StudentPaymentPortal() {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-gray-50">
                 <Loader className="h-8 w-8 animate-spin text-indigo-600" />
+            </div>
+        );
+    }
+
+    if (needsPhone) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-gray-50 p-6">
+                <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center space-y-6">
+                    <h2 className="text-2xl font-bold text-gray-900">Enter Mobile Number</h2>
+                    <p className="text-gray-600">Please provide the WhatsApp number where you received the fee alert.</p>
+                    <form onSubmit={handleManualPhoneSubmit} className="space-y-4">
+                        <input 
+                            type="tel"
+                            value={manualPhone}
+                            onChange={(e) => setManualPhone(e.target.value)}
+                            placeholder="e.g. 9876543210"
+                            className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                            required
+                        />
+                        <button 
+                            type="submit" 
+                            className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition"
+                        >
+                            View Pending Dues
+                        </button>
+                    </form>
+                </div>
             </div>
         );
     }
