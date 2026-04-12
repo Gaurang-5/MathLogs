@@ -33,7 +33,7 @@ export const createBillingSession = async (req: Request, res: Response) => {
             const order = await razorpay.orders.create({
                 amount: amountInPaise,
                 currency: 'INR',
-                receipt: `receipt_${admin.institute.id}_${Date.now()}`,
+                receipt: `rcpt_${admin.institute.id.substring(0, 8)}_${Date.now()}`,
                 payment_capture: true,
                 notes: {
                     instituteId: admin.institute.id,

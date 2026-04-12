@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Camera, CheckCircle2, Clock3, Download, Search, UserCheck } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Camera, CheckCircle2, Clock3, Copy, Download, Search, UserCheck } from 'lucide-react';
 import Layout from '../components/Layout';
 import { api, API_URL } from '../utils/api';
 
@@ -14,6 +14,7 @@ interface AttendanceFeedRecord {
     id: string;
     checkedInAt: string;
     photoUrl: string | null;
+    photoUrlExpiresAt: string | null;
     source: 'KIOSK' | 'MANUAL';
     note: string | null;
     manualMarkedBy: string | null;
@@ -59,9 +60,49 @@ function getTodayString() {
     return `${now.getFullYear()}-${month}-${day}`;
 }
 
+function resolveAttendancePhotoUrl(photoUrl: string | null): string | null {
+    if (!photoUrl) return null;
+
+    const apiIsAbsolute = /^https?:\/\//i.test(API_URL);
+
+    try {
+        const parsed = /^https?:\/\//i.test(photoUrl)
+            ? new URL(photoUrl)
+            : new URL(photoUrl, window.location.origin);
+        const isAttendancePhotoPath = parsed.pathname.includes('/api/public/attendance-photo/');
+
+        if (isAttendancePhotoPath) {
+            if (!apiIsAbsolute) {
+                return `${parsed.pathname}${parsed.search}`;
+            }
+
+            const apiBase = new URL(API_URL);
+            return `${apiBase.origin}${parsed.pathname}${parsed.search}`;
+        }
+
+        if (/^https?:\/\//i.test(photoUrl)) return photoUrl;
+        if (apiIsAbsolute && photoUrl.startsWith('/')) {
+            const apiBase = new URL(API_URL);
+            return `${apiBase.origin}${photoUrl}`;
+        }
+        return photoUrl;
+    } catch {
+        if (apiIsAbsolute && photoUrl.startsWith('/')) {
+            try {
+                const apiBase = new URL(API_URL);
+                return `${apiBase.origin}${photoUrl}`;
+            } catch {
+                return photoUrl;
+            }
+        }
+        return photoUrl;
+    }
+}
+
 export default function Attendance() {
+    const [searchParams] = useSearchParams();
     const [date, setDate] = useState(getTodayString());
-    const [batchId, setBatchId] = useState('');
+    const [batchId, setBatchId] = useState(() => searchParams.get('batchId') || '');
     const [batches, setBatches] = useState<BatchOption[]>([]);
     const [records, setRecords] = useState<AttendanceFeedRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -69,11 +110,14 @@ export default function Attendance() {
     const [studentResults, setStudentResults] = useState<StudentSearchResult[]>([]);
     const [manualBusyId, setManualBusyId] = useState('');
     const [sweepStatus, setSweepStatus] = useState('');
+    const [copied, setCopied] = useState('');
+    const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(new Set());
+
+    const selectedBatch = useMemo(() => batches.find((batch) => batch.id === batchId) || null, [batchId, batches]);
 
     const feedUrl = useMemo(() => {
-        const params = new URLSearchParams({ date });
+        const params = new URLSearchParams({ date, limit: '100' });
         if (batchId) params.set('batchId', batchId);
-        params.set('limit', '100');
         return `/attendance/feed?${params.toString()}`;
     }, [batchId, date]);
 
@@ -119,19 +163,20 @@ export default function Attendance() {
         return () => window.clearTimeout(timer);
     }, [search, batchId]);
 
-    const handleManualPresent = async (studentId: string) => {
+    const markManual = async (studentId: string, status: 'PRESENT' | 'ABSENT') => {
         try {
-            setManualBusyId(studentId);
+            setManualBusyId(`${studentId}-${status}`);
             await api.post('/attendance/manual', {
                 studentId,
                 attendanceDate: date,
-                note: 'Manual override from attendance dashboard',
+                status,
+                note: status === 'ABSENT' ? 'Marked absent manually' : 'Marked present manually',
             });
             setSearch('');
             setStudentResults([]);
             await loadFeed();
         } catch (error) {
-            console.error('Failed to mark student manually', error);
+            console.error('Failed manual attendance update', error);
         } finally {
             setManualBusyId('');
         }
@@ -148,7 +193,10 @@ export default function Attendance() {
         }
     };
 
-    const selectedBatch = batches.find((batch) => batch.id === batchId);
+    const cameraUrl = batchId ? `/attendance/camera?batchId=${encodeURIComponent(batchId)}` : '/attendance/camera';
+    const studentViewUrl = selectedBatch
+        ? `${window.location.origin}/attendance/public/${selectedBatch.id}`
+        : '';
 
     return (
         <Layout title="Attendance">
@@ -156,17 +204,17 @@ export default function Attendance() {
                 <section className="rounded-[28px] border border-app-border bg-app-surface-opaque p-5 shadow-sm">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                         <div>
-                            <h1 className="text-2xl font-semibold tracking-tight text-app-text">Snap-Scan Admin View</h1>
-                            <p className="mt-1 text-sm text-app-text-secondary">See today’s proof photos, run absence checks, and mark late arrivals manually.</p>
+                            <h1 className="text-2xl font-semibold tracking-tight text-app-text">Attendance Control</h1>
+                            <p className="mt-1 text-sm text-app-text-secondary">Launch the dedicated camera preview page, manage absentees, and monitor live logs.</p>
                         </div>
 
                         <div className="flex flex-wrap gap-3">
                             <Link
-                                to={batchId ? `/attendance/kiosk?batchId=${encodeURIComponent(batchId)}` : '/attendance/kiosk'}
+                                to={cameraUrl}
                                 className="inline-flex items-center gap-2 rounded-2xl bg-app-text px-4 py-3 text-sm font-semibold text-app-bg transition-opacity hover:opacity-90"
                             >
                                 <Camera className="h-4 w-4" />
-                                Open Kiosk
+                                Open Camera Preview
                             </Link>
                             <button
                                 type="button"
@@ -205,21 +253,37 @@ export default function Attendance() {
                         </label>
 
                         <div className="rounded-2xl border border-app-border bg-app-bg px-4 py-3">
-                            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-app-text-tertiary">Absence Sweep</span>
-                            <p className="text-sm text-app-text-secondary">{sweepStatus || 'The background worker auto-checks 30 minutes after each batch start.'}</p>
+                            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-app-text-tertiary">Student View Link</span>
+                            {selectedBatch ? (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        await navigator.clipboard.writeText(studentViewUrl);
+                                        setCopied('Student view link copied');
+                                        window.setTimeout(() => setCopied(''), 1500);
+                                    }}
+                                    className="inline-flex items-center gap-2 text-sm font-semibold text-app-text hover:text-app-text-secondary"
+                                >
+                                    <Copy className="h-4 w-4" />
+                                    Copy logged-in list link
+                                </button>
+                            ) : (
+                                <p className="text-sm text-app-text-secondary">Select a batch to generate a student link.</p>
+                            )}
                         </div>
                     </div>
+                    <p className="mt-3 text-sm text-app-text-secondary">{copied || sweepStatus || 'Camera page captures after QR + 3 sec countdown and sends 12-hour photo links to parents.'}</p>
                 </section>
 
-                <section className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+                <section className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
                     <div className="rounded-[28px] border border-app-border bg-app-surface-opaque p-5 shadow-sm">
                         <div className="flex items-center gap-3">
                             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-app-bg">
                                 <UserCheck className="h-5 w-5 text-app-text" />
                             </div>
                             <div>
-                                <h2 className="text-base font-semibold text-app-text">Manual Override</h2>
-                                <p className="text-sm text-app-text-secondary">Mark present for students who forgot their ID card.</p>
+                                <h2 className="text-base font-semibold text-app-text">Manual Present / Absent</h2>
+                                <p className="text-sm text-app-text-secondary">If card scan fails, mark attendance directly.</p>
                             </div>
                         </div>
 
@@ -244,15 +308,25 @@ export default function Attendance() {
                                     <div key={student.id} className="rounded-2xl border border-app-border bg-app-bg p-4">
                                         <p className="text-sm font-semibold text-app-text">{student.name}</p>
                                         <p className="mt-1 text-xs text-app-text-secondary">{student.batch?.name || 'No batch'} {student.humanId ? `• ${student.humanId}` : ''}</p>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleManualPresent(student.id)}
-                                            disabled={manualBusyId === student.id}
-                                            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-app-text px-3 py-2 text-xs font-semibold text-app-bg transition-opacity hover:opacity-90 disabled:opacity-50"
-                                        >
-                                            <CheckCircle2 className="h-4 w-4" />
-                                            {manualBusyId === student.id ? 'Saving...' : 'Mark Present'}
-                                        </button>
+                                        <div className="mt-3 flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => markManual(student.id, 'PRESENT')}
+                                                disabled={manualBusyId === `${student.id}-PRESENT` || manualBusyId === `${student.id}-ABSENT`}
+                                                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                                            >
+                                                <CheckCircle2 className="h-4 w-4" />
+                                                {manualBusyId === `${student.id}-PRESENT` ? 'Saving...' : 'Mark Present'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => markManual(student.id, 'ABSENT')}
+                                                disabled={manualBusyId === `${student.id}-PRESENT` || manualBusyId === `${student.id}-ABSENT`}
+                                                className="inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:opacity-50"
+                                            >
+                                                Mark Absent
+                                            </button>
+                                        </div>
                                     </div>
                                 ))
                             )}
@@ -274,8 +348,8 @@ export default function Attendance() {
                     <div className="rounded-[28px] border border-app-border bg-app-surface-opaque p-5 shadow-sm">
                         <div className="mb-5 flex items-center justify-between gap-4">
                             <div>
-                                <h2 className="text-base font-semibold text-app-text">Chronological Photo Feed</h2>
-                                <p className="text-sm text-app-text-secondary">Most recent entries first, with the saved proof photo attached.</p>
+                                <h2 className="text-base font-semibold text-app-text">Attendance Feed</h2>
+                                <p className="text-sm text-app-text-secondary">Chronological log of who entered and who was marked manually.</p>
                             </div>
                             <div className="rounded-full bg-app-bg px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-app-text-tertiary">
                                 {records.length} record{records.length === 1 ? '' : 's'}
@@ -296,11 +370,20 @@ export default function Attendance() {
                             <div className="grid gap-4 md:grid-cols-2">
                                 {records.map((record) => (
                                     <article key={record.id} className="overflow-hidden rounded-[24px] border border-app-border bg-app-bg">
-                                        {record.photoUrl ? (
-                                            <img src={record.photoUrl} alt={record.student.name} className="h-52 w-full object-cover" />
+                                        {record.photoUrl && !brokenImageIds.has(record.id) ? (
+                                            <img
+                                                src={resolveAttendancePhotoUrl(record.photoUrl) || undefined}
+                                                alt={record.student.name}
+                                                className="h-52 w-full object-cover"
+                                                onError={() => setBrokenImageIds((prev) => {
+                                                    const next = new Set(prev);
+                                                    next.add(record.id);
+                                                    return next;
+                                                })}
+                                            />
                                         ) : (
                                             <div className="flex h-52 items-center justify-center bg-app-surface text-app-text-tertiary">
-                                                Manual entry, no photo captured
+                                                {record.photoUrl ? 'Photo unavailable or expired' : 'No photo for this entry'}
                                             </div>
                                         )}
                                         <div className="space-y-2 p-4">
@@ -318,6 +401,9 @@ export default function Attendance() {
                                                 {record.student.humanId || 'No student ID'}
                                                 {record.manualMarkedBy ? ` • Marked by ${record.manualMarkedBy}` : ''}
                                             </p>
+                                            {record.photoUrlExpiresAt && (
+                                                <p className="text-xs text-app-text-secondary">Photo link expires at {formatDateTime(record.photoUrlExpiresAt)}</p>
+                                            )}
                                             {record.note && <p className="text-sm text-app-text-secondary">{record.note}</p>}
                                         </div>
                                     </article>

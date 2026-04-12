@@ -5,13 +5,11 @@ import { JobStatus } from '@prisma/client';
 export const getSystemLogs = async (req: Request, res: Response) => {
     try {
         const instituteId = (req as any).user?.instituteId;
-        const { type } = req.query; // 'STUDENT' | 'FEE'
+        const { type } = req.query; // 'STUDENT'
         
         let typeFilter = undefined;
         if (type === 'STUDENT') {
             typeFilter = { in: ['STUDENT_JOIN', 'STUDENT_LEAVE'] };
-        } else if (type === 'FEE') {
-            typeFilter = { in: ['FEE_COLLECTED'] };
         }
 
         const logs = await prisma.systemLog.findMany({
@@ -19,8 +17,7 @@ export const getSystemLogs = async (req: Request, res: Response) => {
                 instituteId,
                 ...(typeFilter && { action: typeFilter })
             },
-            orderBy: { createdAt: 'desc' },
-            take: 100
+            orderBy: { createdAt: 'desc' }
         });
 
         res.json(logs);
@@ -40,11 +37,20 @@ export const getCommunicationLogs = async (req: Request, res: Response) => {
                 instituteId,
                 ...(status && { status: status as JobStatus })
             },
-            orderBy: { createdAt: 'desc' },
-            take: 100
+            orderBy: { createdAt: 'desc' }
         });
 
-        res.json(logs);
+        const mappedLogs = logs.map(job => ({
+            id: job.id,
+            phone: job.recipient,
+            type: job.templateId,
+            status: job.status,
+            context: job.data,
+            error: job.error,
+            createdAt: job.createdAt
+        }));
+
+        res.json(mappedLogs);
     } catch (e) {
         console.error('Failed to get communication logs', e);
         res.status(500).json({ error: 'Failed to fetch communication logs' });

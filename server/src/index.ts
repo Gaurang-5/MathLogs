@@ -156,7 +156,6 @@ export function createApp() {
         });
     }
 
-    app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
     app.use(express.static(path.join(__dirname, '../../client/dist')));
     app.use('/api', apiRoutes);
 
@@ -211,15 +210,16 @@ function startServer() {
             console.log('⏭️  WhatsApp Worker skipped (development mode)');
         }
 
-        const attendanceSweepInterval = setInterval(() => {
-            processAttendanceAbsenceSweep().catch((error) => {
-                console.error('[Attendance] Background sweep failed:', error);
-            });
-        }, 60_000);
-        attendanceSweepInterval.unref();
-        processAttendanceAbsenceSweep().catch((error) => {
-            console.error('[Attendance] Startup sweep failed:', error);
-        });
+        // TODO: Enable attendance absence sweep once feature is production-ready
+        // const attendanceSweepInterval = setInterval(() => {
+        //     processAttendanceAbsenceSweep().catch((error) => {
+        //         console.error('[Attendance] Background sweep failed:', error);
+        //     });
+        // }, 60_000);
+        // attendanceSweepInterval.unref();
+        // processAttendanceAbsenceSweep().catch((error) => {
+        //     console.error('[Attendance] Startup sweep failed:', error);
+        // });
 
         console.log(`Server running on http://localhost:${PORT}`);
         console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);

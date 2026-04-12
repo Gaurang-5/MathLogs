@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Loader, X, TrendingUp, TrendingDown, IndianRupee, Mail, History, CheckCircle, Download, ArrowUpRight, FileText, ArrowUpDown, ChevronDown, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../utils/cn';
+import UpiVerificationList from '../components/UpiVerificationList';
 
 interface FeeBreakdown {
     name: string;
@@ -48,7 +49,7 @@ const Fees: React.FC = () => {
     }, [searchTerm]);
 
     const [selectedBatch, setSelectedBatch] = useState('All');
-    const [viewMode, setViewMode] = useState<'defaulters' | 'recent'>('defaulters'); // Default to defaulters
+    const [viewMode, setViewMode] = useState<'defaulters' | 'recent' | 'upi'>('defaulters'); // Default to defaulters
 
     const [selectedStudent, setSelectedStudent] = useState<FeeSummary | null>(null);
     const [paymentAmount, setPaymentAmount] = useState('');
@@ -231,6 +232,12 @@ const Fees: React.FC = () => {
                             >
                                 Recent Payments
                             </button>
+                            <button
+                                onClick={() => setViewMode('upi')}
+                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'upi' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                            >
+                                UPI Approvals
+                            </button>
                         </div>
 
                         {/* Search & Filter */}
@@ -355,7 +362,7 @@ const Fees: React.FC = () => {
                                 )}
                             </div>
                         </div>
-                    ) : (
+                    ) : viewMode === 'defaulters' ? (
                     <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-gray-100">
                         {loading ? (
                             <div className="flex flex-col items-center justify-center h-96 text-gray-400">
@@ -450,6 +457,10 @@ const Fees: React.FC = () => {
                             </div>
                         )}
                     </div>
+                    ) : (
+                        <div className="bg-white rounded-[24px] shadow-sm min-h-[500px] border border-gray-100">
+                            <UpiVerificationList />
+                        </div>
                     )}
                 </div>
             </div>

@@ -2,15 +2,23 @@ import { Request, Response } from 'express';
 import PDFDocument from 'pdfkit';
 import bwipjs from 'bwip-js';
 import { prisma } from '../prisma';
-import { storeAttendancePhoto } from '../utils/attendanceStorage';
 import {
-    buildIndiaDateAtTime,
+    buildAttendancePhotoPath,
+    toAbsoluteAttendancePhotoLink,
+    ATTENDANCE_LINK_TTL_MS,
+    parseAttendancePhotoLinkExpiry,
+    verifyAttendancePhotoToken
+} from '../utils/attendanceLinks';
+import { readAttendancePhoto, storeAttendancePhoto } from '../utils/attendanceStorage';
+import {
     formatIndiaTimestamp,
     getIndiaDayKey,
     getIndiaDayStart,
     getScheduledAttendanceSweepTime,
 } from '../utils/attendanceTime';
 import { sendAttendanceAbsentWhatsApp, sendAttendanceCheckInWhatsApp } from '../utils/whatsapp';
+
+const ABSENT_NOTE = 'STATUS:ABSENT';
 
 function parseAttendanceDate(dateInput?: string): Date {
     if (!dateInput) return getIndiaDayStart();
@@ -31,6 +39,10 @@ function normalizePhoneNumber(phone?: string | null): string | null {
     const digits = phone.replace(/\D/g, '');
     if (!digits) return null;
     return digits.length === 10 ? `+91${digits}` : `+${digits}`;
+}
+
+function isAbsentRecord(note?: string | null): boolean {
+    return typeof note === 'string' && note.startsWith(ABSENT_NOTE);
 }
 
 async function notifyCheckIn(params: {
@@ -135,7 +147,7 @@ export const checkInStudentAttendance = async (req: Request, res: Response) => {
             }
         });
 
-        if (existing) {
+        if (existing && !isAbsentRecord(existing.note)) {
             return res.json({
                 success: true,
                 duplicate: true,
@@ -146,30 +158,58 @@ export const checkInStudentAttendance = async (req: Request, res: Response) => {
                     batchName: student.batch?.name || 'Batch',
                     checkedInAt: existing.checkedInAt,
                     photoUrl: existing.photoUrl,
+                    photoUrlExpiresAt: parseAttendancePhotoLinkExpiry(existing.photoUrl),
                     source: existing.source,
                 }
             });
         }
 
-        const photoUrl = await storeAttendancePhoto({
-            req,
+        const photoStorageKey = await storeAttendancePhoto({
             instituteId: student.instituteId,
             studentId: student.id,
             buffer: image.buffer,
             contentType: image.mimetype || 'image/jpeg',
         });
+        const photoUrlExpiresAt = new Date(Date.now() + ATTENDANCE_LINK_TTL_MS);
+        const checkedInAt = new Date();
 
-        const created = await prisma.attendanceRecord.create({
+        let recordId = existing?.id;
+        if (!recordId) {
+            const created = await prisma.attendanceRecord.create({
+                data: {
+                    studentId: student.id,
+                    batchId: student.batchId,
+                    instituteId: student.instituteId,
+                    academicYearId: student.academicYearId,
+                    attendanceDate,
+                    checkedInAt,
+                    photoMimeType: image.mimetype || 'image/jpeg',
+                    source: 'KIOSK',
+                    note: null,
+                }
+            });
+            recordId = created.id;
+        }
+        if (!recordId) {
+            throw new Error('Failed to resolve attendance record id');
+        }
+
+        const photoPath = buildAttendancePhotoPath({
+            recordId,
+            storageKey: photoStorageKey,
+            mimeType: image.mimetype || 'image/jpeg',
+            expiresAt: photoUrlExpiresAt,
+        });
+
+        await prisma.attendanceRecord.update({
+            where: { id: recordId },
             data: {
-                studentId: student.id,
-                batchId: student.batchId,
-                instituteId: student.instituteId,
-                academicYearId: student.academicYearId,
-                attendanceDate,
-                checkedInAt: new Date(),
-                photoUrl,
+                checkedInAt,
+                photoUrl: photoPath,
                 photoMimeType: image.mimetype || 'image/jpeg',
                 source: 'KIOSK',
+                note: null,
+                manualMarkedById: null,
             }
         });
 
@@ -179,8 +219,8 @@ export const checkInStudentAttendance = async (req: Request, res: Response) => {
             batchName: student.batch?.name || 'Batch',
             instituteName: student.batch?.institute?.name || 'MathLogs',
             instituteId: student.instituteId,
-            checkedInAt: created.checkedInAt,
-            photoUrl,
+            checkedInAt,
+            photoUrl: toAbsoluteAttendancePhotoLink(req, photoPath),
         }).catch((error) => {
             console.error('[Attendance] Failed to enqueue present alert:', error);
         });
@@ -189,18 +229,22 @@ export const checkInStudentAttendance = async (req: Request, res: Response) => {
             success: true,
             duplicate: false,
             record: {
-                id: created.id,
+                id: recordId,
                 studentId: student.id,
                 studentName: student.name,
                 batchName: student.batch?.name || 'Batch',
-                checkedInAt: created.checkedInAt,
-                photoUrl,
-                source: created.source,
+                checkedInAt,
+                photoUrl: photoPath,
+                photoUrlExpiresAt,
+                source: 'KIOSK',
             }
         });
     } catch (error: any) {
         if (error?.code === 'P2002') {
             return res.status(409).json({ error: 'Attendance was already captured for this student today' });
+        }
+        if (error?.code === 'P2021') {
+            return res.status(503).json({ error: 'Attendance setup is pending. Please run the latest database migration.' });
         }
 
         console.error('[Attendance] Check-in failed:', error);
@@ -223,7 +267,12 @@ export const getAttendanceFeed = async (req: Request, res: Response) => {
             },
             orderBy: { checkedInAt: 'desc' },
             take: limit,
-            include: {
+            select: {
+                id: true,
+                checkedInAt: true,
+                photoUrl: true,
+                source: true,
+                note: true,
                 student: {
                     select: {
                         id: true,
@@ -253,6 +302,7 @@ export const getAttendanceFeed = async (req: Request, res: Response) => {
                 id: record.id,
                 checkedInAt: record.checkedInAt,
                 photoUrl: record.photoUrl,
+                photoUrlExpiresAt: parseAttendancePhotoLinkExpiry(record.photoUrl),
                 source: record.source,
                 note: record.note,
                 student: {
@@ -265,7 +315,13 @@ export const getAttendanceFeed = async (req: Request, res: Response) => {
                 manualMarkedBy: record.manualMarkedBy?.username || null,
             }))
         });
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.code === 'P2021' || error?.code === 'P2022') {
+            return res.json({
+                date: getIndiaDayKey(parseAttendanceDate(typeof req.query.date === 'string' ? req.query.date : undefined)),
+                records: [],
+            });
+        }
         console.error('[Attendance] Feed failed:', error);
         res.status(500).json({ error: 'Failed to fetch attendance feed' });
     }
@@ -315,10 +371,14 @@ export const searchAttendanceStudents = async (req: Request, res: Response) => {
 export const markStudentPresentManually = async (req: Request, res: Response) => {
     try {
         const user = (req as any).user;
-        const { studentId, note, attendanceDate: attendanceDateInput } = req.body || {};
+        const { studentId, note, attendanceDate: attendanceDateInput, status } = req.body || {};
+        const normalizedStatus = String(status || 'PRESENT').toUpperCase();
 
         if (!studentId || typeof studentId !== 'string') {
             return res.status(400).json({ error: 'studentId is required' });
+        }
+        if (normalizedStatus !== 'PRESENT' && normalizedStatus !== 'ABSENT') {
+            return res.status(400).json({ error: 'status must be PRESENT or ABSENT' });
         }
 
         const student = await prisma.student.findFirst({
@@ -355,7 +415,51 @@ export const markStudentPresentManually = async (req: Request, res: Response) =>
             }
         });
 
-        if (existing) {
+        if (normalizedStatus === 'ABSENT') {
+            if (existing && !isAbsentRecord(existing.note)) {
+                return res.status(409).json({ error: 'Student is already marked present today' });
+            }
+
+            const record = existing
+                ? await prisma.attendanceRecord.update({
+                    where: { id: existing.id },
+                    data: {
+                        source: 'MANUAL',
+                        note: typeof note === 'string' && note.trim()
+                            ? `${ABSENT_NOTE} ${note.trim()}`
+                            : ABSENT_NOTE,
+                        manualMarkedById: user.id,
+                        photoUrl: null,
+                        photoMimeType: null,
+                    }
+                })
+                : await prisma.attendanceRecord.create({
+                    data: {
+                        studentId: student.id,
+                        batchId: student.batchId,
+                        instituteId: student.instituteId,
+                        academicYearId: student.academicYearId,
+                        attendanceDate,
+                        source: 'MANUAL',
+                        note: typeof note === 'string' && note.trim()
+                            ? `${ABSENT_NOTE} ${note.trim()}`
+                            : ABSENT_NOTE,
+                        manualMarkedById: user.id,
+                    }
+                });
+
+            return res.status(existing ? 200 : 201).json({
+                success: true,
+                duplicate: false,
+                record: {
+                    ...record,
+                    studentName: student.name,
+                    batchName: student.batch?.name || 'Batch',
+                }
+            });
+        }
+
+        if (existing && !isAbsentRecord(existing.note)) {
             return res.json({
                 success: true,
                 duplicate: true,
@@ -363,20 +467,30 @@ export const markStudentPresentManually = async (req: Request, res: Response) =>
             });
         }
 
-        const record = await prisma.attendanceRecord.create({
-            data: {
-                studentId: student.id,
-                batchId: student.batchId,
-                instituteId: student.instituteId,
-                academicYearId: student.academicYearId,
-                attendanceDate,
-                source: 'MANUAL',
-                note: typeof note === 'string' ? note.trim() : 'Marked present manually',
-                manualMarkedById: user.id,
-            }
-        });
+        const record = existing
+            ? await prisma.attendanceRecord.update({
+                where: { id: existing.id },
+                data: {
+                    source: 'MANUAL',
+                    note: typeof note === 'string' && note.trim() ? note.trim() : 'Marked present manually',
+                    manualMarkedById: user.id,
+                    checkedInAt: new Date(),
+                }
+            })
+            : await prisma.attendanceRecord.create({
+                data: {
+                    studentId: student.id,
+                    batchId: student.batchId,
+                    instituteId: student.instituteId,
+                    academicYearId: student.academicYearId,
+                    attendanceDate,
+                    source: 'MANUAL',
+                    note: typeof note === 'string' && note.trim() ? note.trim() : 'Marked present manually',
+                    manualMarkedById: user.id,
+                }
+            });
 
-        res.status(201).json({
+        res.status(existing ? 200 : 201).json({
             success: true,
             duplicate: false,
             record: {
@@ -388,6 +502,96 @@ export const markStudentPresentManually = async (req: Request, res: Response) =>
     } catch (error) {
         console.error('[Attendance] Manual override failed:', error);
         res.status(500).json({ error: 'Failed to mark attendance manually' });
+    }
+};
+
+export const getPublicAttendancePhoto = async (req: Request, res: Response) => {
+    try {
+        const recordId = String(req.params.id || '');
+        const token = typeof req.query.token === 'string' ? req.query.token : '';
+
+        if (!recordId || !token) {
+            return res.status(400).send('Missing photo token');
+        }
+
+        const payload = verifyAttendancePhotoToken(token, recordId);
+        const buffer = await readAttendancePhoto(payload.storageKey);
+        res.setHeader('Content-Type', payload.mimeType || 'image/jpeg');
+        res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+        res.send(buffer);
+    } catch (error: any) {
+        if (error?.name === 'TokenExpiredError') {
+            return res.status(410).send('This photo link has expired');
+        }
+
+        if (error?.name === 'JsonWebTokenError' || error?.message === 'Invalid attendance photo token') {
+            return res.status(403).send('Invalid photo link');
+        }
+        if (error?.name === 'NoSuchKey' || error?.code === 'ENOENT') {
+            return res.status(404).send('Attendance photo not found');
+        }
+
+        console.error('[Attendance] Public photo fetch failed:', error);
+        res.status(500).send('Failed to fetch attendance photo');
+    }
+};
+
+export const getPublicBatchAttendance = async (req: Request, res: Response) => {
+    try {
+        const batchId = String(req.params.id || '');
+        if (!batchId) return res.status(400).json({ error: 'batchId is required' });
+
+        const attendanceDate = parseAttendanceDate(typeof req.query.date === 'string' ? req.query.date : undefined);
+        const batch = await prisma.batch.findUnique({
+            where: { id: batchId },
+            select: {
+                id: true,
+                name: true,
+                institute: { select: { name: true } },
+            }
+        });
+
+        if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+        const records = await prisma.attendanceRecord.findMany({
+            where: { batchId, attendanceDate },
+            orderBy: { checkedInAt: 'asc' },
+            select: {
+                id: true,
+                checkedInAt: true,
+                note: true,
+                student: { select: { name: true, humanId: true } },
+            }
+        });
+
+        const presentRecords = records.filter((record) => !isAbsentRecord(record.note));
+
+        res.json({
+            date: getIndiaDayKey(attendanceDate),
+            batch: {
+                id: batch.id,
+                name: batch.name,
+                instituteName: batch.institute?.name || 'MathLogs',
+            },
+            presentCount: presentRecords.length,
+            students: presentRecords.map((record) => ({
+                id: record.id,
+                name: record.student.name,
+                humanId: record.student.humanId,
+                checkedInAt: record.checkedInAt,
+            })),
+        });
+    } catch (error: any) {
+        if (error?.code === 'P2021' || error?.code === 'P2022') {
+            return res.json({
+                date: getIndiaDayKey(parseAttendanceDate(typeof req.query.date === 'string' ? req.query.date : undefined)),
+                batch: null,
+                presentCount: 0,
+                students: [],
+            });
+        }
+        console.error('[Attendance] Public attendance fetch failed:', error);
+        res.status(500).json({ error: 'Failed to fetch attendance list' });
     }
 };
 
@@ -458,10 +662,11 @@ export async function processAttendanceAbsenceSweep(now: Date = new Date()) {
             },
             select: {
                 studentId: true,
+                note: true,
             }
         });
 
-        const presentIds = new Set(records.map((record) => record.studentId));
+        const presentIds = new Set(records.filter((record) => !isAbsentRecord(record.note)).map((record) => record.studentId));
         const missingStudents = batch.students.filter((student) => !presentIds.has(student.id));
 
         await Promise.allSettled(missingStudents.map(async (student) => {

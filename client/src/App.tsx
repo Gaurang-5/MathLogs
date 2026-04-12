@@ -27,7 +27,9 @@ const Leads = lazy(() => import('./pages/Leads'));
 const Logs = lazy(() => import('./pages/Logs'));
 const WebsiteBuilder = lazy(() => import('./pages/WebsiteBuilder'));
 const Attendance = lazy(() => import('./pages/Attendance'));
-const AttendanceKiosk = lazy(() => import('./pages/AttendanceKiosk'));
+const AttendanceCamera = lazy(() => import('./pages/AttendanceCamera'));
+const AttendancePublic = lazy(() => import('./pages/AttendancePublic'));
+const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
 // Onboarding is eagerly imported above (only 15KB) for instant navigation from Sign Up/Get Started
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -87,6 +89,7 @@ function App() {
             } />
             {/* Public facing routes */}
             <Route path="/i/:slug" element={<PublicInstituteProfile />} />
+            <Route path="/pay/:slug" element={<StudentPaymentPortal />} />
             
             {/* Protected application routes */}
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
@@ -99,7 +102,7 @@ function App() {
             <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
             <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
             <Route path="/attendance" element={<PrivateRoute><Attendance /></PrivateRoute>} />
-            <Route path="/attendance/kiosk" element={<PrivateRoute><AttendanceKiosk /></PrivateRoute>} />
+            <Route path="/attendance/camera" element={<PrivateRoute><AttendanceCamera /></PrivateRoute>} />
             <Route path="/leads" element={<PrivateRoute><Leads /></PrivateRoute>} />
             <Route path="/logs" element={<PrivateRoute><Logs /></PrivateRoute>} />
             <Route path="/website-builder" element={<PrivateRoute><WebsiteBuilder /></PrivateRoute>} />
@@ -109,6 +112,7 @@ function App() {
             <Route path="/register/:batchId" element={<Register />} />
             <Route path="/kiosk/register/:batchId" element={<Register mode="kiosk" />} />
             <Route path="/check-status/:batchId" element={<CheckStatus />} />
+            <Route path="/attendance/public/:batchId" element={<AttendancePublic />} />
 
             {/* Legal / Info Pages */}
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />

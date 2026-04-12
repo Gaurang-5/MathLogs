@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { api } from '../utils/api';
 import { motion } from 'framer-motion';
-import { Activity, Receipt, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Activity, MessageSquare, CheckCircle, XCircle, Clock, Search } from 'lucide-react';
 
 interface SystemLog {
     id: string;
@@ -23,16 +23,18 @@ interface CommunicationLog {
 }
 
 export default function Logs() {
-    const [activeTab, setActiveTab] = useState<'STUDENT' | 'FEE' | 'COMMUNICATION'>('STUDENT');
+    const [activeTab, setActiveTab] = useState<'STUDENT' | 'COMMUNICATION'>('STUDENT');
     const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
     const [commLogs, setCommLogs] = useState<CommunicationLog[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Filters
+    // Filters & Search
+    const [searchQuery, setSearchQuery] = useState('');
+    const [studentActionFilter, setStudentActionFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('');
 
     useEffect(() => {
-        if (activeTab === 'STUDENT' || activeTab === 'FEE') {
+        if (activeTab === 'STUDENT') {
             fetchSystemLogs();
         } else {
             fetchCommLogs();
@@ -62,6 +64,18 @@ export default function Logs() {
         setLoading(false);
     };
 
+    const filteredSystemLogs = systemLogs.filter(log => {
+        const matchSearch = log.entityName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            log.details?.batchName?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchAction = studentActionFilter ? log.action === studentActionFilter : true;
+        return matchSearch && matchAction;
+    });
+
+    const filteredCommLogs = commLogs.filter(log => {
+        const matchSearch = log.phone.includes(searchQuery) || log.type.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchSearch;
+    });
+
     const StatusBadge = ({ status }: { status: string }) => {
         switch (status) {
             case 'COMPLETED': return <span className="flex items-center text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><CheckCircle className="w-3 h-3 mr-1" /> Sent</span>;
@@ -74,7 +88,6 @@ export default function Logs() {
         switch (action) {
             case 'STUDENT_JOIN': return <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">+</div>;
             case 'STUDENT_LEAVE': return <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold">-</div>;
-            case 'FEE_COLLECTED': return <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><Receipt className="w-4 h-4" /></div>;
             default: return <Activity className="w-4 h-4 text-gray-500" />;
         }
     };
@@ -92,13 +105,6 @@ export default function Logs() {
                         Student Activity
                     </button>
                     <button 
-                        onClick={() => setActiveTab('FEE')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all whitespace-nowrap ${activeTab === 'FEE' ? 'bg-accent text-white shadow-md' : 'text-app-text-secondary hover:bg-black/5'}`}
-                    >
-                        <Receipt className="w-4 h-4" />
-                        Fee Logs
-                    </button>
-                    <button 
                         onClick={() => setActiveTab('COMMUNICATION')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all whitespace-nowrap ${activeTab === 'COMMUNICATION' ? 'bg-accent text-white shadow-md' : 'text-app-text-secondary hover:bg-black/5'}`}
                     >
@@ -107,32 +113,55 @@ export default function Logs() {
                     </button>
                 </div>
 
-                {/* Filters */}
-                {activeTab === 'COMMUNICATION' && (
-                    <div className="flex gap-3 mb-6">
+                {/* Search & Filters */}
+                <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-tertiary" />
+                        <input
+                            type="text"
+                            placeholder={activeTab === 'STUDENT' ? "Search students or batches..." : "Search phone or message type..."}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-app-bg border border-app-border rounded-xl text-sm focus:border-accent transition-colors outline-none"
+                        />
+                    </div>
+                    
+                    {activeTab === 'STUDENT' && (
+                        <select
+                            value={studentActionFilter}
+                            onChange={(e) => setStudentActionFilter(e.target.value)}
+                            className="bg-app-bg border border-app-border rounded-xl px-4 py-2 text-sm text-app-text outline-none focus:border-accent transition-colors"
+                        >
+                            <option value="">All Actions</option>
+                            <option value="STUDENT_JOIN">Student Joined</option>
+                            <option value="STUDENT_LEAVE">Student Left</option>
+                        </select>
+                    )}
+
+                    {activeTab === 'COMMUNICATION' && (
                         <select 
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="bg-app-bg border border-app-border rounded-xl px-4 py-2 text-sm text-app-text outline-none focus:border-accent transition-colors"
+                            className="bg-app-bg border border-app-border rounded-xl px-4 py-2 text-sm text-app-text outline-none focus:border-accent transition-colors border-r-8 border-transparent"
                         >
                             <option value="">All Statuses</option>
                             <option value="COMPLETED">Completed</option>
                             <option value="FAILED">Failed</option>
                             <option value="PENDING">Pending</option>
                         </select>
-                    </div>
-                )}
+                    )}
+                </div>
 
                 {/* Content */}
                 {loading ? (
                     <div className="flex justify-center p-12"><div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin"></div></div>
                 ) : (
                     <div className="space-y-4">
-                        {(activeTab === 'STUDENT' || activeTab === 'FEE') ? (
-                            systemLogs.length === 0 ? (
-                                <div className="text-center py-12 text-app-text-tertiary">No logs found.</div>
+                        {activeTab === 'STUDENT' ? (
+                            filteredSystemLogs.length === 0 ? (
+                                <div className="text-center py-12 text-app-text-tertiary">No logs match your search.</div>
                             ) : (
-                                systemLogs.map((log) => (
+                                filteredSystemLogs.map((log) => (
                                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={log.id} className="flex items-start gap-4 p-4 rounded-2xl bg-app-bg border border-app-border hover:border-accent/40 transition-colors">
                                         <ActionIcon action={log.action} />
                                         <div className="flex-1">
@@ -140,25 +169,22 @@ export default function Logs() {
                                                 <h4 className="font-semibold text-app-text">
                                                     {log.action === 'STUDENT_JOIN' && 'Student Joined'}
                                                     {log.action === 'STUDENT_LEAVE' && 'Student Left'}
-                                                    {log.action === 'FEE_COLLECTED' && 'Fee Collected'}
                                                 </h4>
                                                 <span className="text-xs text-app-text-tertiary">{new Date(log.createdAt).toLocaleString()}</span>
                                             </div>
                                             <p className="text-sm text-app-text-secondary mt-1">
                                                 <span className="font-medium text-app-text">{log.entityName}</span>
                                                 {log.details?.batchName && ` • Batch: ${log.details.batchName}`}
-                                                {log.details?.amount && ` • Amount: ₹${log.details.amount}`}
-                                                {log.details?.installmentName && ` (${log.details.installmentName})`}
                                             </p>
                                         </div>
                                     </motion.div>
                                 ))
                             )
                         ) : (
-                            commLogs.length === 0 ? (
-                                <div className="text-center py-12 text-app-text-tertiary">No communication logs found.</div>
+                            filteredCommLogs.length === 0 ? (
+                                <div className="text-center py-12 text-app-text-tertiary">No communication logs match your search.</div>
                             ) : (
-                                commLogs.map((log) => (
+                                filteredCommLogs.map((log) => (
                                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={log.id} className="flex items-start gap-4 p-4 rounded-2xl bg-app-bg border border-app-border hover:border-accent/40 transition-colors">
                                         <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
                                             <MessageSquare className="w-4 h-4" />

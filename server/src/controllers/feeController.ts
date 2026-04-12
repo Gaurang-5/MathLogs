@@ -670,11 +670,14 @@ ${senderName}`;
             let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
             if (phone.length === 10) phone = '+91' + phone;
 
-            import('../utils/whatsapp').then(({ sendFeeReminderWhatsApp }) => {
+            import('../utils/whatsapp').then(({ sendFeeReminderUpiWhatsApp }) => {
                 // WhatsApp templates reject newline (\n) characters inside variables.
                 const feeBreakupText = breakdownLines.join(' | ');
+                
+                const phoneDigits = student.parentWhatsapp!.replace(/\D/g, '').slice(-10);
+                const upiLink = `${process.env.FRONTEND_URL || 'https://mathlogs.com'}/pay/${student.batch?.institute?.slug}?phone=${phoneDigits}`;
 
-                sendFeeReminderWhatsApp(
+                sendFeeReminderUpiWhatsApp(
                     phone,
                     {
                         studentName: student.name,
@@ -682,6 +685,7 @@ ${senderName}`;
                         feeBreakup: feeBreakupText,
                         totalAmount: totalPendingCalc.toLocaleString(),
                         instituteName: student.batch?.institute?.name || "our institute",
+                        upiPaymentLink: upiLink,
                         instituteId: student.instituteId || undefined
                     }
                 ).catch(err => console.error("WhatsApp Fee Update Error:", err));
@@ -946,5 +950,184 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Failed to generate report' });
+    }
+};
+
+export const getUpiVerifications = async (req: Request, res: Response) => {
+    try {
+        const teacherId = (req as any).user?.id;
+        const instituteId = (req as any).user?.instituteId;
+
+        const verifications = await prisma.upiPaymentVerification.findMany({
+            where: {
+                instituteId,
+                status: 'PENDING',
+                student: {
+                    batch: {
+                        teacherId
+                    }
+                }
+            },
+            include: {
+                student: {
+                    select: {
+                        name: true,
+                        parentWhatsapp: true,
+                        batch: { select: { name: true } }
+                    }
+                },
+                installment: {
+                    select: { name: true }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // We could generate presigned URLs if using strict S3,
+        // For simplicity, we can pass down the storageKey. 
+        // We will need an endpoint or logic to serve image bytes if local.
+        res.json(verifications);
+    } catch (e) {
+        console.error('Failed to get UPI verifications:', e);
+        res.status(500).json({ error: 'Failed to list verification requests' });
+    }
+};
+
+import { deletePaymentScreenshot } from '../utils/paymentStorage';
+
+export const approveUpiVerification = async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+        const teacherId = (req as any).user?.id;
+        const instituteId = (req as any).user?.instituteId;
+
+        const rawVerification = await prisma.upiPaymentVerification.findUnique({
+            where: { id },
+            include: {
+                student: { include: { batch: { include: { institute: true } } } },
+                installment: true
+            }
+        });
+        const verification = rawVerification as any;
+
+        if (!verification || verification.instituteId !== instituteId) {
+            return res.status(404).json({ error: 'Verification not found' });
+        }
+        if (verification.student.batch?.teacherId && verification.student.batch.teacherId !== teacherId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        if (verification.status !== 'PENDING') {
+            return res.status(400).json({ error: 'Verification is not pending' });
+        }
+
+        // Inside a transaction to approve and pay
+        await prisma.$transaction(async (tx) => {
+            // Update status
+            await tx.upiPaymentVerification.update({
+                where: { id },
+                data: { status: 'APPROVED' }
+            });
+
+            // Create fee payment
+            if (verification.installmentId) {
+                await tx.feePayment.create({
+                    data: {
+                        studentId: verification.studentId,
+                        installmentId: verification.installmentId,
+                        amountPaid: verification.amount,
+                        date: new Date()
+                    }
+                });
+            } else {
+                // If it was custom amount without installment
+                await tx.feeRecord.create({
+                    data: {
+                        studentId: verification.studentId,
+                        amount: verification.amount,
+                        status: 'PAID',
+                        date: new Date()
+                    }
+                });
+            }
+
+            // System log
+            await tx.systemLog.create({
+                data: {
+                    instituteId,
+                    action: 'FEE_COLLECTED',
+                    entityId: verification.studentId,
+                    entityName: verification.student.name,
+                    details: { amount: verification.amount, type: 'UPI Verification' }
+                }
+            });
+        });
+
+        // 1. Delete the physical screenshot (Space saving)
+        await deletePaymentScreenshot(verification.storageKey).catch(e => console.error('Failed to delete screenshot after approval:', e));
+
+        // 2. WhatsApp Notification
+        const phoneRaw = verification.student.parentWhatsapp;
+        if (phoneRaw) {
+            let phone = phoneRaw.replace(/[^0-9+]/g, '');
+            if (phone.length === 10) phone = '+91' + phone;
+
+            import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
+                sendPaymentReceiptWhatsApp(phone, {
+                    studentName: verification.student.name,
+                    amountPaid: `Rs. ${verification.amount.toLocaleString()}`,
+                    installmentName: verification.installment?.name || 'Fee Payment',
+                    instituteName: verification.student.batch?.institute?.name || 'our institute',
+                    instituteId: instituteId || undefined
+                }).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
+            });
+        }
+
+        res.json({ success: true, message: 'Payment approved successfully!' });
+    } catch (e) {
+        console.error('Approve UPI Payment Error:', e);
+        res.status(500).json({ error: 'Failed to approve payment' });
+    }
+};
+
+export const rejectUpiVerification = async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+        const reason = req.body.reason as string;
+        const teacherId = (req as any).user?.id;
+        const instituteId = (req as any).user?.instituteId;
+
+        const rawVerification = await prisma.upiPaymentVerification.findUnique({
+            where: { id },
+            include: { student: { include: { batch: true } } }
+        });
+        const verification = rawVerification as any;
+
+        if (!verification || verification.instituteId !== instituteId) {
+            return res.status(404).json({ error: 'Verification not found' });
+        }
+        if (verification.student.batch?.teacherId && verification.student.batch.teacherId !== teacherId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        if (verification.status !== 'PENDING') {
+            return res.status(400).json({ error: 'Verification is not pending' });
+        }
+
+        await prisma.upiPaymentVerification.update({
+            where: { id },
+            data: { 
+                status: 'REJECTED',
+                rejectionReason: reason || 'Screenshot unclear or mismatched amount' 
+            }
+        });
+
+        // Delete the physical screenshot (Space saving)
+        await deletePaymentScreenshot(verification.storageKey).catch(e => console.error('Failed to delete screenshot after rejection:', e));
+
+        // TODO: Could send a WhatsApp text saying it was rejected.
+
+        res.json({ success: true, message: 'Payment rejected.' });
+    } catch (e) {
+        console.error('Reject UPI Payment Error:', e);
+        res.status(500).json({ error: 'Failed to reject payment' });
     }
 };

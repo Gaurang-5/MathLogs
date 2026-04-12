@@ -33,6 +33,16 @@ export interface FeeReminderWAData {
     instituteId?: string;
 }
 
+export interface FeeReminderUpiWAData {
+    studentName: string;
+    batchName: string;
+    feeBreakup: string;
+    totalAmount: string;
+    instituteName: string;
+    upiPaymentLink: string;
+    instituteId?: string;
+}
+
 export interface TestMarksWAData {
     studentName: string;
     testName: string;
@@ -130,6 +140,21 @@ export const sendFeeReminderWhatsApp = async (mobileNumber: string, data: FeeRem
     ];
 
     return await enqueueWhatsApp(mobileNumber, FEE_TEMPLATE_NAME, componentValues, data.instituteId);
+};
+
+export const sendFeeReminderUpiWhatsApp = async (mobileNumber: string, data: FeeReminderUpiWAData) => {
+    const FEE_UPI_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_FEE_UPI || 'fee_reminder_with_upi_link_1';
+
+    const componentValues = [
+        data.studentName || "Student",
+        data.batchName || "the batch",
+        data.feeBreakup || "• Balance Due",
+        data.totalAmount || "0",
+        data.instituteName || "our institute",
+        data.upiPaymentLink
+    ];
+
+    return await enqueueWhatsApp(mobileNumber, FEE_UPI_TEMPLATE_NAME, componentValues, data.instituteId);
 };
 
 export const sendTestMarksWhatsApp = async (mobileNumber: string, data: TestMarksWAData) => {

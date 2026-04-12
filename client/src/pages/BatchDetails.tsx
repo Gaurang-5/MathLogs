@@ -809,10 +809,10 @@ export default function BatchDetails() {
                                     <p className="text-xs text-app-text-tertiary mb-2 px-2 uppercase font-bold tracking-wider">Actions</p>
                                     <div className="grid grid-cols-1 gap-3 text-center">
                                         <button
-                                            onClick={() => window.open(`/attendance/kiosk?batchId=${batch.id}`, '_blank')}
+                                            onClick={() => window.open(`/attendance?batchId=${batch.id}`, '_blank')}
                                             className="py-3.5 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-bold transition-all w-full"
                                         >
-                                            Attendance Kiosk
+                                            Open Attendance
                                         </button>
                                         <button
                                             onClick={async () => {

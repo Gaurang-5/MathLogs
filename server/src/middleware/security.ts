@@ -163,6 +163,25 @@ export const paymentLimiter = rateLimit({
     }
 });
 
+// ✅ HIGH-1: Dedicated Limiter for UPI Payment Flows
+export const upiPaymentLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 30, // Limit each IP to 30 requests per windowMs (allows retries)
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many payment requests. Please wait a moment.' },
+    handler: (req: Request, res: Response) => {
+        console.warn('[RATE_LIMIT_EXCEEDED]', {
+            type: 'upi_payment_flow',
+            ip: req.ip,
+            path: req.path,
+            method: req.method,
+            timestamp: new Date().toISOString()
+        });
+        res.status(429).json({ error: 'Too many payment requests. Please wait a moment.' });
+    }
+});
+
 // ✅ HIGH-1: Per-User OCR Rate Limiter
 // Protects against Gemini quota drain and cost spikes
 export const ocrLimiter = rateLimit({

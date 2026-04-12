@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
-import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter } from '../middleware/security';
+import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
 import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
 import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, updateFeeInstallment, deleteFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF, inviteStudentToBatch } from '../controllers/batchController';
@@ -9,10 +9,10 @@ import { registerStudent, getPendingStudents, approveStudent, rejectStudent, upd
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail } from '../controllers/testController';
-import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport } from '../controllers/feeController';
+import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
 import { getSystemLogs, getCommunicationLogs } from '../controllers/logController';
-import { checkInStudentAttendance, downloadBatchIdCards, getAttendanceFeed, markStudentPresentManually, searchAttendanceStudents, triggerAttendanceAbsenceSweep } from '../controllers/attendanceController';
+import { checkInStudentAttendance, downloadBatchIdCards, getAttendanceFeed, getPublicAttendancePhoto, getPublicBatchAttendance, markStudentPresentManually, searchAttendanceStudents, triggerAttendanceAbsenceSweep } from '../controllers/attendanceController';
 
 import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
@@ -21,6 +21,9 @@ import { getPaymentHistory } from '../controllers/feeController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
 import { processOCRTextract } from '../utils/ocrTextract';
+import path from 'path';
+import fs from 'fs';
+import { randomUUID } from 'crypto';
 
 import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
 
@@ -30,13 +33,28 @@ const router = Router();
 // These routes do NOT require authentication and are used by parents/students.
 router.get('/public/i/:slug', publicLimiter, getPublicInstituteProfile as any);
 router.post('/public/i/:slug/lead', publicLimiter, submitPublicLead as any);
+router.get('/public/attendance-photo/:id', publicLimiter, getPublicAttendancePhoto as any);
+router.get('/public/batch/:id/attendance', publicLimiter, getPublicBatchAttendance as any);
+import { getPublicStudentFees, submitUpiPayment, getPaymentScreenshot } from '../controllers/publicController';
+router.get('/public/i/:slug/student-fees', upiPaymentLimiter, getPublicStudentFees as any);
+router.get('/public/payment-screenshot/:key', publicLimiter, getPaymentScreenshot as any);
 // =========================================================
 
-// Configure multer for memory storage
+// Configure multer for disk storage
 const upload = multer({
-    storage: multer.memoryStorage(),
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+            const tmpDir = path.join(__dirname, '../../uploads/tmp');
+            fs.mkdirSync(tmpDir, { recursive: true });
+            cb(null, tmpDir);
+        },
+        filename: (req, file, cb) => {
+            cb(null, `${Date.now()}-${randomUUID()}${path.extname(file.originalname)}`);
+        }
+    }),
     limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit
+        files: 1 // Prevent multi-file attacks
     },
     fileFilter: (req: any, file: any, cb: any) => {
         const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -47,6 +65,9 @@ const upload = multer({
         }
     }
 });
+
+// ================= FILE UPLOAD ROUTES =================
+router.post('/public/i/:slug/submit-upi', upiPaymentLimiter, upload.single('screenshot'), submitUpiPayment as any);
 
 import crypto from 'crypto';
 import { prisma } from '../prisma';
@@ -296,6 +317,9 @@ router.post('/fees/pay-installment', authenticateToken as any, paymentLimiter, v
 router.get('/fees/recent', authenticateToken as any, getRecentTransactions as any);
 router.get('/fees/download-transactions', authenticateToken as any, downloadMonthlyReport as any);
 router.post('/fees/remind', authenticateToken as any, bulkNotifyLimiter, sendFeeReminder as any);
+router.get('/fees/upi-verifications', authenticateToken as any, getUpiVerifications as any);
+router.post('/fees/upi-verifications/:id/approve', authenticateToken as any, paymentLimiter, approveUpiVerification as any);
+router.post('/fees/upi-verifications/:id/reject', authenticateToken as any, rejectUpiVerification as any);
 
 // Stats
 router.get('/stats/growth', authenticateToken as any, getStudentGrowthStats as any);

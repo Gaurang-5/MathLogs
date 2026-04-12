@@ -8,35 +8,36 @@ datasource db {
 }
 
 model Institute {
-  id                     String         @id @default(uuid())
-  name                   String
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
-  slug                   String?        @unique
-  aboutUs                String?
-  websiteConfig          Json?
-  config                 Json?          @default("{\"subjects\": [\"Math\", \"Science\"], \"allowedClasses\": [\"9\", \"10\"], \"requiresGrades\": true}")
-  plan                   Tier           @default(FREE)
-  email                  String?
-  phoneNumber            String?
-  teacherName            String?
-  status                 String         @default("ACTIVE")
-  suspensionReason       String?
-  planExpiryDate         DateTime?
-  planStartDate          DateTime?
-  razorpayOrderId        String?
-  razorpaySubscriptionId String?
-  areRegistrationsPaused Boolean        @default(false)
-  academicYears          AcademicYear[]
-  admins                 Admin[]
-  batches                Batch[]
-  invites                InviteToken[]
-  students               Student[]
-  tests                  Test[]
-  attendanceRecords      AttendanceRecord[]
-  attendanceSweepRuns    AttendanceSweepRun[]
-  studentLeads           StudentLead[]
-  systemLogs             SystemLog[]
+  id                      String                   @id @default(uuid())
+  name                    String
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  slug                    String?                  @unique
+  aboutUs                 String?
+  websiteConfig           Json?
+  config                  Json?                    @default("{\"subjects\": [\"Math\", \"Science\"], \"allowedClasses\": [\"9\", \"10\"], \"requiresGrades\": true}")
+  plan                    Tier                     @default(FREE)
+  email                   String?
+  phoneNumber             String?
+  teacherName             String?
+  status                  String                   @default("ACTIVE")
+  suspensionReason        String?
+  planExpiryDate          DateTime?
+  planStartDate           DateTime?
+  razorpayOrderId         String?
+  razorpaySubscriptionId  String?
+  areRegistrationsPaused  Boolean                  @default(false)
+  academicYears           AcademicYear[]
+  admins                  Admin[]
+  batches                 Batch[]
+  invites                 InviteToken[]
+  students                Student[]
+  tests                   Test[]
+  attendanceRecords       AttendanceRecord[]
+  attendanceSweepRuns     AttendanceSweepRun[]
+  studentLeads            StudentLead[]
+  systemLogs              SystemLog[]
+  upiPaymentVerifications UpiPaymentVerification[]
 }
 
 model InviteToken {
@@ -50,66 +51,66 @@ model InviteToken {
 }
 
 model Admin {
-  id                    String         @id @default(uuid())
-  username              String         @unique
-  password              String
-  passwordVersion       Int            @default(1)
-  currentAcademicYear   String         @default("2024-2025")
-  currentAcademicYearId String?
-  instituteId           String?
-  role                  String         @default("INSTITUTE_ADMIN")
-  ownedAcademicYears    AcademicYear[] @relation("OwnedYears")
-  activeAcademicYear    AcademicYear?  @relation("ActiveYear", fields: [currentAcademicYearId], references: [id])
-  institute             Institute?     @relation(fields: [instituteId], references: [id])
-  batches               Batch[]
-  tests                 Test[]
+  id                      String             @id @default(uuid())
+  username                String             @unique
+  password                String
+  passwordVersion         Int                @default(1)
+  currentAcademicYear     String             @default("2024-2025")
+  currentAcademicYearId   String?
+  instituteId             String?
+  role                    String             @default("INSTITUTE_ADMIN")
+  ownedAcademicYears      AcademicYear[]     @relation("OwnedYears")
+  activeAcademicYear      AcademicYear?      @relation("ActiveYear", fields: [currentAcademicYearId], references: [id])
+  institute               Institute?         @relation(fields: [instituteId], references: [id])
+  batches                 Batch[]
+  tests                   Test[]
   manualAttendanceRecords AttendanceRecord[] @relation("ManualAttendanceBy")
-  refreshTokens         RefreshToken[]
+  refreshTokens           RefreshToken[]
 }
 
 model AcademicYear {
-  id              String     @id @default(uuid())
-  name            String
-  startDate       DateTime?
-  endDate         DateTime?
-  isDefault       Boolean    @default(false)
-  teacherId       String
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  instituteId     String?
-  institute       Institute? @relation(fields: [instituteId], references: [id])
-  teacher         Admin      @relation("OwnedYears", fields: [teacherId], references: [id])
-  activeForAdmins Admin[]    @relation("ActiveYear")
-  batches         Batch[]
-  students        Student[]
-  tests           Test[]
-  attendanceRecords AttendanceRecord[]
+  id                  String               @id @default(uuid())
+  name                String
+  startDate           DateTime?
+  endDate             DateTime?
+  isDefault           Boolean              @default(false)
+  teacherId           String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  instituteId         String?
+  institute           Institute?           @relation(fields: [instituteId], references: [id])
+  teacher             Admin                @relation("OwnedYears", fields: [teacherId], references: [id])
+  activeForAdmins     Admin[]              @relation("ActiveYear")
+  batches             Batch[]
+  students            Student[]
+  tests               Test[]
+  attendanceRecords   AttendanceRecord[]
   attendanceSweepRuns AttendanceSweepRun[]
 
   @@unique([teacherId, name])
 }
 
 model Batch {
-  id                  String           @id @default(uuid())
+  id                  String               @id @default(uuid())
   name                String
   subject             String?
   className           String?
   timeSlot            String?
-  feeAmount           Float            @default(0)
+  feeAmount           Float                @default(0)
   academicYear        String?
   academicYearId      String?
   whatsappGroupLink   String?
-  autoSendWelcome     Boolean          @default(false)
-  isRegistrationOpen  Boolean          @default(true)
-  isRegistrationEnded Boolean          @default(false)
+  autoSendWelcome     Boolean              @default(false)
+  isRegistrationOpen  Boolean              @default(true)
+  isRegistrationEnded Boolean              @default(false)
   batchNumber         Int?
   teacherId           String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   instituteId         String?
-  academicYearRef     AcademicYear?    @relation(fields: [academicYearId], references: [id])
-  institute           Institute?       @relation(fields: [instituteId], references: [id])
-  teacher             Admin?           @relation(fields: [teacherId], references: [id])
+  academicYearRef     AcademicYear?        @relation(fields: [academicYearId], references: [id])
+  institute           Institute?           @relation(fields: [instituteId], references: [id])
+  teacher             Admin?               @relation(fields: [teacherId], references: [id])
   feeInstallments     FeeInstallment[]
   students            Student[]
   attendanceRecords   AttendanceRecord[]
@@ -121,27 +122,28 @@ model Batch {
 }
 
 model Student {
-  id              String          @id @default(uuid())
-  humanId         String?
-  name            String
-  parentName      String
-  parentWhatsapp  String
-  parentEmail     String?
-  status          String          @default("PENDING")
-  batchId         String?
-  academicYearId  String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  schoolName      String?
-  instituteId     String?
-  feePayments     FeePayment[]
-  fees            FeeRecord[]
-  marks           Mark[]
-  attendanceRecords AttendanceRecord[]
-  academicYearRef AcademicYear?   @relation(fields: [academicYearId], references: [id])
-  batch           Batch?          @relation(fields: [batchId], references: [id])
-  institute       Institute?      @relation(fields: [instituteId], references: [id])
-  balance         StudentBalance?
+  id                      String                   @id @default(uuid())
+  humanId                 String?
+  name                    String
+  parentName              String
+  parentWhatsapp          String
+  parentEmail             String?
+  status                  String                   @default("PENDING")
+  batchId                 String?
+  academicYearId          String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  schoolName              String?
+  instituteId             String?
+  feePayments             FeePayment[]
+  fees                    FeeRecord[]
+  marks                   Mark[]
+  attendanceRecords       AttendanceRecord[]
+  academicYearRef         AcademicYear?            @relation(fields: [academicYearId], references: [id])
+  batch                   Batch?                   @relation(fields: [batchId], references: [id])
+  institute               Institute?               @relation(fields: [instituteId], references: [id])
+  balance                 StudentBalance?
+  upiPaymentVerifications UpiPaymentVerification[]
 
   @@unique([humanId, academicYearId])
   @@unique([name, parentWhatsapp, batchId], name: "student_natural_key")
@@ -153,6 +155,7 @@ model Student {
   @@index([createdAt])
   @@index([instituteId, status])
   @@index([instituteId, createdAt])
+  @@index([instituteId, parentWhatsapp])
 }
 
 model FeeRecord {
@@ -204,13 +207,14 @@ model Mark {
 }
 
 model FeeInstallment {
-  id        String       @id @default(uuid())
-  name      String
-  amount    Float
-  batchId   String
-  createdAt DateTime     @default(now())
-  batch     Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  payments  FeePayment[]
+  id                      String                   @id @default(uuid())
+  name                    String
+  amount                  Float
+  batchId                 String
+  createdAt               DateTime                 @default(now())
+  batch                   Batch                    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  payments                FeePayment[]
+  upiPaymentVerifications UpiPaymentVerification[]
 
   @@index([batchId])
 }
@@ -245,25 +249,27 @@ model StudentBalance {
 }
 
 model AttendanceRecord {
-  id               String           @id @default(uuid())
-  studentId        String
-  batchId          String
-  instituteId      String
-  academicYearId   String?
-  attendanceDate   DateTime
-  checkedInAt      DateTime         @default(now())
-  photoUrl         String?
-  photoMimeType    String?
-  note             String?
-  source           AttendanceSource @default(KIOSK)
-  manualMarkedById String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  student          Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  batch            Batch            @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  institute        Institute        @relation(fields: [instituteId], references: [id], onDelete: Cascade)
-  academicYearRef  AcademicYear?    @relation(fields: [academicYearId], references: [id])
-  manualMarkedBy   Admin?           @relation("ManualAttendanceBy", fields: [manualMarkedById], references: [id])
+  id                String           @id @default(uuid())
+  studentId         String
+  batchId           String
+  instituteId       String
+  academicYearId    String?
+  attendanceDate    DateTime
+  checkedInAt       DateTime         @default(now())
+  photoStorageKey   String?
+  photoUrl          String?
+  photoUrlExpiresAt DateTime?
+  photoMimeType     String?
+  note              String?
+  source            AttendanceSource @default(KIOSK)
+  manualMarkedById  String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  student           Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batch             Batch            @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  institute         Institute        @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  academicYearRef   AcademicYear?    @relation(fields: [academicYearId], references: [id])
+  manualMarkedBy    Admin?           @relation("ManualAttendanceBy", fields: [manualMarkedById], references: [id])
 
   @@unique([studentId, attendanceDate])
   @@index([batchId, attendanceDate, checkedInAt])
@@ -271,17 +277,17 @@ model AttendanceRecord {
 }
 
 model AttendanceSweepRun {
-  id             String        @id @default(uuid())
-  batchId        String
-  instituteId    String
-  academicYearId String?
-  attendanceDate DateTime
-  scheduledFor   DateTime
-  status         String        @default("COMPLETED")
-  createdAt      DateTime      @default(now())
-  completedAt    DateTime?
-  batch          Batch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  institute      Institute     @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  id              String        @id @default(uuid())
+  batchId         String
+  instituteId     String
+  academicYearId  String?
+  attendanceDate  DateTime
+  scheduledFor    DateTime
+  status          String        @default("COMPLETED")
+  createdAt       DateTime      @default(now())
+  completedAt     DateTime?
+  batch           Batch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  institute       Institute     @relation(fields: [instituteId], references: [id], onDelete: Cascade)
   academicYearRef AcademicYear? @relation(fields: [academicYearId], references: [id])
 
   @@unique([batchId, attendanceDate])
@@ -378,19 +384,18 @@ model OnboardingLead {
   @@index([createdAt])
 }
 
-
 // OTP tokens stored in DB instead of in-memory Map
 // Survives server restarts and works across multiple Heroku dynos
 model OtpToken {
   id         String   @id @default(uuid())
-  identifier String   // Phone number or email (normalized)
+  identifier String // Phone number or email (normalized)
   otp        String
   expiresAt  DateTime
   verified   Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   @@unique([identifier]) // One active OTP per identifier (upsert replaces old)
-  @@index([expiresAt])   // For cleanup queries
+  @@index([expiresAt]) // For cleanup queries
 }
 
 // Refresh tokens for secure JWT rotation
@@ -439,15 +444,15 @@ model SystemAlert {
 }
 
 model StudentLead {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   studentName     String
   parentName      String
   parentPhone     String
   batchInterestId String?
-  status          String   @default("NEW") // NEW, CONTACTED, CONVERTED, LOST
+  status          String    @default("NEW") // NEW, CONTACTED, CONVERTED, LOST
   instituteId     String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   institute       Institute @relation(fields: [instituteId], references: [id])
   batch           Batch?    @relation(fields: [batchInterestId], references: [id])
 
@@ -458,14 +463,34 @@ model StudentLead {
 model SystemLog {
   id          String   @id @default(uuid())
   instituteId String
-  action      String   // E.g., STUDENT_JOIN, STUDENT_LEAVE, FEE_COLLECTED
-  entityId    String?  // Optional reference ID
-  entityName  String?  // Human readable name (e.g., Student Name, Batch Name)
-  details     Json?    // Optional structured details
+  action      String // E.g., STUDENT_JOIN, STUDENT_LEAVE, FEE_COLLECTED
+  entityId    String? // Optional reference ID
+  entityName  String? // Human readable name (e.g., Student Name, Batch Name)
+  details     Json? // Optional structured details
   createdAt   DateTime @default(now())
 
-  institute   Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  institute Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
 
   @@index([instituteId, action])
   @@index([createdAt])
+}
+
+model UpiPaymentVerification {
+  id              String   @id @default(uuid())
+  studentId       String
+  instituteId     String
+  installmentId   String? // Null if paying custom amount, assigned if paying specific installment
+  amount          Float
+  storageKey      String // The S3 or local path key of the screenshot
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  student     Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  institute   Institute       @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  installment FeeInstallment? @relation(fields: [installmentId], references: [id])
+
+  @@index([instituteId, status])
+  @@index([studentId])
 }
