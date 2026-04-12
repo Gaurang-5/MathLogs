@@ -1021,6 +1021,13 @@ class AlreadyProcessedError extends Error {
     }
 }
 
+class PaymentValidationError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'PaymentValidationError';
+    }
+}
+
 export const approveUpiVerification = async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
@@ -1048,6 +1055,19 @@ export const approveUpiVerification = async (req: Request, res: Response) => {
 
         // Inside a transaction to approve and pay
         await prisma.$transaction(async (tx) => {
+            // VERIFICATION: Check the materialized balance to absolutely prevent double-logging
+            const studentBalance = await tx.studentBalance.findUnique({
+                where: { studentId: verification.studentId }
+            });
+            const pendingAmount = studentBalance?.balance || 0;
+            
+            if (pendingAmount <= 0) {
+                throw new PaymentValidationError("Cannot approve! This student has no pending fee. The payment was likely logged directly by another method.");
+            }
+            if (verification.amount > pendingAmount) {
+                throw new PaymentValidationError(`Cannot approve! The receipt amount (₹${verification.amount}) is greater than the student's current due balance (₹${pendingAmount}).`);
+            }
+
             // Atomically claim this verification row so concurrent approvers cannot double-collect.
             const claimed = await tx.upiPaymentVerification.updateMany({
                 where: {
@@ -1163,6 +1183,9 @@ export const approveUpiVerification = async (req: Request, res: Response) => {
     } catch (e: any) {
         if (e instanceof AlreadyProcessedError) {
             return res.status(400).json({ error: e.message, alreadyProcessed: true });
+        }
+        if (e instanceof PaymentValidationError) {
+            return res.status(400).json({ error: e.message });
         }
         console.error('Approve UPI Payment Error:', e?.message, e?.stack);
         res.status(500).json({ error: 'Failed to approve payment', detail: e?.message });
