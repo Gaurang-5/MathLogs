@@ -10,7 +10,7 @@ import { authenticateToken } from './middleware/auth';
 import { initializeSentry } from './monitoring/sentry';
 import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
 import { emailWorker } from './utils/emailWorker';
-import { processAttendanceAbsenceSweep } from './controllers/attendanceController';
+
 
 import * as Sentry from '@sentry/node';
 
