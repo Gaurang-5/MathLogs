@@ -1,72 +1,109 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import React, { useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { motion } from 'framer-motion';
-import { Upload, CheckCircle, AlertCircle, Loader, User, Calendar, IndianRupee } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Upload, CheckCircle, AlertCircle, Loader, Phone, ChevronRight, IndianRupee, ArrowLeft, Clock } from 'lucide-react';
 
 const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
 
+interface FeeInstallment {
+    id: string;
+    name: string;
+    amount: number;
+    dueDate?: string;
+}
+
+interface FeePayment {
+    id: string;
+    amount: number;
+    installmentId?: string;
+}
+
+interface PendingVerification {
+    id: string;
+    amount: number;
+    createdAt: string;
+    status: string;
+}
+
+interface StudentData {
+    studentId: string;
+    studentName: string;
+    batchName: string;
+    feeInstallments: FeeInstallment[];
+    feePayments: FeePayment[];
+    pendingVerifications: PendingVerification[];
+}
+
+interface InstituteInfo {
+    name: string;
+    logoUrl: string | null;
+}
+
+type Step = 'phone' | 'select-student' | 'upload' | 'success';
+
 export default function StudentPaymentPortal() {
     const { slug } = useParams<{ slug: string }>();
-    const [searchParams] = useSearchParams();
-    const phoneParam = searchParams.get('phone');
 
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    const [step, setStep] = useState<Step>('phone');
+    const [phone, setPhone] = useState('');
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    
-    const [data, setData] = useState<any>(null);
-    const [selectedStudent, setSelectedStudent] = useState<any>(null);
+
+    const [institute, setInstitute] = useState<InstituteInfo | null>(null);
+    const [students, setStudents] = useState<StudentData[]>([]);
+    const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
+
     const [amount, setAmount] = useState('');
+    const [selectedInstallmentId, setSelectedInstallmentId] = useState<string>('');
     const [file, setFile] = useState<File | null>(null);
+    const [submitting, setSubmitting] = useState(false);
 
-    const [manualPhone, setManualPhone] = useState('');
-    const [needsPhone, setNeedsPhone] = useState(false);
-
-    useEffect(() => {
-        if (!slug) {
-            setError('Invalid institute link.');
-            setLoading(false);
-            return;
-        }
-
-        if (!phoneParam) {
-            setNeedsPhone(true);
-            setLoading(false);
-            return;
-        }
-
-        fetchStudentFees(phoneParam);
-    }, [slug, phoneParam]);
-
-    const fetchStudentFees = (phone: string) => {
+    const lookupStudent = useCallback(async () => {
+        if (!slug || phone.length < 10) return;
         setLoading(true);
-        axios.get(`${API_URL}/public/i/${slug}/student-fees?phone=${phone}`)
-            .then(res => {
-                setData(res.data);
-                if (res.data.students.length === 1) {
-                    setSelectedStudent(res.data.students[0]);
-                }
-                setNeedsPhone(false);
-            })
-            .catch(err => {
-                setError(err.response?.data?.error || 'Failed to load details. Your link or number might be incorrect.');
-            })
-            .finally(() => setLoading(false));
+        setError('');
+
+        try {
+            const res = await axios.get(`${API_URL}/public/i/${slug}/student-fees?phone=${phone.replace(/\D/g, '').slice(-10)}`);
+            setInstitute(res.data.institute);
+            setStudents(res.data.students);
+
+            if (res.data.students.length === 1) {
+                setSelectedStudent(res.data.students[0]);
+                setStep('upload');
+            } else {
+                setStep('select-student');
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Could not find student. Please check the number.');
+        } finally {
+            setLoading(false);
+        }
+    }, [slug, phone]);
+
+    const handleSelectStudent = (student: StudentData) => {
+        setSelectedStudent(student);
+        setStep('upload');
     };
 
-    const handleManualPhoneSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (manualPhone.length >= 10) {
-            fetchStudentFees(manualPhone);
-        }
+    const getBalance = (student: StudentData) => {
+        const totalFee = student.feeInstallments.reduce((sum, i) => sum + i.amount, 0);
+        const totalPaid = student.feePayments.reduce((sum, p) => sum + p.amount, 0);
+        return totalFee - totalPaid;
+    };
+
+    const getInstallmentBalance = (student: StudentData, installment: FeeInstallment) => {
+        const paid = student.feePayments
+            .filter(p => p.installmentId === installment.id)
+            .reduce((sum, p) => sum + p.amount, 0);
+        return installment.amount - paid;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedStudent || !amount || !file) {
-            setError('Please complete all fields and upload a screenshot.');
+            setError('Please fill all fields and upload a screenshot.');
             return;
         }
 
@@ -74,263 +111,573 @@ export default function StudentPaymentPortal() {
         setError('');
 
         const formData = new FormData();
-        formData.append('studentId', selectedStudent.id);
+        formData.append('studentId', selectedStudent.studentId);
         formData.append('amount', amount);
+        if (selectedInstallmentId) {
+            formData.append('installmentId', selectedInstallmentId);
+        }
         formData.append('screenshot', file);
 
         try {
             await axios.post(`${API_URL}/public/i/${slug}/submit-upi`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            setSuccess('Thank you! Your payment screenshot has been uploaded. We will verify it shortly.');
+            setStep('success');
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to submit the payment verification.');
+            setError(err.response?.data?.error || 'Submission failed. Please try again.');
         } finally {
             setSubmitting(false);
         }
     };
 
-    if (loading) {
+    if (!slug) {
         return (
-            <div className="flex h-screen w-screen items-center justify-center bg-gray-50">
-                <Loader className="h-8 w-8 animate-spin text-indigo-600" />
-            </div>
-        );
-    }
-
-    if (needsPhone) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-gray-50 p-6">
-                <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900">Enter Mobile Number</h2>
-                    <p className="text-gray-600">Please provide the WhatsApp number where you received the fee alert.</p>
-                    <form onSubmit={handleManualPhoneSubmit} className="space-y-4">
-                        <input 
-                            type="tel"
-                            value={manualPhone}
-                            onChange={(e) => setManualPhone(e.target.value)}
-                            placeholder="e.g. 9876543210"
-                            className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
-                            required
-                        />
-                        <button 
-                            type="submit" 
-                            className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition"
-                        >
-                            View Pending Dues
-                        </button>
-                    </form>
+            <div className="portal-container">
+                <div className="portal-card text-center">
+                    <div className="portal-icon-circle portal-icon-error">
+                        <AlertCircle size={32} />
+                    </div>
+                    <h2>Invalid Link</h2>
+                    <p className="text-muted">This payment link is not valid.</p>
                 </div>
-            </div>
-        );
-    }
-
-    if (error && !data) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-gray-50 p-6">
-                <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center space-y-4">
-                    <div className="bg-red-100 p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center">
-                        <AlertCircle className="w-10 h-10 text-red-600" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900">Oops!</h2>
-                    <p className="text-gray-600">{error}</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (success) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-gray-50 p-6">
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-6 flex flex-col items-center"
-                >
-                    <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
-                        <CheckCircle className="w-12 h-12 text-green-600" />
-                    </div>
-                    <div>
-                        <h2 className="text-3xl font-black text-gray-900 tracking-tight">Payment Sent</h2>
-                        <p className="mt-3 text-gray-600 leading-relaxed">{success}</p>
-                    </div>
-                </motion.div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 md:p-8 flex items-center justify-center">
-            <div className="max-w-xl w-full bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100/50">
-                
-                {/* Header Section */}
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-10 text-white text-center relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -ml-20 -mb-20"></div>
-                    
-                    <div className="relative z-10 flex flex-col items-center">
-                        {data?.institute.logoUrl && (
-                            <img 
-                                src={data.institute.logoUrl} 
-                                alt="Institute Logo" 
-                                className="w-20 h-20 rounded-2xl bg-white p-1 mb-4 shadow-xl object-contain object-center"
-                            />
-                        )}
-                        <h1 className="text-3xl font-black tracking-tight">{data?.institute.name}</h1>
-                        <p className="text-indigo-100 mt-2 font-medium">UPI Payment Verification</p>
-                    </div>
-                </div>
-
-                <div className="p-8 space-y-8">
-                    {/* Student Selection (if multiple students on same phone number) */}
-                    {data?.students.length > 1 && !selectedStudent && (
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-gray-900 border-b pb-2">Select Student Profile</h3>
-                            <div className="grid gap-3">
-                                {data.students.map((sts: any) => (
-                                    <button 
-                                        key={sts.id} 
-                                        onClick={() => setSelectedStudent(sts)}
-                                        className="flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-indigo-600 hover:bg-indigo-50/50 transition-all text-left"
-                                    >
-                                        <div className="flex items-center space-x-3">
-                                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
-                                                {sts.name[0]}
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-gray-900">{sts.name}</p>
-                                                <p className="text-sm text-gray-500">{sts.batch?.name || 'No Batch'}</p>
-                                            </div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+        <div className="portal-container">
+            {/* Institute Header */}
+            {institute && (
+                <div className="portal-header">
+                    {institute.logoUrl && (
+                        <img src={institute.logoUrl} alt="" className="portal-logo" />
                     )}
+                    <h1 className="portal-title">{institute.name}</h1>
+                    <p className="portal-subtitle">Fee Payment Portal</p>
+                </div>
+            )}
 
-                    {selectedStudent && (
-                        <motion.form 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="space-y-8" 
-                            onSubmit={handleSubmit}
-                        >
-                            {/* Selected Student Block */}
-                            {data?.students.length > 1 && (
-                                <div className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-12 h-12 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center">
-                                            <User className="text-indigo-600 w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Paying For</p>
-                                            <p className="font-bold text-gray-900">{selectedStudent.name}</p>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setSelectedStudent(null)}
-                                        className="text-sm text-indigo-600 font-medium hover:underline"
-                                    >
-                                        Change
-                                    </button>
-                                </div>
-                            )}
+            <AnimatePresence mode="wait">
+                {/* STEP 1: Phone Entry */}
+                {step === 'phone' && (
+                    <motion.div
+                        key="phone"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="portal-card"
+                    >
+                        {!institute && (
+                            <div className="portal-header-inline">
+                                <h2>Fee Payment Portal</h2>
+                                <p className="text-muted">Enter your registered mobile number</p>
+                            </div>
+                        )}
+
+                        {institute && (
+                            <p className="text-muted" style={{ marginBottom: '1.5rem' }}>Enter your registered mobile number to view pending fees.</p>
+                        )}
+
+                        <form onSubmit={(e) => { e.preventDefault(); lookupStudent(); }}>
+                            <div className="input-group">
+                                <div className="input-icon"><Phone size={20} /></div>
+                                <input
+                                    type="tel"
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    placeholder="e.g. 9876543210"
+                                    className="portal-input"
+                                    maxLength={13}
+                                    required
+                                />
+                            </div>
 
                             {error && (
-                                <div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm flex items-start">
-                                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                                <div className="portal-error">
+                                    <AlertCircle size={16} />
                                     <span>{error}</span>
                                 </div>
                             )}
 
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Amount Paid
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                        <IndianRupee className="h-5 w-5 text-gray-400" />
+                            <button type="submit" className="portal-btn portal-btn-primary" disabled={loading || phone.length < 10}>
+                                {loading ? <Loader size={20} className="spin" /> : <>Continue <ChevronRight size={18} /></>}
+                            </button>
+                        </form>
+                    </motion.div>
+                )}
+
+                {/* STEP 2: Select Student (if multiple) */}
+                {step === 'select-student' && (
+                    <motion.div
+                        key="select"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="portal-card"
+                    >
+                        <button className="portal-back" onClick={() => { setStep('phone'); setError(''); }}>
+                            <ArrowLeft size={16} /> Back
+                        </button>
+                        <h3>We found {students.length} students</h3>
+                        <p className="text-muted">Select whose fee you are paying:</p>
+
+                        <div className="student-list">
+                            {students.map(s => (
+                                <button
+                                    key={s.studentId}
+                                    className="student-card"
+                                    onClick={() => handleSelectStudent(s)}
+                                >
+                                    <div className="student-avatar">{s.studentName[0]}</div>
+                                    <div className="student-info">
+                                        <span className="student-name">{s.studentName}</span>
+                                        <span className="student-batch">{s.batchName}</span>
+                                        <span className="student-balance">Balance: ₹{getBalance(s).toLocaleString()}</span>
                                     </div>
-                                    <input 
-                                        type="number"
-                                        placeholder="0.00" 
-                                        value={amount}
-                                        onChange={(e) => setAmount(e.target.value)}
-                                        className="w-full pl-11 pr-4 py-4 text-xl font-medium bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                                        required
-                                    />
-                                </div>
+                                    <ChevronRight size={18} className="text-muted" />
+                                </button>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+
+                {/* STEP 3: Upload Screenshot */}
+                {step === 'upload' && selectedStudent && (
+                    <motion.div
+                        key="upload"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="portal-card"
+                    >
+                        {students.length > 1 && (
+                            <button className="portal-back" onClick={() => { setStep('select-student'); setError(''); setFile(null); setAmount(''); }}>
+                                <ArrowLeft size={16} /> Change Student
+                            </button>
+                        )}
+
+                        <div className="selected-student-banner">
+                            <div className="student-avatar">{selectedStudent.studentName[0]}</div>
+                            <div>
+                                <strong>{selectedStudent.studentName}</strong>
+                                <span className="student-batch">{selectedStudent.batchName}</span>
+                            </div>
+                        </div>
+
+                        {/* Pending verifications warning */}
+                        {selectedStudent.pendingVerifications.length > 0 && (
+                            <div className="portal-warning">
+                                <Clock size={16} />
+                                <span>You already have {selectedStudent.pendingVerifications.length} payment(s) under review.</span>
+                            </div>
+                        )}
+
+                        {/* Fee Breakdown */}
+                        {selectedStudent.feeInstallments.length > 0 && (
+                            <div className="fee-breakdown">
+                                <h4>Fee Installments</h4>
+                                {selectedStudent.feeInstallments.map(inst => {
+                                    const balance = getInstallmentBalance(selectedStudent, inst);
+                                    if (balance <= 0) return null;
+                                    return (
+                                        <label key={inst.id} className={`fee-item ${selectedInstallmentId === inst.id ? 'fee-item-selected' : ''}`}>
+                                            <input
+                                                type="radio"
+                                                name="installment"
+                                                value={inst.id}
+                                                checked={selectedInstallmentId === inst.id}
+                                                onChange={() => {
+                                                    setSelectedInstallmentId(inst.id);
+                                                    setAmount(String(balance));
+                                                }}
+                                            />
+                                            <div className="fee-item-text">
+                                                <span>{inst.name}</span>
+                                                <span className="fee-item-amount">₹{balance.toLocaleString()} due</span>
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit}>
+                            <div className="input-group">
+                                <div className="input-icon"><IndianRupee size={20} /></div>
+                                <input
+                                    type="number"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    placeholder="Amount paid"
+                                    className="portal-input"
+                                    min="1"
+                                    required
+                                />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Upload Receipt / Screenshot
-                                </label>
-                                <label className={`
-                                    flex flex-col items-center justify-center w-full h-48 
-                                    border-2 border-dashed rounded-2xl cursor-pointer 
-                                    transition-all duration-200
-                                    ${file ? 'border-indigo-500 bg-indigo-50/50' : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'}
-                                `}>
-                                    <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-                                        {file ? (
-                                            <CheckCircle className="w-10 h-10 text-indigo-600 mb-3" />
-                                        ) : (
-                                            <Upload className="w-10 h-10 text-gray-400 mb-3" />
-                                        )}
-                                        
-                                        <p className="text-sm font-semibold text-gray-700">
-                                            {file ? file.name : 'Tap to select screenshot'}
-                                        </p>
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            {file ? 'Click to replace file' : 'PNG, JPG or JPEG (Max 5MB)'}
-                                        </p>
-                                    </div>
-                                    <input 
-                                        type="file" 
-                                        className="hidden" 
-                                        accept="image/jpeg, image/png, image/jpg" 
-                                        onChange={(e) => {
-                                            if (e.target.files && e.target.files.length > 0) {
-                                                setFile(e.target.files[0]);
-                                            }
-                                        }}
-                                        required
-                                    />
-                                </label>
-                            </div>
-
-                            <button 
-                                type="submit" 
-                                disabled={submitting || !file || !amount}
-                                className={`
-                                    w-full py-4 px-6 rounded-xl font-bold text-lg 
-                                    shadow-lg transition-all
-                                    flex items-center justify-center space-x-2
-                                    ${(submitting || !file || !amount) 
-                                        ? 'bg-gray-200 text-gray-400 shadow-none cursor-not-allowed' 
-                                        : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-500/30 hover:-translate-y-0.5 text-white'
-                                    }
-                                `}
-                            >
-                                {submitting ? (
+                            <label className={`upload-area ${file ? 'upload-area-filled' : ''}`}>
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/jpg"
+                                    onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])}
+                                    hidden
+                                />
+                                {file ? (
                                     <>
-                                        <Loader className="w-5 h-5 animate-spin" />
-                                        <span>Uploading...</span>
+                                        <CheckCircle size={28} />
+                                        <span className="upload-filename">{file.name}</span>
+                                        <span className="text-muted">Tap to change</span>
                                     </>
                                 ) : (
-                                    <span>Submit Verification</span>
+                                    <>
+                                        <Upload size={28} />
+                                        <span>Tap to upload payment screenshot</span>
+                                        <span className="text-muted">JPG, PNG (Max 5MB)</span>
+                                    </>
                                 )}
+                            </label>
+
+                            {error && (
+                                <div className="portal-error">
+                                    <AlertCircle size={16} />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+
+                            <button type="submit" className="portal-btn portal-btn-primary" disabled={submitting || !file || !amount}>
+                                {submitting ? <Loader size={20} className="spin" /> : 'Submit Payment Receipt'}
                             </button>
-                        </motion.form>
-                    )}
-                </div>
-            </div>
-            
-            <p className="fixed bottom-6 text-center w-full text-xs text-gray-400 font-medium z-0">
-                Powered by MathLogs Secure Payments
-            </p>
+                        </form>
+                    </motion.div>
+                )}
+
+                {/* STEP 4: Success */}
+                {step === 'success' && (
+                    <motion.div
+                        key="success"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="portal-card text-center"
+                    >
+                        <div className="portal-icon-circle portal-icon-success">
+                            <CheckCircle size={40} />
+                        </div>
+                        <h2>Receipt Submitted!</h2>
+                        <p className="text-muted">
+                            Your payment of <strong>₹{Number(amount).toLocaleString()}</strong> for <strong>{selectedStudent?.studentName}</strong> has been submitted.
+                        </p>
+                        <p className="text-muted">Your teacher will verify it shortly. You'll receive a WhatsApp confirmation once approved.</p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <p className="portal-footer">Secured by MathLogs</p>
+
+            <style>{`
+                .portal-container {
+                    min-height: 100vh;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 1.5rem;
+                    background: linear-gradient(135deg, #f0f4ff 0%, #fafbff 50%, #f5f0ff 100%);
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                }
+                .portal-header {
+                    text-align: center;
+                    margin-bottom: 1.5rem;
+                }
+                .portal-logo {
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 16px;
+                    object-fit: contain;
+                    background: #fff;
+                    padding: 4px;
+                    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+                    margin-bottom: 0.75rem;
+                }
+                .portal-title {
+                    font-size: 1.5rem;
+                    font-weight: 800;
+                    color: #1a1a2e;
+                    margin: 0;
+                }
+                .portal-subtitle {
+                    color: #6b7280;
+                    font-size: 0.9rem;
+                    margin-top: 0.25rem;
+                }
+                .portal-card {
+                    width: 100%;
+                    max-width: 420px;
+                    background: #fff;
+                    border-radius: 20px;
+                    padding: 2rem;
+                    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+                    border: 1px solid rgba(0,0,0,0.04);
+                }
+                .portal-header-inline h2 {
+                    font-size: 1.4rem;
+                    font-weight: 700;
+                    margin: 0 0 0.25rem;
+                    color: #1a1a2e;
+                }
+                .text-center { text-align: center; }
+                .text-muted { color: #6b7280; font-size: 0.9rem; }
+                .input-group {
+                    position: relative;
+                    margin-bottom: 1rem;
+                }
+                .input-icon {
+                    position: absolute;
+                    left: 14px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    color: #9ca3af;
+                }
+                .portal-input {
+                    width: 100%;
+                    padding: 14px 14px 14px 46px;
+                    font-size: 1.05rem;
+                    border: 1.5px solid #e5e7eb;
+                    border-radius: 14px;
+                    outline: none;
+                    transition: all 0.2s;
+                    background: #fafafa;
+                    box-sizing: border-box;
+                }
+                .portal-input:focus {
+                    border-color: #6366f1;
+                    background: #fff;
+                    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+                }
+                .portal-btn {
+                    width: 100%;
+                    padding: 14px;
+                    border: none;
+                    border-radius: 14px;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: all 0.2s;
+                    margin-top: 0.5rem;
+                }
+                .portal-btn-primary {
+                    background: #6366f1;
+                    color: #fff;
+                }
+                .portal-btn-primary:hover:not(:disabled) {
+                    background: #4f46e5;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+                }
+                .portal-btn:disabled {
+                    opacity: 0.4;
+                    cursor: not-allowed;
+                    transform: none;
+                }
+                .portal-error {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 8px;
+                    background: #fef2f2;
+                    color: #dc2626;
+                    padding: 12px 14px;
+                    border-radius: 12px;
+                    font-size: 0.88rem;
+                    margin-bottom: 0.75rem;
+                }
+                .portal-warning {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    background: #fffbeb;
+                    color: #b45309;
+                    padding: 12px 14px;
+                    border-radius: 12px;
+                    font-size: 0.88rem;
+                    margin-bottom: 1rem;
+                }
+                .portal-back {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    background: none;
+                    border: none;
+                    color: #6366f1;
+                    font-size: 0.88rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    padding: 0;
+                    margin-bottom: 1rem;
+                }
+                .student-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    margin-top: 1rem;
+                }
+                .student-card {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 14px;
+                    border: 1.5px solid #e5e7eb;
+                    border-radius: 14px;
+                    background: #fff;
+                    cursor: pointer;
+                    text-align: left;
+                    width: 100%;
+                    transition: all 0.2s;
+                }
+                .student-card:hover {
+                    border-color: #6366f1;
+                    background: #fafaff;
+                }
+                .student-avatar {
+                    width: 42px;
+                    height: 42px;
+                    border-radius: 12px;
+                    background: #eef2ff;
+                    color: #6366f1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 700;
+                    font-size: 1.1rem;
+                    flex-shrink: 0;
+                }
+                .student-info {
+                    display: flex;
+                    flex-direction: column;
+                    flex: 1;
+                    min-width: 0;
+                }
+                .student-name {
+                    font-weight: 600;
+                    color: #1a1a2e;
+                    font-size: 0.95rem;
+                }
+                .student-batch {
+                    color: #6b7280;
+                    font-size: 0.82rem;
+                }
+                .student-balance {
+                    color: #dc2626;
+                    font-size: 0.82rem;
+                    font-weight: 500;
+                }
+                .selected-student-banner {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px;
+                    background: #f9fafb;
+                    border-radius: 14px;
+                    margin-bottom: 1rem;
+                }
+                .selected-student-banner strong {
+                    display: block;
+                    color: #1a1a2e;
+                }
+                .fee-breakdown {
+                    margin-bottom: 1rem;
+                }
+                .fee-breakdown h4 {
+                    font-size: 0.85rem;
+                    color: #6b7280;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    margin: 0 0 0.5rem;
+                }
+                .fee-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 12px;
+                    border: 1.5px solid #e5e7eb;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    margin-bottom: 6px;
+                    transition: all 0.15s;
+                }
+                .fee-item:hover, .fee-item-selected {
+                    border-color: #6366f1;
+                    background: #fafaff;
+                }
+                .fee-item input[type="radio"] {
+                    accent-color: #6366f1;
+                }
+                .fee-item-text {
+                    display: flex;
+                    justify-content: space-between;
+                    flex: 1;
+                    font-size: 0.9rem;
+                }
+                .fee-item-amount {
+                    font-weight: 600;
+                    color: #dc2626;
+                }
+                .upload-area {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                    padding: 2rem 1rem;
+                    border: 2px dashed #d1d5db;
+                    border-radius: 14px;
+                    cursor: pointer;
+                    color: #6b7280;
+                    text-align: center;
+                    transition: all 0.2s;
+                    margin-bottom: 1rem;
+                }
+                .upload-area:hover {
+                    border-color: #6366f1;
+                    background: #fafaff;
+                }
+                .upload-area-filled {
+                    border-color: #6366f1;
+                    background: #eef2ff;
+                    color: #4f46e5;
+                }
+                .upload-filename {
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    word-break: break-all;
+                }
+                .portal-icon-circle {
+                    width: 72px;
+                    height: 72px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0 auto 1rem;
+                }
+                .portal-icon-success {
+                    background: #dcfce7;
+                    color: #16a34a;
+                }
+                .portal-icon-error {
+                    background: #fee2e2;
+                    color: #dc2626;
+                }
+                .portal-footer {
+                    margin-top: 2rem;
+                    font-size: 0.78rem;
+                    color: #9ca3af;
+                }
+                .spin { animation: spin 1s linear infinite; }
+                @keyframes spin { to { transform: rotate(360deg); } }
+            `}</style>
         </div>
     );
 }
