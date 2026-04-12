@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, AlertCircle, Eye } from 'lucide-react';
@@ -200,54 +201,58 @@ export default function UpiVerificationList() {
             })}
 
             {/* Lightbox Modal */}
-            <AnimatePresence>
-                {enlargedImage && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
-                        onClick={() => setEnlargedImage(null)}
-                    >
-                        <button
+            {typeof document !== 'undefined' && createPortal(
+                <AnimatePresence>
+                    {enlargedImage && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
                             onClick={() => setEnlargedImage(null)}
-                            className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 text-white rounded-full p-2.5 transition-colors z-[110]"
                         >
-                            <X className="w-6 h-6" />
-                        </button>
-                        <motion.img
-                            initial={{ scale: 0.95, y: 10 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.95, y: 10 }}
-                            src={enlargedImage}
-                            alt="Enlarged screenshot"
-                            className="max-w-full max-h-[90vh] object-contain rounded-[24px] shadow-2xl relative z-[105]"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                            <button
+                                onClick={() => setEnlargedImage(null)}
+                                className="absolute top-20 right-6 bg-white/20 hover:bg-white/30 text-white rounded-full p-2.5 transition-colors z-[10000]"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                            <motion.img
+                                initial={{ scale: 0.95, y: 10 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.95, y: 10 }}
+                                src={enlargedImage}
+                                alt="Enlarged screenshot"
+                                className="max-w-full max-h-[90vh] object-contain rounded-[24px] shadow-2xl relative z-[9999]"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
 
             {/* Custom Action Confirmation Modal */}
-            <AnimatePresence>
-                {confirmAction && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4"
-                        onClick={() => setConfirmAction(null)}
-                    >
+            {typeof document !== 'undefined' && createPortal(
+                <AnimatePresence>
+                    {confirmAction && (
                         <motion.div
-                            initial={{ scale: 0.95, opacity: 0, y: 10 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 10 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-white rounded-[24px] p-6 max-w-[320px] w-full shadow-2xl flex flex-col items-center text-center border border-neutral-100"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4"
+                            onClick={() => setConfirmAction(null)}
                         >
-                            <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${confirmAction.action === 'approve' ? 'bg-[#059669]/10 text-[#059669]' : 'bg-red-100 text-red-600'}`}>
-                                {confirmAction.action === 'approve' ? <Check className="w-7 h-7 stroke-[2.5px]" /> : <X className="w-7 h-7 stroke-[2.5px]" />}
-                            </div>
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-white rounded-[24px] p-6 max-w-[320px] w-full shadow-2xl flex flex-col items-center text-center border border-neutral-100 relative z-[10000]"
+                            >
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${confirmAction.action === 'approve' ? 'bg-[#059669]/10 text-[#059669]' : 'bg-red-100 text-red-600'}`}>
+                                    {confirmAction.action === 'approve' ? <Check className="w-7 h-7 stroke-[2.5px]" /> : <X className="w-7 h-7 stroke-[2.5px]" />}
+                                </div>
                             <h3 className="text-[20px] font-bold text-app-text mb-2">
                                 {confirmAction.action === 'approve' ? 'Approve Payment?' : 'Reject Payment?'}
                             </h3>
@@ -289,7 +294,9 @@ export default function UpiVerificationList() {
                         </motion.div>
                     </motion.div>
                 )}
-            </AnimatePresence>
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 }

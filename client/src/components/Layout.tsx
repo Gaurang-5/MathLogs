@@ -3,7 +3,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, Users, FileText, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, Zap, Settings, CreditCard } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
 import ToastProvider from './ToastProvider';
 import QuickFeeModal from './QuickFeeModal';
@@ -26,6 +26,42 @@ export default function Layout({ children, title }: LayoutProps) {
         return false;
     });
     const [showQuickFeeModal, setShowQuickFeeModal] = useState(false);
+
+
+
+    const [pullY, setPullY] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const startYRef = useRef(0);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (window.scrollY === 0) {
+            startYRef.current = e.touches[0].clientY;
+        } else {
+            startYRef.current = 0;
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (startYRef.current > 0 && window.scrollY === 0) {
+            const currentY = e.touches[0].clientY;
+            const diff = currentY - startYRef.current;
+            if (diff > 0) {
+                // simple resistance
+                setPullY(Math.min(diff * 0.4, 80)); 
+            }
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (pullY >= 60) {
+            setIsRefreshing(true);
+            setTimeout(() => {
+                window.location.reload();
+            }, 300);
+        }
+        setPullY(0);
+        startYRef.current = 0;
+    };
 
     const showMobileNav = ['/dashboard', '/batches', '/tests', '/fees', '/scan', '/settings', '/billing'].includes(location.pathname);
 
@@ -216,14 +252,26 @@ export default function Layout({ children, title }: LayoutProps) {
 
             {/* Main Content Area */}
             <main
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 className={cn(
                     "flex-1 flex flex-col min-h-screen bg-app-bg relative transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] min-w-0 xl:pb-0",
                     showMobileNav ? "pb-32" : "pb-6",
                     isSidebarCollapsed ? "xl:pl-[8rem]" : "xl:pl-[20rem]"
                 )}
             >
-                <div className="xl:hidden" style={{ height: 'calc(4rem + env(safe-area-inset-top))' }}></div> {/* Spacer for mobile header with safe area */}
+                {/* Pull-to-refresh spinner */}
+                <div 
+                    className="flex justify-center items-center w-full overflow-hidden transition-all duration-300 pointer-events-none xl:hidden"
+                    style={{ height: `${pullY}px`, opacity: pullY > 10 ? 1 : 0 }}
+                >
+                    <div className="w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center">
+                         <div className={cn("w-5 h-5 border-2 border-accent border-t-transparent rounded-full", (isRefreshing || pullY >= 60) ? "animate-spin" : "")}></div>
+                    </div>
+                </div>
 
+                <div className="xl:hidden" style={{ height: 'calc(4rem + env(safe-area-inset-top))' }}></div> {/* Spacer for mobile header with safe area */}
 
                 <div className="flex-1 p-4 lg:p-8 w-full max-w-full mx-auto animate-fadeIn relative z-0 overflow-x-hidden">
                     {title && (
