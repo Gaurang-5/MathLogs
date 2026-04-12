@@ -21,6 +21,7 @@ export interface WelcomeWAData {
     batchName: string;
     whatsappLink: string;
     instituteName: string;
+    instituteId?: string;
 }
 
 export interface FeeReminderWAData {
@@ -29,6 +30,17 @@ export interface FeeReminderWAData {
     feeBreakup: string;
     totalAmount: string;
     instituteName: string;
+    instituteId?: string;
+}
+
+export interface FeeReminderUpiWAData {
+    studentName: string;
+    batchName: string;
+    feeBreakup: string;
+    totalAmount: string;
+    instituteName: string;
+    upiPaymentLink: string;
+    instituteId?: string;
 }
 
 export interface TestMarksWAData {
@@ -37,6 +49,7 @@ export interface TestMarksWAData {
     marksObtained: string;
     totalMarks: string;
     instituteName: string;
+    instituteId?: string;
 }
 
 export interface PaymentReceiptWAData {
@@ -44,6 +57,32 @@ export interface PaymentReceiptWAData {
     amountPaid: string;
     installmentName: string;
     instituteName: string;
+    instituteId?: string;
+}
+
+export interface PaymentRejectionWAData {
+    studentName: string;
+    reason: string;
+    paymentPortalLink: string;
+    instituteName: string;
+    instituteId?: string;
+}
+
+export interface AttendanceCheckInWAData {
+    studentName: string;
+    batchName: string;
+    instituteName: string;
+    checkInTime: string;
+    photoUrl: string;
+    instituteId?: string;
+}
+
+export interface AttendanceAbsentWAData {
+    studentName: string;
+    batchName: string;
+    instituteName: string;
+    scheduledTime: string;
+    instituteId?: string;
 }
 
 /**
@@ -54,7 +93,7 @@ export interface PaymentReceiptWAData {
  * @param templateName The Template ID/Name registered in Meta Business Manager
  * @param componentValues Positional string parameters stringified in array [] format
  */
-export const enqueueWhatsApp = async (mobileNumber: string, templateName: string, componentValues: string[]) => {
+export const enqueueWhatsApp = async (mobileNumber: string, templateName: string, componentValues: string[], instituteId?: string) => {
     if (!templateName) {
         console.warn('[WhatsApp] Dropped: No template configured.');
         return false;
@@ -71,7 +110,8 @@ export const enqueueWhatsApp = async (mobileNumber: string, templateName: string
                 recipient: formattedMobile,
                 templateId: templateName,
                 data: componentValues,
-                status: 'PENDING'
+                status: 'PENDING',
+                instituteId: instituteId || null
             }
         });
 
@@ -93,7 +133,7 @@ export const sendWelcomeWhatsApp = async (mobileNumber: string, data: WelcomeWAD
         data.whatsappLink || "Contact admin for group link"
     ];
 
-    return await enqueueWhatsApp(mobileNumber, WELCOME_TEMPLATE_NAME, componentValues);
+    return await enqueueWhatsApp(mobileNumber, WELCOME_TEMPLATE_NAME, componentValues, data.instituteId);
 };
 
 export const sendFeeReminderWhatsApp = async (mobileNumber: string, data: FeeReminderWAData) => {
@@ -107,7 +147,22 @@ export const sendFeeReminderWhatsApp = async (mobileNumber: string, data: FeeRem
         data.instituteName || "our institute"
     ];
 
-    return await enqueueWhatsApp(mobileNumber, FEE_TEMPLATE_NAME, componentValues);
+    return await enqueueWhatsApp(mobileNumber, FEE_TEMPLATE_NAME, componentValues, data.instituteId);
+};
+
+export const sendFeeReminderUpiWhatsApp = async (mobileNumber: string, data: FeeReminderUpiWAData) => {
+    const FEE_UPI_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_FEE_UPI || 'fee_reminder_with_upi_link_1';
+
+    const componentValues = [
+        data.studentName || "Student",
+        data.batchName || "the batch",
+        data.feeBreakup || "• Balance Due",
+        data.totalAmount || "0",
+        data.instituteName || "our institute",
+        data.upiPaymentLink
+    ];
+
+    return await enqueueWhatsApp(mobileNumber, FEE_UPI_TEMPLATE_NAME, componentValues, data.instituteId);
 };
 
 export const sendTestMarksWhatsApp = async (mobileNumber: string, data: TestMarksWAData) => {
@@ -121,7 +176,7 @@ export const sendTestMarksWhatsApp = async (mobileNumber: string, data: TestMark
         data.marksObtained || "0"
     ];
 
-    return await enqueueWhatsApp(mobileNumber, TEST_TEMPLATE_NAME, componentValues);
+    return await enqueueWhatsApp(mobileNumber, TEST_TEMPLATE_NAME, componentValues, data.instituteId);
 };
 
 export const sendSetupLinkWhatsApp = async (mobileNumber: string, data: { ownerName: string, setupLink: string, tuitionName: string }) => {
@@ -156,10 +211,22 @@ export const sendPaymentReceiptWhatsApp = async (mobileNumber: string, data: Pay
         data.instituteName || "our institute"
     ];
 
-    return await enqueueWhatsApp(mobileNumber, PAYMENT_TEMPLATE_NAME, componentValues);
+    return await enqueueWhatsApp(mobileNumber, PAYMENT_TEMPLATE_NAME, componentValues, data.instituteId);
 };
 
-export const sendStudentInviteWhatsApp = async (mobileNumber: string, data: { instituteName: string, batchName: string, registrationLink: string }) => {
+export const sendPaymentRejectionWhatsApp = async (mobileNumber: string, data: PaymentRejectionWAData) => {
+    const REJECT_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_PAYMENT_REJECT || 'payment_rejected_alert';
+
+    const componentValues = [
+        data.studentName || "Student",
+        data.reason || "Screenshot unclear",
+        data.paymentPortalLink
+    ];
+
+    return await enqueueWhatsApp(mobileNumber, REJECT_TEMPLATE_NAME, componentValues, data.instituteId);
+};
+
+export const sendStudentInviteWhatsApp = async (mobileNumber: string, data: { instituteName: string, batchName: string, registrationLink: string, instituteId?: string }) => {
     const INVITE_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_INVITE || 'student_registration_link';
 
     // The order of parameters should match your template defined in Meta Business Manager.
@@ -169,5 +236,32 @@ export const sendStudentInviteWhatsApp = async (mobileNumber: string, data: { in
         data.registrationLink
     ];
 
-    return await enqueueWhatsApp(mobileNumber, INVITE_TEMPLATE_NAME, componentValues);
+    return await enqueueWhatsApp(mobileNumber, INVITE_TEMPLATE_NAME, componentValues, data.instituteId);
+};
+
+export const sendAttendanceCheckInWhatsApp = async (mobileNumber: string, data: AttendanceCheckInWAData) => {
+    const ATTENDANCE_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_ATTENDANCE_PRESENT || 'attendance_checkin_alert';
+
+    const componentValues = [
+        data.studentName || 'Student',
+        data.batchName || 'the batch',
+        data.instituteName || 'our institute',
+        data.checkInTime || 'just now',
+        data.photoUrl
+    ];
+
+    return await enqueueWhatsApp(mobileNumber, ATTENDANCE_TEMPLATE_NAME, componentValues, data.instituteId);
+};
+
+export const sendAttendanceAbsentWhatsApp = async (mobileNumber: string, data: AttendanceAbsentWAData) => {
+    const ATTENDANCE_ABSENT_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_ATTENDANCE_ABSENT || 'attendance_absent_alert';
+
+    const componentValues = [
+        data.studentName || 'Student',
+        data.batchName || 'the batch',
+        data.instituteName || 'our institute',
+        data.scheduledTime || 'today'
+    ];
+
+    return await enqueueWhatsApp(mobileNumber, ATTENDANCE_ABSENT_TEMPLATE_NAME, componentValues, data.instituteId);
 };
