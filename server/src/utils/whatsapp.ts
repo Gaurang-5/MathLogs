@@ -151,7 +151,7 @@ export const sendFeeReminderWhatsApp = async (mobileNumber: string, data: FeeRem
 };
 
 export const sendFeeReminderUpiWhatsApp = async (mobileNumber: string, data: FeeReminderUpiWAData) => {
-    const FEE_UPI_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_FEE_UPI || 'fee_reminder_with_upi_link_1';
+    const FEE_UPI_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_FEE || 'fee_breakup_alert_1';
 
     const componentValues = [
         data.studentName || "Student",
