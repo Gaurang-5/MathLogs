@@ -12,7 +12,6 @@ import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, 
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
 import { getSystemLogs, getCommunicationLogs } from '../controllers/logController';
-import { checkInStudentAttendance, downloadBatchIdCards, getAttendanceFeed, getPublicAttendancePhoto, getPublicBatchAttendance, markStudentPresentManually, searchAttendanceStudents, triggerAttendanceAbsenceSweep } from '../controllers/attendanceController';
 
 import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
@@ -33,8 +32,6 @@ const router = Router();
 // These routes do NOT require authentication and are used by parents/students.
 router.get('/public/i/:slug', publicLimiter, getPublicInstituteProfile as any);
 router.post('/public/i/:slug/lead', publicLimiter, submitPublicLead as any);
-router.get('/public/attendance-photo/:id', publicLimiter, getPublicAttendancePhoto as any);
-router.get('/public/batch/:id/attendance', publicLimiter, getPublicBatchAttendance as any);
 import { getPublicStudentFees, submitUpiPayment, getPaymentScreenshot } from '../controllers/publicController';
 router.get('/public/i/:slug/student-fees', upiPaymentLimiter, getPublicStudentFees as any);
 router.get('/public/payment-screenshot/:key', publicLimiter, getPaymentScreenshot as any);
@@ -265,7 +262,6 @@ router.put('/batches/:id', authenticateToken as any, validateRequest(updateBatch
 router.delete('/batches/:id', authenticateToken as any, deleteBatch as any);
 router.get('/batches/:id/download', authenticateToken as any, downloadBatchPDF as any);
 router.get('/batches/:id/qr-pdf', authenticateToken as any, downloadBatchQRPDF as any);
-router.get('/batches/:id/id-cards', authenticateToken as any, downloadBatchIdCards as any);
 router.put('/batches/:id/toggle-registration', authenticateToken as any, toggleBatchRegistration as any);
 router.put('/batches/:id/end-registration', authenticateToken as any, endBatchRegistration as any);
 router.post('/batches/:id/installments', authenticateToken as any, validateRequest(createInstallmentSchema), createFeeInstallment as any);
@@ -285,14 +281,7 @@ router.post('/students/:id/approve', authenticateToken as any, approveStudent as
 router.post('/students/:id/reject', authenticateToken as any, rejectStudent as any);
 router.put('/students/:id', authenticateToken as any, validateRequest(updateStudentSchema), updateStudent as any);
 router.get('/students/lookup/:humanId', authenticateToken as any, getStudentByHumanId as any);
-
-// Attendance
-router.post('/attendance/check-in', authenticateToken as any, upload.single('image'), checkInStudentAttendance as any);
-router.get('/attendance/feed', authenticateToken as any, getAttendanceFeed as any);
-router.get('/attendance/students', authenticateToken as any, searchAttendanceStudents as any);
-router.post('/attendance/manual', authenticateToken as any, markStudentPresentManually as any);
-router.post('/attendance/absence-sweep', authenticateToken as any, triggerAttendanceAbsenceSweep as any);
-
+// Students
 // Stickers
 router.get('/stickers/download', authenticateToken as any, generateStickerSheet as any);
 
