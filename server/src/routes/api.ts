@@ -11,7 +11,7 @@ import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail } from '../controllers/testController';
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
-import { getSystemLogs, getCommunicationLogs } from '../controllers/logController';
+
 
 import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
@@ -308,14 +308,8 @@ router.post('/billing/create', authenticateToken as any, createBillingSession as
 router.post('/billing/verify', authenticateToken as any, verifyBillingPayment as any);
 router.delete('/billing/cancel', authenticateToken as any, cancelSubscription as any);
 
-import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo, impersonateInstitute } from '../controllers/instituteController';
-import { getSystemAlerts, createSystemAlert, dismissSystemAlert } from '../controllers/alertController';
+import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo } from '../controllers/instituteController';
 
-router.get('/alerts', authenticateToken as any, getSystemAlerts as any);
-router.post('/alerts', authenticateToken as any, createSystemAlert as any);
-router.put('/alerts/:id/dismiss', authenticateToken as any, dismissSystemAlert as any);
-
-router.post('/institutes/:id/impersonate', authenticateToken as any, impersonateInstitute as any);
 router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
 router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
 router.put('/institutes/:id/details', authenticateToken as any, updateInstituteDetails as any);
@@ -347,16 +341,6 @@ router.get('/admin-onboarding/:token', publicLimiter, getAdminOnboardingLink as 
 router.post('/admin-onboarding/create-order', publicLimiter, createAdminOnboardingOrder as any);
 router.post('/admin-onboarding/verify-payment', publicLimiter, verifyAdminOnboardingPayment as any);
 
-// Leads Management (Teacher-facing)
-import { getLeads, updateLeadStatus, convertLead, getInstituteSlug, updateInstituteSlug } from '../controllers/leadController';
-router.get('/leads', authenticateToken as any, getLeads as any);
-router.put('/leads/:id/status', authenticateToken as any, updateLeadStatus as any);
-router.post('/leads/:id/convert', authenticateToken as any, convertLead as any);
-router.get('/institute/slug', authenticateToken as any, getInstituteSlug as any);
-router.put('/institute/slug', authenticateToken as any, updateInstituteSlug as any);
 
-// Logs
-router.get('/logs/system', authenticateToken as any, getSystemLogs as any);
-router.get('/logs/communications', authenticateToken as any, getCommunicationLogs as any);
 
 export default router;
