@@ -375,7 +375,7 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
         const batch = await prisma.batch.findUnique({ 
             where: { id },
             include: {
-                institute: { select: { name: true } },
+                institute: { select: { name: true, slug: true } },
                 students: {
                     where: { status: 'APPROVED' },
                     select: {
@@ -404,8 +404,9 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
 
         // --- Auto-Send Fee Reminder Logic (Background Queue) ---
         // Sending directly to DB queue, no throttling required.
-        const { sendFeeReminderWhatsApp } = await import('../utils/whatsapp');
+        const { sendFeeReminderUpiWhatsApp } = await import('../utils/whatsapp');
         const instituteName = batch.institute?.name || 'Coaching Institute';
+        const upiPaymentLink = batch.institute?.slug ? `https://mathlogs.app/pay/${batch.institute.slug}` : 'Please contact admin for payment details.';
         const allInstallments = [...batch.feeInstallments, installment];
         const studentsToNotify = batch.students.filter(s => s.parentWhatsapp);
 
@@ -431,12 +432,13 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
                     if (!phone.startsWith('+') && phone.length === 10) phone = '+91' + phone;
 
                     try {
-                        await sendFeeReminderWhatsApp(phone, {
+                        await sendFeeReminderUpiWhatsApp(phone, {
                             studentName: student.name,
                             batchName: batch.name,
                             feeBreakup: breakupLines.join('\n'),
                             totalAmount: totalDue.toString(),
-                            instituteName
+                            instituteName,
+                            upiPaymentLink
                         });
                         sent++;
                     } catch (err) {
