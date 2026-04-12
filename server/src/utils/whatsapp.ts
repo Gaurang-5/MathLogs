@@ -158,8 +158,8 @@ export const sendFeeReminderUpiWhatsApp = async (mobileNumber: string, data: Fee
         data.batchName || "the batch",
         data.feeBreakup || "• Balance Due",
         data.totalAmount || "0",
-        data.instituteName || "our institute",
-        data.upiPaymentLink
+        data.upiPaymentLink,
+        data.instituteName || "our institute"
     ];
 
     return await enqueueWhatsApp(mobileNumber, FEE_UPI_TEMPLATE_NAME, componentValues, data.instituteId);

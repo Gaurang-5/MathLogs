@@ -431,14 +431,19 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
                     let phone = student.parentWhatsapp!.replace(/[^0-9+]/g, '');
                     if (!phone.startsWith('+') && phone.length === 10) phone = '+91' + phone;
 
+                    const phoneDigits = student.parentWhatsapp!.replace(/\D/g, '').slice(-10);
+                    const personalizedUpiLink = batch.institute?.slug 
+                        ? `https://mathlogs.app/pay/${batch.institute.slug}?phone=${phoneDigits}`
+                        : 'Please contact admin for payment details.';
+
                     try {
                         await sendFeeReminderUpiWhatsApp(phone, {
                             studentName: student.name,
                             batchName: batch.name,
-                            feeBreakup: breakupLines.join('\n'),
+                            feeBreakup: breakupLines.join(' | '),
                             totalAmount: totalDue.toString(),
                             instituteName,
-                            upiPaymentLink
+                            upiPaymentLink: personalizedUpiLink
                         });
                         sent++;
                     } catch (err) {
