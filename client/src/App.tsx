@@ -22,6 +22,7 @@ const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
+const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
 // Onboarding is eagerly imported above (only 15KB) for instant navigation from Sign Up/Get Started
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -95,6 +96,7 @@ function App() {
             <Route path="/register/:batchId" element={<Register />} />
             <Route path="/kiosk/register/:batchId" element={<Register mode="kiosk" />} />
             <Route path="/check-status/:batchId" element={<CheckStatus />} />
+            <Route path="/pay/:slug" element={<StudentPaymentPortal />} />
 
             {/* Legal / Info Pages */}
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
