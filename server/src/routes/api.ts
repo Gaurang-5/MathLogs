@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
-import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter } from '../middleware/security';
+import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
 import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
 import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, updateFeeInstallment, deleteFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF, inviteStudentToBatch } from '../controllers/batchController';
@@ -9,8 +9,9 @@ import { registerStudent, getPendingStudents, approveStudent, rejectStudent, upd
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail } from '../controllers/testController';
-import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport } from '../controllers/feeController';
+import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
+import { getSystemLogs, getCommunicationLogs } from '../controllers/logController';
 
 import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
@@ -20,13 +21,23 @@ import multer from 'multer';
 import { processOCR } from '../utils/ocr';
 import { processOCRTextract } from '../utils/ocrTextract';
 
+import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
+
 const router = Router();
 
-// Configure multer for memory storage
+// ================= PUBLIC DOMAIN ROUTES =================
+// These routes do NOT require authentication and are used by parents/students.
+router.get('/public/i/:slug', publicLimiter, getPublicInstituteProfile as any);
+router.post('/public/i/:slug/lead', publicLimiter, submitPublicLead as any);
+import { getPublicStudentFees, submitUpiPayment, getPaymentScreenshot } from '../controllers/publicController';
+router.get('/public/i/:slug/student-fees', upiPaymentLimiter, getPublicStudentFees as any);
+router.get('/public/payment-screenshot/:key', publicLimiter, getPaymentScreenshot as any);
+// Configure multer for memory storage (no temp files on disk)
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit
+        files: 1 // Prevent multi-file attacks
     },
     fileFilter: (req: any, file: any, cb: any) => {
         const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -37,6 +48,9 @@ const upload = multer({
         }
     }
 });
+
+// ================= FILE UPLOAD ROUTES =================
+router.post('/public/i/:slug/submit-upi', upiPaymentLimiter, upload.single('screenshot'), submitUpiPayment as any);
 
 import crypto from 'crypto';
 import { prisma } from '../prisma';
@@ -253,7 +267,7 @@ router.post('/students/:id/approve', authenticateToken as any, approveStudent as
 router.post('/students/:id/reject', authenticateToken as any, rejectStudent as any);
 router.put('/students/:id', authenticateToken as any, validateRequest(updateStudentSchema), updateStudent as any);
 router.get('/students/lookup/:humanId', authenticateToken as any, getStudentByHumanId as any);
-
+// Students
 // Stickers
 router.get('/stickers/download', authenticateToken as any, generateStickerSheet as any);
 
@@ -278,6 +292,9 @@ router.post('/fees/pay-installment', authenticateToken as any, paymentLimiter, v
 router.get('/fees/recent', authenticateToken as any, getRecentTransactions as any);
 router.get('/fees/download-transactions', authenticateToken as any, downloadMonthlyReport as any);
 router.post('/fees/remind', authenticateToken as any, bulkNotifyLimiter, sendFeeReminder as any);
+router.get('/fees/upi-verifications', authenticateToken as any, getUpiVerifications as any);
+router.post('/fees/upi-verifications/:id/approve', authenticateToken as any, paymentLimiter, approveUpiVerification as any);
+router.post('/fees/upi-verifications/:id/reject', authenticateToken as any, paymentLimiter, rejectUpiVerification as any);
 
 // Stats
 router.get('/stats/growth', authenticateToken as any, getStudentGrowthStats as any);
@@ -291,9 +308,14 @@ router.post('/billing/create', authenticateToken as any, createBillingSession as
 router.post('/billing/verify', authenticateToken as any, verifyBillingPayment as any);
 router.delete('/billing/cancel', authenticateToken as any, cancelSubscription as any);
 
-// New Analytics & Config Routes
-// New Analytics & Config Routes
-import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo } from '../controllers/instituteController';
+import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo, impersonateInstitute } from '../controllers/instituteController';
+import { getSystemAlerts, createSystemAlert, dismissSystemAlert } from '../controllers/alertController';
+
+router.get('/alerts', authenticateToken as any, getSystemAlerts as any);
+router.post('/alerts', authenticateToken as any, createSystemAlert as any);
+router.put('/alerts/:id/dismiss', authenticateToken as any, dismissSystemAlert as any);
+
+router.post('/institutes/:id/impersonate', authenticateToken as any, impersonateInstitute as any);
 router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
 router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
 router.put('/institutes/:id/details', authenticateToken as any, updateInstituteDetails as any);
@@ -324,5 +346,17 @@ router.get('/admin-onboarding/links', authenticateToken as any, listAdminOnboard
 router.get('/admin-onboarding/:token', publicLimiter, getAdminOnboardingLink as any);
 router.post('/admin-onboarding/create-order', publicLimiter, createAdminOnboardingOrder as any);
 router.post('/admin-onboarding/verify-payment', publicLimiter, verifyAdminOnboardingPayment as any);
+
+// Leads Management (Teacher-facing)
+import { getLeads, updateLeadStatus, convertLead, getInstituteSlug, updateInstituteSlug } from '../controllers/leadController';
+router.get('/leads', authenticateToken as any, getLeads as any);
+router.put('/leads/:id/status', authenticateToken as any, updateLeadStatus as any);
+router.post('/leads/:id/convert', authenticateToken as any, convertLead as any);
+router.get('/institute/slug', authenticateToken as any, getInstituteSlug as any);
+router.put('/institute/slug', authenticateToken as any, updateInstituteSlug as any);
+
+// Logs
+router.get('/logs/system', authenticateToken as any, getSystemLogs as any);
+router.get('/logs/communications', authenticateToken as any, getCommunicationLogs as any);
 
 export default router;
