@@ -32,6 +32,7 @@ export default function StudentPaymentPortal() {
 
     const [file, setFile] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [paidByName, setPaidByName] = useState('');
 
     const [paymentType, setPaymentType] = useState<'full' | 'custom'>('full');
@@ -133,13 +134,56 @@ export default function StudentPaymentPortal() {
 
         setSubmitting(true);
         setError('');
-        const formData = new FormData();
-        formData.append('studentId', selectedStudent.studentId);
-        formData.append('amount', amount);
-        formData.append('screenshot', file);
-        if (paidByName.trim()) formData.append('paidByName', paidByName.trim());
+        
         try {
-            await axios.post(`${API_URL}/public/i/${slug}/submit-upi`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            // Client-side Image Compression (massive speed up for network upload)
+            const compressedFile = await new Promise<File>((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(img.src);
+                    const canvas = document.createElement('canvas');
+                    const MAX_SIZE = 1200;
+                    let { width, height } = img;
+                    
+                    if (width > height && width > MAX_SIZE) {
+                        height = Math.round(height * (MAX_SIZE / width));
+                        width = MAX_SIZE;
+                    } else if (height > MAX_SIZE) {
+                        width = Math.round(width * (MAX_SIZE / height));
+                        height = MAX_SIZE;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) ctx.drawImage(img, 0, 0, width, height);
+                    
+                    canvas.toBlob(
+                        (blob) => {
+                            if (blob) resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' }));
+                            else resolve(file); // fallback
+                        },
+                        'image/jpeg',
+                        0.75 // 75% quality is perfect for receipts
+                    );
+                };
+                img.onerror = () => resolve(file); // fallback
+                img.src = URL.createObjectURL(file);
+            });
+
+            const formData = new FormData();
+            formData.append('studentId', selectedStudent.studentId);
+            formData.append('amount', amount);
+            formData.append('screenshot', compressedFile);
+            if (paidByName.trim()) formData.append('paidByName', paidByName.trim());
+
+            await axios.post(`${API_URL}/public/i/${slug}/submit-upi`, formData, { 
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1000000));
+                    setUploadProgress(Math.min(99, percentCompleted)); // Keep at 99% until server fully resolves
+                }
+            });
             setStep('success');
         } catch (err: any) {
             setError(err.response?.data?.error || 'Submission failed. Please try again.');
@@ -473,8 +517,21 @@ export default function StudentPaymentPortal() {
                                                         </div>
                                                     )}
 
-                                                    <button type="submit" disabled={submitting || !file || !amount} className="w-full py-3.5 bg-neutral-900 text-white font-semibold rounded-xl mt-2 shadow-md shadow-neutral-900/20 transition-all duration-200 hover:shadow-lg hover:shadow-black/25 active:scale-[0.98] disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2 group">
-                                                        {submitting ? <Loader className="w-5 h-5 animate-spin" /> : <>Submit Receipt <ArrowRight className="w-[18px] h-[18px] group-hover:translate-x-0.5 transition-transform" /></>}
+                                                    <button type="submit" disabled={submitting || !file || !amount} className="relative overflow-hidden w-full py-3.5 bg-neutral-900 text-white font-semibold rounded-xl mt-2 shadow-md shadow-neutral-900/20 transition-all duration-200 hover:shadow-lg hover:shadow-black/25 active:scale-[0.98] disabled:opacity-80 disabled:cursor-not-allowed flex items-center justify-center gap-2 group">
+                                                        {submitting ? (
+                                                            <>
+                                                                <div className="absolute left-0 top-0 bottom-0 bg-white/20 transition-all duration-300 pointer-events-none" style={{ width: `${uploadProgress}%` }}></div>
+                                                                <span className="relative z-10 flex items-center gap-2">
+                                                                    {uploadProgress < 99 ? (
+                                                                        <>Uploading... {Math.max(1, uploadProgress)}%</>
+                                                                    ) : (
+                                                                        <><Loader className="w-5 h-5 animate-spin" /> Verifying...</>
+                                                                    )}
+                                                                </span>
+                                                            </>
+                                                        ) : (
+                                                            <>Submit Receipt <ArrowRight className="w-[18px] h-[18px] group-hover:translate-x-0.5 transition-transform" /></>
+                                                        )}
                                                     </button>
                                                 </form>
                                             </>

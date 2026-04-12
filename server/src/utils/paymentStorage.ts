@@ -87,13 +87,11 @@ export const verifyPaymentScreenshotSignature = (storageKey: string, exp: number
     return timingSafeEqual(expectedBuf, actualBuf);
 };
 
-/**
- * Stores a payment screenshot to S3. Falls back to Local Disk if AWS fails.
- */
-export const storePaymentScreenshot = async ({ instituteId, studentId, buffer, contentType }: { instituteId: string, studentId: string, buffer: Buffer, contentType: string }) => {
-    let key = generateStorageKey(contentType, instituteId, studentId);
+export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buffer, contentType, recordId }: { instituteId: string, studentId: string, buffer: Buffer, contentType: string, recordId: string }) => {
+    const key = generateStorageKey(contentType, instituteId, studentId);
 
-    await uploadQueue.add(async () => {
+    // Fire and forget - do not return the promise!
+    uploadQueue.add(async () => {
         try {
             await s3.send(new PutObjectCommand({
                 Bucket: BUCKET,
@@ -126,12 +124,19 @@ export const storePaymentScreenshot = async ({ instituteId, studentId, buffer, c
                 const localFileName = key.replace(/\//g, '_');
                 await fs.mkdir(LOCAL_UPLOAD_DIR, { recursive: true }).catch(() => {});
                 await fs.writeFile(path.join(LOCAL_UPLOAD_DIR, localFileName), buffer);
-                key = `LOCAL:${localFileName}`;
+                const localKey = `LOCAL:${localFileName}`;
+                
+                // Update DB with local key since S3 failed
+                const { prisma } = require('../prisma');
+                await prisma.upiPaymentVerification.update({
+                    where: { id: recordId },
+                    data: { storageKey: localKey }
+                }).catch((err: any) => console.error("[Storage] Failed to update DB with local fallback key", err));
             }
         }
     });
 
-    return key;
+    return key; // return the optimistic S3 key immediately
 };
 
 /**
