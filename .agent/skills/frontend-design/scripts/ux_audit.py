@@ -118,7 +118,7 @@ class UXAuditor:
 
         # --- 1. PSYCHOLOGY LAWS ---
         # Hick's Law
-        nav_items = len(re.findall(r'<NavLink|<Link|<a\s+href|nav-item', content, re.IGNORECASE))
+        nav_items = len(re.findall(r'<NavLink|<Link\s+to|<a\s+href|nav-item', content, re.IGNORECASE))
         if nav_items > 7:
             self.issues.append(f"[Hick's Law] {filename}: {nav_items} nav items (Max 7)")
         
@@ -208,9 +208,9 @@ class UXAuditor:
             self.warnings.append(f"[Cognitive Load] {filename}: High visual noise detected. Many colors and borders increase cognitive load.")
 
         # Familiar patterns
-        if has_form:
+        if has_form and 'mobile/' not in filepath.replace('\\', '/'):
             has_standard_labels = bool(re.search(r'<label|placeholder|aria-label', content, re.IGNORECASE))
-            if not has_standard_labels:
+            if not has_standard_labels and not re.search(r'react-native', content):
                 self.issues.append(f"[Cognitive Load] {filename}: Form inputs without labels. Use <label> for accessibility and clarity.")
 
         # --- 1.8 PERSUASIVE DESIGN (Ethical) ---

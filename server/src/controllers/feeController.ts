@@ -1249,3 +1249,69 @@ export const rejectUpiVerification = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to reject payment' });
     }
 };
+
+export const getCustomInvoices = async (req: Request, res: Response) => {
+    try {
+        const teacherId = (req as any).user?.id;
+        const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
+
+        const invoices = await prisma.feeInstallment.findMany({
+            where: {
+                studentId: { not: null },
+                batch: { teacherId },
+                student: {
+                    academicYearId: currentAcademicYearId
+                }
+            },
+            include: {
+                student: {
+                    select: {
+                        id: true,
+                        name: true,
+                        humanId: true,
+                        parentWhatsapp: true
+                    }
+                },
+                batch: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                payments: {
+                    select: {
+                        id: true,
+                        amountPaid: true,
+                        date: true
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        const result = invoices.map(inv => {
+            const totalPaid = inv.payments.reduce((sum, p) => sum + p.amountPaid, 0);
+            return {
+                id: inv.id,
+                name: inv.name,
+                amount: inv.amount,
+                createdAt: inv.createdAt,
+                studentId: inv.studentId,
+                studentName: inv.student?.name || 'Unknown',
+                studentHumanId: inv.student?.humanId || null,
+                batchId: inv.batch?.id || null,
+                batchName: inv.batch?.name || 'N/A',
+                totalPaid,
+                isPaid: totalPaid >= inv.amount,
+                lastPaymentDate: inv.payments.length > 0
+                    ? inv.payments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0].date
+                    : null
+            };
+        });
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error fetching custom invoices:', error);
+        res.status(500).json({ error: 'Failed to fetch custom invoices' });
+    }
+};

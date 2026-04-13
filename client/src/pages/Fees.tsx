@@ -621,8 +621,9 @@ const Fees: React.FC = () => {
 
                             <form onSubmit={handlePayment}>
                                 <div className="mb-8 relative">
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Payment Amount (₹)</label>
+                                    <label htmlFor="paymentAmount" className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Payment Amount (₹)</label>
                                     <input
+                                        id="paymentAmount"
                                         type="number"
                                         inputMode="numeric"
                                         required

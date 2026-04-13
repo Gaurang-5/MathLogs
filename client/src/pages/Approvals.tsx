@@ -104,7 +104,7 @@ export default function Approvals() {
                                             {new Date(s.createdAt).toLocaleDateString()}
                                         </div>
                                     </div>
-                                    <span className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-blue-300 text-xs px-3 py-1 rounded-full font-bold border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
+                                    <span className="bg-gradient-to-r from-blue-600/20 to-teal-600/20 text-blue-300 text-xs px-3 py-1 rounded-full font-bold border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
                                         {s.batch?.name}
                                     </span>
                                 </div>

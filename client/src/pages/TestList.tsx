@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Calendar, FileText, CheckCircle, X, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Dropdown from '../components/Dropdown';
 
 interface Test {
     id: string;
@@ -146,24 +147,18 @@ export default function TestList() {
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-widest mb-2">Batch</label>
-                                    <div className="relative">
-                                        <select
-                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 text-app-text p-4 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all appearance-none"
-                                            value={selectedBatchId}
-                                            onChange={e => setSelectedBatchId(e.target.value)}
-                                            required
-                                        >
-                                            <option value="" disabled>Select a batch</option>
-                                            {batches.map(batch => (
-                                                <option key={batch.id} value={batch.id}>
-                                                    {batch.name} {batch.className ? `(${batch.className})` : ''} - {batch.subject || 'Maths'}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-secondary rotate-90 pointer-events-none" />
-                                    </div>
+                                <div className="mt-[-8px]">
+                                    <Dropdown
+                                        label="Batch"
+                                        value={selectedBatchId}
+                                        onChange={setSelectedBatchId}
+                                        placeholder="Select a batch"
+                                        required={true}
+                                        options={batches.map(batch => ({
+                                            value: batch.id,
+                                            label: `${batch.name} ${batch.className ? `(${batch.className})` : ''} - ${batch.subject || 'Maths'}`
+                                        }))}
+                                    />
                                 </div>
 
                                 <div>

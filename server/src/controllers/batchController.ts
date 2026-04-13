@@ -229,6 +229,7 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                         id: true,
                         name: true,
                         amount: true,
+                        studentId: true,
                         createdAt: true
                     },
                     orderBy: { createdAt: 'asc' }
@@ -356,7 +357,7 @@ export const toggleBatchRegistration = async (req: Request, res: Response) => {
 
 export const createFeeInstallment = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
-    const { name, amount } = req.body;
+    const { name, amount, studentId } = req.body;
     const teacherId = (req as any).user?.id;
 
     if (!name || amount === undefined) {
@@ -379,6 +380,7 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
                 students: {
                     where: { status: 'APPROVED' },
                     select: {
+                        id: true, // Needed for studentId match
                         name: true,
                         parentWhatsapp: true,
                         feePayments: {
@@ -394,11 +396,17 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
         const user = (req as any).user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
+        if (studentId) {
+            const studentExists = batch.students.find(s => s.id === studentId);
+            if (!studentExists) return res.status(400).json({ error: 'Student not found in this batch' });
+        }
+
         const installment = await prisma.feeInstallment.create({
             data: {
                 batchId: id,
                 name,
-                amount: parsedAmount
+                amount: parsedAmount,
+                studentId: studentId || null
             }
         });
 
@@ -408,7 +416,11 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
         const instituteName = batch.institute?.name || 'Coaching Institute';
         const upiPaymentLink = batch.institute?.slug ? `https://mathlogs.app/pay/${batch.institute.slug}` : 'Please contact admin for payment details.';
         const allInstallments = [...batch.feeInstallments, installment];
-        const studentsToNotify = batch.students.filter(s => s.parentWhatsapp);
+        
+        // Target only the specific student if a custom invoice, otherwise notify everyone
+        const studentsToNotify = studentId 
+            ? batch.students.filter(s => s.parentWhatsapp && s.id === studentId)
+            : batch.students.filter(s => s.parentWhatsapp);
 
         // Fire in background — don't block the HTTP response
         setImmediate(async () => {

@@ -50,13 +50,20 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Calculate total fee (batch fee or sum of installments)
+    -- Calculate total fee (batch fee or sum of installments + custom invoices)
     SELECT 
         COALESCE(
             CASE 
-                WHEN COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id), 0) > 0
-                THEN COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id), 0)
-                ELSE b."feeAmount"
+                -- If the batch is using installments (has at least 1 batch-wide installment)
+                WHEN (SELECT COUNT(*) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id AND fi."studentId" IS NULL) > 0
+                THEN 
+                    -- Only sum batch installments created ON OR AFTER the student joined
+                    COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id AND fi."studentId" IS NULL AND fi."createdAt" >= s."createdAt"), 0) +
+                    -- PLUS any custom student-specific installments
+                    COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."studentId" = s.id), 0)
+                ELSE 
+                    -- Flat batch fee mode PLUS any custom student-specific installments
+                    b."feeAmount" + COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."studentId" = s.id), 0)
             END,
             0
         ) INTO v_total_fee
@@ -138,13 +145,21 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- Update all students in the affected batch
     IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
-        PERFORM calculate_student_balance(s.id)
-        FROM "Student" s
-        WHERE s."batchId" = NEW."batchId";
+        IF NEW."studentId" IS NOT NULL THEN
+            PERFORM calculate_student_balance(NEW."studentId");
+        ELSE
+            PERFORM calculate_student_balance(s.id)
+            FROM "Student" s
+            WHERE s."batchId" = NEW."batchId";
+        END IF;
     ELSIF (TG_OP = 'DELETE') THEN
-        PERFORM calculate_student_balance(s.id)
-        FROM "Student" s
-        WHERE s."batchId" = OLD."batchId";
+        IF OLD."studentId" IS NOT NULL THEN
+            PERFORM calculate_student_balance(OLD."studentId");
+        ELSE
+            PERFORM calculate_student_balance(s.id)
+            FROM "Student" s
+            WHERE s."batchId" = OLD."batchId";
+        END IF;
     END IF;
     RETURN NULL;
 END;

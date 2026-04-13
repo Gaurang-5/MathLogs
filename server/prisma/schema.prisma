@@ -136,6 +136,7 @@ model Student {
   schoolName              String?
   instituteId             String?
   feePayments             FeePayment[]
+  feeInstallments         FeeInstallment[]
   fees                    FeeRecord[]
   marks                   Mark[]
   attendanceRecords       AttendanceRecord[]
@@ -211,12 +212,15 @@ model FeeInstallment {
   name                    String
   amount                  Float
   batchId                 String
+  studentId               String?
   createdAt               DateTime                 @default(now())
   batch                   Batch                    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  student                 Student?                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
   payments                FeePayment[]
   upiPaymentVerifications UpiPaymentVerification[]
 
   @@index([batchId])
+  @@index([studentId])
 }
 
 model FeePayment {

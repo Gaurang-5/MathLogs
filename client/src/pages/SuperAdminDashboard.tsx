@@ -716,7 +716,7 @@ export default function SuperAdminDashboard() {
 
                         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                             <div className="flex items-center gap-4 mb-4">
-                                <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+                                <div className="p-3 bg-teal-50 text-teal-600 rounded-2xl">
                                     <GraduationCap className="w-6 h-6" />
                                 </div>
                                 <div>
@@ -804,7 +804,7 @@ export default function SuperAdminDashboard() {
                                             </button>
                                             <button
                                                 onClick={() => handleOpenEditDetails(inst)}
-                                                className="p-3 bg-purple-50/50 hover:bg-purple-50 text-purple-600 hover:text-purple-700 rounded-xl transition-all border border-purple-100 hover:border-purple-200 font-medium text-sm flex items-center gap-2"
+                                                className="p-3 bg-teal-50/50 hover:bg-teal-50 text-teal-600 hover:text-teal-700 rounded-xl transition-all border border-teal-100 hover:border-teal-200 font-medium text-sm flex items-center gap-2"
                                                 title="Edit Institute Details"
                                             >
                                                 <Edit2 className="w-4 h-4" />

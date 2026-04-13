@@ -1363,7 +1363,7 @@ export default function BatchDetails() {
 
                                 <form onSubmit={handleUpdate} className="grid grid-cols-1 gap-6">
                                     {/* Student Section */}
-                                    <div className="space-y-4 p-4 border-2 border-black rounded-2xl bg-white">
+                                    <div className="space-y-4">
                                         <div className="flex items-center gap-2 mb-2">
                                             <div className="p-1.5 bg-accent/10 rounded-lg text-accent"><User className="w-4 h-4" /></div>
                                             <h4 className="text-sm font-bold text-app-text tracking-tight">Student Details</h4>
@@ -1411,7 +1411,7 @@ export default function BatchDetails() {
                                     </div>
 
                                     {/* Guardian Section */}
-                                    <div className="space-y-4 p-4 border-2 border-black rounded-2xl bg-white">
+                                    <div className="space-y-4">
                                         <div className="flex items-center gap-2 mb-2">
                                             <div className="p-1.5 bg-success/10 rounded-lg text-success"><Users className="w-4 h-4" /></div>
                                             <h4 className="text-sm font-bold text-app-text tracking-tight">Parent & Contact</h4>
@@ -1580,12 +1580,7 @@ export default function BatchDetails() {
                                 </div>
 
                                 <form onSubmit={handleAddStudent} className="grid grid-cols-1 gap-6">
-                                    <div className="space-y-4 p-4 border-2 border-black rounded-2xl bg-white">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <div className="p-1.5 bg-success/10 rounded-lg text-success"><Phone className="w-4 h-4" /></div>
-                                            <h4 className="text-sm font-bold text-app-text tracking-tight">WhatsApp Number</h4>
-                                        </div>
-
+                                    <div className="space-y-4 pt-2">
                                         <div className="space-y-1.5">
                                             <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider ml-1">Student's WhatsApp</label>
                                             <div className="relative">

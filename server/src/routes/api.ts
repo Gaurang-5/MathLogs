@@ -9,7 +9,7 @@ import { registerStudent, getPendingStudents, approveStudent, rejectStudent, upd
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail } from '../controllers/testController';
-import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification } from '../controllers/feeController';
+import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
 
 
@@ -295,6 +295,7 @@ router.post('/fees/remind', authenticateToken as any, bulkNotifyLimiter, sendFee
 router.get('/fees/upi-verifications', authenticateToken as any, getUpiVerifications as any);
 router.post('/fees/upi-verifications/:id/approve', authenticateToken as any, paymentLimiter, approveUpiVerification as any);
 router.post('/fees/upi-verifications/:id/reject', authenticateToken as any, paymentLimiter, rejectUpiVerification as any);
+router.get('/fees/custom-invoices', authenticateToken as any, getCustomInvoices as any);
 
 // Stats
 router.get('/stats/growth', authenticateToken as any, getStudentGrowthStats as any);

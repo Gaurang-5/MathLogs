@@ -209,16 +209,16 @@ function ProfileSection() {
                             ) : (
                                 <ImagePlus className="text-gray-400 group-hover:text-black transition-colors" size={28} />
                             )}
-                            
+
                             {isUploading && (
                                 <div className="absolute inset-0 bg-white/80 flex items-center justify-center backdrop-blur-sm">
                                     <Loader2 className="animate-spin text-black" size={24} />
                                 </div>
                             )}
 
-                            <input 
-                                type="file" 
-                                accept="image/png" 
+                            <input
+                                type="file"
+                                accept="image/png"
                                 onChange={handleLogoUpload}
                                 disabled={isUploading}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"

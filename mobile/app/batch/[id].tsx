@@ -22,7 +22,7 @@ const { width } = Dimensions.get('window');
 const T = {
   bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
   textSec: '#86868B', textMuted: '#AEAEB2', accent: '#0d7ff2',
-  purple: '#a855f7', emerald: '#10b981', amber: '#f59e0b', red: '#ef4444',
+  teal: '#0d9488', emerald: '#10b981', amber: '#f59e0b', red: '#ef4444',
   border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
 };
 

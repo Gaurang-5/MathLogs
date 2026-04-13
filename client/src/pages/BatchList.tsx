@@ -3,7 +3,7 @@ import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Users, Plus, X, GraduationCap } from 'lucide-react';
+import { Clock, Users, Plus, X, GraduationCap, Hash, BookOpen, Type, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Batch {
@@ -137,11 +137,11 @@ export default function BatchList() {
     return (
         <Layout title="Manage Batches">
             {/* Action Bar */}
-            <div className="mb-8 flex justify-between items-center">
-                <p className="text-app-text-secondary">View and manage your coaching batches.</p>
+            <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <p className="text-app-text-secondary font-medium text-sm">View and manage your coaching batches.</p>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    className="bg-app-text text-app-bg hover:bg-app-text/90 border border-black  px-5 py-2.5 rounded-full font-semibold shadow-lg transition-all active:scale-95 flex items-center text-sm"
+                    className="bg-black text-white hover:bg-neutral-800 px-6 py-3 rounded-2xl font-bold shadow-lg shadow-black/10 transition-all active:scale-95 flex items-center text-sm cursor-pointer"
                 >
                     {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
                     {showForm ? 'Cancel' : 'Create New Batch'}
@@ -154,14 +154,24 @@ export default function BatchList() {
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
                         className="mb-8"
                     >
-                        <div className="bg-app-surface-opaque border border-app-border p-8 rounded-[24px] shadow-sm">
-                            <h3 className="font-semibold text-lg mb-8 text-app-text flex items-center">
-                                <span className="w-8 h-8 rounded-full bg-accent-subtle flex items-center justify-center mr-3 text-accent text-sm font-bold">01</span>
-                                Create New Batch
-                            </h3>
-                            <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-app-surface-opaque border-[1.5px] border-black/5 p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-[32px] shadow-2xl shadow-black/5 relative overflow-hidden">
+                            {/* Top accent bar */}
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent-primary to-blue-400" />
+
+                            <div className="flex items-start justify-between mb-8">
+                                <div>
+                                    <h3 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-3">
+                                        <span className="flex items-center justify-center w-8 h-8 rounded-full bg-black text-white text-sm font-bold">+</span>
+                                        Create New Batch
+                                    </h3>
+                                    <p className="text-app-text-secondary mt-2 font-medium text-sm ml-11">Fill in the details to set up a new batch.</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 {requiresGrades && (
                                     <Dropdown
                                         label="Class / Grade"
@@ -170,31 +180,38 @@ export default function BatchList() {
                                         options={allowedClasses.map(cls => ({ value: cls, label: cls }))}
                                         placeholder="Select Class"
                                         required
+                                        icon={<GraduationCap className="w-5 h-5" />}
                                     />
                                 )}
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Batch Number</label>
-                                    <input
-                                        className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
-                                        type="number"
-                                        min="1"
-                                        placeholder="e.g. 1"
-                                        value={batchNumber}
-                                        onChange={e => setBatchNumber(e.target.value)}
-                                        required
-                                    />
+                                <div className="space-y-2 group">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Batch Number</label>
+                                    <div className="relative">
+                                        <Hash className="absolute left-4 top-4 w-5 h-5 text-gray-400 group-focus-within:text-accent-primary transition-colors" />
+                                        <input
+                                            className="w-full bg-neutral-50/50 border-2 border-transparent focus:bg-white focus:border-accent-primary text-app-text pl-12 p-4 rounded-2xl outline-none transition-all placeholder:text-gray-400 font-semibold"
+                                            type="number"
+                                            min="1"
+                                            placeholder="e.g. 1"
+                                            value={batchNumber}
+                                            onChange={e => setBatchNumber(e.target.value)}
+                                            required
+                                        />
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Batch Name (Optional)</label>
-                                    <input
-                                        className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
-                                        type="text"
-                                        placeholder="e.g. Target 2026 Batch"
-                                        value={customName}
-                                        onChange={e => setCustomName(e.target.value)}
-                                    />
+                                <div className="space-y-2 group">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Batch Name (Optional)</label>
+                                    <div className="relative">
+                                        <Type className="absolute left-4 top-4 w-5 h-5 text-gray-400 group-focus-within:text-accent-primary transition-colors" />
+                                        <input
+                                            className="w-full bg-neutral-50/50 border-2 border-transparent focus:bg-white focus:border-accent-primary text-app-text pl-12 p-4 rounded-2xl outline-none transition-all placeholder:text-gray-400 font-semibold"
+                                            type="text"
+                                            placeholder="e.g. Target 2026 Batch"
+                                            value={customName}
+                                            onChange={e => setCustomName(e.target.value)}
+                                        />
+                                    </div>
                                 </div>
 
                                 {allowedSubjects.length > 0 ? (
@@ -205,31 +222,46 @@ export default function BatchList() {
                                         options={allowedSubjects.map(s => ({ value: s, label: s }))}
                                         placeholder="Select Subject"
                                         required
+                                        icon={<BookOpen className="w-5 h-5" />}
                                     />
                                 ) : (
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Subject</label>
+                                    <div className="space-y-2 group">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Subject</label>
+                                        <div className="relative">
+                                            <BookOpen className="absolute left-4 top-4 w-5 h-5 text-gray-400 group-focus-within:text-accent-primary transition-colors" />
+                                            <input
+                                                className="w-full bg-neutral-50/50 border-2 border-transparent focus:bg-white focus:border-accent-primary text-app-text pl-12 p-4 rounded-2xl outline-none transition-all placeholder:text-gray-400 font-semibold"
+                                                placeholder="e.g. Mathematics, Science"
+                                                value={subject}
+                                                onChange={e => setSubject(e.target.value)}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2 group">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Time Slot</label>
+                                    <div className="relative">
+                                        <Clock className="absolute left-4 top-4 w-5 h-5 text-gray-400 group-focus-within:text-accent-primary transition-colors" />
                                         <input
-                                            className="w-full !bg-neutral-50 border border-app-border text-app-text  p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
-                                            placeholder="e.g. Mathematics, Science"
-                                            value={subject}
-                                            onChange={e => setSubject(e.target.value)}
+                                            className="w-full bg-neutral-50/50 border-2 border-transparent focus:bg-white focus:border-accent-primary text-app-text pl-12 p-4 rounded-2xl outline-none transition-all placeholder:text-gray-400 font-semibold"
+                                            placeholder="e.g. Mon-Wed-Fri 4 PM"
+                                            value={timeSlot}
+                                            onChange={e => setTimeSlot(e.target.value)}
                                             required
                                         />
                                     </div>
-                                )}
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Time Slot</label>
-                                    <input
-                                        className="w-full !bg-neutral-50 border border-app-border text-app-text  p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
-                                        placeholder="e.g. Mon-Wed-Fri 4 PM"
-                                        value={timeSlot}
-                                        onChange={e => setTimeSlot(e.target.value)}
-                                        required
-                                    />
                                 </div>
-                                <div className="md:col-span-2 flex justify-end pt-4">
-                                    <button type="submit" className="bg-neutral-900 hover:bg-black  text-white px-8 py-3.5 rounded-xl font-bold shadow-lg shadow-neutral-500/10 transition-all hover:scale-[1.02] active:scale-95 w-full md:w-auto">Save Batch</button>
+
+                                <div className="sm:col-span-2 flex justify-end pt-4">
+                                    <button
+                                        type="submit"
+                                        className="w-full sm:w-auto px-8 py-4 bg-black text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 transition-all active:scale-95 cursor-pointer shadow-lg shadow-black/10"
+                                    >
+                                        Save Batch
+                                        <ChevronRight className="w-5 h-5" />
+                                    </button>
                                 </div>
                             </form>
                         </div>
@@ -238,9 +270,11 @@ export default function BatchList() {
             </AnimatePresence>
 
             {loading ? (
-                <div className="text-center text-app-text-secondary py-20 animate-pulse">Loading batches...</div>
+                <div className="flex items-center justify-center py-20">
+                    <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                </div>
             ) : (
-                <div className="space-y-12 pb-20">
+                <div className="space-y-10 pb-20">
                     {/* Dynamic Sections */}
                     {(() => {
                         let sections: string[] = [];
@@ -271,38 +305,48 @@ export default function BatchList() {
 
                             return (
                                 <div key={section}>
-                                    <h2 className="text-xl font-bold text-app-text mb-5 pl-1 flex items-center gap-3">
-                                        <span className="w-1.5 h-6 rounded-full bg-accent"></span>
-                                        {section}
-                                    </h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {/* Section header */}
+                                    <div className="mb-5 pl-1">
+                                        <h2 className="text-lg sm:text-xl font-bold text-app-text tracking-tight flex items-center gap-3">
+                                            <span className="flex items-center justify-center w-7 h-7 rounded-full bg-black text-white text-xs font-bold">{classBatches.length}</span>
+                                            {section}
+                                        </h2>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                                         {classBatches.map((batch, index) => (
                                             <motion.div
                                                 key={batch.id}
                                                 initial={{ opacity: 0, y: 20 }}
                                                 animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: index * 0.05 }}
+                                                transition={{ delay: index * 0.06, duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}
                                                 onClick={() => window.location.href = `/batches/${batch.id}`}
-                                                className="bg-app-surface-opaque hover:bg-app-surface border border-app-border p-6 rounded-[24px] shadow-sm hover:shadow-xl transition-all group flex flex-col relative overflow-hidden cursor-pointer hover:-translate-y-1"
+                                                className="bg-app-surface-opaque border-[1.5px] border-black/5 p-5 sm:p-6 rounded-2xl sm:rounded-[28px] shadow-sm hover:shadow-2xl hover:shadow-black/10 transition-all duration-300 group flex flex-col relative overflow-hidden cursor-pointer hover:-translate-y-1"
                                             >
-                                                <div className="flex justify-between items-start mb-6 relative z-10">
+                                                {/* Hover gradient reveal */}
+                                                <div className="absolute top-0 right-0 w-32 h-32 bg-accent-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
+
+                                                <div className="flex justify-between items-start mb-5 relative z-10">
                                                     <div>
-                                                        <h3 className="font-semibold text-xl text-app-text group-hover:text-accent transition-colors">{batch.name}</h3>
-                                                        <div className="flex items-center text-sm font-medium text-app-text-secondary mt-1">
-                                                            <GraduationCap className="w-4 h-4 mr-1.5 text-accent" />
+                                                        <h3 className="font-bold text-lg sm:text-xl text-app-text group-hover:text-black transition-colors tracking-tight">{batch.name}</h3>
+                                                        <div className="flex items-center text-sm font-semibold text-app-text-secondary mt-1.5">
+                                                            <GraduationCap className="w-4 h-4 mr-1.5 text-accent-primary" />
                                                             {batch.subject}
                                                         </div>
                                                     </div>
-                                                    <span className="bg-app-surface text-app-text-secondary text-xs px-3 py-1.5 rounded-full font-bold border border-app-border flex items-center">
+                                                    <span className="bg-black text-white text-xs px-3 py-1.5 rounded-full font-bold flex items-center shadow-sm">
                                                         <Users className="w-3 h-3 mr-1.5" />
                                                         {batch._count?.students || 0}
                                                     </span>
                                                 </div>
 
                                                 <div className="relative z-10 mt-auto">
-                                                    <div className="flex items-center text-sm text-app-text-secondary bg-app-bg p-3 rounded-xl border border-app-border/50">
-                                                        <Clock className="w-4 h-4 mr-3 text-app-text-tertiary" />
-                                                        {batch.timeSlot}
+                                                    <div className="flex items-center justify-between text-sm text-app-text-secondary bg-neutral-50/80 p-3.5 rounded-2xl border border-black/5">
+                                                        <div className="flex items-center">
+                                                            <Clock className="w-4 h-4 mr-2.5 text-app-text-tertiary" />
+                                                            <span className="font-medium">{batch.timeSlot}</span>
+                                                        </div>
+                                                        <ChevronRight className="w-4 h-4 text-app-text-tertiary group-hover:text-black group-hover:translate-x-0.5 transition-all" />
                                                     </div>
                                                 </div>
                                             </motion.div>
@@ -315,13 +359,24 @@ export default function BatchList() {
 
                     {/* Empty State */}
                     {batches.length === 0 && !showForm && (
-                        <div className="col-span-full py-20 text-center flex flex-col items-center justify-center bg-app-surface border border-dashed border-app-border rounded-[24px]">
-                            <div className="w-16 h-16 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center mb-4 text-app-text-secondary">
-                                <Users className="w-8 h-8" strokeWidth={1.5} />
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="py-20 text-center flex flex-col items-center justify-center bg-app-surface-opaque border-[1.5px] border-dashed border-black/10 rounded-[32px]"
+                        >
+                            <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mb-5">
+                                <Users className="w-8 h-8 text-app-text-tertiary" strokeWidth={1.5} />
                             </div>
-                            <h3 className="text-app-text font-bold text-lg">No Batches Found</h3>
-                            <p className="text-app-text-secondary mt-1">Create your first batch to start adding students.</p>
-                        </div>
+                            <h3 className="text-app-text font-bold text-xl tracking-tight">No Batches Yet</h3>
+                            <p className="text-app-text-secondary mt-2 font-medium text-sm max-w-sm">Create your first batch to start adding students and managing your coaching center.</p>
+                            <button
+                                onClick={() => setShowForm(true)}
+                                className="mt-6 bg-black text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-neutral-800 transition-all active:scale-95 cursor-pointer shadow-lg shadow-black/10"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Create First Batch
+                            </button>
+                        </motion.div>
                     )}
                 </div>
             )}

@@ -18,7 +18,7 @@ const CARD_W = (width - 48 - 12) / 2;
 const T = {
   bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
   textSec: '#86868B', textMuted: '#AEAEB2', accent: '#0d7ff2',
-  purple: '#a855f7', emerald: '#10b981', red: '#ef4444',
+  teal: '#0d9488', emerald: '#10b981', red: '#ef4444',
   amber: '#f59e0b', border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
 };
 
@@ -139,7 +139,7 @@ export default function DashboardScreen() {
             ) : (
               <>
                 <StatCard icon={<Users size={20} color={T.accent} />} value={data?.stats.students ?? 0} label="Students" color={T.accent} />
-                <StatCard icon={<BookOpen size={20} color={T.purple} />} value={data?.stats.batches ?? 0} label="Batches" color={T.purple} />
+                <StatCard icon={<BookOpen size={20} color={T.teal} />} value={data?.stats.batches ?? 0} label="Batches" color={T.teal} />
                 <StatCard icon={<TrendingUp size={20} color={T.emerald} />} value={`${collectionRate}%`} label="Collection" color={T.emerald} />
                 <StatCard icon={<IndianRupee size={20} color={T.amber} />} value={`₹${(data?.finances?.collected ?? 0).toLocaleString()}`} label="This Month" color={T.amber} />
               </>

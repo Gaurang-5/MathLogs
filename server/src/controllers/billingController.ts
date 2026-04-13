@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import { Tier } from '@prisma/client';
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key',
@@ -24,29 +25,43 @@ export const createBillingSession = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Institute not found' });
         }
 
-        const monthlyAmountInINR = planId === 'pro' ? 1999 : 999;
+        const instituteConfig = (admin.institute.config as any) || {};
+
+        // Determine pricing based on plan type
+        let monthlyAmountInINR: number;
+        let yearlyAmountInINR: number;
+
+        if (planId === 'custom') {
+            monthlyAmountInINR = instituteConfig.customPriceMonthly || 0;
+            yearlyAmountInINR = instituteConfig.customPriceYearly || 0;
+        } else {
+            monthlyAmountInINR = planId === 'pro' ? 1999 : 999;
+            yearlyAmountInINR = planId === 'pro' ? 19999 : 9999;
+        }
         
         if (billingCycle === 'yearly') {
-            const amountInINR = planId === 'pro' ? 19999 : 9999;
-            const amountInPaise = amountInINR * 100;
+            if (yearlyAmountInINR <= 0) {
+                return res.status(400).json({ error: 'Yearly pricing is not configured for this plan.' });
+            }
+            const amountInPaise = yearlyAmountInINR * 100;
 
             const order = await razorpay.orders.create({
                 amount: amountInPaise,
                 currency: 'INR',
-                receipt: `receipt_${admin.institute.id}_${Date.now()}`,
+                receipt: `rcpt_${admin.institute.id.slice(-8)}_${Date.now()}`,
                 payment_capture: true,
                 notes: {
                     instituteId: admin.institute.id,
                     planId,
                     billingCycle
                 }
-            });
+            } as any);
 
             return res.json({
                 success: true,
-                orderId: order.id,
-                amount: order.amount,
-                currency: order.currency,
+                orderId: (order as any).id,
+                amount: (order as any).amount,
+                currency: (order as any).currency,
                 keyId: process.env.RAZORPAY_KEY_ID || 'dummy_key',
             });
         } else {
@@ -138,7 +153,21 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
         }
 
         // Extend their plan
-        const tier = planId === 'pro' ? 'PRO' : 'FREE';
+        const currentConfig = (admin.institute.config as any) || {};
+        let tier: Tier;
+        let maxStudents: number;
+
+        if (planId === 'custom') {
+            tier = (admin.institute.plan as Tier) || Tier.PRO;
+            maxStudents = currentConfig.maxStudents || 250;
+        } else if (planId === 'pro') {
+            tier = Tier.PRO;
+            maxStudents = 250;
+        } else {
+            tier = Tier.BASIC;
+            maxStudents = 100;
+        }
+
         const daysToAdd = billingCycle === 'yearly' ? 365 : 30;
         
         let newExpiryDate = admin.institute.planExpiryDate ? new Date(admin.institute.planExpiryDate) : new Date();
@@ -148,9 +177,6 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
         }
         
         newExpiryDate.setDate(newExpiryDate.getDate() + daysToAdd);
-
-        const currentConfig = (admin.institute.config as any) || {};
-        const maxStudents = tier === 'PRO' ? 250 : 100;
 
         await prisma.institute.update({
             where: { id: admin.institute.id },
