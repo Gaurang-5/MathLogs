@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
 import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
@@ -30,6 +30,7 @@ interface FeeInstallment {
     name: string;
     amount: number;
     batchId: string;
+    studentId?: string | null;
     createdAt: string;
 }
 
@@ -121,6 +122,10 @@ export default function BatchDetails() {
     const [newInstallment, setNewInstallment] = useState({ name: '', amount: '' });
     const [editingInstallment, setEditingInstallment] = useState<FeeInstallment | null>(null);
     const [installmentToDelete, setInstallmentToDelete] = useState<FeeInstallment | null>(null);
+
+    // Custom Invoice State
+    const [showCustomInvoice, setShowCustomInvoice] = useState<Student | null>(null);
+    const [customInvoice, setCustomInvoice] = useState({ name: '', amount: '', markAsPaid: false });
 
     // Payment Modal State
     const [paymentModal, setPaymentModal] = useState<{ student: Student, installment: FeeInstallment, date: string } | null>(null);
@@ -509,6 +514,41 @@ export default function BatchDetails() {
         }
     };
 
+    const handleCreateCustomInvoice = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!showCustomInvoice) return;
+        const toastId = toast.loading('Creating custom invoice...');
+        try {
+            const installment = await apiRequest(`/batches/${id}/installments`, 'POST', {
+                name: customInvoice.name,
+                amount: Number(customInvoice.amount),
+                studentId: showCustomInvoice.id
+            });
+
+            // If "Mark as Paid" is checked, immediately log a payment
+            if (customInvoice.markAsPaid && installment?.id) {
+                await apiRequest(`/fees/pay-installment`, 'POST', {
+                    studentId: showCustomInvoice.id,
+                    installmentId: installment.id,
+                    amount: Number(customInvoice.amount),
+                    date: new Date().toISOString().split('T')[0]
+                });
+            }
+
+            toast.success(
+                customInvoice.markAsPaid
+                    ? 'Custom invoice created & marked paid'
+                    : 'Custom invoice created',
+                { id: toastId }
+            );
+            setShowCustomInvoice(null);
+            setCustomInvoice({ name: '', amount: '', markAsPaid: false });
+            setTimeout(() => fetchDetails(), 300);
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to create custom invoice'), { id: toastId });
+        }
+    };
+
     const handleUpdateInstallment = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingInstallment) return;
@@ -618,27 +658,28 @@ export default function BatchDetails() {
 
     return (
         <Layout title={batch.name}>
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
                 <button
                     onClick={() => navigate('/batches')}
-                    className="flex items-center text-app-text-secondary hover:text-app-text mb-6 transition-colors font-medium"
+                    className="flex items-center text-app-text-secondary hover:text-black mb-6 transition-colors font-bold text-sm uppercase tracking-widest"
                 >
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back to Batches
                 </button>
 
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
                     {/* Batch Info Card */}
-                    <div className="xl:col-span-2 bg-app-surface-opaque border border-app-border p-4 md:p-8 rounded-3xl shadow-sm flex flex-col gap-6">
-                        <div className="flex justify-between items-start gap-4">
+                    <div className="xl:col-span-2 bg-neutral-50/50-opaque border-[1.5px] border-black/5 p-5 md:p-8 rounded-2xl md:rounded-[32px] shadow-sm flex flex-col gap-6 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-accent-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 -translate-y-1/2 translate-x-1/3" />
+                        <div className="flex justify-between items-start gap-4 relative z-10">
                             <div className="flex-1 min-w-0">
-                                <div className="flex flex-wrap items-center gap-3 mb-2">
-                                    <h2 className="text-2xl md:text-3xl font-bold text-app-text tracking-tight break-words">{batch.name}</h2>
-                                    <span className="bg-accent/10 text-accent text-xs px-3 py-1 rounded-full border border-accent/20 font-semibold whitespace-nowrap">{batch.subject}</span>
-                                    {batch.className && <span className="bg-blue-500/10 text-blue-500 text-xs px-3 py-1 rounded-full border border-blue-500/20 font-semibold whitespace-nowrap">{batch.className}</span>}
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <h2 className="text-2xl md:text-4xl font-extrabold text-black tracking-tighter break-words">{batch.name}</h2>
+                                    <span className="bg-black text-white text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap">{batch.subject}</span>
+                                    {batch.className && <span className="bg-neutral-100 text-black text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap">{batch.className}</span>}
                                 </div>
-                                <div className="flex items-center text-app-text-secondary gap-4 md:gap-6 mt-2 text-sm font-medium flex-wrap">
-                                    <span className="flex items-center whitespace-nowrap"><Clock className="w-4 h-4 mr-2 text-app-text-tertiary" /> {batch.timeSlot}</span>
-                                    <span className="flex items-center whitespace-nowrap"><Users className="w-4 h-4 mr-2 text-app-text-tertiary" /> {batch.students.length} Students</span>
+                                <div className="flex items-center text-app-text-secondary gap-4 md:gap-6 mt-3 text-sm font-bold flex-wrap">
+                                    <span className="flex items-center whitespace-nowrap"><Clock className="w-4 h-4 mr-2 text-black" /> {batch.timeSlot}</span>
+                                    <span className="flex items-center whitespace-nowrap"><Users className="w-4 h-4 mr-2 text-black" /> {batch.students.length} Students</span>
                                 </div>
                             </div>
                             <div className="flex gap-2 shrink-0">
@@ -662,25 +703,25 @@ export default function BatchDetails() {
                         <div className="flex flex-wrap gap-3 w-full mt-auto">
                             <button
                                 onClick={handleDownloadPDF}
-                                className="bg-app-bg hover:bg-app-border text-app-text px-6 py-3.5 rounded-xl font-bold flex items-center justify-center border border-app-border transition-all active:scale-95 flex-1"
+                                className="bg-neutral-50/80 hover:bg-neutral-100/80 text-black px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center border-[1.5px] border-black/5 transition-all active:scale-95 flex-1"
                             >
                                 <Download className="w-5 h-5 mr-2" /> Download List
                             </button>
                             <button
                                 onClick={handlePrintStickers}
-                                className="bg-app-bg hover:bg-app-border text-app-text px-6 py-3.5 rounded-xl font-bold flex items-center justify-center border border-app-border transition-all active:scale-95 flex-1"
+                                className="bg-neutral-50/80 hover:bg-neutral-100/80 text-black px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center border-[1.5px] border-black/5 transition-all active:scale-95 flex-1"
                             >
                                 <Printer className="w-5 h-5 mr-2" /> Print Stickers
                             </button>
                             <button
                                 onClick={() => setShowAddStudent(true)}
-                                className="bg-app-surface hover:bg-app-surface-hover text-app-text px-6 py-3.5 rounded-xl font-bold flex items-center justify-center border border-app-border transition-all active:scale-95 flex-1"
+                                className="bg-black hover:bg-black/90 text-white px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center transition-all active:scale-95 flex-1 shadow-sm shadow-black/10"
                             >
                                 <Plus className="w-5 h-5 mr-2" /> Add Student
                             </button>
                             <button
                                 onClick={() => setShowManageInstallments(true)}
-                                className="bg-app-surface hover:bg-app-surface-hover text-app-text px-6 py-3.5 rounded-xl font-bold flex items-center justify-center border border-app-border transition-all active:scale-95 flex-1"
+                                className="bg-neutral-50/80 hover:bg-neutral-100/80 text-black px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center border-[1.5px] border-black/5 transition-all active:scale-95 flex-1"
                             >
                                 <Settings className="w-5 h-5 mr-2" /> Fee Columns
                             </button>
@@ -689,8 +730,8 @@ export default function BatchDetails() {
                                 className={cn(
                                     "px-6 py-3.5 rounded-xl font-bold flex items-center justify-center border transition-all active:scale-95 flex-1",
                                     batch.whatsappGroupLink
-                                        ? "bg-app-surface hover:bg-app-surface-hover text-app-text border-app-border"
-                                        : "bg-app-surface border-dashed border-app-text-tertiary text-app-text hover:border-app-text"
+                                        ? "bg-neutral-50/50 hover:bg-neutral-50/50-hover text-app-text border-black/5"
+                                        : "bg-neutral-50/50 border-dashed border-app-text-tertiary text-app-text hover:border-app-text"
                                 )}
                             >
                                 <Phone className="w-5 h-5 mr-2" />
@@ -699,7 +740,7 @@ export default function BatchDetails() {
                             <button
                                 onClick={handleSendWhatsappInvite}
                                 disabled={!batch.whatsappGroupLink}
-                                className="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-6 py-3.5 rounded-xl font-bold flex items-center justify-center transition-all active:scale-95 flex-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-app-surface disabled:text-app-text-tertiary disabled:border-app-border"
+                                className="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-6 py-3.5 rounded-xl font-bold flex items-center justify-center transition-all active:scale-95 flex-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-50/50 disabled:text-app-text-tertiary disabled:border-black/5"
                             >
                                 <Mail className="w-5 h-5 mr-2" /> Send Invites
                             </button>
@@ -708,9 +749,9 @@ export default function BatchDetails() {
 
                     {/* Registration Control Card */}
                     {!batch.isRegistrationEnded && (
-                        <div className="bg-app-surface-opaque border border-app-border p-4 md:p-6 rounded-3xl shadow-sm flex flex-col items-center text-center relative">
-
-                            <div className="flex items-center justify-between w-full mb-6">
+                        <div className="bg-neutral-50/50-opaque border-[1.5px] border-black/5 p-5 md:p-6 rounded-2xl md:rounded-[32px] shadow-sm flex flex-col items-center text-center relative group overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
+                            <div className="flex items-center justify-between w-full mb-6 relative z-10">
                                 <div className="flex items-center gap-3">
                                     <span className="font-bold text-app-text-secondary text-xs uppercase tracking-wider">Registration</span>
                                     <div className={cn(
@@ -775,7 +816,7 @@ export default function BatchDetails() {
                                 </div>
                             </div>
 
-                            <div className="bg-white p-4 rounded-2xl mb-6 shadow-inner flex flex-col items-center gap-4">
+                            <div className="bg-white p-5 rounded-[24px] mb-6 shadow-sm border border-black/5 flex flex-col items-center gap-4">
                                 <QRCode value={`${window.location.origin}/register/${batch.id}`} size={140} />
                                 <button
                                     onClick={async () => {
@@ -798,27 +839,27 @@ export default function BatchDetails() {
                                             toast.error('Failed to download QR PDF');
                                         }
                                     }}
-                                    className="text-xs font-bold text-app-text-tertiary hover:text-app-text flex items-center gap-1.5 transition-colors bg-app-surface px-3 py-1.5 rounded-lg border border-app-border hover:border-app-text-secondary"
+                                    className="text-xs font-bold text-app-text-tertiary hover:text-black flex items-center gap-1.5 transition-colors bg-neutral-50 px-4 py-2 rounded-xl border border-black/5 hover:border-black/10"
                                 >
-                                    <Download className="w-3 h-3" /> Download QR
+                                    <Download className="w-3.5 h-3.5" /> Download QR
                                 </button>
                             </div>
 
                             <div className="w-full space-y-3">
                                 <div>
-                                    <p className="text-xs text-app-text-tertiary mb-2 px-2 uppercase font-bold tracking-wider">Actions</p>
+                                    <p className="text-[10px] text-app-text-tertiary mb-2 px-2 uppercase font-bold tracking-widest text-left">Quick Actions</p>
                                     <div className="grid grid-cols-1 gap-3 text-center">
                                         <button
                                             onClick={() => window.open(`/kiosk/register/${batch.id}`, '_blank')}
-                                            className="py-3.5 rounded-xl bg-app-surface hover:bg-app-surface-hover text-app-text border border-app-border text-xs font-bold transition-all w-full"
+                                            className="py-3.5 rounded-2xl bg-neutral-50/80 hover:bg-neutral-100/80 text-black border-[1.5px] border-black/5 text-xs font-bold transition-all w-full"
                                         >
-                                            Kiosk Invite
+                                            Open Fullscreen Kiosk
                                         </button>
                                         <button
                                             onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`); toast.success('Invite Link Copied'); }}
-                                            className="py-3.5 rounded-xl bg-app-surface hover:bg-app-surface-hover text-app-text border border-app-border text-xs font-bold transition-all w-full"
+                                            className="py-3.5 rounded-2xl bg-neutral-50/80 hover:bg-neutral-100/80 text-black border-[1.5px] border-black/5 text-xs font-bold transition-all w-full"
                                         >
-                                            Copy Invite Link
+                                            Copy Web Link
                                         </button>
                                     </div>
                                 </div>
@@ -828,21 +869,21 @@ export default function BatchDetails() {
                 </div>
             </div>
 
-            <div className="bg-app-surface-opaque border border-app-border rounded-[24px] shadow-sm mt-8">
+            <div className="bg-neutral-50/50-opaque border-[1.5px] border-black/5 rounded-[32px] shadow-sm mt-8 overflow-hidden">
                 {/* Search Header */}
-                <div className="p-4 border-b border-app-border bg-app-surface/50 backdrop-blur-md sticky top-0 z-10 rounded-t-[24px]">
+                <div className="p-5 border-b-[1.5px] border-black/5 bg-neutral-50/30 backdrop-blur-md sticky top-0 z-10">
                     <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                         <div className="relative max-w-md w-full">
-                            <Search className="absolute left-3 top-3 w-5 h-5 text-app-text-tertiary" />
+                            <Search className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Search by name, school, ID, or phone..."
+                                placeholder="Search students..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-app-bg border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent transition-all placeholder:text-app-text-tertiary"
+                                className="w-full bg-white border-2 border-transparent pl-12 pr-4 py-3 rounded-2xl text-app-text outline-none focus:border-black/10 shadow-sm transition-all placeholder:text-gray-400 font-semibold"
                             />
                         </div>
-                        <div className="flex items-center gap-2 bg-app-bg p-1 rounded-xl border border-app-border self-end md:self-auto">
+                        <div className="flex items-center gap-1 bg-neutral-100/80 p-1.5 rounded-2xl self-end md:self-auto border border-black/5">
                             <button
                                 onClick={() => setTableFontSize(Math.max(0, tableFontSize - 1))}
                                 disabled={tableFontSize === 0}
@@ -866,10 +907,10 @@ export default function BatchDetails() {
 
                 <div className="hidden md:block overflow-auto rounded-b-[24px] w-full max-w-full custom-scrollbar" style={{ maxHeight: 'calc(100vh - 220px)' }}>
                     <table className="w-full text-left border-collapse relative">
-                        <thead className={cn("bg-app-surface text-app-text-secondary uppercase font-bold tracking-wider sticky top-0 z-20 shadow-sm outline outline-1 outline-app-border", getTextSizeClass('header'))}>
+                        <thead className={cn("bg-neutral-50/90 text-app-text-secondary uppercase font-extrabold tracking-widest sticky top-0 z-20 shadow-sm outline outline-1 outline-black/5 backdrop-blur-md", getTextSizeClass('header'))}>
                             <tr>
                                 <th
-                                    className={cn("bg-app-surface cursor-pointer select-none hover:bg-app-surface-hover transition-colors group", getCellPadding())}
+                                    className={cn("bg-transparent cursor-pointer select-none hover:bg-black/5 transition-colors group", getCellPadding())}
                                     style={{ minWidth: '100px', whiteSpace: 'nowrap' }}
                                     onClick={() => {
                                         setSortConfig(current => {
@@ -888,30 +929,43 @@ export default function BatchDetails() {
                                         )}
                                     </div>
                                 </th>
-                                <th className={cn("bg-app-surface", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Student Name</th>
-                                <th className={cn("bg-app-surface", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>School</th>
-                                <th className={cn("bg-app-surface", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Parent Name</th>
-                                <th className={cn("bg-app-surface", getCellPadding())} style={{ minWidth: '200px', whiteSpace: 'nowrap' }}>Contact</th>
-                                <th className={cn("bg-app-surface text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Tests</th>
-                                <th className={cn("bg-app-surface text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Avg (10)</th>
-                                {batch.feeInstallments?.map(inst => (
-                                    <th key={inst.id} className={cn("bg-app-surface text-center", getCellPadding())} style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>
+                                <th className={cn("bg-transparent", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Student Name</th>
+                                <th className={cn("bg-transparent", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>School</th>
+                                <th className={cn("bg-transparent", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Parent Name</th>
+                                <th className={cn("bg-transparent", getCellPadding())} style={{ minWidth: '200px', whiteSpace: 'nowrap' }}>Contact</th>
+                                <th className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Tests</th>
+                                <th className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Avg (10)</th>
+                                {batch.feeInstallments?.filter(inst => !inst.studentId).map(inst => (
+                                    <th key={inst.id} className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>
                                         <div className="flex flex-col items-center">
                                             <span>{inst.name}</span>
                                             <span className={cn("text-app-text-tertiary", getTextSizeClass('sub'))}>₹{inst.amount}</span>
                                         </div>
                                     </th>
                                 ))}
-                                <th className={cn("border-b border-app-border text-center", getCellPadding())} style={{ minWidth: '120px', whiteSpace: 'nowrap' }}>Actions</th>
+                                {/* Dynamic headers for custom (student-specific) invoices */}
+                                {(() => {
+                                    const allCustom = batch.feeInstallments?.filter(i => i.studentId) || [];
+                                    const seen = new Set<string>();
+                                    return allCustom.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; }).map(inst => (
+                                        <th key={inst.id} className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>
+                                            <div className="flex flex-col items-center">
+                                                <span>{inst.name}</span>
+                                                <span className={cn("text-app-text-tertiary", getTextSizeClass('sub'))}>₹{inst.amount}</span>
+                                            </div>
+                                        </th>
+                                    ));
+                                })()}
+                                <th className={cn("border-b border-black/5 text-center", getCellPadding())} style={{ minWidth: '120px', whiteSpace: 'nowrap' }}>Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-app-border text-app-text">
+                        <tbody className="divide-y divide-black/5 text-app-text">
                             {filteredStudents.map((student) => {
                                 // Dynamic Fee Logic (Virtual Allocation)
                                 const instPaidMap = getInstallmentPaidMap(student, batch.feeInstallments || []);
 
                                 return (
-                                    <tr key={student.id} className="hover:bg-app-surface transition-colors group">
+                                    <tr key={student.id} className="hover:bg-neutral-50/70 transition-colors group">
                                         <td className={cn("font-mono text-app-text-tertiary", getCellPadding(), getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }}>{student.humanId || '-'}</td>
                                         <td className={cn("font-semibold text-app-text", getCellPadding(), getTextSizeClass('body'))} style={{ whiteSpace: 'nowrap' }} title={student.name}>{student.name}</td>
                                         <td className={cn("text-app-text-secondary", getCellPadding(), getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }} title={student.schoolName || ''}>{student.schoolName || '-'}</td>
@@ -928,7 +982,7 @@ export default function BatchDetails() {
                                             </button>
                                         </td>
                                         <td className={cn("text-center font-bold text-app-text", getCellPadding())}>{getStudentAverage(student)}</td>
-                                        {batch.feeInstallments?.map(inst => {
+                                        {batch.feeInstallments?.filter(inst => !inst.studentId).map(inst => {
                                             const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
                                             // Use calculated amount from map, fallback to simple check if missing (shouldn't happen)
                                             const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);
@@ -994,18 +1048,84 @@ export default function BatchDetails() {
                                                 </td>
                                             );
                                         })}
-                                        <td className={cn("text-center", getCellPadding())} >
-                                            <div className="flex items-center justify-center gap-2">
+                                        {/* Custom student-specific invoices — rendered as regular fee circles */}
+                                        {(() => {
+                                            const allCustom = batch.feeInstallments?.filter(i => i.studentId) || [];
+                                            const seen = new Set<string>();
+                                            const uniqueCustom = allCustom.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
+                                            return uniqueCustom.map(inst => {
+                                                // Only render circle if this invoice belongs to this student
+                                                if (inst.studentId !== student.id) {
+                                                    return <td key={inst.id} className={cn("text-center text-app-text-tertiary", getCellPadding())} title="Not applicable">-</td>;
+                                                }
+                                                const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
+                                                const paidAmount = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+                                                const isFullyPaid = paidAmount >= inst.amount;
+                                                const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
+                                                return (
+                                                    <td key={inst.id} className={cn("text-center", getCellPadding())}>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (isFullyPaid) {
+                                                                    if (payments.length > 0) {
+                                                                        setViewPayment({ student, installment: inst, payments });
+                                                                    } else {
+                                                                        toast.success('Paid via Account Balance');
+                                                                    }
+                                                                } else {
+                                                                    const remaining = inst.amount - paidAmount;
+                                                                    setPaymentModal({
+                                                                        student,
+                                                                        installment: { ...inst, amount: remaining },
+                                                                        date: new Date().toISOString().split('T')[0]
+                                                                    });
+                                                                }
+                                                            }}
+                                                            className={cn(
+                                                                "rounded-full flex items-center justify-center border-2 transition-all mx-auto relative group/btn",
+                                                                getPaymentButtonSize(),
+                                                                isFullyPaid
+                                                                    ? "border-app-text bg-transparent cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                                                                    : isPartiallyPaid
+                                                                        ? "border-orange-400 text-orange-500 cursor-pointer bg-orange-50 hover:bg-orange-100"
+                                                                        : "border-app-text-tertiary bg-transparent hover:border-app-text cursor-pointer text-app-text"
+                                                            )}
+                                                            title={
+                                                                isFullyPaid
+                                                                    ? (payments.length > 0 ? `Paid on ${new Date(payments[0].date).toLocaleDateString()}` : 'Paid via Balance')
+                                                                    : isPartiallyPaid
+                                                                        ? `Partial: ₹${paidAmount}/${inst.amount}`
+                                                                        : `${inst.name} — ₹${inst.amount}`
+                                                            }
+                                                        >
+                                                            {isFullyPaid && <div className={cn("bg-current rounded-full", getPaymentInnerSize())} />}
+                                                            {isPartiallyPaid && (
+                                                                <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold">P</div>
+                                                            )}
+                                                        </button>
+                                                    </td>
+                                                );
+                                            });
+                                        })()}
+                                        <td className={cn("text-center border-b border-black/5", getCellPadding())} >
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <button
+                                                    onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false }); }}
+                                                    className="p-2 bg-neutral-50 hover:bg-black text-black hover:text-white rounded-xl border border-black/5 transition-colors"
+                                                    title="Custom Invoice"
+                                                >
+                                                    <Receipt className="w-4 h-4" />
+                                                </button>
                                                 <button
                                                     onClick={() => setEditingStudent(student)}
-                                                    className="p-2 hover:bg-accent/10 text-accent rounded-lg transition-colors"
+                                                    className="p-2 bg-neutral-50 hover:bg-black text-black hover:text-white rounded-xl border border-black/5 transition-colors"
                                                     title="Edit"
                                                 >
                                                     <Edit2 className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(student)}
-                                                    className="p-2 hover:bg-danger/10 text-danger rounded-lg transition-colors"
+                                                    className="p-2 bg-neutral-50 hover:bg-red-50 text-red-600 rounded-xl border border-black/5 transition-colors"
                                                     title="Delete"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -1017,7 +1137,7 @@ export default function BatchDetails() {
                             })}
                             {filteredStudents.length === 0 && (
                                 <tr>
-                                    <td colSpan={6 + (batch.feeInstallments?.length || 0)} className="p-20 text-center text-app-text-tertiary flex flex-col items-center justify-center">
+                                    <td colSpan={6 + (batch.feeInstallments?.filter(i => !i.studentId).length || 0) + (batch.feeInstallments?.filter(i => i.studentId).length || 0)} className="p-20 text-center text-app-text-tertiary flex flex-col items-center justify-center">
                                         <Users className="w-12 h-12 mb-4 opacity-20" />
                                         <p>{searchQuery ? 'No students match your search.' : 'No students in this batch yet.'}</p>
                                     </td>
@@ -1029,28 +1149,29 @@ export default function BatchDetails() {
 
                 {/* Mobile Student List Card View */}
                 <div className="md:hidden">
-                    <div className="divide-y divide-app-border">
+                    <div className="divide-y divide-black/5">
                         {filteredStudents.map((student) => {
                             // Dynamic Fee Logic (Virtual Allocation) - Mobile
                             const instPaidMap = getInstallmentPaidMap(student, batch.feeInstallments || []);
 
                             return (
-                                <div key={student.id} className="p-4 flex flex-col gap-3 bg-app-surface-opaque hover:bg-app-surface transition-colors">
+                                <div key={student.id} className="p-5 flex flex-col gap-3 bg-white hover:bg-neutral-50/50 transition-colors">
                                     <div className="flex flex-col gap-3">
                                         <div className="flex justify-between items-start">
                                             <div className="flex-1 min-w-0 pr-4">
-                                                <h4 className={cn("font-bold text-app-text break-words leading-tight", getTextSizeClass('body'))}>{student.name}</h4>
+                                                <h4 className={cn("font-extrabold text-black tracking-tighter break-words leading-tight", getTextSizeClass('body'))}>{student.name}</h4>
                                                 {student.humanId && (
-                                                    <span className={cn("inline-block mt-1 font-mono bg-app-surface border border-app-border px-2 py-0.5 rounded-full text-app-text-tertiary", getTextSizeClass('sub'))}>
+                                                    <span className={cn("inline-block mt-1.5 font-mono bg-neutral-100 px-2.5 py-0.5 rounded-full text-app-text-tertiary font-bold border border-black/5", getTextSizeClass('sub'))}>
                                                         {student.humanId}
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex gap-2 shrink-0">
-                                                <button onClick={() => setViewMarksId(student.id)} className="p-2 bg-app-text/5 text-app-text rounded-lg active:scale-95 transition-transform"><Eye className={getIconSizeClass()} /></button>
-                                                <a href={`tel:${student.parentWhatsapp}`} className="p-2 bg-success/10 text-success rounded-lg active:scale-95 transition-transform"><Phone className={getIconSizeClass()} /></a>
-                                                <button onClick={() => setEditingStudent(student)} className="p-2 bg-accent/10 text-accent rounded-lg active:scale-95 transition-transform"><Edit2 className={getIconSizeClass()} /></button>
-                                                <button onClick={() => handleDelete(student)} className="p-2 bg-danger/10 text-danger rounded-lg active:scale-95 transition-transform"><Trash2 className={getIconSizeClass()} /></button>
+                                            <div className="flex gap-1.5 shrink-0 flex-wrap justify-end max-w-[140px]">
+                                                <button onClick={() => setViewMarksId(student.id)} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all"><Eye className={getIconSizeClass()} /></button>
+                                                <a href={`tel:${student.parentWhatsapp}`} className="p-2 bg-neutral-50 hover:bg-green-50 text-green-600 border border-black/5 rounded-xl active:scale-90 transition-all"><Phone className={getIconSizeClass()} /></a>
+                                                <button onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false }); }} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all" title="Custom Invoice"><Receipt className={getIconSizeClass()} /></button>
+                                                <button onClick={() => setEditingStudent(student)} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all"><Edit2 className={getIconSizeClass()} /></button>
+                                                <button onClick={() => handleDelete(student)} className="p-2 bg-neutral-50 hover:bg-red-50 text-red-600 border border-black/5 rounded-xl active:scale-90 transition-all"><Trash2 className={getIconSizeClass()} /></button>
                                             </div>
                                         </div>
 
@@ -1072,10 +1193,11 @@ export default function BatchDetails() {
 
                                     {/* Mobile Fees Scroll View */}
                                     {
-                                        batch.feeInstallments && batch.feeInstallments.length > 0 && (
-                                            <div className="mt-2 pt-3 border-t border-app-border/50">
+                                        batch.feeInstallments && batch.feeInstallments.filter(i => !i.studentId).length > 0 && (
+                                            <div className="mt-2 pt-3 border-t border-black/5/50">
                                                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
                                                     {batch.feeInstallments.filter((inst) => {
+                                                        if (inst.studentId) return false; // Skip custom invoices
                                                         const studentJoinDate = getStudentJoinDate(student.createdAt);
                                                         const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
                                                         return instDate >= studentJoinDate;
@@ -1108,11 +1230,73 @@ export default function BatchDetails() {
                                                                 }}
                                                                 className={cn(
                                                                     "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border font-medium whitespace-nowrap transition-all",
-                                                                    "bg-app-surface hover:bg-app-surface-hover border-app-border text-app-text",
+                                                                    "bg-neutral-50/50 hover:bg-neutral-50/50-hover border-black/5 text-app-text",
                                                                     getTextSizeClass('body')
                                                                 )}
                                                             >
                                                                 {/* Circle Indicator matching Desktop */}
+                                                                <div className={cn(
+                                                                    "rounded-full flex items-center justify-center border transition-all relative",
+                                                                    getIconSizeClass(),
+                                                                    isFullyPaid
+                                                                        ? "border-app-text"
+                                                                        : isPartiallyPaid
+                                                                            ? "border-orange-400 text-orange-500 bg-orange-50"
+                                                                            : "border-app-text-tertiary text-app-text"
+                                                                )}>
+                                                                    {isFullyPaid && <div className={cn("bg-current rounded-full", getPaymentInnerSize())} />}
+                                                                    {isPartiallyPaid && <div className="text-[6px] font-bold">P</div>}
+                                                                </div>
+
+                                                                <div className="flex flex-col items-start leading-none gap-0.5">
+                                                                    <span>{inst.name}</span>
+                                                                    {isPartiallyPaid && (
+                                                                        <span className="text-[9px] text-orange-500 font-bold">Due: ₹{inst.amount - paidAmount}</span>
+                                                                    )}
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+                                    {/* Custom student-specific invoices — rendered as regular mobile fee pills */}
+                                    {
+                                        batch.feeInstallments && batch.feeInstallments.filter(i => i.studentId === student.id).length > 0 && (
+                                            <div className={cn(batch.feeInstallments.filter(i => !i.studentId).length === 0 ? "mt-2 pt-3 border-t border-black/5/50" : "")}>
+                                                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
+                                                    {batch.feeInstallments.filter(inst => inst.studentId === student.id).map((inst) => {
+                                                        const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
+                                                        const paidAmount = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+                                                        const isFullyPaid = paidAmount >= inst.amount;
+                                                        const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
+
+                                                        return (
+                                                            <button
+                                                                key={inst.id}
+                                                                onClick={() => {
+                                                                    if (isFullyPaid) {
+                                                                        if (payments.length > 0) {
+                                                                            setViewPayment({ student, installment: inst, payments });
+                                                                        } else {
+                                                                            toast.success('Paid via Account Balance');
+                                                                        }
+                                                                    } else {
+                                                                        const remaining = inst.amount - paidAmount;
+                                                                        setPaymentModal({
+                                                                            student,
+                                                                            installment: { ...inst, amount: remaining },
+                                                                            date: new Date().toISOString().split('T')[0]
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                className={cn(
+                                                                    "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border font-medium whitespace-nowrap transition-all",
+                                                                    "bg-neutral-50/50 hover:bg-neutral-50/50-hover border-black/5 text-app-text",
+                                                                    getTextSizeClass('body')
+                                                                )}
+                                                            >
                                                                 <div className={cn(
                                                                     "rounded-full flex items-center justify-center border transition-all relative",
                                                                     getIconSizeClass(),
@@ -1170,11 +1354,11 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border border-app-border rounded-[24px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
+                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
                             >
                                 <div className="flex justify-between items-center mb-8">
                                     <h3 className="text-xl font-bold text-app-text">Edit Student</h3>
-                                    <button onClick={() => setEditingStudent(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                    <button onClick={() => setEditingStudent(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                                 </div>
 
                                 <form onSubmit={handleUpdate} className="grid grid-cols-1 gap-6">
@@ -1193,7 +1377,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={editingStudent.name}
                                                         onChange={(e) => setEditingStudent(prev => prev ? { ...prev, name: e.target.value } : null)}
-                                                        className="w-full bg-app-bg border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         required
                                                         placeholder="e.g. Rahul Sharma"
                                                     />
@@ -1206,7 +1390,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={editingStudent.humanId || ''}
                                                         disabled
-                                                        className="w-full bg-neutral-100 dark:bg-neutral-800 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text-tertiary cursor-not-allowed outline-none select-none pointer-events-none"
+                                                        className="w-full bg-neutral-100 dark:bg-neutral-800 border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-2.5 text-app-text-tertiary cursor-not-allowed outline-none select-none pointer-events-none"
                                                         placeholder="Generated ID"
                                                     />
                                                 </div>
@@ -1218,7 +1402,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={editingStudent.schoolName || ''}
                                                         onChange={(e) => setEditingStudent(prev => prev ? { ...prev, schoolName: e.target.value } : null)}
-                                                        className="w-full bg-app-bg border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         placeholder="e.g. DPS, KV, etc."
                                                     />
                                                 </div>
@@ -1241,7 +1425,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={editingStudent.parentName}
                                                         onChange={(e) => setEditingStudent(prev => prev ? { ...prev, parentName: e.target.value } : null)}
-                                                        className="w-full bg-app-bg border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         required
                                                         placeholder="Guardian's Name"
                                                     />
@@ -1254,7 +1438,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={editingStudent.parentWhatsapp}
                                                         onChange={(e) => setEditingStudent(prev => prev ? { ...prev, parentWhatsapp: e.target.value } : null)}
-                                                        className="w-full bg-app-bg border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         required
                                                         placeholder="10-digit Number"
                                                     />
@@ -1267,7 +1451,7 @@ export default function BatchDetails() {
                                                     <input
                                                         value={editingStudent.parentEmail || ''}
                                                         onChange={(e) => setEditingStudent(prev => prev ? { ...prev, parentEmail: e.target.value } : null)}
-                                                        className="w-full bg-app-bg border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                         placeholder="Optional"
                                                     />
                                                 </div>
@@ -1275,7 +1459,7 @@ export default function BatchDetails() {
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-end pt-4 border-t border-app-border">
+                                    <div className="flex justify-end pt-4 border-t border-black/5">
                                         <button
                                             type="submit"
                                             className="!bg-black hover:!bg-neutral-800 !text-white border-2 !border-black px-8 py-3 rounded-xl font-bold flex items-center shadow-lg shadow-gray-200 transition-all active:scale-[0.98]"
@@ -1306,20 +1490,20 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border border-app-border rounded-[24px] p-8 max-w-2xl w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-8 max-w-2xl w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
                         >
                             <div className="flex justify-between items-center mb-6">
                                 <div>
                                     <h3 className="text-xl font-bold text-app-text">{viewMarks.name}'s Performance</h3>
                                     <p className="text-sm text-app-text-secondary mt-1">Detailed breakdown of test scores</p>
                                 </div>
-                                <button onClick={() => setViewMarksId(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                <button onClick={() => setViewMarksId(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                             </div>
 
-                            <div className="border border-app-border rounded-xl overflow-hidden">
+                            <div className="border-[1.5px] border-black/5 rounded-xl overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left min-w-[600px]">
-                                        <thead className="bg-app-surface border-b border-app-border">
+                                        <thead className="bg-neutral-50/50 border-b border-black/5">
                                             <tr className="whitespace-nowrap">
                                                 <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Test Name</th>
                                                 <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Date</th>
@@ -1333,7 +1517,7 @@ export default function BatchDetails() {
                                                 const max = mark.test.maxMarks || 0;
                                                 const normalized = max > 0 ? (mark.score / max) * 10 : 0;
                                                 return (
-                                                    <tr key={mark.id} className="hover:bg-app-surface/50 transition-colors">
+                                                    <tr key={mark.id} className="hover:bg-neutral-50/50/50 transition-colors">
                                                         <td className="px-6 py-4 font-medium text-app-text">{mark.test.name}</td>
                                                         <td className="px-6 py-4 text-app-text-secondary text-sm">{new Date(mark.test.date).toLocaleDateString()}</td>
                                                         <td className="px-6 py-4 text-center text-app-text">{mark.score}</td>
@@ -1351,7 +1535,7 @@ export default function BatchDetails() {
                                             )}
                                         </tbody>
                                         {viewMarks.marks && viewMarks.marks.length > 0 && (
-                                            <tfoot className="bg-app-surface border-t border-app-border">
+                                            <tfoot className="bg-neutral-50/50 border-t border-black/5">
                                                 <tr>
                                                     <td colSpan={4} className="px-6 py-4 text-sm font-bold text-app-text text-right">Average Normalized Score</td>
                                                     <td className="px-6 py-4 text-right font-mono font-bold text-xl text-app-text">
@@ -1385,14 +1569,14 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border border-app-border rounded-[24px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
+                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
                             >
                                 <div className="flex justify-between items-center mb-8">
                                     <div>
                                         <h3 className="text-xl font-bold text-app-text">Invite Student</h3>
                                         <p className="text-sm text-app-text-tertiary">Send a secure registration link via WhatsApp.</p>
                                     </div>
-                                    <button onClick={() => setShowAddStudent(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                    <button onClick={() => setShowAddStudent(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                                 </div>
 
                                 <form onSubmit={handleAddStudent} className="grid grid-cols-1 gap-6">
@@ -1414,7 +1598,7 @@ export default function BatchDetails() {
                                                         const val = e.target.value.replace(/\D/g, '');
                                                         if (val.length <= 10) setNewWhatsapp(val);
                                                     }}
-                                                    className="w-full !bg-neutral-50 border border-app-border rounded-xl pl-10 pr-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                    className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                     required
                                                     autoFocus
                                                     placeholder="10-digit Number"
@@ -1455,7 +1639,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border border-app-border rounded-[24px] p-8 max-w-md w-full shadow-2xl relative z-10"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-8 max-w-md w-full shadow-2xl relative z-10"
                         >
                             <div className="flex justify-between items-start mb-6">
                                 <div>
@@ -1467,7 +1651,7 @@ export default function BatchDetails() {
                                         This will permanently remove <span className="font-bold text-app-text">{studentToDelete.name}</span> and all their data including fees and marks.
                                     </p>
                                 </div>
-                                <button onClick={() => setStudentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                <button onClick={() => setStudentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                             </div>
 
                             <form onSubmit={confirmDeleteStudent} className="space-y-4">
@@ -1478,7 +1662,7 @@ export default function BatchDetails() {
                                     <input
                                         value={deleteInput}
                                         onChange={(e) => setDeleteInput(e.target.value)}
-                                        className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all placeholder:text-app-text-tertiary/50"
                                         placeholder="Type 'delete'"
                                         autoFocus
                                     />
@@ -1488,7 +1672,7 @@ export default function BatchDetails() {
                                     <button
                                         type="button"
                                         onClick={() => setStudentToDelete(null)}
-                                        className="flex-1 py-3 rounded-xl font-bold bg-app-surface border border-app-border text-app-text hover:bg-app-surface-hover transition-colors"
+                                        className="flex-1 py-3 rounded-xl font-bold bg-neutral-50/50 border-[1.5px] border-black/5 text-app-text hover:bg-neutral-50/50-hover transition-colors"
                                     >
                                         Cancel
                                     </button>
@@ -1521,11 +1705,11 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border border-app-border rounded-[24px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10"
+                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10"
                             >
                                 <div className="flex justify-between items-center mb-8">
                                     <h3 className="text-xl font-bold text-app-text">Edit Batch Details</h3>
-                                    <button onClick={() => setShowEditBatch(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                    <button onClick={() => setShowEditBatch(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                                 </div>
 
                                 <form onSubmit={handleUpdateBatch} className="space-y-5">
@@ -1534,7 +1718,7 @@ export default function BatchDetails() {
                                         <input
                                             value={editBatchData.name}
                                             onChange={(e) => setEditBatchData({ ...editBatchData, name: e.target.value })}
-                                            className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                             required
                                         />
                                     </div>
@@ -1544,7 +1728,7 @@ export default function BatchDetails() {
                                             <input
                                                 value={editBatchData.className}
                                                 onChange={(e) => setEditBatchData({ ...editBatchData, className: e.target.value })}
-                                                className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -1552,7 +1736,7 @@ export default function BatchDetails() {
                                             <input
                                                 value={editBatchData.timeSlot}
                                                 onChange={(e) => setEditBatchData({ ...editBatchData, timeSlot: e.target.value })}
-                                                className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                                 placeholder="e.g. 10:00 AM"
                                             />
                                         </div>
@@ -1590,11 +1774,11 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border border-app-border rounded-[24px] p-5 md:p-8 max-w-md w-full shadow-2xl relative z-10"
+                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-5 md:p-8 max-w-md w-full shadow-2xl relative z-10"
                             >
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-xl font-bold text-app-text">WhatsApp Group Link</h3>
-                                    <button onClick={() => setShowWhatsAppModal(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                    <button onClick={() => setShowWhatsAppModal(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                                 </div>
 
                                 <form onSubmit={handleUpdateWhatsappLink} className="space-y-5">
@@ -1603,7 +1787,7 @@ export default function BatchDetails() {
                                         <input
                                             value={whatsappLinkInput}
                                             onChange={(e) => setWhatsappLinkInput(e.target.value)}
-                                            className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                             placeholder="https://chat.whatsapp.com/..."
                                             autoFocus
                                         />
@@ -1612,7 +1796,7 @@ export default function BatchDetails() {
                                         </p>
                                     </div>
 
-                                    <div className="flex items-center justify-between p-4 bg-app-surface rounded-xl border border-app-border">
+                                    <div className="flex items-center justify-between p-4 bg-neutral-50/50 rounded-xl border-[1.5px] border-black/5">
                                         <div className="space-y-0.5">
                                             <label className="text-sm font-bold text-app-text">Auto-Send Invites</label>
                                             <p className="text-xs text-app-text-tertiary w-11/12">Automatically send WhatsApp & Email invites to new students.</p>
@@ -1666,18 +1850,18 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border border-app-border rounded-[24px] p-6 md:p-8 max-w-md w-full shadow-2xl relative z-10 flex flex-col max-h-[90vh]"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 md:p-8 max-w-md w-full shadow-2xl relative z-10 flex flex-col max-h-[90vh]"
                         >
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-app-text">Fee Columns</h3>
-                                <button onClick={() => setShowManageInstallments(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                <button onClick={() => setShowManageInstallments(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                             </div>
 
                             <div className="overflow-y-auto pr-2 mb-6 flex-1 min-h-[150px]">
-                                {batch?.feeInstallments && batch.feeInstallments.length > 0 ? (
+                                {batch?.feeInstallments && batch.feeInstallments.filter(i => !i.studentId).length > 0 ? (
                                     <div className="space-y-3">
-                                        {[...batch.feeInstallments].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map(inst => (
-                                            <div key={inst.id} className="flex justify-between items-center p-4 rounded-xl border border-app-border bg-app-surface group">
+                                        {[...batch.feeInstallments].filter(i => !i.studentId).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map(inst => (
+                                            <div key={inst.id} className="flex justify-between items-center p-4 rounded-xl border-[1.5px] border-black/5 bg-neutral-50/50 group">
                                                 <div className="flex flex-col">
                                                     <span className="font-bold text-app-text">{inst.name}</span>
                                                     <span className="text-xs text-app-text-tertiary uppercase tracking-wider">Amount: ₹{inst.amount}</span>
@@ -1700,7 +1884,7 @@ export default function BatchDetails() {
                                 )}
                             </div>
 
-                            <div className="flex justify-end pt-4 border-t border-app-border">
+                            <div className="flex justify-end pt-4 border-t border-black/5">
                                 <button
                                     onClick={() => { setShowManageInstallments(false); setShowAddInstallment(true); }}
                                     className="bg-neutral-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98]"
@@ -1729,11 +1913,11 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border border-app-border rounded-[24px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
+                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
                             >
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-xl font-bold text-app-text">Add Fee Installment</h3>
-                                    <button onClick={() => setShowAddInstallment(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                    <button onClick={() => setShowAddInstallment(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                                 </div>
 
                                 <form onSubmit={handleAddInstallment} className="space-y-4">
@@ -1742,7 +1926,7 @@ export default function BatchDetails() {
                                         <input
                                             value={newInstallment.name}
                                             onChange={(e) => setNewInstallment({ ...newInstallment, name: e.target.value })}
-                                            className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                             placeholder="e.g. Jan-Mar 2024"
                                             required
                                         />
@@ -1754,7 +1938,7 @@ export default function BatchDetails() {
                                             inputMode="numeric"
                                             value={newInstallment.amount}
                                             onChange={(e) => setNewInstallment({ ...newInstallment, amount: e.target.value })}
-                                            className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                             required
                                         />
                                     </div>
@@ -1791,11 +1975,11 @@ export default function BatchDetails() {
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border border-app-border rounded-[24px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
+                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
                             >
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-xl font-bold text-app-text">Edit Fee Column</h3>
-                                    <button onClick={() => setEditingInstallment(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                    <button onClick={() => setEditingInstallment(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                                 </div>
 
                                 <form onSubmit={handleUpdateInstallment} className="space-y-4">
@@ -1804,7 +1988,7 @@ export default function BatchDetails() {
                                         <input
                                             value={editingInstallment.name}
                                             onChange={(e) => setEditingInstallment({ ...editingInstallment, name: e.target.value })}
-                                            className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                             required
                                         />
                                     </div>
@@ -1815,7 +1999,7 @@ export default function BatchDetails() {
                                             inputMode="numeric"
                                             value={editingInstallment.amount}
                                             onChange={(e) => setEditingInstallment({ ...editingInstallment, amount: Number(e.target.value) })}
-                                            className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                             required
                                         />
                                     </div>
@@ -1850,7 +2034,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border border-app-border rounded-[24px] p-8 max-w-md w-full shadow-2xl relative z-10"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-8 max-w-md w-full shadow-2xl relative z-10"
                         >
                             <div className="flex justify-between items-start mb-6">
                                 <div>
@@ -1862,14 +2046,14 @@ export default function BatchDetails() {
                                         Are you sure you want to delete <span className="font-bold text-app-text">{installmentToDelete.name}</span>? This will permanently remove it.
                                     </p>
                                 </div>
-                                <button onClick={() => setInstallmentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-app-surface"><X className="w-5 h-5" /></button>
+                                <button onClick={() => setInstallmentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                             </div>
 
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
                                     onClick={() => setInstallmentToDelete(null)}
-                                    className="flex-1 py-3 rounded-xl font-bold bg-app-surface border border-app-border text-app-text hover:bg-app-surface-hover transition-colors"
+                                    className="flex-1 py-3 rounded-xl font-bold bg-neutral-50/50 border-[1.5px] border-black/5 text-app-text hover:bg-neutral-50/50-hover transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -1900,10 +2084,10 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border border-app-border rounded-[24px] p-0 max-w-sm w-full shadow-2xl relative z-10 overflow-hidden"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-0 max-w-sm w-full shadow-2xl relative z-10 overflow-hidden"
                         >
                             {/* Header */}
-                            <div className="p-6 border-b border-app-border flex justify-between items-start bg-app-surface-opaque">
+                            <div className="p-6 border-b border-black/5 flex justify-between items-start bg-neutral-50/50-opaque">
                                 <div>
                                     <h3 className="text-lg font-bold text-app-text">{paymentModal.student.name}</h3>
                                     <div className="flex flex-col mt-1">
@@ -1911,7 +2095,7 @@ export default function BatchDetails() {
                                         <span className="text-app-text font-medium">{paymentModal.installment.name}</span>
                                     </div>
                                 </div>
-                                <div className="bg-app-surface border border-app-border px-3 py-1.5 rounded-lg">
+                                <div className="bg-neutral-50/50 border-[1.5px] border-black/5 px-3 py-1.5 rounded-lg">
                                     <span className="text-lg font-bold text-app-text">₹{paymentModal.installment.amount}</span>
                                 </div>
                             </div>
@@ -1928,7 +2112,7 @@ export default function BatchDetails() {
                                                     type="date"
                                                     value={paymentModal.date}
                                                     onChange={(e) => setPaymentModal({ ...paymentModal, date: e.target.value })}
-                                                    className="w-full !bg-neutral-50 border border-app-border rounded-xl pl-10 pr-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
+                                                    className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-3 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
                                                     required
                                                 />
                                             </div>
@@ -1939,7 +2123,7 @@ export default function BatchDetails() {
                                         <button
                                             type="button"
                                             onClick={() => setPaymentModal(null)}
-                                            className="px-4 py-3 rounded-xl bg-app-bg hover:bg-app-border text-danger font-bold text-sm transition-colors border border-neutral-900  hover:border-danger/10"
+                                            className="px-4 py-3 rounded-xl bg-white hover:bg-app-border text-danger font-bold text-sm transition-colors border border-neutral-900  hover:border-danger/10"
                                         >
                                             Deny
                                         </button>
@@ -1976,7 +2160,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 10 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                            className="bg-white border border-neutral-200 rounded-[24px] p-6 max-w-xs w-full shadow-2xl relative z-10 flex flex-col items-center text-center font-sans"
+                            className="bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 max-w-xs w-full shadow-2xl relative z-10 flex flex-col items-center text-center font-sans"
                         >
                             <div className="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4 border border-green-200">
                                 <span className="text-2xl">✓</span>
@@ -2052,7 +2236,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border border-app-border rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
                         >
                             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
                                 <Trash2 className="w-8 h-8" />
@@ -2064,7 +2248,7 @@ export default function BatchDetails() {
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setShowCloseConfirm(false)}
-                                    className="flex-1 py-3 rounded-xl font-bold bg-app-surface border border-app-border text-app-text hover:bg-app-surface-hover transition-colors"
+                                    className="flex-1 py-3 rounded-xl font-bold bg-neutral-50/50 border-[1.5px] border-black/5 text-app-text hover:bg-neutral-50/50-hover transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -2095,7 +2279,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border border-app-border rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
                         >
                             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
                                 <Trash2 className="w-8 h-8" />
@@ -2110,7 +2294,7 @@ export default function BatchDetails() {
                             <input
                                 value={deleteCodeInput}
                                 onChange={(e) => setDeleteCodeInput(e.target.value)}
-                                className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-center text-app-text font-mono tracking-widest text-lg focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none mb-6"
+                                className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-center text-app-text font-mono tracking-widest text-lg focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none mb-6"
                                 placeholder="0000"
                                 autoFocus
                             />
@@ -2118,7 +2302,7 @@ export default function BatchDetails() {
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setShowDeleteConfirm(false)}
-                                    className="flex-1 py-3 rounded-xl font-bold bg-app-surface border border-app-border text-app-text hover:bg-app-surface-hover transition-colors"
+                                    className="flex-1 py-3 rounded-xl font-bold bg-neutral-50/50 border-[1.5px] border-black/5 text-app-text hover:bg-neutral-50/50-hover transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -2149,7 +2333,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border border-app-border rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
                         >
                             <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                 {sendingState.completed ? (
@@ -2168,7 +2352,7 @@ export default function BatchDetails() {
                             </p>
 
                             {/* Progress Bar */}
-                            <div className="w-full bg-app-surface border border-app-border rounded-full h-3 mb-6 overflow-hidden relative">
+                            <div className="w-full bg-neutral-50/50 border-[1.5px] border-black/5 rounded-full h-3 mb-6 overflow-hidden relative">
                                 <motion.div
                                     className="h-full bg-blue-500"
                                     initial={{ width: 0 }}
@@ -2187,6 +2371,96 @@ export default function BatchDetails() {
                             ) : (
                                 <p className="text-xs text-app-text-tertiary">Please do not close this window.</p>
                             )}
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Custom Invoice Modal */}
+            <AnimatePresence>
+                {showCustomInvoice && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-md"
+                            onClick={() => setShowCustomInvoice(null)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
+                        >
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="text-xl font-bold text-app-text">Custom Invoice</h3>
+                                    <p className="text-sm text-app-text-tertiary mt-1">For <span className="font-bold text-app-text">{showCustomInvoice.name}</span></p>
+                                </div>
+                                <button onClick={() => setShowCustomInvoice(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
+                            </div>
+
+                            <form onSubmit={handleCreateCustomInvoice} className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Invoice Name</label>
+                                    <input
+                                        value={customInvoice.name}
+                                        onChange={(e) => setCustomInvoice({ ...customInvoice, name: e.target.value })}
+                                        className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                        placeholder="e.g. April-May Fee, Registration"
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Amount (₹)</label>
+                                    <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={customInvoice.amount}
+                                        onChange={(e) => setCustomInvoice({ ...customInvoice, amount: e.target.value })}
+                                        className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                        placeholder="0"
+                                        required
+                                        min="1"
+                                    />
+                                </div>
+
+                                {/* Mark as Paid Toggle */}
+                                <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-xl border-[1.5px] border-black/5">
+                                    <div>
+                                        <p className="text-sm font-bold text-app-text">Mark as Paid</p>
+                                        <p className="text-xs text-app-text-tertiary mt-0.5">Instantly log payment for this invoice</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCustomInvoice({ ...customInvoice, markAsPaid: !customInvoice.markAsPaid })}
+                                        className={cn(
+                                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                                            customInvoice.markAsPaid ? "bg-green-500" : "bg-gray-300"
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                                                customInvoice.markAsPaid ? "translate-x-6" : "translate-x-1"
+                                            )}
+                                        />
+                                    </button>
+                                </div>
+
+                                <div className="flex justify-end pt-4">
+                                    <button
+                                        type="submit"
+                                        className="bg-neutral-900 hover:bg-black text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center gap-2"
+                                    >
+                                        <Receipt className="w-4 h-4" />
+                                        {customInvoice.markAsPaid ? 'Create & Mark Paid' : 'Create Invoice'}
+                                    </button>
+                                </div>
+                                <div className="h-4 md:hidden"></div>
+                            </form>
                         </motion.div>
                     </div>
                 )}
