@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Loader, X, TrendingUp, TrendingDown, IndianRupee, Mail, History, CheckCircle, Download, ArrowUpRight, FileText, ArrowUpDown, ChevronDown, Check } from 'lucide-react';
+import { Search, Loader, X, TrendingUp, TrendingDown, IndianRupee, Mail, History, CheckCircle, Download, ArrowUpRight, FileText, ArrowUpDown, ChevronDown, Check, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../utils/cn';
 import UpiVerificationList from '../components/UpiVerificationList';
@@ -36,6 +36,21 @@ interface Transaction {
     type: string;
 }
 
+interface CustomInvoice {
+    id: string;
+    name: string;
+    amount: number;
+    createdAt: string;
+    studentId: string;
+    studentName: string;
+    studentHumanId: string | null;
+    batchId: string | null;
+    batchName: string;
+    totalPaid: number;
+    isPaid: boolean;
+    lastPaymentDate: string | null;
+}
+
 const Fees: React.FC = () => {
     const [students, setStudents] = useState<FeeSummary[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -49,7 +64,7 @@ const Fees: React.FC = () => {
     }, [searchTerm]);
 
     const [selectedBatch, setSelectedBatch] = useState('All');
-    const [viewMode, setViewMode] = useState<'defaulters' | 'recent' | 'upi'>('defaulters'); // Default to defaulters
+    const [viewMode, setViewMode] = useState<'defaulters' | 'recent' | 'upi' | 'custom'>('defaulters');
 
     const [selectedStudent, setSelectedStudent] = useState<FeeSummary | null>(null);
     const [paymentAmount, setPaymentAmount] = useState('');
@@ -72,7 +87,19 @@ const Fees: React.FC = () => {
     useEffect(() => {
         fetchFees();
         fetchTransactions();
+        fetchCustomInvoices();
     }, []);
+
+    const [customInvoices, setCustomInvoices] = useState<CustomInvoice[]>([]);
+
+    const fetchCustomInvoices = async () => {
+        try {
+            const data = await api.get<CustomInvoice[]>(`/fees/custom-invoices?t=${Date.now()}`);
+            setCustomInvoices(data);
+        } catch {
+            // Silently fail — tab will show empty state
+        }
+    };
 
     const fetchFees = async () => {
         try {
@@ -184,29 +211,29 @@ const Fees: React.FC = () => {
             */}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <div className="bg-white p-6 rounded-[24px] shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="bg-white p-6 md:p-8 border-[1.5px] border-black/5 rounded-[32px] shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
                     <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:scale-110 transition-transform">
                         <TrendingUp className="w-24 h-24" />
                     </div>
-                    <div className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Total Collected</div>
+                    <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Total Collected</div>
                     <div className="text-3xl font-black text-gray-800">₹{stats.totalCollected.toLocaleString()}</div>
                     <div className="h-1 w-12 bg-green-500 rounded-full mt-4"></div>
                 </div>
 
-                <div className="bg-white p-6 rounded-[24px] shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="bg-white p-6 md:p-8 border-[1.5px] border-black/5 rounded-[32px] shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
                     <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:scale-110 transition-transform">
                         <TrendingDown className="w-24 h-24" />
                     </div>
-                    <div className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Outstanding Dues</div>
+                    <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Outstanding Dues</div>
                     <div className="text-3xl font-black text-red-500">₹{stats.totalDue.toLocaleString()}</div>
                     <div className="h-1 w-12 bg-red-500 rounded-full mt-4"></div>
                 </div>
 
-                <div className="bg-white p-6 rounded-[24px] shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="bg-white p-6 md:p-8 border-[1.5px] border-black/5 rounded-[32px] shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
                     <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:scale-110 transition-transform">
                         <IndianRupee className="w-24 h-24" />
                     </div>
-                    <div className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Collection Rate</div>
+                    <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Collection Rate</div>
                     <div className="text-3xl font-black text-blue-600">{stats.collectionRate}%</div>
                     <div className="h-1 w-12 bg-blue-500 rounded-full mt-4"></div>
                 </div>
@@ -217,9 +244,9 @@ const Fees: React.FC = () => {
                 <div className="space-y-6">
 
                     {/* Toolbar */}
-                    <div className="bg-white p-4 rounded-[24px] shadow-sm flex flex-col gap-4">
+                    <div className="bg-white p-5 md:p-6 border-[1.5px] border-black/5 rounded-[32px] shadow-sm flex flex-col gap-4">
                         {/* View Toggle */}
-                        <div className="flex flex-wrap bg-gray-100 p-1 rounded-2xl w-full">
+                        <div className="flex flex-wrap bg-neutral-100/80 border border-black/5 p-1.5 rounded-[20px] w-full">
                             <button
                                 onClick={() => setViewMode('defaulters')}
                                 className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'defaulters' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
@@ -238,6 +265,17 @@ const Fees: React.FC = () => {
                             >
                                 UPI Approvals
                             </button>
+                            <button
+                                onClick={() => setViewMode('custom')}
+                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'custom' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                            >
+                                Custom Invoices
+                                {customInvoices.length > 0 && (
+                                    <span className={cn("ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold", viewMode === 'custom' ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-500")}>
+                                        {customInvoices.length}
+                                    </span>
+                                )}
+                            </button>
                         </div>
 
                         {/* Search & Filter */}
@@ -247,7 +285,7 @@ const Fees: React.FC = () => {
                                 <input
                                     type="text"
                                     placeholder="Search student..."
-                                    className="w-full bg-gray-50 border-transparent focus:bg-white border focus:border-blue-500 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none transition-all"
+                                    className="w-full bg-white border-2 border-transparent focus:border-black/10 rounded-2xl shadow-sm pl-9 pr-4 py-2.5 text-sm outline-none transition-all"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -256,7 +294,7 @@ const Fees: React.FC = () => {
                                 <div className="relative flex-1 md:flex-none">
                                     <button
                                         onClick={() => setShowBatchMenu(!showBatchMenu)}
-                                        className="w-full md:w-48 bg-gray-50 border border-transparent hover:bg-white hover:border-blue-200 focus:bg-white focus:border-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 outline-none transition-all flex items-center justify-between gap-2"
+                                        className="w-full md:w-48 bg-white border-[1.5px] border-black/5 hover:border-black/10 focus:border-black/20 rounded-2xl shadow-sm px-4 py-2.5 text-sm font-medium text-gray-600 outline-none transition-all flex items-center justify-between gap-2"
                                     >
                                         <span className="truncate">{selectedBatch === 'All' ? 'All Batches' : selectedBatch}</span>
                                         <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform", showBatchMenu && "rotate-180")} />
@@ -265,7 +303,7 @@ const Fees: React.FC = () => {
                                     {showBatchMenu && (
                                         <>
                                             <div className="fixed inset-0 z-10" onClick={() => setShowBatchMenu(false)}></div>
-                                            <div className="absolute left-0 top-full mt-2 w-full md:w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-20 max-h-64 overflow-y-auto custom-scrollbar">
+                                            <div className="absolute left-0 top-full mt-2 w-full md:w-56 bg-white rounded-xl shadow-xl border border-black/5 p-1 z-20 max-h-64 overflow-y-auto custom-scrollbar">
                                                 <button
                                                     onClick={() => { setSelectedBatch('All'); setShowBatchMenu(false); }}
                                                     className={cn("w-full text-left px-3 py-2 rounded-lg text-sm font-medium flex justify-between items-center transition-colors", selectedBatch === 'All' ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
@@ -299,8 +337,8 @@ const Fees: React.FC = () => {
                                     {showSortMenu && (
                                         <>
                                             <div className="fixed inset-0 z-10" onClick={() => setShowSortMenu(false)}></div>
-                                            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-20">
-                                                <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Sort List By</div>
+                                            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-black/5 p-1 z-20">
+                                                <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-widest">Sort List By</div>
                                                 <button
                                                     onClick={() => { setListSort('amount'); setShowSortMenu(false); }}
                                                     className={cn("w-full text-left px-3 py-2 rounded-lg text-sm font-bold flex justify-between items-center", listSort === 'amount' ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
@@ -331,7 +369,7 @@ const Fees: React.FC = () => {
                     </div>
 
                     {viewMode === 'recent' ? (
-                        <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-gray-100 p-6 md:p-8">
+                        <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-black/5 p-6 md:p-8">
                             <div className="flex items-center justify-between mb-8">
                                 <h3 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
                                     <History className="w-5 h-5 text-gray-500" /> Recent Transactions
@@ -342,7 +380,7 @@ const Fees: React.FC = () => {
                                     <div className="text-center text-gray-400 text-sm py-10">No recent transactions</div>
                                 ) : (
                                     filteredTransactions.map(tx => (
-                                        <div key={tx.id} className="group flex items-start justify-between p-5 rounded-2xl hover:bg-gray-50 transition-colors border border-gray-100/80 hover:border-gray-200">
+                                        <div key={tx.id} className="group flex items-start justify-between p-5 rounded-2xl hover:bg-gray-50 transition-colors border border-black/5/80 hover:border-gray-200">
                                             <div className="flex gap-4">
                                                 <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0">
                                                     {tx.studentName.charAt(0)}
@@ -363,7 +401,7 @@ const Fees: React.FC = () => {
                             </div>
                         </div>
                     ) : viewMode === 'defaulters' ? (
-                    <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-gray-100">
+                    <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-black/5">
                         {loading ? (
                             <div className="flex flex-col items-center justify-center h-96 text-gray-400">
                                 <Loader className="w-8 h-8 animate-spin mb-4 text-blue-500" />
@@ -372,7 +410,7 @@ const Fees: React.FC = () => {
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
-                                    <thead className="bg-gray-50/50 border-b border-gray-100">
+                                    <thead className="bg-gray-50/50 border-b border-black/5">
                                         <tr>
                                             <th className="p-5 pl-8 font-bold text-gray-400 text-xs uppercase tracking-wider">Student Details</th>
                                             <th className="p-5 font-bold text-gray-400 text-xs uppercase tracking-wider text-right">Balance</th>
@@ -457,11 +495,74 @@ const Fees: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    ) : (
-                        <div className="bg-white rounded-[24px] shadow-sm min-h-[500px] border border-gray-100">
+                    ) : viewMode === 'upi' ? (
+                        <div className="bg-white rounded-[24px] shadow-sm min-h-[500px] border border-black/5">
                             <UpiVerificationList />
                         </div>
-                    )}
+                    ) : viewMode === 'custom' ? (
+                        <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-black/5 p-6 md:p-8">
+                            <div className="flex items-center justify-between mb-8">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
+                                    <Receipt className="w-5 h-5 text-amber-500" /> Custom Invoices
+                                </h3>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2 text-xs font-bold">
+                                        <span className="flex items-center gap-1 text-green-600"><CheckCircle className="w-3 h-3" /> {customInvoices.filter(i => i.isPaid).length} Paid</span>
+                                        <span className="text-gray-300">|</span>
+                                        <span className="text-red-500">{customInvoices.filter(i => !i.isPaid).length} Pending</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="space-y-3">
+                                {customInvoices.length === 0 ? (
+                                    <div className="text-center text-gray-400 text-sm py-16 flex flex-col items-center gap-3">
+                                        <Receipt className="w-10 h-10 opacity-20" />
+                                        <p>No custom invoices yet.</p>
+                                        <p className="text-xs text-gray-300">Create one from any student's action menu in their batch.</p>
+                                    </div>
+                                ) : (
+                                    customInvoices.map(inv => (
+                                        <div key={inv.id} className="group flex items-start justify-between p-5 rounded-2xl hover:bg-gray-50 transition-colors border border-black/5/80 hover:border-gray-200">
+                                            <div className="flex gap-4">
+                                                <div className={cn(
+                                                    "w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg shrink-0",
+                                                    inv.isPaid ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"
+                                                )}>
+                                                    {inv.isPaid ? <CheckCircle className="w-5 h-5" /> : <Receipt className="w-5 h-5" />}
+                                                </div>
+                                                <div>
+                                                    <div className="text-base font-bold text-gray-800">{inv.name}</div>
+                                                    <div className="text-xs text-gray-500 mt-0.5 font-medium">
+                                                        {inv.studentName} {inv.studentHumanId && <span className="text-gray-400">({inv.studentHumanId})</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-1.5">
+                                                        <span className="text-[11px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md font-medium">{inv.batchName}</span>
+                                                        <span className="text-[11px] text-gray-400">{new Date(inv.createdAt).toLocaleDateString()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right flex flex-col items-end">
+                                                <div className={cn("text-lg font-bold font-mono", inv.isPaid ? "text-green-600" : "text-red-500")}>
+                                                    ₹{inv.amount.toLocaleString()}
+                                                </div>
+                                                <div className={cn(
+                                                    "text-[10px] font-bold mt-1.5 px-2 py-0.5 rounded-full",
+                                                    inv.isPaid ? "bg-green-50 text-green-600 border border-green-100" : "bg-red-50 text-red-500 border border-red-100"
+                                                )}>
+                                                    {inv.isPaid ? 'PAID' : 'UNPAID'}
+                                                </div>
+                                                {inv.lastPaymentDate && (
+                                                    <div className="text-[10px] text-gray-400 mt-1">
+                                                        Paid {new Date(inv.lastPaymentDate).toLocaleDateString()}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </div>
 
@@ -492,7 +593,7 @@ const Fees: React.FC = () => {
                             <h2 className="text-2xl font-black mb-1 text-gray-900">Record Payment</h2>
                             <p className="text-sm text-gray-500 mb-8">Enter amount received from parent.</p>
 
-                            <div className="bg-gray-50 p-6 rounded-2xl mb-8 border border-gray-100">
+                            <div className="bg-gray-50 p-6 rounded-2xl mb-8 border border-black/5">
                                 <div className="flex justify-between mb-3 items-center">
                                     <span className="text-sm text-gray-500 font-medium">Student</span>
                                     <span className="text-sm font-bold text-gray-900">{selectedStudent.name}</span>
@@ -505,7 +606,7 @@ const Fees: React.FC = () => {
 
                                 {selectedStudent.breakdown && selectedStudent.breakdown.length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-gray-200">
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Pending Payments:</p>
+                                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Pending Payments:</p>
                                         <div className="space-y-1">
                                             {selectedStudent.breakdown.map((item, i) => (
                                                 <div key={i} className="flex justify-between text-sm">
@@ -573,7 +674,7 @@ const Fees: React.FC = () => {
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-0 overflow-visible relative z-10"
                         >
-                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <div className="p-6 border-b border-black/5 flex justify-between items-center bg-gray-50/50">
                                 <div>
                                     <h2 className="text-xl font-black text-gray-900">Download Reports</h2>
                                     <p className="text-xs text-gray-500 font-medium">Select a report to generate</p>
@@ -588,7 +689,7 @@ const Fees: React.FC = () => {
 
                             <div className="p-6 space-y-4">
                                 {/* Defaulters Option */}
-                                <div className="p-4 rounded-2xl border border-gray-100 hover:border-red-200 hover:bg-red-50/30 transition-all group">
+                                <div className="p-4 rounded-2xl border border-black/5 hover:border-red-200 hover:bg-red-50/30 transition-all group">
                                     <div className="flex justify-between items-start mb-3">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
@@ -615,7 +716,7 @@ const Fees: React.FC = () => {
                                             {showReportBatchMenu && (
                                                 <>
                                                     <div className="fixed inset-0 z-20" onClick={() => setShowReportBatchMenu(false)}></div>
-                                                    <div className="absolute left-0 top-full mt-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-30 max-h-48 overflow-y-auto custom-scrollbar">
+                                                    <div className="absolute left-0 top-full mt-1 w-full bg-white rounded-xl shadow-xl border border-black/5 p-1 z-30 max-h-48 overflow-y-auto custom-scrollbar">
                                                         <button
                                                             onClick={() => { setReportBatch('All'); setShowReportBatchMenu(false); }}
                                                             className={cn("w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold flex justify-between items-center", reportBatch === 'All' ? "bg-red-50 text-red-600" : "text-gray-700 hover:bg-gray-50")}
@@ -651,7 +752,7 @@ const Fees: React.FC = () => {
                                             {showReportSortMenu && (
                                                 <>
                                                     <div className="fixed inset-0 z-20" onClick={() => setShowReportSortMenu(false)}></div>
-                                                    <div className="absolute right-0 top-full mt-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-30">
+                                                    <div className="absolute right-0 top-full mt-1 w-full bg-white rounded-xl shadow-xl border border-black/5 p-1 z-30">
                                                         <button
                                                             onClick={() => { setReportSort('amount'); setShowReportSortMenu(false); }}
                                                             className={cn("w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold flex justify-between items-center", reportSort === 'amount' ? "bg-red-50 text-red-600" : "text-gray-700 hover:bg-gray-50")}
@@ -701,7 +802,7 @@ const Fees: React.FC = () => {
                                 </div>
 
                                 {/* Monthly Statement Option */}
-                                <div className="p-4 rounded-2xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all group">
+                                <div className="p-4 rounded-2xl border border-black/5 hover:border-blue-200 hover:bg-blue-50/30 transition-all group">
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
@@ -728,7 +829,7 @@ const Fees: React.FC = () => {
                                             {showMonthMenu && (
                                                 <>
                                                     <div className="fixed inset-0 z-20" onClick={() => setShowMonthMenu(false)}></div>
-                                                    <div className="absolute left-0 bottom-full mb-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-30 max-h-48 overflow-y-auto custom-scrollbar">
+                                                    <div className="absolute left-0 bottom-full mb-1 w-full bg-white rounded-xl shadow-xl border border-black/5 p-1 z-30 max-h-48 overflow-y-auto custom-scrollbar">
                                                         {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                                                             <button
                                                                 key={m}
@@ -757,7 +858,7 @@ const Fees: React.FC = () => {
                                             {showYearMenu && (
                                                 <>
                                                     <div className="fixed inset-0 z-20" onClick={() => setShowYearMenu(false)}></div>
-                                                    <div className="absolute right-0 bottom-full mb-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 p-1 z-30">
+                                                    <div className="absolute right-0 bottom-full mb-1 w-full bg-white rounded-xl shadow-xl border border-black/5 p-1 z-30">
                                                         {[2023, 2024, 2025, 2026].map(y => (
                                                             <button
                                                                 key={y}

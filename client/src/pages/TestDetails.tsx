@@ -444,7 +444,7 @@ export default function TestDetails() {
                             exit={{ opacity: 0, scale: 0.95, y: 10 }}
                             className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 overflow-hidden"
                         >
-                            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <div className="px-6 py-4 border-b border-black/5 flex justify-between items-center bg-gray-50/50">
                                 <h3 className="font-bold text-lg text-gray-800">Edit Test</h3>
                                 <button onClick={() => setShowEdit(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
                                     <X className="w-5 h-5 text-gray-500" />
@@ -571,7 +571,7 @@ export default function TestDetails() {
                             exit={{ opacity: 0, scale: 0.95, y: 10 }}
                             className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 overflow-hidden"
                         >
-                            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <div className="px-6 py-4 border-b border-black/5 flex justify-between items-center bg-gray-50/50">
                                 <h3 className="font-bold text-lg text-gray-800">Add Manual Result</h3>
                                 <button onClick={() => setShowAddResult(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
                                     <X className="w-5 h-5 text-gray-500" />

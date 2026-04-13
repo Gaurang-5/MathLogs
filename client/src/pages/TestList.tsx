@@ -86,7 +86,7 @@ export default function TestList() {
     const TestCard = ({ test }: { test: Test }) => (
         <div
             onClick={() => navigate(`/tests/${test.id}`)}
-            className="bg-app-surface border border-app-border rounded-[24px] p-6 hover:shadow-lg transition-all cursor-pointer group hover:border-app-text/20 relative overflow-hidden"
+            className="bg-app-surface border-[1.5px] border-black/5 rounded-[32px] p-6 hover:shadow-lg transition-all cursor-pointer group hover:border-app-text/20 relative overflow-hidden"
         >
             <div className="flex justify-between items-start mb-4">
                 <div className="p-3 bg-app-bg border border-app-border rounded-xl group-hover:bg-app-surface-hover transition-colors">
@@ -147,7 +147,7 @@ export default function TestList() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Batch</label>
+                                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-widest mb-2">Batch</label>
                                     <div className="relative">
                                         <select
                                             className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all appearance-none"
