@@ -174,11 +174,20 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
 
         const studentData = students.map(student => {
             const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
+            const paidInstallmentIds = new Set(student.feePayments.map(p => p.installmentId));
+            
             return {
                 studentId: student.id,
                 studentName: student.name,
                 batchName: student.batch?.name || 'N/A',
-                feeInstallments: (student.batch?.feeInstallments || []).filter(inst => new Date(inst.createdAt) >= studentJoinDate),
+                feeInstallments: (student.batch?.feeInstallments || []).filter(inst => {
+                    if (inst.studentId) {
+                        return inst.studentId === student.id;
+                    }
+                    const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
+                    const hasPayment = paidInstallmentIds.has(inst.id);
+                    return isAfterJoin || hasPayment;
+                }),
                 feePayments: student.feePayments || [],
                 feeRecords: student.fees || [],
                 pendingVerifications: student.upiPaymentVerifications || []
@@ -284,7 +293,15 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
             }
         } else {
             const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const installments = (student.batch?.feeInstallments || []).filter(inst => new Date(inst.createdAt) >= studentJoinDate);
+            const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
+            const installments = (student.batch?.feeInstallments || []).filter(inst => {
+                if (inst.studentId) {
+                    return inst.studentId === studentId;
+                }
+                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
+                const hasPayment = paidInstallmentIds.has(inst.id);
+                return isAfterJoin || hasPayment;
+            });
             const totalFee = installments.reduce((sum, inst) => sum + Number(inst.amount || 0), 0);
 
             const validInstallmentIds = new Set(installments.map(inst => inst.id));
