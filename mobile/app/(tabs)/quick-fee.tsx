@@ -24,6 +24,7 @@ interface StudentResult {
   id: string;
   name: string;
   humanId: string | null;
+  phone: string | null;
   batchName: string;
   totalFee: number;
   totalPaid: number;
@@ -52,7 +53,8 @@ export default function QuickFeeScreen() {
     const lowerSearch = search.toLowerCase();
     return students.filter(s => 
       s.name.toLowerCase().includes(lowerSearch) || 
-      (s.humanId && s.humanId.toLowerCase().includes(lowerSearch))
+      (s.humanId && s.humanId.toLowerCase().includes(lowerSearch)) ||
+      (s.phone && s.phone.includes(search.trim()))
     ).slice(0, 5); // top 5 results
   }, [search, students]);
 
@@ -108,7 +110,7 @@ export default function QuickFeeScreen() {
           <Animated.View entering={FadeInDown.duration(400)} style={s.headerArea}>
           <View style={s.iconWrap}><Zap size={32} color={T.white} fill={T.white} /></View>
           <Text style={s.title}>Quick Fee</Text>
-          <Text style={s.subtitle}>Search by name or ID to log payment</Text>
+          <Text style={s.subtitle}>Search by name, ID, or phone to log payment</Text>
         </Animated.View>
 
         {!student && !success && (
@@ -117,7 +119,7 @@ export default function QuickFeeScreen() {
               <Search size={22} color={T.textMuted} />
               <TextInput
                 style={s.searchInput}
-                placeholder="Student Name or ID (e.g., John or STD...)"
+                placeholder="Student Name, ID, or Phone..."
                 placeholderTextColor={T.textMuted}
                 value={search}
                 onChangeText={setSearch}

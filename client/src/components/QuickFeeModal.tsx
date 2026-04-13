@@ -13,6 +13,7 @@ interface Student {
     id: string;
     name: string;
     humanId: string | null;
+    phone: string | null;
     batchName: string;
     balance: number;
 }
@@ -54,7 +55,8 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
     const filteredStudents = search.trim()
         ? students.filter(s =>
             s.name.toLowerCase().includes(search.toLowerCase()) ||
-            (s.humanId && s.humanId.toLowerCase().includes(search.toLowerCase()))
+            (s.humanId && s.humanId.toLowerCase().includes(search.toLowerCase())) ||
+            (s.phone && s.phone.includes(search.trim()))
         ).slice(0, 5)
         : [];
 
@@ -120,7 +122,7 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
                                             <input
                                                 ref={inputRef}
                                                 type="text"
-                                                placeholder="Search by name or ID..."
+                                                placeholder="Search by name, ID, or phone..."
                                                 className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl pl-12 pr-4 py-3.5 outline-none transition-all font-medium"
                                                 value={search}
                                                 onChange={(e) => setSearch(e.target.value)}

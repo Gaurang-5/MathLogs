@@ -210,6 +210,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 id: true,
                 humanId: true,
                 name: true,
+                parentWhatsapp: true,
                 createdAt: true, // Needed for oldestDue fallback
                 batch: {
                     select: {
@@ -314,6 +315,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 id: student.id,
                 humanId: student.humanId,
                 name: student.name,
+                phone: student.parentWhatsapp,
                 batchName: student.batch?.name || 'N/A',
                 totalFee,
                 totalPaid,
