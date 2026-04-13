@@ -291,7 +291,7 @@ export default function TestDetails() {
                     <div className="flex gap-2 self-end md:self-auto shrink-0">
                         <button
                             onClick={handleDownloadReport}
-                            className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border border-app-border bg-white shadow-sm"
+                            className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border-[1.5px] border-black/5 bg-white shadow-sm"
                             title="Download Report"
                         >
                             <Download className="w-4 h-4" />
@@ -299,14 +299,14 @@ export default function TestDetails() {
                         <button
                             onClick={handleSendResults}
                             disabled={sendingResults}
-                            className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border border-app-border bg-white shadow-sm disabled:opacity-50"
+                            className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border-[1.5px] border-black/5 bg-white shadow-sm disabled:opacity-50"
                             title="Send Results via Email"
                         >
                             <Mail className="w-4 h-4" />
                         </button>
                         <button
                             onClick={handleOpenEdit}
-                            className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border border-app-border bg-white shadow-sm"
+                            className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border-[1.5px] border-black/5 bg-white shadow-sm"
                             title="Edit Test"
                         >
                             <Pencil className="w-4 h-4" />
@@ -362,7 +362,7 @@ export default function TestDetails() {
                             <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">{test.marks.length} Records</span>
                             <button
                                 onClick={handleOpenAddResult}
-                                className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border border-app-border bg-slate-50 flex items-center gap-2 text-sm font-bold"
+                                className="p-2 text-app-text hover:bg-black/5 rounded-lg transition-colors border-[1.5px] border-black/5 bg-neutral-50 hover:bg-neutral-100 flex items-center gap-2 text-sm font-bold"
                             >
                                 <Plus className="w-4 h-4" /> Add Manual
                             </button>

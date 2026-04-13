@@ -101,7 +101,7 @@ export default function TestList() {
             <h3 className="text-xl font-bold text-app-text mb-1 truncate">{test.name}</h3>
             <p className="text-app-text-secondary text-sm font-medium mb-4">{test.className ? `${test.className} • ` : ''}{test.subject}</p>
 
-            <div className="mt-4 pt-4 border-t border-app-border flex items-center text-xs font-bold text-app-text-secondary tracking-wide uppercase">
+            <div className="mt-4 pt-4 border-t border-black/5 flex items-center text-xs font-bold text-app-text-tertiary tracking-wide uppercase">
                 <Calendar className="w-4 h-4 mr-2" />
                 {new Date(test.date).toLocaleDateString()}
             </div>
@@ -114,7 +114,7 @@ export default function TestList() {
                 <p className="text-app-text-secondary">View and manage your tests and results.</p>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    className="bg-app-text text-app-bg hover:bg-app-text/90 border border-black  px-5 py-2.5 rounded-full font-semibold shadow-lg transition-all active:scale-95 flex items-center text-sm"
+                    className="bg-black text-white hover:bg-neutral-800 border-[1.5px] border-black/5 px-6 py-3 rounded-2xl font-bold shadow-lg shadow-black/10 transition-all active:scale-95 flex items-center text-sm"
                 >
                     {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
                     {showForm ? 'Cancel' : 'Create New Test'}
@@ -129,7 +129,7 @@ export default function TestList() {
                         exit={{ opacity: 0, height: 0 }}
                         className="overflow-hidden mb-8"
                     >
-                        <div className="bg-app-surface border border-app-border p-5 md:p-8 rounded-[24px] shadow-xl">
+                        <div className="bg-white border-[1.5px] border-black/5 p-6 md:p-8 rounded-[32px] shadow-sm">
                             <h3 className="font-semibold text-lg mb-8 text-app-text flex items-center">
                                 <span className="w-8 h-8 rounded-full bg-accent-subtle flex items-center justify-center mr-3 text-accent text-sm font-bold">01</span>
                                 Create New Test
@@ -138,7 +138,7 @@ export default function TestList() {
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-semibold text-app-text-secondary uppercase tracking-wider mb-2">Test Name</label>
                                     <input
-                                        className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
+                                        className="w-full !bg-neutral-50 border-[1.5px] border-black/5 text-app-text p-4 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-secondary/50"
                                         placeholder="e.g. Unit Test 1"
                                         value={name}
                                         onChange={e => setName(e.target.value)}
@@ -150,7 +150,7 @@ export default function TestList() {
                                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-widest mb-2">Batch</label>
                                     <div className="relative">
                                         <select
-                                            className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all appearance-none"
+                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 text-app-text p-4 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all appearance-none"
                                             value={selectedBatchId}
                                             onChange={e => setSelectedBatchId(e.target.value)}
                                             required
@@ -170,7 +170,7 @@ export default function TestList() {
                                     <label className="block text-xs font-semibold text-app-text-secondary uppercase tracking-wider mb-2">Date</label>
                                     <input
                                         type="date"
-                                        className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all"
+                                        className="w-full !bg-neutral-50 border-[1.5px] border-black/5 text-app-text p-4 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                         value={date}
                                         onChange={e => setDate(e.target.value)}
                                         required
@@ -182,7 +182,7 @@ export default function TestList() {
                                     <input
                                         type="number"
                                     inputMode="numeric"
-                                        className="w-full !bg-neutral-50 border border-app-border text-app-text p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all"
+                                        className="w-full !bg-neutral-50 border-[1.5px] border-black/5 text-app-text p-4 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
                                         placeholder="e.g. 50"
                                         value={maxMarks}
                                         onChange={e => setMaxMarks(e.target.value)}
