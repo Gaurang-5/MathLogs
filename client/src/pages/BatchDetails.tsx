@@ -855,12 +855,35 @@ export default function BatchDetails() {
                                         >
                                             Open Fullscreen Kiosk
                                         </button>
-                                        <button
-                                            onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`); toast.success('Invite Link Copied'); }}
-                                            className="py-3.5 rounded-2xl bg-neutral-50/80 hover:bg-neutral-100/80 text-black border-[1.5px] border-black/5 text-xs font-bold transition-all w-full"
-                                        >
-                                            Copy Web Link
-                                        </button>
+                                        <div className="flex gap-2 w-full">
+                                            <button
+                                                onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`); toast.success('Invite Link Copied'); }}
+                                                className="py-3.5 rounded-2xl bg-neutral-50/80 hover:bg-neutral-100/80 text-black border-[1.5px] border-black/5 text-xs font-bold transition-all flex-[2] text-center"
+                                            >
+                                                Copy Web Link
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        if (navigator.share) {
+                                                            await navigator.share({
+                                                                title: 'Batch Registration',
+                                                                text: `Please use this link to register for ${batch.name}.`,
+                                                                url: `${window.location.origin}/register/${batch.id}`
+                                                            });
+                                                        } else {
+                                                            navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`);
+                                                            toast.success('Share api not supported. Link copied!');
+                                                        }
+                                                    } catch (err) {
+                                                        console.error('Share failed', err);
+                                                    }
+                                                }}
+                                                className="py-3.5 rounded-2xl bg-neutral-50/80 hover:bg-neutral-100/80 text-black border-[1.5px] border-black/5 text-xs font-bold transition-all flex-1 text-center"
+                                            >
+                                                Share
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
