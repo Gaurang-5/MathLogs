@@ -221,6 +221,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                                 id: true,
                                 name: true,
                                 amount: true,
+                                studentId: true,
                                 createdAt: true
                             },
                             orderBy: { createdAt: 'asc' }
@@ -248,7 +249,22 @@ export const getFeeSummary = async (req: Request, res: Response) => {
         const summary = students.map((student: any) => {
             const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
             const allBatchInstallments = student.batch?.feeInstallments || [];
-            const validInstallments = allBatchInstallments.filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
+            
+            // Build a set of installment IDs that have existing payments for this student
+            const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
+            
+            // Filter installments: include global ones (no studentId) that are after join date OR have payments,
+            // plus student-specific ones that belong to THIS student
+            const validInstallments = allBatchInstallments.filter((inst: any) => {
+                if (inst.studentId) {
+                    // Student-specific installment: only include if it belongs to this student
+                    return inst.studentId === student.id;
+                }
+                // Global installment: include if after join date OR student has payments for it
+                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
+                const hasPayment = paidInstallmentIds.has(inst.id);
+                return isAfterJoin || hasPayment;
+            });
             const validInstallmentIds = new Set(validInstallments.map((inst: any) => inst.id));
 
             // Calculate adhoc/generic cash payments (FeeRecords)
@@ -371,7 +387,15 @@ export const recordPayment = async (req: Request, res: Response) => {
 
             const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
             const allBatchInstallments = student.batch?.feeInstallments || [];
-            const installments = allBatchInstallments.filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
+            const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
+            const installments = allBatchInstallments.filter((inst: any) => {
+                if (inst.studentId) {
+                    return inst.studentId === studentId;
+                }
+                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
+                const hasPayment = paidInstallmentIds.has(inst.id);
+                return isAfterJoin || hasPayment;
+            });
             const validInstallmentIds = new Set(installments.map(i => i.id));
 
             // Validation: Prevent Overpayment
@@ -623,7 +647,15 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
 
         // Calculate breakdown
         const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-        const installments = (student.batch?.feeInstallments || []).filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
+        const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
+        const installments = (student.batch?.feeInstallments || []).filter((inst: any) => {
+            if (inst.studentId) {
+                return inst.studentId === studentId;
+            }
+            const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
+            const hasPayment = paidInstallmentIds.has(inst.id);
+            return isAfterJoin || hasPayment;
+        });
         const breakdownLines: string[] = [];
         let totalPendingCalc = 0;
 
