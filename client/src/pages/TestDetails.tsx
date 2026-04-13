@@ -6,6 +6,7 @@ import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save, Mail, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Dropdown from '../components/Dropdown';
 
 interface StudentSummary {
     id: string;
@@ -588,19 +589,19 @@ export default function TestDetails() {
                                             No eligible students found. All students in this class/year might already have marks.
                                         </div>
                                     ) : (
-                                        <select
-                                            value={selectedStudentId}
-                                            onChange={(e) => setSelectedStudentId(e.target.value)}
-                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium appearance-none"
-                                            required
-                                        >
-                                            <option value="">-- Select Student --</option>
-                                            {eligibleStudents.map((s) => (
-                                                <option key={s.id} value={s.id}>
-                                                    {s.name} ({s.batchName || 'No Batch'})
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <div className="mt-[-8px]">
+                                            <Dropdown
+                                                label=""
+                                                value={selectedStudentId}
+                                                onChange={setSelectedStudentId}
+                                                placeholder="-- Select Student --"
+                                                required={true}
+                                                options={eligibleStudents.map((s) => ({
+                                                    value: s.id,
+                                                    label: `${s.name} (${s.batchName || 'No Batch'})`
+                                                }))}
+                                            />
+                                        </div>
                                     )}
                                 </div>
                                 <div>

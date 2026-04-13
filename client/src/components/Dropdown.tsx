@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronRight, Check } from 'lucide-react';
+import { ChevronDown, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface DropdownProps {
     label: string;
@@ -9,9 +10,10 @@ interface DropdownProps {
     placeholder?: string;
     disabled?: boolean;
     required?: boolean;
+    icon?: React.ReactNode;
 }
 
-export default function Dropdown({ label, value, onChange, options, placeholder = 'Select...', disabled = false, required = false }: DropdownProps) {
+export default function Dropdown({ label, value, onChange, options, placeholder = 'Select...', disabled = false, required = false, icon }: DropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     void required;
@@ -30,47 +32,73 @@ export default function Dropdown({ label, value, onChange, options, placeholder 
     const selectedOption = options.find(opt => opt.value === value);
 
     return (
-        <div ref={dropdownRef} className="relative">
-            <label className="block text-xs font-semibold text-app-text-secondary uppercase tracking-wider mb-2">
-                {label}
-            </label>
+        <div ref={dropdownRef} className="relative space-y-2 group">
+            {label && (
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">
+                    {label}
+                </label>
+            )}
 
             <button
                 type="button"
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 disabled={disabled}
-                className={`w-full !bg-neutral-50 border border-app-border text-app-text  p-3.5 rounded-xl focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all text-left flex items-center justify-between ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-accent'
-                    } ${!value ? 'text-app-text-secondary/50 dark:text-gray-400' : ''}`}
+                className={`w-full bg-neutral-50/50 border-2 text-app-text p-4 rounded-2xl outline-none transition-all text-left flex items-center justify-between font-semibold ${
+                    isOpen
+                        ? 'border-accent-primary bg-white shadow-sm'
+                        : 'border-transparent hover:border-black/10'
+                } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${
+                    !value ? 'text-gray-400' : ''
+                } ${icon ? 'pl-12' : ''}`}
             >
-                <span>{selectedOption?.label || placeholder}</span>
-                <ChevronRight className={`w-4 h-4 text-app-text-secondary transition-transform ${isOpen ? '-rotate-90' : 'rotate-90'}`} />
+                {icon && (
+                    <span className={`absolute left-4 top-[calc(50%+12px)] -translate-y-1/2 transition-colors ${
+                        isOpen ? 'text-accent-primary' : 'text-gray-400'
+                    }`}>
+                        {icon}
+                    </span>
+                )}
+                <span className="truncate">{selectedOption?.label || placeholder}</span>
+                <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 shrink-0 ml-2 ${isOpen ? 'rotate-180 text-accent-primary' : ''}`} />
             </button>
 
-            {/* Dropdown Menu - Always opens downward */}
-            {isOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 !bg-white border border-app-border rounded-xl shadow-xl z-50 max-h-60 overflow-auto">
-                    {options.map((option) => (
-                        <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => {
-                                onChange(option.value);
-                                setIsOpen(false);
-                            }}
-                            className={`w-full px-4 py-3 text-left hover:bg-neutral-100  transition-colors flex items-center justify-between ${value === option.value ? 'bg-accent/10 text-accent font-medium' : 'text-app-text '
+            {/* Dropdown Menu */}
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                        transition={{ duration: 0.15, ease: [0.2, 0.8, 0.2, 1] }}
+                        className="absolute top-full left-0 right-0 mt-2 bg-white border-[1.5px] border-black/5 rounded-2xl shadow-2xl shadow-black/10 z-50 max-h-60 overflow-auto py-1.5"
+                    >
+                        {options.map((option) => (
+                            <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => {
+                                    onChange(option.value);
+                                    setIsOpen(false);
+                                }}
+                                className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-between rounded-xl mx-1.5 first:mt-0 last:mb-0 ${
+                                    value === option.value
+                                        ? 'bg-black text-white font-bold'
+                                        : 'text-app-text hover:bg-neutral-50 font-medium'
                                 }`}
-                        >
-                            <span>{option.label}</span>
-                            {value === option.value && <Check className="w-4 h-4" />}
-                        </button>
-                    ))}
-                    {options.length === 0 && (
-                        <div className="px-4 py-3 text-app-text-secondary text-center">
-                            No options available
-                        </div>
-                    )}
-                </div>
-            )}
+                                style={{ width: 'calc(100% - 12px)' }}
+                            >
+                                <span className="text-sm">{option.label}</span>
+                                {value === option.value && <Check className="w-4 h-4 shrink-0" />}
+                            </button>
+                        ))}
+                        {options.length === 0 && (
+                            <div className="px-4 py-4 text-app-text-tertiary text-center text-sm font-medium">
+                                No options available
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

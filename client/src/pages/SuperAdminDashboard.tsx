@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import Dropdown from '../components/Dropdown';
 import {
     Building2,
     Users,
@@ -614,15 +615,18 @@ export default function SuperAdminDashboard() {
                             <div className="space-y-2 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
                                 <label className="text-sm font-bold text-gray-900">Change Plan Prefix</label>
                                 <p className="text-xs text-gray-500 mb-3">Manually upgrade or downgrade their tier.</p>
-                                <select
-                                    value={selectedNewPlan}
-                                    onChange={(e) => setSelectedNewPlan(e.target.value as 'NO_PLAN' | 'BASIC' | 'PRO')}
-                                    className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black outline-none font-medium text-sm"
-                                >
-                                    <option value="NO_PLAN">NO_PLAN (Paused)</option>
-                                    <option value="BASIC">BASIC</option>
-                                    <option value="PRO">PRO</option>
-                                </select>
+                                <div className="mt-[-8px]">
+                                    <Dropdown
+                                        label=""
+                                        value={selectedNewPlan}
+                                        onChange={(val) => setSelectedNewPlan(val as 'NO_PLAN' | 'BASIC' | 'PRO')}
+                                        options={[
+                                            { value: 'NO_PLAN', label: 'NO_PLAN (Paused)' },
+                                            { value: 'BASIC', label: 'BASIC' },
+                                            { value: 'PRO', label: 'PRO' }
+                                        ]}
+                                    />
+                                </div>
                                 <button
                                     onClick={() => handleSavePlan('UPDATE')}
                                     disabled={isSavingPlan}
