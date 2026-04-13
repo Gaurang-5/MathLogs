@@ -1343,15 +1343,15 @@ export default function Home() {
                                                 </div>
 
                                                 {/* Print Stickers */}
-                                                <div className="group/btn flex items-center gap-3 bg-neutral-50 hover:bg-violet-50 border border-neutral-200 hover:border-violet-200 rounded-2xl px-5 py-4 cursor-pointer transition-all min-w-[220px]">
-                                                    <div className="w-9 h-9 rounded-xl bg-white border border-neutral-200 group-hover/btn:border-violet-200 flex items-center justify-center shrink-0 shadow-sm transition-colors">
-                                                        <Printer className="w-4 h-4 text-neutral-500 group-hover/btn:text-violet-600 transition-colors" />
+                                                <div className="group/btn flex items-center gap-3 bg-neutral-50 hover:bg-teal-50 border border-neutral-200 hover:border-teal-200 rounded-2xl px-5 py-4 cursor-pointer transition-all min-w-[220px]">
+                                                    <div className="w-9 h-9 rounded-xl bg-white border border-neutral-200 group-hover/btn:border-teal-200 flex items-center justify-center shrink-0 shadow-sm transition-colors">
+                                                        <Printer className="w-4 h-4 text-neutral-500 group-hover/btn:text-teal-600 transition-colors" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="text-[13px] font-bold text-neutral-800 group-hover/btn:text-violet-700 transition-colors">Print Stickers</div>
+                                                        <div className="text-[13px] font-bold text-neutral-800 group-hover/btn:text-teal-700 transition-colors">Print Stickers</div>
                                                         <div className="text-[11px] text-neutral-400">Unique labels for test papers</div>
                                                     </div>
-                                                    <Printer className="w-3.5 h-3.5 text-neutral-300 group-hover/btn:text-violet-500 transition-colors shrink-0" />
+                                                    <Printer className="w-3.5 h-3.5 text-neutral-300 group-hover/btn:text-teal-500 transition-colors shrink-0" />
                                                 </div>
                                             </div>
                                         </div>
