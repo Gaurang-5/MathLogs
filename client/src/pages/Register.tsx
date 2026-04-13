@@ -327,7 +327,12 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                                 <p className="text-app-text text-sm">{submittedData.schoolName}</p>
                             </div>
                             <div className="pt-2 border-t border-app-border">
-                                {batchStatus?.autoSendWelcome && batchStatus?.whatsappGroupLink ? (
+                                {mode === 'kiosk' ? (
+                                    <div className="space-y-1 mt-1 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                        <p className="text-sm text-blue-800 font-medium">WhatsApp Invitation</p>
+                                        <p className="text-xs text-blue-600">A WhatsApp message will be sent to your registered number shortly.</p>
+                                    </div>
+                                ) : batchStatus?.autoSendWelcome && batchStatus?.whatsappGroupLink ? (
                                     <div className="space-y-2 mt-1">
                                         <p className="text-sm text-app-text font-medium">Join the WhatsApp Group</p>
                                         <p className="text-xs text-app-text-secondary">Join for updates and announcements.</p>
@@ -347,7 +352,12 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                     ) : (
                         <div className="mt-5 space-y-4">
                             <p className="text-app-text-secondary text-sm leading-relaxed">Your request has been submitted successfully.</p>
-                            {batchStatus?.autoSendWelcome && batchStatus?.whatsappGroupLink ? (
+                            {mode === 'kiosk' ? (
+                                <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-left">
+                                    <p className="text-sm text-blue-800 font-medium">WhatsApp Invitation</p>
+                                    <p className="text-xs text-blue-600 mt-1">A WhatsApp message will be sent to your registered number shortly.</p>
+                                </div>
+                            ) : batchStatus?.autoSendWelcome && batchStatus?.whatsappGroupLink ? (
                                 <a href={batchStatus.whatsappGroupLink} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold py-3 px-4 rounded-xl text-center transition-colors">
                                     Join WhatsApp Group
                                 </a>

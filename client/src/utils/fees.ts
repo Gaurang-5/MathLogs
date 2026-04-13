@@ -32,7 +32,11 @@ export function getInstallmentPaidMap(student: FeeAllocationStudent, installment
     let currentBuffer = genericPaid;
     const studentJoinDate = getStudentJoinDate(student.createdAt);
     const sortedInstallments = [...installments]
-        .filter((installment) => new Date(installment.createdAt).setHours(0, 0, 0, 0) >= studentJoinDate)
+        .filter((installment) => {
+            const isAfterJoin = new Date(installment.createdAt).setHours(0, 0, 0, 0) >= studentJoinDate;
+            const hasPayment = student.feePayments?.some(p => p.installmentId === installment.id);
+            return isAfterJoin || hasPayment;
+        })
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     const installmentPaidMap: Record<string, number> = {};

@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
+import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -125,7 +126,7 @@ export default function BatchDetails() {
 
     // Custom Invoice State
     const [showCustomInvoice, setShowCustomInvoice] = useState<Student | null>(null);
-    const [customInvoice, setCustomInvoice] = useState({ name: '', amount: '', markAsPaid: false });
+    const [customInvoice, setCustomInvoice] = useState({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
 
     // Payment Modal State
     const [paymentModal, setPaymentModal] = useState<{ student: Student, installment: FeeInstallment, date: string } | null>(null);
@@ -519,11 +520,31 @@ export default function BatchDetails() {
         if (!showCustomInvoice) return;
         const toastId = toast.loading('Creating custom invoice...');
         try {
-            const installment = await apiRequest(`/batches/${id}/installments`, 'POST', {
-                name: customInvoice.name,
-                amount: Number(customInvoice.amount),
-                studentId: showCustomInvoice.id
-            });
+            if (customInvoice.existingInstallmentId) {
+                // Link an existing global invoice to this student
+                const existingInst = batch?.feeInstallments?.find(i => i.id === customInvoice.existingInstallmentId);
+                const paymentAmount = customInvoice.markAsPaid ? Number(existingInst?.amount || 0) : 0;
+                
+                await apiRequest(`/fees/pay-installment`, 'POST', {
+                    studentId: showCustomInvoice.id,
+                    installmentId: customInvoice.existingInstallmentId,
+                    amount: paymentAmount,
+                    date: new Date().toISOString().split('T')[0]
+                });
+
+                toast.success(
+                    customInvoice.markAsPaid
+                        ? 'Installment linked & marked paid'
+                        : 'Installment successfully linked to student',
+                    { id: toastId }
+                );
+            } else {
+                // Create brand new student-specific invoice
+                const installment = await apiRequest(`/batches/${id}/installments`, 'POST', {
+                    name: customInvoice.name,
+                    amount: Number(customInvoice.amount),
+                    studentId: showCustomInvoice.id
+                });
 
             // If "Mark as Paid" is checked, immediately log a payment
             if (customInvoice.markAsPaid && installment?.id) {
@@ -541,8 +562,10 @@ export default function BatchDetails() {
                     : 'Custom invoice created',
                 { id: toastId }
             );
+            }
+
             setShowCustomInvoice(null);
-            setCustomInvoice({ name: '', amount: '', markAsPaid: false });
+            setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
             setTimeout(() => fetchDetails(), 300);
         } catch (error: unknown) {
             toast.error(getErrorMessage(error, 'Failed to create custom invoice'), { id: toastId });
@@ -1014,7 +1037,7 @@ export default function BatchDetails() {
 
                                             const studentJoinDate = getStudentJoinDate(student.createdAt);
                                             const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
-                                            const isNotApplicable = instDate < studentJoinDate;
+                                            const isNotApplicable = instDate < studentJoinDate && payments.length === 0;
 
                                             if (isNotApplicable) {
                                                 return (
@@ -1133,7 +1156,7 @@ export default function BatchDetails() {
                                         <td className={cn("text-center border-b border-black/5", getCellPadding())} >
                                             <div className="flex items-center justify-center gap-1.5">
                                                 <button
-                                                    onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false }); }}
+                                                    onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
                                                     className="p-2 bg-neutral-50 hover:bg-black text-black hover:text-white rounded-xl border border-black/5 transition-colors"
                                                     title="Custom Invoice"
                                                 >
@@ -1192,7 +1215,7 @@ export default function BatchDetails() {
                                             <div className="flex gap-1.5 shrink-0 flex-wrap justify-end max-w-[140px]">
                                                 <button onClick={() => setViewMarksId(student.id)} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all"><Eye className={getIconSizeClass()} /></button>
                                                 <a href={`tel:${student.parentWhatsapp}`} className="p-2 bg-neutral-50 hover:bg-green-50 text-green-600 border border-black/5 rounded-xl active:scale-90 transition-all"><Phone className={getIconSizeClass()} /></a>
-                                                <button onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false }); }} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all" title="Custom Invoice"><Receipt className={getIconSizeClass()} /></button>
+                                                <button onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all" title="Custom Invoice"><Receipt className={getIconSizeClass()} /></button>
                                                 <button onClick={() => setEditingStudent(student)} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all"><Edit2 className={getIconSizeClass()} /></button>
                                                 <button onClick={() => handleDelete(student)} className="p-2 bg-neutral-50 hover:bg-red-50 text-red-600 border border-black/5 rounded-xl active:scale-90 transition-all"><Trash2 className={getIconSizeClass()} /></button>
                                             </div>
@@ -1223,7 +1246,8 @@ export default function BatchDetails() {
                                                         if (inst.studentId) return false; // Skip custom invoices
                                                         const studentJoinDate = getStudentJoinDate(student.createdAt);
                                                         const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
-                                                        return instDate >= studentJoinDate;
+                                                        const hasPayment = student.feePayments?.some(p => p.installmentId === inst.id);
+                                                        return instDate >= studentJoinDate || hasPayment;
                                                     }).map((inst) => {
                                                         const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
                                                         // Use calculated amount from map
@@ -1823,16 +1847,15 @@ export default function BatchDetails() {
                                             type="button"
                                             onClick={() => setAutoSendWelcomeInput(!autoSendWelcomeInput)}
                                             className={cn(
-                                                "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
-                                                autoSendWelcomeInput ? "bg-accent" : "bg-neutral-200 dark:bg-neutral-700"
+                                                "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                                autoSendWelcomeInput ? "bg-green-500" : "bg-gray-200"
                                             )}
                                         >
                                             <span
                                                 className={cn(
-                                                    "pointer-events-none inline-block h-5 w-5 transform bg-white shadow ring-0 transition duration-200 ease-in-out",
+                                                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
                                                     autoSendWelcomeInput ? "translate-x-5" : "translate-x-0"
                                                 )}
-                                                style={{ borderRadius: '50%' }}
                                             />
                                         </button>
                                     </div>
@@ -2421,29 +2444,73 @@ export default function BatchDetails() {
 
                             <form onSubmit={handleCreateCustomInvoice} className="space-y-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Invoice Name</label>
-                                    <input
-                                        value={customInvoice.name}
-                                        onChange={(e) => setCustomInvoice({ ...customInvoice, name: e.target.value })}
-                                        className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                        placeholder="e.g. April-May Fee, Registration"
-                                        required
-                                        autoFocus
-                                    />
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Invoice Type</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomInvoice({ ...customInvoice, existingInstallmentId: '' })}
+                                            className={cn("flex-1 py-2 rounded-xl text-sm font-bold border transition-colors", !customInvoice.existingInstallmentId ? "bg-black text-white border-black" : "bg-neutral-50 text-app-text-tertiary border-black/5 hover:border-black/20")}
+                                        >
+                                            New
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const globalInsts = batch?.feeInstallments?.filter(i => !i.studentId);
+                                                setCustomInvoice({ ...customInvoice, existingInstallmentId: globalInsts?.[0]?.id || 'error' });
+                                            }}
+                                            className={cn("flex-1 py-2 rounded-xl text-sm font-bold border transition-colors", customInvoice.existingInstallmentId ? "bg-black text-white border-black" : "bg-neutral-50 text-app-text-tertiary border-black/5 hover:border-black/20")}
+                                        >
+                                            Existing
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Amount (₹)</label>
-                                    <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        value={customInvoice.amount}
-                                        onChange={(e) => setCustomInvoice({ ...customInvoice, amount: e.target.value })}
-                                        className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                        placeholder="0"
-                                        required
-                                        min="1"
-                                    />
-                                </div>
+
+                                {customInvoice.existingInstallmentId ? (
+                                    <div className="pt-2">
+                                        <Dropdown
+                                            label="Select Global Fee"
+                                            value={customInvoice.existingInstallmentId}
+                                            onChange={(val) => setCustomInvoice({ ...customInvoice, existingInstallmentId: val })}
+                                            options={[
+                                                ...(batch?.feeInstallments?.filter(i => !i.studentId).map(inst => ({
+                                                    value: inst.id,
+                                                    label: `${inst.name} — ₹${inst.amount}`
+                                                })) || []),
+                                                ...(batch?.feeInstallments?.filter(i => !i.studentId).length === 0 ? [
+                                                    { value: 'error', label: 'No global fees available' }
+                                                ] : [])
+                                            ]}
+                                        />
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Invoice Name</label>
+                                            <input
+                                                value={customInvoice.name}
+                                                onChange={(e) => setCustomInvoice({ ...customInvoice, name: e.target.value })}
+                                                className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                placeholder="e.g. April-May Fee, Registration"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Amount (₹)</label>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                value={customInvoice.amount}
+                                                onChange={(e) => setCustomInvoice({ ...customInvoice, amount: e.target.value })}
+                                                className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                                placeholder="0"
+                                                required
+                                                min="1"
+                                            />
+                                        </div>
+                                    </>
+                                )}
 
                                 {/* Mark as Paid Toggle */}
                                 <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-xl border-[1.5px] border-black/5">
@@ -2455,14 +2522,14 @@ export default function BatchDetails() {
                                         type="button"
                                         onClick={() => setCustomInvoice({ ...customInvoice, markAsPaid: !customInvoice.markAsPaid })}
                                         className={cn(
-                                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
-                                            customInvoice.markAsPaid ? "bg-green-500" : "bg-gray-300"
+                                            "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                            customInvoice.markAsPaid ? "bg-green-500" : "bg-gray-200"
                                         )}
                                     >
                                         <span
                                             className={cn(
-                                                "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-                                                customInvoice.markAsPaid ? "translate-x-6" : "translate-x-1"
+                                                "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
+                                                customInvoice.markAsPaid ? "translate-x-5" : "translate-x-0"
                                             )}
                                         />
                                     </button>

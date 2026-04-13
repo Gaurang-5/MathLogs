@@ -87,12 +87,12 @@ function ChangePasswordForm() {
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">Current Password</label>
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-1.5 ml-1 tracking-wider">Current Password</label>
                 <input
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text  transition-colors"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none font-medium placeholder:text-gray-400"
                     placeholder="Enter current password"
                     required
                 />
@@ -100,34 +100,34 @@ function ChangePasswordForm() {
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">New Password</label>
+                    <label className="block text-xs font-bold uppercase text-gray-500 mb-1.5 ml-1 tracking-wider">New Password</label>
                     <input
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text  transition-colors"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none font-medium placeholder:text-gray-400"
                         placeholder="Min 6 chars"
                         required
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">Confirm New</label>
+                    <label className="block text-xs font-bold uppercase text-gray-500 mb-1.5 ml-1 tracking-wider">Confirm New</label>
                     <input
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full !bg-neutral-50 border border-app-border rounded-xl px-4 py-3 outline-none focus:border-app-text text-app-text  transition-colors"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none font-medium placeholder:text-gray-400"
                         placeholder="Re-enter new"
                         required
                     />
                 </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-4">
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                    className="flex items-center justify-center gap-2 bg-black text-white px-8 py-3.5 rounded-xl font-bold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-black/10 active:scale-[0.98]"
                 >
                     {loading ? 'Updating...' : (
                         <>
@@ -188,7 +188,12 @@ function ProfileSection() {
         };
     };
 
-    if (!profile) return <div className="animate-pulse bg-gray-100 h-48 rounded-[24px] mb-12" />;
+    if (!profile) return (
+        <div className="max-w-4xl mx-auto mb-12">
+            <h2 className="text-xl font-bold text-app-text mb-1 flex items-center gap-2">Profile</h2>
+            <div className="animate-pulse bg-white border border-gray-100 shadow-sm h-[320px] rounded-3xl mt-6" />
+        </div>
+    );
 
     return (
         <div className="max-w-4xl mx-auto mb-12">
@@ -197,9 +202,10 @@ function ProfileSection() {
             </h2>
             <p className="text-app-text-secondary text-sm mb-6">Your personal contact details and plan info.</p>
 
-            <div className="bg-app-surface-opaque border border-app-border rounded-[24px] p-8 grid grid-cols-1 md:grid-cols-2 gap-6 relative overflow-hidden">
+            <div className="bg-white border border-gray-100 rounded-3xl p-8 grid grid-cols-1 md:grid-cols-2 gap-8 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
                 {/* Decorative background */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-gray-100 to-transparent rounded-bl-[100px] opacity-50 pointer-events-none" />
+                <div className="absolute top-0 right-0 w-80 h-80 bg-accent/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4 pointer-events-none" />
 
                 <div className="relative z-10 md:col-span-2 mb-2 flex items-center gap-6">
                     <div className="relative group shrink-0">
@@ -234,19 +240,19 @@ function ProfileSection() {
 
                 <div className="relative z-10">
                     <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-2 pl-1">Teacher Name</label>
-                    <div className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3.5 text-app-text font-semibold shadow-sm">
+                    <div className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-app-text font-semibold shadow-sm">
                         {profile.username}
                     </div>
                 </div>
                 <div className="relative z-10">
                     <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-2 pl-1">Email</label>
-                    <div className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3.5 text-app-text font-medium shadow-sm">
+                    <div className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-app-text font-medium shadow-sm">
                         {profile.email}
                     </div>
                 </div>
                 <div className="relative z-10">
                     <label className="block text-xs font-bold uppercase text-app-text-tertiary mb-2 pl-1">Phone</label>
-                    <div className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3.5 text-app-text font-medium shadow-sm">
+                    <div className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-app-text font-medium shadow-sm">
                         {profile.phone}
                     </div>
                 </div>
@@ -268,6 +274,7 @@ function ProfileSection() {
 
 export default function Settings() {
     const [years, setYears] = useState<AcademicYear[]>([]);
+    const [loadingYears, setLoadingYears] = useState(true);
     const [currentYearId, setCurrentYearId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [newYearName, setNewYearName] = useState('');
@@ -282,6 +289,8 @@ export default function Settings() {
         } catch (error) {
             console.error('Fetch error:', error);
             toast.error('Failed to load academic years');
+        } finally {
+            setLoadingYears(false);
         }
     };
 
@@ -428,21 +437,25 @@ export default function Settings() {
                 {/* Debug Info */}
                 {/* <pre className="hidden">{JSON.stringify(years, null, 2)}</pre> */}
 
-                {years.length === 0 && !isCreating && (
-                    <div className="col-span-full py-12 text-center text-app-text-tertiary">
-                        <p>No academic years found. Create one to get started.</p>
+                {loadingYears ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                        {[1, 2, 3].map(i => <div key={i} className="animate-pulse bg-white border border-gray-100 rounded-[28px] h-64 shadow-[0_8px_30px_rgb(0,0,0,0.03)]" />)}
                     </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-                    {years.map(year => (
-                        <div
-                            key={year.id}
-                            className={`relative p-6 rounded-[24px] border transition-all duration-300 flex flex-col justify-between ${year.id === currentYearId
-                                ? '!bg-white border-black shadow-sm ring-1 ring-black'
-                                : 'bg-app-surface-opaque border-app-border hover:border-gray-400 dark:hover:border-gray-600'
-                                }`}
-                        >
+                ) : years.length === 0 && !isCreating ? (
+                    <div className="col-span-full py-12 bg-white rounded-3xl border border-gray-100 text-center text-app-text-tertiary shadow-[0_8px_30px_rgb(0,0,0,0.03)] mb-12">
+                        <p className="font-semibold text-lg text-gray-400 mb-2">No academic years found.</p>
+                        <p className="text-sm">Create one to start organizing your batches.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                        {years.map(year => (
+                            <div
+                                key={year.id}
+                                className={`relative p-7 rounded-[28px] border transition-all duration-300 flex flex-col justify-between ${year.id === currentYearId
+                                    ? 'bg-white border-black shadow-xl ring-1 ring-black'
+                                    : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)]'
+                                    }`}
+                            >
                             {/* Active Card Layout matches screenshot exactly */}
                             {year.id === currentYearId ? (
                                 <>
@@ -472,34 +485,34 @@ export default function Settings() {
                                 /* Inactive Card Layout (Standard) */
                                 <>
                                     <div className="flex items-start justify-between mb-4">
-                                        <div className="p-3 bg-app-bg rounded-2xl">
-                                            <Calendar className="w-6 h-6 text-app-text-secondary" />
+                                        <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                                            <Calendar className="w-6 h-6 text-gray-500" />
                                         </div>
                                         <button
                                             onClick={() => handleDeleteClick(year.id, year.name)}
-                                            className="p-2 text-app-text-tertiary hover:text-red-500 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
+                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
                                             title="Delete Year"
                                         >
                                             <Trash2 size={18} />
                                         </button>
                                     </div>
 
-                                    <h3 className="text-xl font-bold text-app-text mb-2">{year.name}</h3>
-                                    <p className="text-sm text-app-text-tertiary mb-6">
+                                    <h3 className="text-xl font-bold text-gray-900 mb-2">{year.name}</h3>
+                                    <p className="text-sm text-gray-400 font-medium mb-6">
                                         {new Date(year.createdAt).toLocaleDateString()}
                                     </p>
 
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => handleSwitchClick(year.id, year.name)}
-                                            className="flex-1 flex items-center justify-center gap-2 bg-app-bg border border-app-border py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                                            className="flex-1 flex items-center justify-center gap-2 bg-gray-50 border border-gray-100 py-3 rounded-2xl text-sm font-semibold hover:bg-gray-100 hover:border-gray-200 transition-all active:scale-[0.98]"
                                         >
                                             <RefreshCcw size={16} />
                                             <span>Switch</span>
                                         </button>
                                         <button
                                             onClick={() => handleBackup(year.id, year.name)}
-                                            className="flex-1 flex items-center justify-center gap-2 bg-app-bg border border-app-border py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                                            className="flex-1 flex items-center justify-center gap-2 bg-gray-50 border border-gray-100 py-3 rounded-2xl text-sm font-semibold hover:bg-gray-100 hover:border-gray-200 transition-all active:scale-[0.98]"
                                             title="Download Backup"
                                         >
                                             <Download size={16} />
@@ -511,15 +524,16 @@ export default function Settings() {
                         </div>
                     ))}
                 </div>
+                )}
 
                 {/* Security Section */}
-                <div className="max-w-xl">
+                <div className="max-w-2xl mb-12">
                     <div className="mb-6">
                         <h2 className="text-xl font-bold text-app-text">Security</h2>
-                        <p className="text-app-text-secondary text-sm mt-1">Update your login credentials.</p>
+                        <p className="text-app-text-secondary text-sm mt-1">Update your login credentials securely.</p>
                     </div>
 
-                    <div className="bg-white border border-app-border p-6 rounded-[24px]">
+                    <div className="bg-white border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 rounded-3xl">
                         <ChangePasswordForm />
                     </div>
                 </div>
