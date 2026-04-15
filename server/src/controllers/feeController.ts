@@ -842,14 +842,15 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         const endDate = new Date(Date.UTC(yearNum, monthIdx + 1, 1, -5, -30, 0, -1));
 
         // Fetch Installment Payments
-        const teacherId = (req as any).user?.id;
+        const instituteId = (req as any).user?.instituteId;
         const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
         const payments = await prisma.feePayment.findMany({
             where: {
                 student: {
-                    batch: { teacherId },
-                    academicYearId: currentAcademicYearId
+                    instituteId: instituteId,
+                    academicYearId: currentAcademicYearId,
+                    status: 'APPROVED'
                 },
                 date: {
                     gte: startDate,
@@ -868,8 +869,9 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
             where: {
                 status: 'PAID',
                 student: {
-                    batch: { teacherId },
-                    academicYearId: currentAcademicYearId
+                    instituteId: instituteId,
+                    academicYearId: currentAcademicYearId,
+                    status: 'APPROVED'
                 },
                 date: {
                     gte: startDate,
