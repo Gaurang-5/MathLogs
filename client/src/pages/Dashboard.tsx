@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart, BarChart, Bar } from 'recharts';
@@ -141,6 +141,22 @@ export default function Dashboard() {
     const collectionRate = finances.totalCollected + finances.pending > 0
         ? Math.min(100, Math.round((finances.totalCollected / (finances.totalCollected + finances.pending)) * 100))
         : 0;
+
+    // Synchronize the raw graph's remaining calculations with the exact clamped system pending dues 
+    // to absorb edge-cases like overpayments overriding unallocated totals
+    const adjustedFinanceGrowthData = useMemo(() => {
+        if (!financeGrowthData.length) return [];
+        const lastBar = financeGrowthData[financeGrowthData.length - 1];
+        if (!lastBar || finances.pending <= 0) return financeGrowthData;
+        
+        const diff = finances.pending - lastBar.remaining;
+        if (diff === 0) return financeGrowthData;
+        
+        return financeGrowthData.map(d => ({
+            ...d,
+            remaining: Math.max(0, d.remaining + diff)
+        }));
+    }, [financeGrowthData, finances.pending]);
 
     const getGreeting = () => {
         return 'Hello';
@@ -410,7 +426,7 @@ export default function Dashboard() {
                             <div className="h-[260px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
-                                        data={financeGrowthData}
+                                        data={adjustedFinanceGrowthData}
                                         margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                                         barGap={4}
                                     >

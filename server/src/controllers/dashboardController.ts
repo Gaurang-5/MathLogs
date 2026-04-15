@@ -252,10 +252,16 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
             GROUP BY yr, mo
         `);
 
+        // 3. Format with cumulative remaining
+        let cumulativeGenerated = 0;
+        let cumulativeCollected = 0;
+
         generatedByMonth.forEach(row => {
             const key = `${row.yr}-${row.mo}`;
             if (monthlyData[key]) {
                 monthlyData[key].generated += Number(row.total);
+            } else if (new Date(row.yr, row.mo, 1) <= startRawDate) {
+                cumulativeGenerated += Number(row.total);
             }
         });
 
@@ -294,12 +300,35 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
             const key = `${row.yr}-${row.mo}`;
             if (monthlyData[key]) {
                 monthlyData[key].collected += Number(row.total);
+            } else if (new Date(row.yr, row.mo, 1) <= startRawDate) {
+                cumulativeCollected += Number(row.total);
             }
         });
 
-        // 3. Format with cumulative remaining
-        let cumulativeGenerated = 0;
-        let cumulativeCollected = 0;
+        // Handle overpayments conceptually (difference between clamped StudentBalance sum and raw differential)
+        let totalOverpaid = 0;
+        try {
+            const overpaidQuery = await prisma.$queryRaw<Array<{ amt: number }>>`
+                SELECT COALESCE(SUM(amount_overpaid), 0)::float as amt FROM (
+                    SELECT GREATEST(0, (COALESCE(SUM(fp."amountPaid"), 0) + COALESCE(SUM(fr.amount), 0)) - (
+                        -- total generated for this student
+                        COALESCE((SELECT SUM(amount) FROM "FeeInstallment" WHERE "studentId" = s.id OR ("batchId" = s."batchId" AND "studentId" IS NULL)), 0) +
+                        CASE WHEN NOT EXISTS(SELECT 1 FROM "FeeInstallment" WHERE "batchId" = s."batchId" AND "studentId" IS NULL) THEN COALESCE((SELECT "feeAmount" FROM "Batch" WHERE id = s."batchId"), 0) ELSE 0 END
+                    )) as amount_overpaid
+                    FROM "Student" s
+                    LEFT JOIN "FeePayment" fp ON fp."studentId" = s.id
+                    LEFT JOIN "FeeRecord" fr ON fr."studentId" = s.id AND fr.status = 'PAID'
+                    WHERE s."instituteId" = ${instituteId}
+                    GROUP BY s.id
+                ) sub
+            `;
+            totalOverpaid = overpaidQuery[0]?.amt || 0;
+        } catch (e) {
+            console.error('Overpaid query failed', e);
+        }
+
+        // Apply overpaid offset to starting generated baseline to balance remaining
+        cumulativeGenerated += totalOverpaid;
 
         const data = months.map(m => {
             const key = `${m.year}-${m.monthIndex}`;
