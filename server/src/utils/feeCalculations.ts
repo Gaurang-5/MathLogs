@@ -2,6 +2,7 @@ export interface FeeInstallmentSnapshot {
     id: string;
     amount: number;
     createdAt: string | Date;
+    studentId?: string | null;
 }
 
 export interface FeePaymentSnapshot {
@@ -37,11 +38,29 @@ export function calculateStudentFeeSnapshot(student: StudentFeeSnapshotInput): S
     let unallocatedCash = paidSimple;
 
     const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
+    const paidInstallmentIds = new Set(student.feePayments.map((p) => p.installmentId));
+    
+    const isBatchInstallmentActive = (student.batch?.feeInstallments || []).some((fi) => !fi.studentId);
+    
+    // Valid installments: global ones after join date OR have payments, plus custom ones for this student
     const sortedInstallments = (student.batch?.feeInstallments || [])
-        .filter((installment) => new Date(installment.createdAt) >= studentJoinDate)
+        .filter((installment) => {
+            if (installment.studentId) return true; // custom invoice
+            const isAfterJoin = new Date(installment.createdAt) >= studentJoinDate;
+            const hasPayment = paidInstallmentIds.has(installment.id);
+            return isAfterJoin || hasPayment;
+        })
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    const installmentTotal = sortedInstallments.reduce((sum, installment) => sum + installment.amount, 0);
-    const totalFee = installmentTotal > 0 ? installmentTotal : (student.batch?.feeAmount || 0);
+        
+    const globalInstallmentsTotal = sortedInstallments
+        .filter((fi) => !fi.studentId)
+        .reduce((sum, fi) => sum + fi.amount, 0);
+        
+    const customInstallmentsTotal = sortedInstallments
+        .filter((fi) => fi.studentId)
+        .reduce((sum, fi) => sum + fi.amount, 0);
+
+    const totalFee = (isBatchInstallmentActive ? globalInstallmentsTotal : (student.batch?.feeAmount || 0)) + customInstallmentsTotal;
 
     const paidInstallments = student.feePayments.reduce((sum, payment) => sum + payment.amountPaid, 0);
     const balance = totalFee - paidSimple - paidInstallments;

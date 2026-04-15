@@ -57,8 +57,8 @@ BEGIN
                 -- If the batch is using installments (has at least 1 batch-wide installment)
                 WHEN (SELECT COUNT(*) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id AND fi."studentId" IS NULL) > 0
                 THEN 
-                    -- Only sum batch installments created ON OR AFTER the student joined
-                    COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id AND fi."studentId" IS NULL AND fi."createdAt" >= s."createdAt"), 0) +
+                    -- Only sum batch installments created ON OR AFTER the student joined OR that the student has paid
+                    COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."batchId" = b.id AND fi."studentId" IS NULL AND (fi."createdAt" >= s."createdAt" OR EXISTS (SELECT 1 FROM "FeePayment" fp WHERE fp."installmentId" = fi.id AND fp."studentId" = s.id))), 0) +
                     -- PLUS any custom student-specific installments
                     COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."studentId" = s.id), 0)
                 ELSE 

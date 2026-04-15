@@ -250,6 +250,8 @@ export const getFeeSummary = async (req: Request, res: Response) => {
             const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
             const allBatchInstallments = student.batch?.feeInstallments || [];
             
+            const isBatchInstallmentActive = allBatchInstallments.some((inst: any) => !inst.studentId);
+            
             // Build a set of installment IDs that have existing payments for this student
             const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
             
@@ -305,8 +307,18 @@ export const getFeeSummary = async (req: Request, res: Response) => {
             });
 
             // Fallback for non-installment batches
-            const batchHasInstallments = allBatchInstallments.length > 0;
-            const totalFee = batchHasInstallments ? installmentTotal : (student.batch?.feeAmount || 0);
+            // Total fee calculation: If batch uses global installments, use global valid installments
+            // If batch uses flat fee, use flat fee.
+            // In both cases, add custom valid installments (which only apply to this student).
+            const globalInstallmentsTotal = validInstallments
+                .filter((inst: any) => !inst.studentId)
+                .reduce((sum: number, inst: any) => sum + inst.amount, 0);
+                
+            const customInstallmentsTotal = validInstallments
+                .filter((inst: any) => inst.studentId)
+                .reduce((sum: number, inst: any) => sum + inst.amount, 0);
+
+            const totalFee = (isBatchInstallmentActive ? globalInstallmentsTotal : (student.batch?.feeAmount || 0)) + customInstallmentsTotal;
 
             const totalPaid = paidSimple + paidInstallments;
             // Clamp balance: negative means overpaid — show as 0 (no dues)
