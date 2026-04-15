@@ -835,8 +835,11 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         const monthIdx = parseInt(month as string) - 1; // 1-based to 0-based
         const yearNum = parseInt(year as string);
 
-        const startDate = new Date(yearNum, monthIdx, 1);
-        const endDate = new Date(yearNum, monthIdx + 1, 0, 23, 59, 59);
+        // Determine accurate IST (Asia/Kolkata) boundaries mapped to UTC for database queries
+        // Start of month IST is Year-Month-01 00:00:00 -> UTC offset is -5:30
+        const startDate = new Date(Date.UTC(yearNum, monthIdx, 1, -5, -30, 0, 0));
+        // End of month IST is Year-(Month+1)-01 00:00:00 minus 1 ms
+        const endDate = new Date(Date.UTC(yearNum, monthIdx + 1, 1, -5, -30, 0, -1));
 
         // Fetch Installment Payments
         const teacherId = (req as any).user?.id;
@@ -863,6 +866,7 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         // Fetch Ad-hoc (Surplus) Records
         const records = await prisma.feeRecord.findMany({
             where: {
+                status: 'PAID',
                 student: {
                     batch: { teacherId },
                     academicYearId: currentAcademicYearId
