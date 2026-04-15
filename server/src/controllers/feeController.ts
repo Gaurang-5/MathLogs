@@ -1305,14 +1305,16 @@ export const rejectUpiVerification = async (req: Request, res: Response) => {
 export const getCustomInvoices = async (req: Request, res: Response) => {
     try {
         const teacherId = (req as any).user?.id;
+        const instituteId = (req as any).user?.instituteId;
         const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
         const invoices = await prisma.feeInstallment.findMany({
             where: {
                 studentId: { not: null },
-                batch: { teacherId },
                 student: {
-                    academicYearId: currentAcademicYearId
+                    instituteId: instituteId,
+                    academicYearId: currentAcademicYearId,
+                    status: 'APPROVED'
                 }
             },
             include: {
