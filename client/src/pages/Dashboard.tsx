@@ -437,7 +437,7 @@ export default function Dashboard() {
                                             }}
                                             formatter={(value: number | string, name: string) => [
                                                 showFeeData ? `₹${(value ?? 0).toLocaleString()}` : '₹••••••',
-                                                name === 'collected' ? 'Collected' : 'Remaining'
+                                                name === 'Collected' ? 'Collected' : 'Remaining'
                                             ]}
                                         />
                                         <Bar dataKey="collected" name="Collected" fill="#000000" radius={[6, 6, 0, 0]} maxBarSize={36} />

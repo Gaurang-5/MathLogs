@@ -224,11 +224,14 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
                 COALESCE(SUM(fi.amount), 0)::float AS total
             FROM "FeeInstallment" fi
             JOIN "Batch" b ON b.id = fi."batchId"
-            JOIN "Student" s ON s."batchId" = b.id
+            JOIN "Student" s ON s."batchId" = b.id AND (fi."studentId" IS NULL OR fi."studentId" = s.id)
             WHERE s.status = 'APPROVED'
                 AND s."instituteId" = ${instituteId}
                 ${ayFilter}
-                AND fi."createdAt" >= s."createdAt"
+                AND (
+                    (fi."studentId" IS NULL AND (fi."createdAt" >= s."createdAt" OR EXISTS (SELECT 1 FROM "FeePayment" fp WHERE fp."installmentId" = fi.id AND fp."studentId" = s.id)))
+                    OR (fi."studentId" = s.id)
+                )
             GROUP BY yr, mo
 
             UNION ALL
@@ -244,7 +247,7 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
                 ${ayFilter}
                 AND b."feeAmount" > 0
                 AND NOT EXISTS (
-                    SELECT 1 FROM "FeeInstallment" fi2 WHERE fi2."batchId" = b.id
+                    SELECT 1 FROM "FeeInstallment" fi2 WHERE fi2."batchId" = b.id AND fi2."studentId" IS NULL
                 )
             GROUP BY yr, mo
         `);
