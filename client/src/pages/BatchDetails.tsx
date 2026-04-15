@@ -691,7 +691,7 @@ export default function BatchDetails() {
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
                     {/* Batch Info Card */}
-                    <div className="xl:col-span-2 bg-neutral-50/50-opaque border-[1.5px] border-black/5 p-5 md:p-8 rounded-2xl md:rounded-[32px] shadow-sm flex flex-col gap-6 relative overflow-hidden group">
+                    <div className="xl:col-span-2 bg-white/70 backdrop-blur-2xl border-[1.5px] border-black/5 p-5 md:p-8 rounded-2xl md:rounded-[32px] shadow-sm flex flex-col gap-6 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-accent-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 -translate-y-1/2 translate-x-1/3" />
                         <div className="flex justify-between items-start gap-4 relative z-10">
                             <div className="flex-1 min-w-0">
@@ -772,7 +772,7 @@ export default function BatchDetails() {
 
                     {/* Registration Control Card */}
                     {!batch.isRegistrationEnded && (
-                        <div className="bg-neutral-50/50-opaque border-[1.5px] border-black/5 p-5 md:p-6 rounded-2xl md:rounded-[32px] shadow-sm flex flex-col items-center text-center relative group overflow-hidden">
+                        <div className="bg-white/70 backdrop-blur-2xl border-[1.5px] border-black/5 p-5 md:p-6 rounded-2xl md:rounded-[32px] shadow-sm flex flex-col items-center text-center relative group overflow-hidden">
                             <div className="absolute top-0 right-0 w-24 h-24 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
                             <div className="flex items-center justify-between w-full mb-6 relative z-10">
                                 <div className="flex items-center gap-3">
@@ -915,9 +915,9 @@ export default function BatchDetails() {
                 </div>
             </div>
 
-            <div className="bg-neutral-50/50-opaque border-[1.5px] border-black/5 rounded-[32px] shadow-sm mt-8 overflow-hidden">
+            <div className="bg-white/70 backdrop-blur-2xl border-[1.5px] border-black/5 rounded-[32px] shadow-sm mt-8 overflow-hidden">
                 {/* Search Header */}
-                <div className="p-5 border-b-[1.5px] border-black/5 bg-neutral-50/30 backdrop-blur-md sticky top-0 z-10">
+                <div className="p-5 border-b-[1.5px] border-black/5 bg-white/40 backdrop-blur-md sticky top-0 z-10">
                     <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                         <div className="relative max-w-md w-full">
                             <Search className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" />
@@ -2128,7 +2128,7 @@ export default function BatchDetails() {
                             className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-0 max-w-sm w-full shadow-2xl relative z-10 overflow-hidden"
                         >
                             {/* Header */}
-                            <div className="p-6 border-b border-black/5 flex justify-between items-start bg-neutral-50/50-opaque">
+                            <div className="p-6 border-b border-black/5 flex justify-between items-start bg-white/70 backdrop-blur-md">
                                 <div>
                                     <h3 className="text-lg font-bold text-app-text">{paymentModal.student.name}</h3>
                                     <div className="flex flex-col mt-1">

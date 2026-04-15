@@ -47,11 +47,10 @@
     --neutral-900: #111827;
     --neutral-950: #030712;
 
-    /* Accent - Calm Intelligent Blue (Apple-like) */
-    --accent-primary: #0071e3;
-    /* Classic Apple Blue */
-    --accent-hover: #0077ed;
-    --accent-subtle: #e5f1ff;
+    /* Accent - Dark Minimalist (replaces Blue) */
+    --accent-primary: #111827;
+    --accent-hover: #1f2937;
+    --accent-subtle: #f3f4f6;
 
     /* Functional Colors */
     --success: #34c759;
