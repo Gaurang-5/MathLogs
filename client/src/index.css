@@ -1,7 +1,31 @@
 @import "tailwindcss";
 
 @theme {
-    /* Using Tailwind config where possible, but overrides here for specificity */
+    --color-app-bg: var(--bg-app);
+    --color-app-surface: var(--bg-surface);
+    --color-app-surface-opaque: var(--bg-surface-opaque);
+    --color-app-text: var(--text-main);
+    --color-app-text-secondary: var(--text-secondary);
+    --color-app-text-tertiary: var(--text-tertiary);
+    --color-app-border: var(--border-subtle);
+
+    --color-primary: var(--neutral-900);
+    --color-primary-foreground: #ffffff;
+
+    --color-accent: var(--accent-primary);
+    --color-accent-hover: var(--accent-hover);
+    --color-accent-subtle: var(--accent-subtle);
+
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-danger: var(--danger);
+
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+    --shadow-sm: var(--shadow-sm);
+    --shadow-md: var(--shadow-md);
+    --shadow-lg: var(--shadow-lg);
+    --shadow-xl: var(--shadow-xl);
 }
 
 :root {
