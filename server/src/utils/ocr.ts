@@ -50,11 +50,10 @@ export async function processOCR(input: Buffer | string): Promise<{ score: strin
         cleanBase64 = input.replace(/^data:image\/(png|jpeg|webp);base64,/, "");
     }
 
-    // Primary choice is Flash (fast/cheap). Backup choices use Pro tier (separate quota) to bypass 429 errors.
+    // Primary: 2.5 Flash (best price/performance). Fallback: 2.5 Flash Lite.
     const models = [
-        "gemini-2.0-flash",
-        "gemini-2.5-pro",
-        "gemini-pro-latest"
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
     ];
 
     for (const modelName of models) {

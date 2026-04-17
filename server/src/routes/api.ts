@@ -150,37 +150,14 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
             return res.json(cached);
         }
 
-        // ──────────────────────────────────────────────────────
-        // ──────────────────────────────────────────────────────
-        // PRIMARY ENGINE: Amazon Textract
-        // To re-enable Gemini comparison, uncomment the block below
-        // ──────────────────────────────────────────────────────
-
+        // DUAL ENGINE: Textract + Gemini run in parallel
         // Parse maxMarks from form data (sent alongside the image)
         const maxMarks = req.body.maxMarks ? parseFloat(req.body.maxMarks) : undefined;
         if (maxMarks) console.log(`📏 MaxMarks constraint: ${maxMarks}`);
 
-        const result = await processOCRTextract(imageBuffer, maxMarks);
-
-        console.log(`✅ OCR (Textract) → "${result.score}" (confidence: ${result.confidence})${maxMarks ? ` [max: ${maxMarks}]` : ''}`);
-
-        await setOcrCache(hash, result);
-
-        res.json({
-            score: result.score,
-            confidence: result.confidence,
-            raw: result.raw,
-            source: 'textract',
-        });
-
-        // ──────────────────────────────────────────────────────
-        // DISABLED: Gemini comparison mode (kept for future use)
-        // To re-enable, uncomment below and comment out the Textract-only block above
-        // ──────────────────────────────────────────────────────
-        /*
         const [geminiResult, textractResult] = await Promise.allSettled([
             processOCR(imageBuffer),
-            processOCRTextract(imageBuffer).catch((err: any) => {
+            processOCRTextract(imageBuffer, maxMarks).catch((err: any) => {
                 console.warn("⚠️ Textract failed:", err.message);
                 return { score: "TEXTRACT_ERROR", confidence: 0, raw: err.message, rawTexts: [] };
             })
@@ -195,27 +172,32 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
             : { score: "TEXTRACT_ERROR", confidence: 0, raw: (textractResult as any).reason?.message || "Unknown error", rawTexts: [] };
 
         const match = gemini.score === (textract as any).score;
-        console.log(`✅ OCR Comparison | Gemini: "${gemini.score}" | Textract: "${(textract as any).score}" | Match: ${match ? '✅' : '❌'}`);
+        console.log(`✅ OCR | Gemini: "${gemini.score}" (${(gemini.confidence * 100).toFixed(0)}%) | Textract: "${(textract as any).score}" (${((textract as any).confidence * 100).toFixed(0)}%) | Match: ${match ? '✅' : '❌'}`);
 
         const geminiOk = gemini.score && !gemini.score.includes('ERROR');
         const textractOk = (textract as any).score && !(textract as any).score.includes('ERROR');
         let primary: { score: string; confidence: number; raw: string; source: string };
 
         if (geminiOk && textractOk) {
-            primary = gemini.confidence >= (textract as any).confidence
-                ? { score: gemini.score, confidence: gemini.confidence, raw: gemini.raw, source: 'gemini' }
-                : { score: (textract as any).score, confidence: (textract as any).confidence, raw: (textract as any).raw, source: 'textract' };
+            if (match) {
+                primary = { score: gemini.score, confidence: Math.min(1, gemini.confidence + 0.1), raw: gemini.raw, source: 'both' };
+            } else {
+                primary = gemini.confidence >= (textract as any).confidence
+                    ? { score: gemini.score, confidence: gemini.confidence, raw: gemini.raw, source: 'gemini' }
+                    : { score: (textract as any).score, confidence: (textract as any).confidence, raw: (textract as any).raw, source: 'textract' };
+            }
         } else if (textractOk) {
             primary = { score: (textract as any).score, confidence: (textract as any).confidence, raw: (textract as any).raw, source: 'textract' };
-        } else {
+        } else if (geminiOk) {
             primary = { score: gemini.score, confidence: gemini.confidence, raw: gemini.raw, source: 'gemini' };
+        } else {
+            primary = { score: "ERROR_UNCERTAIN", confidence: 0, raw: "Both engines failed", source: 'none' };
         }
 
         await setOcrCache(hash, primary);
-        res.json({ score: primary.score, confidence: primary.confidence, raw: primary.raw, source: primary.source,
-            comparison: { gemini: { score: gemini.score, confidence: gemini.confidence }, textract: { score: (textract as any).score, confidence: (textract as any).confidence }, match }
-        });
-        */
+        res.json({ score: primary.score, confidence: primary.confidence, raw: primary.raw, source: primary.source });
+
+
 
     } catch (error: any) {
         console.error("❌ OCR Proxy Error:", error);
