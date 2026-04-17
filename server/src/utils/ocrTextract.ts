@@ -9,6 +9,8 @@ const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
 const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
 
 let textractClient: TextractClient | null = null;
+const BOX_CENTERS = [0.17, 0.5, 0.83] as const;
+const MAX_BOX_DISTANCE = 0.2;
 
 function getClient(): TextractClient {
     if (textractClient) return textractClient;
@@ -37,7 +39,7 @@ function getClient(): TextractClient {
  *   - Non-numeric labels that survived cropping
  *   - Tiny stray detections (noise)
  */
-function extractScoreFromBlocks(blocks: Block[], maxMarks?: number): { score: string; confidence: number; rawTexts: string[] } {
+export function extractScoreFromBlocks(blocks: Block[], maxMarks?: number): { score: string; confidence: number; rawTexts: string[] } {
     const textBlocks: Array<{
         text: string;
         normalizedText: string;
@@ -105,8 +107,7 @@ function extractScoreFromBlocks(blocks: Block[], maxMarks?: number): { score: st
         return { score: "ERROR_UNCERTAIN", confidence: 0, rawTexts };
     }
 
-    // 3. Dynamic Assignment of Digits
-    // Sort all characters across all blocks by their CenterX
+    // 3. Assign candidate characters to the known three-box layout.
     const allChars: Array<{ char: string, centerX: number, confidence: number }> = [];
 
     for (const b of validDigits) {
@@ -123,56 +124,52 @@ function extractScoreFromBlocks(blocks: Block[], maxMarks?: number): { score: st
     // Sort left to right
     allChars.sort((a, b) => a.centerX - b.centerX);
 
+    const boxCandidates = BOX_CENTERS.map((center, index) => {
+        const ranked = allChars
+            .map((candidate) => {
+                const distance = Math.abs(candidate.centerX - center);
+                const proximityScore = Math.max(0, 1 - (distance / MAX_BOX_DISTANCE));
+                return {
+                    ...candidate,
+                    distance,
+                    score: candidate.confidence + (proximityScore * 35),
+                    boxIndex: index,
+                };
+            })
+            .filter((candidate) => candidate.distance <= MAX_BOX_DISTANCE)
+            .sort((a, b) => b.score - a.score);
+
+        return ranked[0] || null;
+    });
+
+    let selectedBoxes = boxCandidates
+        .map((candidate, boxIndex) => ({ candidate, boxIndex }))
+        .filter((entry): entry is { candidate: NonNullable<typeof boxCandidates[number]>; boxIndex: number } => Boolean(entry.candidate));
+
+    // Prefer the last N boxes when the score cannot legally have more digits.
+    const maxDigits = maxMarks ? Math.max(1, String(Math.trunc(maxMarks)).length) : 3;
+    if (selectedBoxes.length > maxDigits) {
+        selectedBoxes = selectedBoxes.slice(selectedBoxes.length - maxDigits);
+    }
+
     let finalScore = "";
     let totalConf = 0;
-    const numBoxes = allChars.length;
 
-    // Determine max digits allowed based on maxMarks
-    // e.g. maxMarks=20 → max 2 digits, maxMarks=9 → max 1 digit
-    const maxDigits = maxMarks ? Math.max(1, String(maxMarks).length) : 3;
-
-    // Trim characters to maxDigits (take rightmost/last N chars since they're most likely the actual score)
-    const effectiveChars = allChars.length > maxDigits ? allChars.slice(-maxDigits) : allChars;
-    const effectiveCount = effectiveChars.length;
-
-    if (effectiveCount === 3) {
-        // 3 blocks: Hundreds, Tens, Ones
-        finalScore = effectiveChars.map(c => c.char).join("");
-        totalConf = effectiveChars.reduce((sum, c) => sum + c.confidence, 0);
-    } else if (effectiveCount === 2) {
-        // 2 blocks: Could be Tens+Ones (85), Hundreds+Tens (10), or Hundreds+Ones (105)
-        const [left, right] = effectiveChars;
-        
-        // Define rough centers for the three boxes to gauge spacing
-        // Box 1 ~ 0.16, Box 2 ~ 0.50, Box 3 ~ 0.83
-        const getBoxIndex = (cx: number) => {
-            const dist0 = Math.abs(cx - 0.16);
-            const dist1 = Math.abs(cx - 0.50);
-            const dist2 = Math.abs(cx - 0.83);
-            if (dist0 <= dist1 && dist0 <= dist2) return 0;
-            if (dist1 <= dist0 && dist1 <= dist2) return 1;
-            return 2;
-        };
-
-        const leftBox = getBoxIndex(left.centerX);
-        const rightBox = getBoxIndex(right.centerX);
-
-        if (leftBox === 0 && rightBox === 2) {
-            // Gap in the middle! It must be Hundreds and Ones (e.g., 1_5 -> 105)
-            finalScore = left.char + "0" + right.char;
+    if (selectedBoxes.length > 0) {
+        // Only preserve an internal zero for 3-digit score sheets where the middle box is blank.
+        if (selectedBoxes.length === 2 && selectedBoxes[0].boxIndex === 0 && selectedBoxes[1].boxIndex === 2 && maxDigits >= 3) {
+            finalScore = `${selectedBoxes[0].candidate.char}0${selectedBoxes[1].candidate.char}`;
+            totalConf = selectedBoxes[0].candidate.confidence + selectedBoxes[1].candidate.confidence;
         } else {
-            // Consecutive boxes or adjacent: just join them (Tens+Ones or Hundreds+Tens)
-            finalScore = left.char + right.char;
+            finalScore = selectedBoxes.map(({ candidate }) => candidate.char).join("");
+            totalConf = selectedBoxes.reduce((sum, { candidate }) => sum + candidate.confidence, 0);
         }
-        totalConf = left.confidence + right.confidence;
-    } else if (effectiveCount === 1) {
-        // 1 block: Safely assume it is the Ones place (a single digit score)
-        finalScore = effectiveChars[0].char;
-        totalConf = effectiveChars[0].confidence;
-    } else if (effectiveCount > 3) {
-        // Fallback for >3 decoded digits
-        finalScore = effectiveChars.map(c => c.char).join("").substring(0, 3);
-        totalConf = effectiveChars.slice(0, 3).reduce((sum, c) => sum + c.confidence, 0);
+    }
+
+    if (!finalScore && allChars.length > 0) {
+        const fallbackChars = allChars.length > maxDigits ? allChars.slice(allChars.length - maxDigits) : allChars;
+        finalScore = fallbackChars.map((c) => c.char).join("");
+        totalConf = fallbackChars.reduce((sum, c) => sum + c.confidence, 0);
     }
 
     if (!finalScore) {
@@ -198,7 +195,9 @@ function extractScoreFromBlocks(blocks: Block[], maxMarks?: number): { score: st
 
     return {
         score: finalScore,
-        confidence: effectiveCount > 0 ? (totalConf / Math.min(effectiveCount, 3)) / 100 : 0,
+        confidence: selectedBoxes.length > 0
+            ? (totalConf / selectedBoxes.length) / 100
+            : (allChars.length > 0 ? (totalConf / Math.min(allChars.length, 3)) / 100 : 0),
         rawTexts
     };
 }

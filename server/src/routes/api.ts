@@ -18,7 +18,6 @@ import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../
 import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } from '../controllers/onboardingController';
 import { getPaymentHistory } from '../controllers/feeController';
 import multer from 'multer';
-import { processOCR } from '../utils/ocr';
 import { processOCRTextract } from '../utils/ocrTextract';
 
 import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
@@ -162,16 +161,18 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
 
         const result = await processOCRTextract(imageBuffer, maxMarks);
 
-        console.log(`✅ OCR (Textract) → "${result.score}" (confidence: ${result.confidence})${maxMarks ? ` [max: ${maxMarks}]` : ''}`);
+        console.log(`✅ OCR (textract) → "${result.score}" (confidence: ${result.confidence})${maxMarks ? ` [max: ${maxMarks}]` : ''}`);
 
-        await setOcrCache(hash, result);
-
-        res.json({
+        const responsePayload = {
             score: result.score,
             confidence: result.confidence,
             raw: result.raw,
             source: 'textract',
-        });
+        };
+
+        await setOcrCache(hash, responsePayload);
+
+        res.json(responsePayload);
 
         // ──────────────────────────────────────────────────────
         // DISABLED: Gemini comparison mode (kept for future use)

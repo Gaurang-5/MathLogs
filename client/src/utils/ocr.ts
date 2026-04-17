@@ -5,6 +5,15 @@ export interface OCRResult {
     debugImage?: string;
 }
 
+// Mirrors the normalized box strip produced in server/src/controllers/stickerController.ts.
+// We only send the handwritten digit row to OCR, not the full right-hand sticker panel.
+const DIGIT_STRIP_BOUNDS = {
+    left: 0.43,
+    top: 0.44,
+    right: 0.93,
+    bottom: 0.89,
+} as const;
+
 // Helper for preprocessing (still used)
 async function preprocessImage(imageBase64: string): Promise<string> {
     return new Promise((resolve) => {
@@ -47,50 +56,63 @@ async function preprocessImage(imageBase64: string): Promise<string> {
 }
 
 /**
- * Crops ONLY the 3 digit-box area from the CV-warped sticker image.
- *
- * Sticker layout (warped to 1200×646):
- *   Left 42%  → QR code + divider (excluded)
- *   Right 58% → Student info area:
- *     - Top ~45%    → Student name + "MARKS:" label (excluded)
- *     - Bottom ~55% → The 3 handwritten digit boxes (KEPT)
- *
- * By cropping to ONLY the digit boxes we:
- *   1. Eliminate the student name (may contain numbers like "Class 10")
- *   2. Eliminate the "MARKS:" label text
- *   3. Eliminate any writing/numbers outside the sticker borders
- *   4. Give Textract a tiny, focused image → faster + more accurate
+ * Crops the handwritten digit strip using the same geometry as the generated sticker.
+ * This avoids sending the QR area, student name, MARKS label, or vertical OCR watermark.
  */
 async function cropMarksRegion(warpedBase64: string): Promise<string> {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
-            // Horizontal: skip QR + divider (left 42%), keep digit area
-            const marksStartX = Math.floor(img.width * 0.42);
-            // Vertical: skip name + "MARKS:" label (top 45%), keep digit boxes
-            const digitBoxStartY = Math.floor(img.height * 0.45);
+            const marksStartX = Math.max(0, Math.floor(img.width * DIGIT_STRIP_BOUNDS.left));
+            const digitBoxStartY = Math.max(0, Math.floor(img.height * DIGIT_STRIP_BOUNDS.top));
+            const marksEndX = Math.min(img.width, Math.ceil(img.width * DIGIT_STRIP_BOUNDS.right));
+            const digitBoxEndY = Math.min(img.height, Math.ceil(img.height * DIGIT_STRIP_BOUNDS.bottom));
 
-            const cropWidth = img.width - marksStartX;
-            const cropHeight = img.height - digitBoxStartY;
+            const cropWidth = Math.max(1, marksEndX - marksStartX);
+            const cropHeight = Math.max(1, digitBoxEndY - digitBoxStartY);
+            const upscale = 2;
 
             const canvas = document.createElement('canvas');
-            canvas.width = cropWidth;
-            canvas.height = cropHeight;
+            canvas.width = cropWidth * upscale;
+            canvas.height = cropHeight * upscale;
             const ctx = canvas.getContext('2d');
             if (!ctx) { resolve(warpedBase64); return; }
 
-            // White background to avoid edge artifacts
+            // Keep the handwriting crisp when enlarging the digit strip.
+            ctx.imageSmoothingEnabled = false;
             ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, cropWidth, cropHeight);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(
                 img,
                 marksStartX, digitBoxStartY,   // source x, y
                 cropWidth, cropHeight,          // source w, h
                 0, 0,                           // dest x, y
-                cropWidth, cropHeight            // dest w, h
+                canvas.width, canvas.height
             );
 
-            resolve(canvas.toDataURL('image/jpeg', 0.92));
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const pixels = imageData.data;
+            for (let i = 0; i < pixels.length; i += 4) {
+                const gray = (pixels[i] * 0.299) + (pixels[i + 1] * 0.587) + (pixels[i + 2] * 0.114);
+
+                let normalized = gray;
+                if (gray > 225) {
+                    normalized = 255;
+                } else if (gray < 120) {
+                    normalized = 0;
+                } else {
+                    normalized = ((gray - 120) / 105) * 255;
+                }
+
+                const finalGray = Math.max(0, Math.min(255, Math.round(normalized)));
+                pixels[i] = finalGray;
+                pixels[i + 1] = finalGray;
+                pixels[i + 2] = finalGray;
+                pixels[i + 3] = 255;
+            }
+            ctx.putImageData(imageData, 0, 0);
+
+            resolve(canvas.toDataURL('image/jpeg', 0.98));
         };
         img.onerror = () => resolve(warpedBase64);
         img.src = warpedBase64;
@@ -204,4 +226,3 @@ export async function extractMarksFromSticker(
 
     return { score: "", confidence: 0, debugImage: processedImage };
 }
-
