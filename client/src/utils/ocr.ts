@@ -187,11 +187,24 @@ function buildBoxImage(
     rawCtx.fillRect(0, 0, rawBox.width, rawBox.height);
     rawCtx.drawImage(source, srcX, srcY, srcW, srcH, 0, 0, rawBox.width, rawBox.height);
 
-    const normalizedBox = normalizeCanvas(rawBox);
-    const bounds = trimDigitBounds(normalizedBox);
-    const trimmedW = Math.max(1, bounds.right - bounds.left);
-    const trimmedH = Math.max(1, bounds.bottom - bounds.top);
+    // Remove the printed box frame and underline before looking for handwriting.
+    const innerX = Math.floor(rawBox.width * 0.14);
+    const innerY = Math.floor(rawBox.height * 0.12);
+    const innerW = Math.max(1, Math.floor(rawBox.width * 0.72));
+    const innerH = Math.max(1, Math.floor(rawBox.height * 0.68));
 
+    const innerBox = document.createElement('canvas');
+    innerBox.width = innerW;
+    innerBox.height = innerH;
+    const innerCtx = innerBox.getContext('2d');
+    if (!innerCtx) return rawBox;
+
+    innerCtx.fillStyle = '#FFFFFF';
+    innerCtx.fillRect(0, 0, innerBox.width, innerBox.height);
+    innerCtx.drawImage(rawBox, innerX, innerY, innerW, innerH, 0, 0, innerW, innerH);
+
+    const normalizedBox = normalizeCanvas(innerBox);
+    const { darkRatio } = getDarkProfiles(normalizedBox, 185);
     const output = document.createElement('canvas');
     output.width = 220;
     output.height = 260;
@@ -200,6 +213,15 @@ function buildBoxImage(
 
     outputCtx.fillStyle = '#FFFFFF';
     outputCtx.fillRect(0, 0, output.width, output.height);
+
+    if (darkRatio < 0.008 || darkRatio > 0.50) {
+        return output;
+    }
+
+    const bounds = trimDigitBounds(normalizedBox);
+    const trimmedW = Math.max(1, bounds.right - bounds.left);
+    const trimmedH = Math.max(1, bounds.bottom - bounds.top);
+
     outputCtx.drawImage(
         normalizedBox,
         bounds.left,
