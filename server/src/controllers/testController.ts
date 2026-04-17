@@ -4,7 +4,7 @@ import PDFDocument from 'pdfkit';
 import { addMathLogsHeader } from '../utils/pdfUtils';
 
 export const createTest = async (req: Request, res: Response) => {
-    const { name, subject, date, maxMarks, className } = req.body;
+    const { name, subject, date, maxMarks, className, batchId } = req.body;
     const teacherId = (req as any).user?.id;
     const user = (req as any).user;
     const academicYearId = (req as any).user?.currentAcademicYearId;
@@ -23,7 +23,8 @@ export const createTest = async (req: Request, res: Response) => {
                 maxMarks: parseFloat(maxMarks),
                 teacherId,
                 academicYearId,
-                instituteId: user.instituteId  // ✅ SECURITY: Multi-tenant isolation
+                instituteId: user.instituteId, // ✅ SECURITY: Multi-tenant isolation
+                batchId
             }
         });
         res.json(test);
@@ -46,6 +47,9 @@ export const getTests = async (req: Request, res: Response) => {
             include: {
                 _count: {
                     select: { marks: true }
+                },
+                batch: {
+                    select: { name: true, className: true }
                 }
             }
         });
@@ -315,7 +319,7 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
         // Fetch test details (lightweight query)
         const test = await prisma.test.findUnique({
             where: { id: String(id) },
-            select: { teacherId: true, className: true } // Only fetch what's needed
+            select: { teacherId: true, batchId: true, className: true } // Fetch batchId
         });
 
         if (!test) return res.status(404).json({ error: 'Test not found' });
@@ -324,30 +328,52 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        // Find students:
-        // 1. Same Academic Year
-        // 2. Matching Class Name (via Batch)
-        // 3. Approved status
-        // 4. NO existing mark for this test (DB-level filtering)
-        const students = await prisma.student.findMany({
-            where: {
-                academicYearId: currentAcademicYearId,
-                batch: {
-                    className: test.className || undefined
-                },
-                status: 'APPROVED',
-                marks: {
-                    none: {
-                        testId: String(id)
-                    }
-                }
-            },
-            include: {
-                batch: {
-                    select: { name: true }
-                }
-            },
-            orderBy: { name: 'asc' }
+        const students = await prisma.test.findUnique({ where: { id: String(id) } }).then(async (testData) => {
+            if(!testData) return [];
+            
+            // If test has a specific batchId, ONLY show students from that batch
+            if (testData.batchId) {
+                return prisma.student.findMany({
+                    where: {
+                        academicYearId: currentAcademicYearId,
+                        batchId: testData.batchId,
+                        status: 'APPROVED',
+                        marks: {
+                            none: {
+                                testId: String(id)
+                            }
+                        }
+                    },
+                    include: {
+                        batch: {
+                            select: { name: true }
+                        }
+                    },
+                    orderBy: { name: 'asc' }
+                });
+            } else {
+                // Fallback for older tests that only had className
+                return prisma.student.findMany({
+                    where: {
+                        academicYearId: currentAcademicYearId,
+                        batch: {
+                            className: testData.className || undefined
+                        },
+                        status: 'APPROVED',
+                        marks: {
+                            none: {
+                                testId: String(id)
+                            }
+                        }
+                    },
+                    include: {
+                        batch: {
+                            select: { name: true }
+                        }
+                    },
+                    orderBy: { name: 'asc' }
+                });
+            }
         });
 
         const eligibleStudents = students.map((s: any) => ({
@@ -381,6 +407,7 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                 className: true,
                 teacherId: true,
                 instituteId: true,
+                batchId: true,
                 institute: { select: { name: true } }
             }
         });
@@ -390,37 +417,55 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        // Fetch all batch IDs where at least one student took this test
-        const testMarks = await prisma.mark.findMany({
-            where: { testId: test.id },
-            select: { student: { select: { batchId: true } } }
-        });
+        let students = [];
 
-        const testBatchIds = Array.from(new Set(
-            testMarks.map(m => m.student?.batchId).filter(Boolean)
-        )) as string[];
-
-        if (testBatchIds.length === 0) {
-            return res.status(400).json({ error: 'No marks found for this test. Cannot determine batches.' });
-        }
-
-        // 2. Fetch All Relevant Students (Only matching testBatchIds)
-        // We need students who are APPROVED
-        const students = await prisma.student.findMany({
-            where: {
-                academicYearId: currentAcademicYearId,
-                batchId: {
-                    in: testBatchIds
+        if (test.batchId) {
+            // Precise batch scoped tests don't need marks to know who should get messages!
+            students = await prisma.student.findMany({
+                where: {
+                    academicYearId: currentAcademicYearId,
+                    batchId: test.batchId,
+                    status: 'APPROVED'
                 },
-                status: 'APPROVED'
-            },
-            include: {
-                marks: {
-                    where: { testId: test.id },
-                    select: { score: true }
+                include: {
+                    marks: {
+                        where: { testId: test.id },
+                        select: { score: true }
+                    }
                 }
+            });
+        } else {
+            // Legacy tests without strict batchId bounding 
+            // We have to trace backwards from who has marks to figure out which batches to message
+            const testMarks = await prisma.mark.findMany({
+                where: { testId: test.id },
+                select: { student: { select: { batchId: true } } }
+            });
+
+            const testBatchIds = Array.from(new Set(
+                testMarks.map(m => m.student?.batchId).filter(Boolean)
+            )) as string[];
+
+            if (testBatchIds.length === 0) {
+                return res.status(400).json({ error: 'No marks found for this legacy test. Cannot determine batches to message.' });
             }
-        });
+
+            students = await prisma.student.findMany({
+                where: {
+                    academicYearId: currentAcademicYearId,
+                    batchId: {
+                        in: testBatchIds
+                    },
+                    status: 'APPROVED'
+                },
+                include: {
+                    marks: {
+                        where: { testId: test.id },
+                        select: { score: true }
+                    }
+                }
+            });
+        }
 
         if (students.length === 0) {
             return res.status(400).json({ error: 'No students found for this test.' });

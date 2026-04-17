@@ -116,6 +116,7 @@ model Batch {
   attendanceRecords   AttendanceRecord[]
   attendanceSweepRuns AttendanceSweepRun[]
   studentLeads        StudentLead[]
+  tests               Test[]
 
   @@index([teacherId, academicYearId, className])
   @@index([instituteId, academicYearId])
@@ -184,14 +185,17 @@ model Test {
   academicYear    String?
   academicYearId  String?
   instituteId     String?
+  batchId         String?
   marks           Mark[]
   academicYearRef AcademicYear? @relation(fields: [academicYearId], references: [id])
   institute       Institute?    @relation(fields: [instituteId], references: [id])
   teacher         Admin?        @relation(fields: [teacherId], references: [id])
+  batch           Batch?        @relation(fields: [batchId], references: [id])
 
   @@index([teacherId, academicYearId])
   @@index([date])
   @@index([instituteId, academicYearId])
+  @@index([batchId])
 }
 
 model Mark {

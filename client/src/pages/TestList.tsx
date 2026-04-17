@@ -14,6 +14,8 @@ interface Test {
     date: string;
     maxMarks: number;
     className?: string;
+    batchId?: string;
+    batch?: { name: string; className?: string };
     _count: { marks: number };
 }
 
@@ -71,7 +73,8 @@ export default function TestList() {
                 subject,
                 date,
                 maxMarks: parseFloat(maxMarks), // Convert to number
-                className
+                className,
+                batchId: selectedBatchId // Added batchId Support
             });
             // Navigate to Dashboard immediately
             navigate(`/tests/${res.id}`);
@@ -80,9 +83,20 @@ export default function TestList() {
         }
     };
 
-    const class10Tests = tests.filter(t => t.className === 'Class 10');
-    const class9Tests = tests.filter(t => t.className === 'Class 9');
-    const otherTests = tests.filter(t => t.className !== 'Class 10' && t.className !== 'Class 9');
+    // Group tests by batch
+    const groupedByBatch = tests.reduce((acc: Record<string, { batchName: string, tests: Test[] }>, test) => {
+        const batchKey = test.batchId || 'no-batch';
+        const batchName = test.batch ? test.batch.name : (test.className || 'Other');
+        
+        if (!acc[batchKey]) {
+            acc[batchKey] = {
+                batchName: batchName,
+                tests: []
+            };
+        }
+        acc[batchKey].tests.push(test);
+        return acc;
+    }, {});
 
     const TestCard = ({ test }: { test: Test }) => (
         <div
@@ -100,7 +114,7 @@ export default function TestList() {
             </div>
 
             <h3 className="text-xl font-bold text-app-text mb-1 truncate">{test.name}</h3>
-            <p className="text-app-text-secondary text-sm font-medium mb-4">{test.className ? `${test.className} • ` : ''}{test.subject}</p>
+            <p className="text-app-text-secondary text-sm font-medium mb-4">{test.batch?.name ? `${test.batch.name} • ` : (test.className ? `${test.className} • ` : '')}{test.subject}</p>
 
             <div className="mt-4 pt-4 border-t border-black/5 flex items-center text-xs font-bold text-app-text-tertiary tracking-wide uppercase">
                 <Calendar className="w-4 h-4 mr-2" />
@@ -200,35 +214,14 @@ export default function TestList() {
                 <div className="text-center py-20 animate-pulse text-app-text-secondary">Loading tests...</div>
             ) : (
                 <div className="space-y-12 pb-20">
-                    {/* Class 10 Section */}
-                    {class10Tests.length > 0 && (
-                        <section>
-                            <h3 className="text-lg font-bold text-app-text mb-6">Class 10 Tests</h3>
+                    {Object.entries(groupedByBatch).map(([batchId, group]) => (
+                        <section key={batchId}>
+                            <h3 className="text-lg font-bold text-app-text mb-6">{group.batchName} Tests</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {class10Tests.map(test => <TestCard key={test.id} test={test} />)}
+                                {group.tests.map(test => <TestCard key={test.id} test={test} />)}
                             </div>
                         </section>
-                    )}
-
-                    {/* Class 9 Section */}
-                    {class9Tests.length > 0 && (
-                        <section>
-                            <h3 className="text-lg font-bold text-app-text mb-6">Class 9 Tests</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {class9Tests.map(test => <TestCard key={test.id} test={test} />)}
-                            </div>
-                        </section>
-                    )}
-
-                    {/* Other Section */}
-                    {otherTests.length > 0 && (
-                        <section>
-                            <h3 className="text-lg font-bold text-app-text mb-6">Other Tests</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {otherTests.map(test => <TestCard key={test.id} test={test} />)}
-                            </div>
-                        </section>
-                    )}
+                    ))}
 
                     {tests.length === 0 && (
                         <div className="col-span-full py-20 text-center border-2 border-dashed border-app-border rounded-[24px]">

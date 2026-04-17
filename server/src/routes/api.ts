@@ -156,9 +156,13 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
         // To re-enable Gemini comparison, uncomment the block below
         // ──────────────────────────────────────────────────────
 
-        const result = await processOCRTextract(imageBuffer);
+        // Parse maxMarks from form data (sent alongside the image)
+        const maxMarks = req.body.maxMarks ? parseFloat(req.body.maxMarks) : undefined;
+        if (maxMarks) console.log(`📏 MaxMarks constraint: ${maxMarks}`);
 
-        console.log(`✅ OCR (Textract) → "${result.score}" (confidence: ${result.confidence})`);
+        const result = await processOCRTextract(imageBuffer, maxMarks);
+
+        console.log(`✅ OCR (Textract) → "${result.score}" (confidence: ${result.confidence})${maxMarks ? ` [max: ${maxMarks}]` : ''}`);
 
         await setOcrCache(hash, result);
 

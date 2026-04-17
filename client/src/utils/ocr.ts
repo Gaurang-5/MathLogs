@@ -104,7 +104,8 @@ async function cropMarksRegion(warpedBase64: string): Promise<string> {
  */
 export async function extractMarksFromSticker(
     videoElement: HTMLVideoElement,
-    imageOverride?: string | null
+    imageOverride?: string | null,
+    maxMarks?: number
 ): Promise<OCRResult> {
 
 
@@ -162,6 +163,7 @@ export async function extractMarksFromSticker(
         const fetchRes = await fetch(processedImage);
         const blob = await fetchRes.blob();
         formData.append('image', blob, 'scan.jpg');
+        if (maxMarks) formData.append('maxMarks', String(maxMarks));
 
         const token = localStorage.getItem('token');
         if (!token) {

@@ -17,7 +17,10 @@ declare global {
 
 interface ScanTest {
     id: string;
+    name?: string;
+    subject?: string;
     className?: string | null;
+    maxMarks?: number;
 }
 
 interface StudentMark {
@@ -201,9 +204,13 @@ export default function ScanMarks() {
 
                                     if (!smartImage) console.warn("⚠️ CV warp failed — using raw video fallback");
 
+                                    // Get maxMarks from the selected test for OCR range validation
+                                    const currentTest = testsRef.current.find(t => t.id === selectedTestId);
+                                    const testMaxMarks = currentTest?.maxMarks;
+
                                     return smartImage
-                                        ? await extractMarksFromSticker(videoElement, smartImage)
-                                        : await extractMarksFromSticker(videoElement);
+                                        ? await extractMarksFromSticker(videoElement, smartImage, testMaxMarks)
+                                        : await extractMarksFromSticker(videoElement, undefined, testMaxMarks);
                                 } catch (ocrErr) {
                                     console.error("❌ OCR Error:", ocrErr);
                                     return { score: "", confidence: 0, debugImage: null };

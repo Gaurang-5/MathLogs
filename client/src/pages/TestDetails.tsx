@@ -570,9 +570,9 @@ export default function TestDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 10 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                            className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 overflow-hidden"
+                            className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 overflow-visible"
                         >
-                            <div className="px-6 py-4 border-b border-black/5 flex justify-between items-center bg-gray-50/50">
+                            <div className="px-6 py-4 border-b border-black/5 flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
                                 <h3 className="font-bold text-lg text-gray-800">Add Manual Result</h3>
                                 <button onClick={() => setShowAddResult(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
                                     <X className="w-5 h-5 text-gray-500" />
@@ -586,7 +586,7 @@ export default function TestDetails() {
                                         <div className="text-sm text-gray-400">Loading students...</div>
                                     ) : eligibleStudents.length === 0 ? (
                                         <div className="text-sm text-orange-500 bg-orange-50 p-3 rounded-lg border border-orange-100">
-                                            No eligible students found. All students in this class/year might already have marks.
+                                            No eligible students found. All students in this batch might already have marks.
                                         </div>
                                     ) : (
                                         <div className="mt-[-8px]">
@@ -598,7 +598,7 @@ export default function TestDetails() {
                                                 required={true}
                                                 options={eligibleStudents.map((s) => ({
                                                     value: s.id,
-                                                    label: `${s.name} (${s.batchName || 'No Batch'})`
+                                                    label: s.batchName ? `${s.name} (${s.batchName.split('(')[0].trim()})` : s.name
                                                 }))}
                                             />
                                         </div>
@@ -665,7 +665,7 @@ export default function TestDetails() {
 
                             <h3 className="text-xl font-bold text-app-text mb-2">Send Results?</h3>
                             <p className="text-app-text-secondary mb-8">
-                                This will send email reports to all parents of students in this batch.
+                                This will send Email and WhatsApp reports to all parents of students in this batch.
                             </p>
 
                             <div className="flex flex-col gap-3">
@@ -680,7 +680,7 @@ export default function TestDetails() {
                                             Sending...
                                         </>
                                     ) : (
-                                        'Yes, Send Emails'
+                                        'Yes, Send Reports'
                                     )}
                                 </button>
                                 <button

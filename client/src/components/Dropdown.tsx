@@ -87,7 +87,7 @@ export default function Dropdown({ label, value, onChange, options, placeholder 
                                 }`}
                                 style={{ width: 'calc(100% - 12px)' }}
                             >
-                                <span className="text-sm">{option.label}</span>
+                                <span className="text-sm truncate mr-2">{option.label}</span>
                                 {value === option.value && <Check className="w-4 h-4 shrink-0" />}
                             </button>
                         ))}

@@ -37,7 +37,7 @@ function getClient(): TextractClient {
  *   - Non-numeric labels that survived cropping
  *   - Tiny stray detections (noise)
  */
-function extractScoreFromBlocks(blocks: Block[]): { score: string; confidence: number; rawTexts: string[] } {
+function extractScoreFromBlocks(blocks: Block[], maxMarks?: number): { score: string; confidence: number; rawTexts: string[] } {
     const textBlocks: Array<{
         text: string;
         normalizedText: string;
@@ -127,13 +127,21 @@ function extractScoreFromBlocks(blocks: Block[]): { score: string; confidence: n
     let totalConf = 0;
     const numBoxes = allChars.length;
 
-    if (numBoxes === 3) {
+    // Determine max digits allowed based on maxMarks
+    // e.g. maxMarks=20 → max 2 digits, maxMarks=9 → max 1 digit
+    const maxDigits = maxMarks ? Math.max(1, String(maxMarks).length) : 3;
+
+    // Trim characters to maxDigits (take rightmost/last N chars since they're most likely the actual score)
+    const effectiveChars = allChars.length > maxDigits ? allChars.slice(-maxDigits) : allChars;
+    const effectiveCount = effectiveChars.length;
+
+    if (effectiveCount === 3) {
         // 3 blocks: Hundreds, Tens, Ones
-        finalScore = allChars.map(c => c.char).join("");
-        totalConf = allChars.reduce((sum, c) => sum + c.confidence, 0);
-    } else if (numBoxes === 2) {
+        finalScore = effectiveChars.map(c => c.char).join("");
+        totalConf = effectiveChars.reduce((sum, c) => sum + c.confidence, 0);
+    } else if (effectiveCount === 2) {
         // 2 blocks: Could be Tens+Ones (85), Hundreds+Tens (10), or Hundreds+Ones (105)
-        const [left, right] = allChars;
+        const [left, right] = effectiveChars;
         
         // Define rough centers for the three boxes to gauge spacing
         // Box 1 ~ 0.16, Box 2 ~ 0.50, Box 3 ~ 0.83
@@ -157,23 +165,40 @@ function extractScoreFromBlocks(blocks: Block[]): { score: string; confidence: n
             finalScore = left.char + right.char;
         }
         totalConf = left.confidence + right.confidence;
-    } else if (numBoxes === 1) {
+    } else if (effectiveCount === 1) {
         // 1 block: Safely assume it is the Ones place (a single digit score)
-        finalScore = allChars[0].char;
-        totalConf = allChars[0].confidence;
-    } else if (numBoxes > 3) {
+        finalScore = effectiveChars[0].char;
+        totalConf = effectiveChars[0].confidence;
+    } else if (effectiveCount > 3) {
         // Fallback for >3 decoded digits
-        finalScore = allChars.map(c => c.char).join("").substring(0, 3);
-        totalConf = allChars.slice(0, 3).reduce((sum, c) => sum + c.confidence, 0);
+        finalScore = effectiveChars.map(c => c.char).join("").substring(0, 3);
+        totalConf = effectiveChars.slice(0, 3).reduce((sum, c) => sum + c.confidence, 0);
     }
 
     if (!finalScore) {
         return { score: "ERROR_UNCERTAIN", confidence: 0, rawTexts };
     }
 
+    // Range validation: if we know maxMarks, reject scores that exceed it
+    if (maxMarks && parseInt(finalScore, 10) > maxMarks) {
+        // Try progressively shorter substrings (e.g., "85" → "8" if maxMarks=20)
+        // This handles cases where noise added an extra digit
+        for (let len = finalScore.length - 1; len >= 1; len--) {
+            const shorter = finalScore.substring(finalScore.length - len);
+            if (parseInt(shorter, 10) <= maxMarks) {
+                finalScore = shorter;
+                break;
+            }
+        }
+        // If still exceeds after trimming, flag as uncertain
+        if (parseInt(finalScore, 10) > maxMarks) {
+            return { score: "ERROR_UNCERTAIN", confidence: 0, rawTexts };
+        }
+    }
+
     return {
         score: finalScore,
-        confidence: numBoxes > 0 ? (totalConf / Math.min(numBoxes, 3)) / 100 : 0,
+        confidence: effectiveCount > 0 ? (totalConf / Math.min(effectiveCount, 3)) / 100 : 0,
         rawTexts
     };
 }
@@ -184,7 +209,8 @@ function extractScoreFromBlocks(blocks: Block[]): { score: string; confidence: n
  * Sufficient for reading handwritten digits from the tightly-cropped digit box image.
  */
 export async function processOCRTextract(
-    input: Buffer | string
+    input: Buffer | string,
+    maxMarks?: number
 ): Promise<{ score: string; confidence: number; raw: string; rawTexts: string[] }> {
     const client = getClient();
 
@@ -214,7 +240,7 @@ export async function processOCRTextract(
         };
     }
 
-    const { score, confidence, rawTexts } = extractScoreFromBlocks(response.Blocks);
+    const { score, confidence, rawTexts } = extractScoreFromBlocks(response.Blocks, maxMarks);
 
     return {
         score,
