@@ -15,6 +15,7 @@ interface CropBounds {
 interface PreparedMarksCrop {
     ocrImage: string | null;
     debugImage: string | null;
+    boxImages: string[];
 }
 
 // Fixed crops work only when the sticker warp is perfect. In real scans the warp can drift,
@@ -142,6 +143,76 @@ function normalizeCanvas(canvas: HTMLCanvasElement): HTMLCanvasElement {
 
     ctx.putImageData(imageData, 0, 0);
     return normalized;
+}
+
+function trimDigitBounds(canvas: HTMLCanvasElement) {
+    const { rowDark, columnDark } = getDarkProfiles(canvas, 210);
+    const width = canvas.width;
+    const height = canvas.height;
+
+    let left = 0;
+    while (left < width - 1 && columnDark[left] <= 1) left++;
+
+    let right = width - 1;
+    while (right > left && columnDark[right] <= 1) right--;
+
+    let top = 0;
+    while (top < height - 1 && rowDark[top] <= 1) top++;
+
+    let bottom = height - 1;
+    while (bottom > top && rowDark[bottom] <= 1) bottom--;
+
+    return {
+        left: Math.max(0, left - Math.floor(width * 0.06)),
+        top: Math.max(0, top - Math.floor(height * 0.08)),
+        right: Math.min(width, right + Math.floor(width * 0.06)),
+        bottom: Math.min(height, bottom + Math.floor(height * 0.08)),
+    };
+}
+
+function buildBoxImage(
+    source: HTMLCanvasElement,
+    srcX: number,
+    srcY: number,
+    srcW: number,
+    srcH: number
+): HTMLCanvasElement {
+    const rawBox = document.createElement('canvas');
+    rawBox.width = Math.max(1, srcW);
+    rawBox.height = Math.max(1, srcH);
+    const rawCtx = rawBox.getContext('2d');
+    if (!rawCtx) return rawBox;
+
+    rawCtx.fillStyle = '#FFFFFF';
+    rawCtx.fillRect(0, 0, rawBox.width, rawBox.height);
+    rawCtx.drawImage(source, srcX, srcY, srcW, srcH, 0, 0, rawBox.width, rawBox.height);
+
+    const normalizedBox = normalizeCanvas(rawBox);
+    const bounds = trimDigitBounds(normalizedBox);
+    const trimmedW = Math.max(1, bounds.right - bounds.left);
+    const trimmedH = Math.max(1, bounds.bottom - bounds.top);
+
+    const output = document.createElement('canvas');
+    output.width = 220;
+    output.height = 260;
+    const outputCtx = output.getContext('2d');
+    if (!outputCtx) return normalizedBox;
+
+    outputCtx.fillStyle = '#FFFFFF';
+    outputCtx.fillRect(0, 0, output.width, output.height);
+    outputCtx.drawImage(
+        normalizedBox,
+        bounds.left,
+        bounds.top,
+        trimmedW,
+        trimmedH,
+        30,
+        24,
+        output.width - 60,
+        output.height - 48
+    );
+
+    return normalizeCanvas(output);
 }
 
 function getDarkProfiles(canvas: HTMLCanvasElement, threshold = 185) {
@@ -276,7 +347,7 @@ function composeBoxStrip(canvas: HTMLCanvasElement): PreparedMarksCrop {
     const normalizedCanvas = normalizeCanvas(canvas);
     const { darkRatio } = getDarkProfiles(normalizedCanvas, 185);
     if (darkRatio < 0.01 || darkRatio > 0.55) {
-        return { ocrImage: null, debugImage: normalizedCanvas.toDataURL('image/jpeg', 0.98) };
+        return { ocrImage: null, debugImage: canvas.toDataURL('image/jpeg', 0.98), boxImages: [] };
     }
 
     const { divider, rightMarker } = detectMarksAnchors(normalizedCanvas);
@@ -296,7 +367,7 @@ function composeBoxStrip(canvas: HTMLCanvasElement): PreparedMarksCrop {
     const stripHeight = bottom - top;
 
     if (stripWidth < width * 0.22 || stripHeight < height * 0.18) {
-        return { ocrImage: null, debugImage: normalizedCanvas.toDataURL('image/jpeg', 0.98) };
+        return { ocrImage: null, debugImage: canvas.toDataURL('image/jpeg', 0.98), boxImages: [] };
     }
 
     const slotWidth = stripWidth / 3;
@@ -308,11 +379,12 @@ function composeBoxStrip(canvas: HTMLCanvasElement): PreparedMarksCrop {
     composed.height = 250;
     const composedCtx = composed.getContext('2d');
     if (!composedCtx) {
-        return { ocrImage: null, debugImage: normalizedCanvas.toDataURL('image/jpeg', 0.98) };
+        return { ocrImage: null, debugImage: canvas.toDataURL('image/jpeg', 0.98), boxImages: [] };
     }
 
     composedCtx.fillStyle = '#FFFFFF';
     composedCtx.fillRect(0, 0, composed.width, composed.height);
+    const boxImages: string[] = [];
 
     for (let i = 0; i < 3; i++) {
         const srcX = Math.max(0, Math.floor(marksLeft + (i * slotWidth) + boxPaddingX));
@@ -324,7 +396,9 @@ function composeBoxStrip(canvas: HTMLCanvasElement): PreparedMarksCrop {
         const destW = 200;
         const destH = 214;
 
-        composedCtx.drawImage(normalizedCanvas, srcX, srcY, srcW, srcH, destX, destY, destW, destH);
+        const boxCanvas = buildBoxImage(normalizedCanvas, srcX, srcY, srcW, srcH);
+        boxImages.push(boxCanvas.toDataURL('image/jpeg', 0.98));
+        composedCtx.drawImage(boxCanvas, destX, destY, destW, destH);
         composedCtx.strokeStyle = '#D1D5DB';
         composedCtx.lineWidth = 2;
         composedCtx.strokeRect(destX, destY, destW, destH);
@@ -333,12 +407,13 @@ function composeBoxStrip(canvas: HTMLCanvasElement): PreparedMarksCrop {
     const finalNormalized = normalizeCanvas(composed);
     const finalProfiles = getDarkProfiles(finalNormalized, 185);
     if (finalProfiles.darkRatio < 0.01 || finalProfiles.darkRatio > 0.45) {
-        return { ocrImage: null, debugImage: finalNormalized.toDataURL('image/jpeg', 0.98) };
+        return { ocrImage: null, debugImage: composed.toDataURL('image/jpeg', 0.98), boxImages: [] };
     }
 
     return {
         ocrImage: finalNormalized.toDataURL('image/jpeg', 0.98),
         debugImage: finalNormalized.toDataURL('image/jpeg', 0.98),
+        boxImages,
     };
 }
 
@@ -363,15 +438,37 @@ async function cropMarksRegion(imageBase64: string, mode: 'warped' | 'raw'): Pro
             }
 
             if (!bestCanvas) {
-                resolve({ ocrImage: null, debugImage: imageBase64 });
+                resolve({ ocrImage: null, debugImage: imageBase64, boxImages: [] });
                 return;
             }
 
             resolve(composeBoxStrip(bestCanvas));
         };
-        img.onerror = () => resolve({ ocrImage: null, debugImage: imageBase64 });
+        img.onerror = () => resolve({ ocrImage: null, debugImage: imageBase64, boxImages: [] });
         img.src = imageBase64;
     });
+}
+
+async function sendImageToOCR(imageBase64: string, token: string, maxMarks?: number): Promise<{ score: string; confidence: number }> {
+    const formData = new FormData();
+    const fetchRes = await fetch(imageBase64);
+    const blob = await fetchRes.blob();
+    formData.append('image', blob, 'scan.jpg');
+    if (maxMarks) formData.append('maxMarks', String(maxMarks));
+
+    const response = await fetch('/api/scan-ocr', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Server OCR Error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
 }
 
 
@@ -389,6 +486,7 @@ export async function extractMarksFromSticker(
     let imageBase64 = "";
     let processedImage = "";
     let debugPreview = "";
+    let boxImages: string[] = [];
 
     if (imageOverride) {
         // Warp succeeded — crop just the marks region (right 58% of the warped sticker)
@@ -397,6 +495,7 @@ export async function extractMarksFromSticker(
         const prepared = await cropMarksRegion(imageBase64, 'warped');
         processedImage = prepared.ocrImage || "";
         debugPreview = prepared.debugImage || imageBase64;
+        boxImages = prepared.boxImages;
         console.log("📸 Using CV-warped → marks-region crop for OCR");
     } else {
         // Fallback: capture raw video frame cropped to sticker area
@@ -429,12 +528,14 @@ export async function extractMarksFromSticker(
             const prepared = await cropMarksRegion(prepped, 'raw');
             processedImage = prepared.ocrImage || "";
             debugPreview = prepared.debugImage || prepped;
+            boxImages = prepared.boxImages;
             console.log("📸 Using raw fallback → preprocessed → marks-region crop for OCR");
         } catch (e) {
             console.warn("Preprocessing failed, using raw fallback image", e);
             const prepared = await cropMarksRegion(imageBase64, 'raw');
             processedImage = prepared.ocrImage || "";
             debugPreview = prepared.debugImage || imageBase64;
+            boxImages = prepared.boxImages;
         }
     }
 
@@ -446,46 +547,59 @@ export async function extractMarksFromSticker(
 
     // 🚀 SECURITY: Use Backend Proxy with Multipart Upload
     try {
-        const formData = new FormData();
-
-        // Convert Base64 to Blob
-        const fetchRes = await fetch(processedImage);
-        const blob = await fetchRes.blob();
-        formData.append('image', blob, 'scan.jpg');
-        if (maxMarks) formData.append('maxMarks', String(maxMarks));
-
         const token = localStorage.getItem('token');
         if (!token) {
             console.error("❌ Not authenticated: Missing token for OCR");
             throw new Error("Authentication required for scanning");
         }
 
-        console.log(`📤 Sending ${blob.size} bytes to OCR server...`);
         const startTime = performance.now();
+        let data: { score: string; confidence: number };
 
-        const response = await fetch('/api/scan-ocr', {
-            method: 'POST',
-            body: formData, // No Content-Type header needed, browser sets boundary
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        if (boxImages.length === 3) {
+            console.log("📤 Sending 3 per-box OCR requests...");
+            const perBox = await Promise.all(
+                boxImages.map(async (boxImage, index) => {
+                    try {
+                        const result = await sendImageToOCR(boxImage, token, 9);
+                        const score = String(result.score || '').trim();
+                        const digit = score.match(/^\d$/)?.[0] || '';
+                        return { digit, confidence: Number(result.confidence || 0), index };
+                    } catch (error) {
+                        console.warn(`⚠️ OCR failed for box ${index + 1}`, error);
+                        return { digit: '', confidence: 0, index };
+                    }
+                })
+            );
+
+            const mergedScore = perBox.map((entry) => entry.digit).join('');
+            const mergedConfidence = perBox.length > 0
+                ? perBox.reduce((sum, entry) => sum + entry.confidence, 0) / perBox.length
+                : 0;
+
+            data = {
+                score: mergedScore,
+                confidence: mergedConfidence,
+            };
+        } else {
+            console.log("📤 Sending fallback strip OCR request...");
+            data = await sendImageToOCR(processedImage, token, maxMarks);
+        }
 
         const duration = Math.round(performance.now() - startTime);
         console.log(`⏱️ OCR Request took ${duration}ms`);
-
-        if (!response.ok) {
-            throw new Error(`Server OCR Error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
         console.log("✅ Backend OCR Result:", data);
 
         if (data.score && data.score !== "ERROR_UNCERTAIN" && data.score !== "0") {
-            return { score: data.score, confidence: data.confidence, debugImage: debugPreview || processedImage };
-        } else {
-            console.warn("⚠️ Backend returned uncertain result.");
+            let finalScore = data.score;
+            if (maxMarks && /^\d+$/.test(finalScore) && Number(finalScore) > maxMarks) {
+                finalScore = '';
+            }
+            if (finalScore) {
+                return { score: finalScore, confidence: data.confidence, debugImage: debugPreview || processedImage };
+            }
         }
+        console.warn("⚠️ Backend returned uncertain result.");
 
     } catch (e) {
         console.error("❌ OCR Proxy Failed:", e);
