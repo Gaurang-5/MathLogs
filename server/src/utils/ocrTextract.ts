@@ -96,8 +96,8 @@ function extractScoreFromBlocks(blocks: Block[], maxMarks?: number): { score: st
         if (b.left < 0.02 || (b.left + b.width) > 0.98) return false;
         // Reject tiny artifacts (dots/underlines)
         if (b.height < 0.08) return false;
-        // Confidence filter (lower threshold because handwriting can be sketchy)
-        if (b.confidence < 30) return false;
+        // Confidence filter (lower threshold because handwriting in small boxes can be faint)
+        if (b.confidence < 20) return false;
         return true;
     });
 

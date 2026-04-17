@@ -67,8 +67,8 @@ async function cropMarksRegion(warpedBase64: string): Promise<string> {
         img.onload = () => {
             // Horizontal: skip QR + divider (left 42%), keep digit area
             const marksStartX = Math.floor(img.width * 0.42);
-            // Vertical: skip name + "MARKS:" label (top 45%), keep digit boxes
-            const digitBoxStartY = Math.floor(img.height * 0.45);
+            // Vertical: skip name + "MARKS:" label (top 52%), keep digit boxes only
+            const digitBoxStartY = Math.floor(img.height * 0.52);
 
             const cropWidth = img.width - marksStartX;
             const cropHeight = img.height - digitBoxStartY;
