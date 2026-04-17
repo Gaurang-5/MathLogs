@@ -33,7 +33,6 @@ interface OpenCVModule {
     COLOR_RGBA2GRAY: number;
     ADAPTIVE_THRESH_GAUSSIAN_C: number;
     THRESH_BINARY: number;
-    THRESH_BINARY_INV: number;
     RETR_TREE: number;
     CHAIN_APPROX_SIMPLE: number;
     CV_32FC2: number;
@@ -108,17 +107,14 @@ function detectAndWarp(imageData: ImageData): { success: boolean, data?: Uint8Ar
 
         // 3. Adaptive Threshold (works better for varying lighting)
         const binary = new cv.Mat();
-        cv.adaptiveThreshold(blurred, binary, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 2);
+        cv.adaptiveThreshold(blurred, binary, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
 
         // 4. Find Contours
         const contours = new cv.MatVector();
         const hierarchy = new cv.Mat();
         cv.findContours(binary, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
 
-        const markers: Array<{ x: number, y: number; area: number }> = [];
-        const frameArea = src.rows * src.cols;
-        const minMarkerArea = Math.max(80, frameArea * 0.00005);
-        const maxMarkerArea = Math.max(5000, frameArea * 0.02);
+        const markers: Array<{ x: number, y: number }> = [];
 
         // 5. Hierarchical Contour Analysis for 'L' Marker Detection
         // An 'L' marker is an irregular polygon (usually 6 vertices)
@@ -127,8 +123,8 @@ function detectAndWarp(imageData: ImageData): { success: boolean, data?: Uint8Ar
             const cnt = contours.get(i);
             const area = cv.contourArea(cnt);
 
-            // Filter by area relative to the frame so high-res cameras do not get rejected.
-            if (area < minMarkerArea || area > maxMarkerArea) continue;
+            // Filter by area: Markers shouldn't be too huge or too tiny compared to full frame
+            if (area < 100 || area > 5000) continue;
 
             const rect = cv.boundingRect(cnt);
             const aspectRatio = rect.width / rect.height;
@@ -157,7 +153,7 @@ function detectAndWarp(imageData: ImageData): { success: boolean, data?: Uint8Ar
                     if (M.m00 !== 0) {
                         const cx = M.m10 / M.m00;
                         const cy = M.m01 / M.m00;
-                        markers.push({ x: cx, y: cy, area });
+                        markers.push({ x: cx, y: cy });
                     }
                 }
                 approx.delete();
@@ -168,41 +164,32 @@ function detectAndWarp(imageData: ImageData): { success: boolean, data?: Uint8Ar
         gray.delete(); blurred.delete(); binary.delete(); contours.delete(); hierarchy.delete();
 
         if (markers.length >= 4) {
-            const pickClosestToCorner = (
-                candidates: Array<{ x: number, y: number; area: number }>,
-                targetX: number,
-                targetY: number
-            ) => {
-                let best: { x: number, y: number; area: number } | null = null;
-                let bestScore = Infinity;
+            // Found candidates!
+            // Sort to find the 4 extreme outward corners mapping to TL, TR, BR, BL
+            // Using sum and diff of X,Y coordinates
+            let minSum = Infinity, maxSum = -Infinity;
+            let minDiff = Infinity, maxDiff = -Infinity;
+            
+            const orderedPoints = [
+                { x: 0, y: 0 }, // TL
+                { x: 0, y: 0 }, // TR
+                { x: 0, y: 0 }, // BR
+                { x: 0, y: 0 }  // BL
+            ];
 
-                for (const candidate of candidates) {
-                    const distance = Math.hypot(candidate.x - targetX, candidate.y - targetY);
-                    const areaBonus = candidate.area * 0.0005;
-                    const score = distance - areaBonus;
-                    if (score < bestScore) {
-                        bestScore = score;
-                        best = candidate;
-                    }
-                }
+            markers.forEach(p => {
+                const sum = p.x + p.y;
+                const diff = p.y - p.x;
 
-                return best;
-            };
-
-            const centerX = src.cols / 2;
-            const centerY = src.rows / 2;
-
-            const topLeft = pickClosestToCorner(markers.filter((p) => p.x <= centerX && p.y <= centerY), 0, 0);
-            const topRight = pickClosestToCorner(markers.filter((p) => p.x >= centerX && p.y <= centerY), src.cols, 0);
-            const bottomRight = pickClosestToCorner(markers.filter((p) => p.x >= centerX && p.y >= centerY), src.cols, src.rows);
-            const bottomLeft = pickClosestToCorner(markers.filter((p) => p.x <= centerX && p.y >= centerY), 0, src.rows);
-
-            if (!topLeft || !topRight || !bottomRight || !bottomLeft) {
-                src.delete();
-                return { success: false };
-            }
-
-            const orderedPoints = [topLeft, topRight, bottomRight, bottomLeft];
+                // TL: Minimum (X + Y)
+                if (sum < minSum) { minSum = sum; orderedPoints[0] = p; }
+                // BR: Maximum (X + Y)
+                if (sum > maxSum) { maxSum = sum; orderedPoints[2] = p; }
+                // TR: Minimum (Y - X)
+                if (diff < minDiff) { minDiff = diff; orderedPoints[1] = p; }
+                // BL: Maximum (Y - X)
+                if (diff > maxDiff) { maxDiff = diff; orderedPoints[3] = p; }
+            });
 
             // Destination coordinates match 3.9cm × 2.1cm sticker ratio (39/21 ≈ 1.857)
             // 1200px wide for high-res sharpness → height = 1200 / (39/21) ≈ 646px

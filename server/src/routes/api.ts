@@ -178,18 +178,12 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
         const textractOk = (textract as any).score && !(textract as any).score.includes('ERROR');
         let primary: { score: string; confidence: number; raw: string; source: string };
 
-        if (geminiOk && textractOk) {
-            if (match) {
-                primary = { score: gemini.score, confidence: Math.min(1, gemini.confidence + 0.1), raw: gemini.raw, source: 'both' };
-            } else {
-                primary = gemini.confidence >= (textract as any).confidence
-                    ? { score: gemini.score, confidence: gemini.confidence, raw: gemini.raw, source: 'gemini' }
-                    : { score: (textract as any).score, confidence: (textract as any).confidence, raw: (textract as any).raw, source: 'textract' };
-            }
-        } else if (textractOk) {
-            primary = { score: (textract as any).score, confidence: (textract as any).confidence, raw: (textract as any).raw, source: 'textract' };
+        if (geminiOk && textractOk && match) {
+            primary = { score: gemini.score, confidence: Math.min(1, gemini.confidence + 0.1), raw: gemini.raw, source: 'both' };
         } else if (geminiOk) {
             primary = { score: gemini.score, confidence: gemini.confidence, raw: gemini.raw, source: 'gemini' };
+        } else if (textractOk) {
+            primary = { score: (textract as any).score, confidence: (textract as any).confidence, raw: (textract as any).raw, source: 'textract' };
         } else {
             primary = { score: "ERROR_UNCERTAIN", confidence: 0, raw: "Both engines failed", source: 'none' };
         }
