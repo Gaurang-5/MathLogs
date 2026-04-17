@@ -12,20 +12,25 @@ interface CropBounds {
     bottom: number;
 }
 
+interface PreparedMarksCrop {
+    ocrImage: string | null;
+    debugImage: string | null;
+}
+
 // Fixed crops work only when the sticker warp is perfect. In real scans the warp can drift,
 // and the raw fallback is even less stable, so we evaluate a few nearby crop windows.
 const WARPED_DIGIT_CANDIDATES: CropBounds[] = [
-    { left: 0.36, top: 0.47, right: 0.86, bottom: 0.88 },
-    { left: 0.32, top: 0.45, right: 0.84, bottom: 0.88 },
-    { left: 0.40, top: 0.45, right: 0.90, bottom: 0.88 },
-    { left: 0.28, top: 0.38, right: 0.92, bottom: 0.92 },
+    { left: 0.38, top: 0.46, right: 0.86, bottom: 0.87 },
+    { left: 0.36, top: 0.45, right: 0.84, bottom: 0.88 },
+    { left: 0.40, top: 0.45, right: 0.88, bottom: 0.88 },
+    { left: 0.34, top: 0.43, right: 0.86, bottom: 0.90 },
 ];
 
 const RAW_DIGIT_CANDIDATES: CropBounds[] = [
-    { left: 0.30, top: 0.38, right: 0.92, bottom: 0.90 },
-    { left: 0.26, top: 0.36, right: 0.90, bottom: 0.90 },
-    { left: 0.34, top: 0.38, right: 0.96, bottom: 0.92 },
-    { left: 0.22, top: 0.30, right: 0.96, bottom: 0.94 },
+    { left: 0.34, top: 0.38, right: 0.88, bottom: 0.88 },
+    { left: 0.30, top: 0.36, right: 0.86, bottom: 0.88 },
+    { left: 0.38, top: 0.36, right: 0.90, bottom: 0.90 },
+    { left: 0.28, top: 0.34, right: 0.88, bottom: 0.92 },
 ];
 
 // Helper for preprocessing (still used)
@@ -85,7 +90,7 @@ function renderCrop(img: HTMLImageElement, bounds: CropBounds): HTMLCanvasElemen
     const ctx = canvas.getContext('2d');
     if (!ctx) return canvas;
 
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(
@@ -96,66 +101,251 @@ function renderCrop(img: HTMLImageElement, bounds: CropBounds): HTMLCanvasElemen
         canvas.width, canvas.height
     );
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return canvas;
+}
+
+function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = source.width;
+    canvas.height = source.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return canvas;
+    ctx.drawImage(source, 0, 0);
+    return canvas;
+}
+
+function normalizeCanvas(canvas: HTMLCanvasElement): HTMLCanvasElement {
+    const normalized = cloneCanvas(canvas);
+    const ctx = normalized.getContext('2d');
+    if (!ctx) return normalized;
+
+    const imageData = ctx.getImageData(0, 0, normalized.width, normalized.height);
     const pixels = imageData.data;
     for (let i = 0; i < pixels.length; i += 4) {
         const gray = (pixels[i] * 0.299) + (pixels[i + 1] * 0.587) + (pixels[i + 2] * 0.114);
 
-        let normalized = gray;
-        if (gray > 225) {
-            normalized = 255;
-        } else if (gray < 120) {
-            normalized = 0;
+        let value = gray;
+        if (gray > 228) {
+            value = 255;
+        } else if (gray < 105) {
+            value = 0;
         } else {
-            normalized = ((gray - 120) / 105) * 255;
+            value = ((gray - 105) / 123) * 255;
         }
 
-        const finalGray = Math.max(0, Math.min(255, Math.round(normalized)));
+        const finalGray = Math.max(0, Math.min(255, Math.round(value)));
         pixels[i] = finalGray;
         pixels[i + 1] = finalGray;
         pixels[i + 2] = finalGray;
         pixels[i + 3] = 255;
     }
-    ctx.putImageData(imageData, 0, 0);
 
-    return canvas;
+    ctx.putImageData(imageData, 0, 0);
+    return normalized;
 }
 
-function scoreCrop(canvas: HTMLCanvasElement): number {
+function getDarkProfiles(canvas: HTMLCanvasElement, threshold = 185) {
     const ctx = canvas.getContext('2d');
-    if (!ctx) return Number.NEGATIVE_INFINITY;
+    if (!ctx) {
+        return {
+            rowDark: [] as number[],
+            columnDark: [] as number[],
+            darkRatio: 0,
+        };
+    }
 
     const { width, height } = canvas;
     const { data } = ctx.getImageData(0, 0, width, height);
-
-    let centerDark = 0;
-    let edgeDark = 0;
-    let topDark = 0;
-    let lowerDark = 0;
+    const rowDark = new Array<number>(height).fill(0);
+    const columnDark = new Array<number>(width).fill(0);
+    let darkPixels = 0;
 
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const idx = ((y * width) + x) * 4;
             const gray = data[idx];
-            if (gray > 185) continue;
-
-            const xNorm = x / width;
-            const yNorm = y / height;
-
-            if (xNorm > 0.08 && xNorm < 0.92 && yNorm > 0.18 && yNorm < 0.90) centerDark += 1;
-            if (xNorm < 0.06 || xNorm > 0.94) edgeDark += 1;
-            if (yNorm < 0.24) topDark += 1;
-            if (yNorm > 0.28 && yNorm < 0.86) lowerDark += 1;
+            if (gray > threshold) continue;
+            darkPixels += 1;
+            rowDark[y] += 1;
+            columnDark[x] += 1;
         }
     }
 
-    return (centerDark * 1.3) + (lowerDark * 0.4) - (edgeDark * 1.7) - (topDark * 1.5);
+    const totalPixels = width * height;
+    return {
+        rowDark,
+        columnDark,
+        darkRatio: totalPixels > 0 ? darkPixels / totalPixels : 0,
+    };
+}
+
+function sumRange(values: number[], start: number, end: number): number {
+    let total = 0;
+    const safeStart = Math.max(0, Math.floor(start));
+    const safeEnd = Math.min(values.length, Math.ceil(end));
+    for (let i = safeStart; i < safeEnd; i++) total += values[i];
+    return total;
+}
+
+function smoothProfile(values: number[], radius: number): number[] {
+    return values.map((_, index) => {
+        const start = Math.max(0, index - radius);
+        const end = Math.min(values.length, index + radius + 1);
+        return sumRange(values, start, end) / Math.max(1, end - start);
+    });
+}
+
+function scoreCrop(canvas: HTMLCanvasElement): number {
+    const { rowDark, columnDark, darkRatio } = getDarkProfiles(canvas, 185);
+
+    // Reject obviously broken crops: blank white, nearly solid black, or transparent/invalid-looking patches.
+    if (darkRatio < 0.005 || darkRatio > 0.55) return Number.NEGATIVE_INFINITY;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerDark = sumRange(columnDark, width * 0.18, width * 0.88);
+    const edgeDark = sumRange(columnDark, 0, width * 0.08) + sumRange(columnDark, width * 0.92, width);
+    const leftQrDark = sumRange(columnDark, 0, width * 0.24);
+    const topDark = sumRange(rowDark, 0, height * 0.24);
+    const lowerDark = sumRange(rowDark, height * 0.25, height * 0.90);
+
+    return (centerDark * 1.35)
+        + (lowerDark * 0.45)
+        - (edgeDark * 1.8)
+        - (topDark * 1.9)
+        - (leftQrDark * 1.8);
+}
+
+function findPeakIndex(values: number[], start: number, end: number, minValue: number): number | null {
+    let bestIndex: number | null = null;
+    let bestValue = minValue;
+    for (let i = Math.max(0, Math.floor(start)); i < Math.min(values.length, Math.ceil(end)); i++) {
+        if (values[i] > bestValue) {
+            bestValue = values[i];
+            bestIndex = i;
+        }
+    }
+    return bestIndex;
+}
+
+function detectMarksAnchors(canvas: HTMLCanvasElement) {
+    const { columnDark } = getDarkProfiles(canvas, 175);
+    const smoothed = smoothProfile(columnDark, 3);
+    const width = canvas.width;
+    const height = canvas.height;
+    const minimumTallLine = height * 0.10;
+
+    const divider = findPeakIndex(smoothed, width * 0.20, width * 0.60, minimumTallLine);
+    const rightMarker = findPeakIndex(smoothed, width * 0.72, width * 0.98, minimumTallLine);
+
+    return { divider, rightMarker };
+}
+
+function detectMarksBand(canvas: HTMLCanvasElement, left: number, right: number) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { top: Math.floor(canvas.height * 0.22), bottom: Math.floor(canvas.height * 0.82) };
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const xStart = Math.max(0, Math.floor(left));
+    const xEnd = Math.min(width, Math.ceil(right));
+    const { data } = ctx.getImageData(0, 0, width, height);
+    const rowDark = new Array<number>(height).fill(0);
+
+    for (let y = 0; y < height; y++) {
+        for (let x = xStart; x < xEnd; x++) {
+            const idx = ((y * width) + x) * 4;
+            if (data[idx] < 185) rowDark[y] += 1;
+        }
+    }
+
+    const smoothed = smoothProfile(rowDark, 4);
+    const peak = findPeakIndex(smoothed, height * 0.30, height * 0.82, (xEnd - xStart) * 0.06);
+    if (peak == null) {
+        return { top: Math.floor(height * 0.22), bottom: Math.floor(height * 0.82) };
+    }
+
+    const halfHeight = Math.floor(height * 0.24);
+    return {
+        top: Math.max(0, peak - halfHeight),
+        bottom: Math.min(height, peak + halfHeight),
+    };
+}
+
+function composeBoxStrip(canvas: HTMLCanvasElement): PreparedMarksCrop {
+    const normalizedCanvas = normalizeCanvas(canvas);
+    const { darkRatio } = getDarkProfiles(normalizedCanvas, 185);
+    if (darkRatio < 0.01 || darkRatio > 0.55) {
+        return { ocrImage: null, debugImage: normalizedCanvas.toDataURL('image/jpeg', 0.98) };
+    }
+
+    const { divider, rightMarker } = detectMarksAnchors(normalizedCanvas);
+    const width = normalizedCanvas.width;
+    const height = normalizedCanvas.height;
+
+    let marksLeft = divider != null ? divider + (width * 0.04) : width * 0.30;
+    let marksRight = rightMarker != null ? rightMarker - (width * 0.04) : width * 0.86;
+
+    if (marksRight - marksLeft < width * 0.28) {
+        marksLeft = width * 0.30;
+        marksRight = width * 0.86;
+    }
+
+    const { top, bottom } = detectMarksBand(normalizedCanvas, marksLeft, marksRight);
+    const stripWidth = marksRight - marksLeft;
+    const stripHeight = bottom - top;
+
+    if (stripWidth < width * 0.22 || stripHeight < height * 0.18) {
+        return { ocrImage: null, debugImage: normalizedCanvas.toDataURL('image/jpeg', 0.98) };
+    }
+
+    const slotWidth = stripWidth / 3;
+    const boxPaddingX = slotWidth * 0.14;
+    const boxPaddingY = stripHeight * 0.08;
+
+    const composed = document.createElement('canvas');
+    composed.width = 720;
+    composed.height = 250;
+    const composedCtx = composed.getContext('2d');
+    if (!composedCtx) {
+        return { ocrImage: null, debugImage: normalizedCanvas.toDataURL('image/jpeg', 0.98) };
+    }
+
+    composedCtx.fillStyle = '#FFFFFF';
+    composedCtx.fillRect(0, 0, composed.width, composed.height);
+
+    for (let i = 0; i < 3; i++) {
+        const srcX = Math.max(0, Math.floor(marksLeft + (i * slotWidth) + boxPaddingX));
+        const srcY = Math.max(0, Math.floor(top + boxPaddingY));
+        const srcW = Math.max(1, Math.floor(slotWidth - (boxPaddingX * 2)));
+        const srcH = Math.max(1, Math.floor(stripHeight - (boxPaddingY * 2)));
+        const destX = 20 + (i * 235);
+        const destY = 18;
+        const destW = 200;
+        const destH = 214;
+
+        composedCtx.drawImage(normalizedCanvas, srcX, srcY, srcW, srcH, destX, destY, destW, destH);
+        composedCtx.strokeStyle = '#D1D5DB';
+        composedCtx.lineWidth = 2;
+        composedCtx.strokeRect(destX, destY, destW, destH);
+    }
+
+    const finalNormalized = normalizeCanvas(composed);
+    const finalProfiles = getDarkProfiles(finalNormalized, 185);
+    if (finalProfiles.darkRatio < 0.01 || finalProfiles.darkRatio > 0.45) {
+        return { ocrImage: null, debugImage: finalNormalized.toDataURL('image/jpeg', 0.98) };
+    }
+
+    return {
+        ocrImage: finalNormalized.toDataURL('image/jpeg', 0.98),
+        debugImage: finalNormalized.toDataURL('image/jpeg', 0.98),
+    };
 }
 
 /**
- * Crops the handwritten digit strip and chooses the crop window that best matches the box area.
+ * Crops the sticker, chooses the best candidate region, then isolates the actual three marks boxes.
  */
-async function cropMarksRegion(imageBase64: string, mode: 'warped' | 'raw'): Promise<string> {
+async function cropMarksRegion(imageBase64: string, mode: 'warped' | 'raw'): Promise<PreparedMarksCrop> {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
@@ -173,13 +363,13 @@ async function cropMarksRegion(imageBase64: string, mode: 'warped' | 'raw'): Pro
             }
 
             if (!bestCanvas) {
-                resolve(imageBase64);
+                resolve({ ocrImage: null, debugImage: imageBase64 });
                 return;
             }
 
-            resolve(bestCanvas.toDataURL('image/jpeg', 0.98));
+            resolve(composeBoxStrip(bestCanvas));
         };
-        img.onerror = () => resolve(imageBase64);
+        img.onerror = () => resolve({ ocrImage: null, debugImage: imageBase64 });
         img.src = imageBase64;
     });
 }
@@ -198,12 +388,15 @@ export async function extractMarksFromSticker(
 
     let imageBase64 = "";
     let processedImage = "";
+    let debugPreview = "";
 
     if (imageOverride) {
         // Warp succeeded — crop just the marks region (right 58% of the warped sticker)
         // This gives Gemini a much larger, focused view of the 3 digit boxes
         imageBase64 = imageOverride;
-        processedImage = await cropMarksRegion(imageBase64, 'warped');
+        const prepared = await cropMarksRegion(imageBase64, 'warped');
+        processedImage = prepared.ocrImage || "";
+        debugPreview = prepared.debugImage || imageBase64;
         console.log("📸 Using CV-warped → marks-region crop for OCR");
     } else {
         // Fallback: capture raw video frame cropped to sticker area
@@ -233,12 +426,21 @@ export async function extractMarksFromSticker(
         // Preprocess raw capture, THEN crop marks region so it behaves identically to warped version
         try {
             const prepped = await preprocessImage(imageBase64);
-            processedImage = await cropMarksRegion(prepped, 'raw');
+            const prepared = await cropMarksRegion(prepped, 'raw');
+            processedImage = prepared.ocrImage || "";
+            debugPreview = prepared.debugImage || prepped;
             console.log("📸 Using raw fallback → preprocessed → marks-region crop for OCR");
         } catch (e) {
             console.warn("Preprocessing failed, using raw fallback image", e);
-            processedImage = await cropMarksRegion(imageBase64, 'raw');
+            const prepared = await cropMarksRegion(imageBase64, 'raw');
+            processedImage = prepared.ocrImage || "";
+            debugPreview = prepared.debugImage || imageBase64;
         }
+    }
+
+    if (!processedImage) {
+        console.warn("⚠️ Crop rejected before OCR because the marks boxes could not be isolated.");
+        return { score: "", confidence: 0, debugImage: debugPreview || imageBase64 };
     }
 
 
@@ -280,7 +482,7 @@ export async function extractMarksFromSticker(
         console.log("✅ Backend OCR Result:", data);
 
         if (data.score && data.score !== "ERROR_UNCERTAIN" && data.score !== "0") {
-            return { score: data.score, confidence: data.confidence, debugImage: processedImage };
+            return { score: data.score, confidence: data.confidence, debugImage: debugPreview || processedImage };
         } else {
             console.warn("⚠️ Backend returned uncertain result.");
         }
@@ -289,5 +491,5 @@ export async function extractMarksFromSticker(
         console.error("❌ OCR Proxy Failed:", e);
     }
 
-    return { score: "", confidence: 0, debugImage: processedImage };
+    return { score: "", confidence: 0, debugImage: debugPreview || processedImage };
 }
