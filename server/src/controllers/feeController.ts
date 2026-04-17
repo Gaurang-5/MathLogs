@@ -98,10 +98,10 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
             doc.text('Parent Phone', startX + 315, y + 2, { width: 65 });
             doc.text('Oldest Due', startX + 390, y + 2, { width: 60 });
             doc.text('Amount', startX + 460, y + 2, { width: 70, align: 'right' });
-            
+
             drawPendingBorders(y - 5);
         };
-        
+
         const drawPendingBorders = (rectY: number) => {
             doc.save();
             doc.lineWidth(0.5).strokeColor('#D1D5DB');
@@ -249,12 +249,12 @@ export const getFeeSummary = async (req: Request, res: Response) => {
         const summary = students.map((student: any) => {
             const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
             const allBatchInstallments = student.batch?.feeInstallments || [];
-            
+
             const isBatchInstallmentActive = allBatchInstallments.some((inst: any) => !inst.studentId);
-            
+
             // Build a set of installment IDs that have existing payments for this student
             const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
-            
+
             // Filter installments: include global ones (no studentId) that are after join date OR have payments,
             // plus student-specific ones that belong to THIS student
             const validInstallments = allBatchInstallments.filter((inst: any) => {
@@ -313,7 +313,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
             const globalInstallmentsTotal = validInstallments
                 .filter((inst: any) => !inst.studentId)
                 .reduce((sum: number, inst: any) => sum + inst.amount, 0);
-                
+
             const customInstallmentsTotal = validInstallments
                 .filter((inst: any) => inst.studentId)
                 .reduce((sum: number, inst: any) => sum + inst.amount, 0);
@@ -731,7 +731,7 @@ ${senderName}`;
             import('../utils/whatsapp').then(({ sendFeeReminderUpiWhatsApp }) => {
                 // WhatsApp templates reject newline (\n) characters inside variables.
                 const feeBreakupText = breakdownLines.join(' | ');
-                
+
                 const phoneDigits = student.parentWhatsapp!.replace(/\D/g, '').slice(-10);
                 const upiLink = `${process.env.FRONTEND_URL || 'https://mathlogs.com'}/pay/${student.batch?.institute?.slug}?phone=${phoneDigits}`;
 
@@ -921,7 +921,7 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         const dateString = `${startDate.toLocaleString('default', { month: 'long' })} ${year}`;
         doc.fontSize(18).text(`Fee Transactions Report`, { align: 'center' });
         doc.moveDown(0.5);
-        
+
         const totalCollected = allTx.reduce((sum, tx) => sum + tx.amount, 0);
         doc.fontSize(10).fillColor('gray').text(`Period: ${dateString} | Total Transactions: ${allTx.length} | Total Collected: Rs. ${totalCollected.toLocaleString()}`, { align: 'center' });
         doc.fillColor('black');
@@ -946,10 +946,10 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
             doc.text('Batch', startX + 275, y + 2, { width: 95 });
             doc.text('Type', startX + 380, y + 2, { width: 80 });
             doc.text('Amount', startX + 470, y + 2, { width: 60, align: 'right' });
-            
+
             drawTableBorders(y - 5);
         };
-        
+
         const drawTableBorders = (rectY: number) => {
             doc.save();
             doc.lineWidth(0.5).strokeColor('#D1D5DB');
@@ -976,7 +976,7 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
             }
 
             doc.font('Helvetica').fontSize(9).fillColor('black');
-            
+
             doc.text(new Date(tx.date).toLocaleDateString(), startX + 5, currentY + 7, { width: 60, ellipsis: true });
             doc.text(tx.id, startX + 75, currentY + 7, { width: 75, ellipsis: true });
             doc.text(tx.name, startX + 160, currentY + 7, { width: 105, ellipsis: true });
@@ -989,7 +989,7 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
             drawTableBorders(currentY);
             currentY += rowHeight;
         });
-        
+
         doc.moveDown(1.5);
         currentY = doc.y;
 
@@ -1112,7 +1112,7 @@ export const approveUpiVerification = async (req: Request, res: Response) => {
                 where: { studentId: verification.studentId }
             });
             const pendingAmount = studentBalance?.balance || 0;
-            
+
             if (pendingAmount <= 0) {
                 throw new PaymentValidationError("Cannot approve! This student has no pending fee. The payment was likely logged directly by another method.");
             }
@@ -1157,11 +1157,11 @@ export const approveUpiVerification = async (req: Request, res: Response) => {
                 const studentJoinDate = studentData.createdAt ? new Date(studentData.createdAt) : new Date(0);
                 const installments = studentData.batch.feeInstallments
                     .filter(inst => new Date(inst.createdAt) >= studentJoinDate)
-                    .sort((a,b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
                 for (const inst of installments) {
                     if (remainingAmount <= 0) break;
-                    
+
                     const paidSoFar = studentData.feePayments.filter(p => p.installmentId === inst.id).reduce((sum, p) => sum + p.amountPaid, 0);
                     const pendingForThis = inst.amount - paidSoFar;
 
@@ -1269,9 +1269,9 @@ export const rejectUpiVerification = async (req: Request, res: Response) => {
 
         await prisma.upiPaymentVerification.update({
             where: { id },
-            data: { 
+            data: {
                 status: 'REJECTED',
-                rejectionReason: reason || 'Screenshot unclear or mismatched amount' 
+                rejectionReason: reason || 'Screenshot unclear or mismatched amount'
             }
         });
 
@@ -1284,7 +1284,7 @@ export const rejectUpiVerification = async (req: Request, res: Response) => {
             let phone = phoneRaw.replace(/[^0-9+]/g, '');
             if (phone.length === 10) phone = '+91' + phone;
             const link = `https://mathlogs.com/pay/${verification.student.batch.institute.slug}`;
-            
+
             import('../utils/whatsapp').then(({ sendPaymentRejectionWhatsApp }) => {
                 sendPaymentRejectionWhatsApp(phone, {
                     studentName: verification.student.name,
