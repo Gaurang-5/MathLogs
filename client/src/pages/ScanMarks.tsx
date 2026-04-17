@@ -252,6 +252,9 @@ export default function ScanMarks() {
                                     console.log("⚠️ Student already has marks:", existing.score);
                                     setExistingMark(existing.score);
                                     setPendingStudent(studentData);
+                                    if (extractedMark && extractedMark.trim() !== "") {
+                                        setScore(extractedMark);
+                                    }
                                 } else {
                                     console.log("✅ Setting student and score:", extractedMark);
                                     setStudent(studentData);
