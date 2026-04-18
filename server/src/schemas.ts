@@ -106,7 +106,8 @@ export const createTestSchema = z.object({
         date: z.string().datetime().or(z.string()), // ISO date or any string
         maxMarks: z.number().positive("Max marks must be positive")
             .or(z.string().regex(/^\d+(\.\d+)?$/).transform(Number)),
-        className: z.string().max(100).optional()
+        className: z.string().max(100).optional(),
+        batchIds: z.array(z.string().uuid("Invalid Batch ID")).optional()
     })
 });
 

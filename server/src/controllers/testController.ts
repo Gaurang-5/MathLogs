@@ -4,7 +4,7 @@ import PDFDocument from 'pdfkit';
 import { addMathLogsHeader } from '../utils/pdfUtils';
 
 export const createTest = async (req: Request, res: Response) => {
-    const { name, subject, date, maxMarks, className, batchId } = req.body;
+    const { name, subject, date, maxMarks, className, batchId, batchIds } = req.body;
     const teacherId = (req as any).user?.id;
     const user = (req as any).user;
     const academicYearId = (req as any).user?.currentAcademicYearId;
@@ -24,7 +24,12 @@ export const createTest = async (req: Request, res: Response) => {
                 teacherId,
                 academicYearId,
                 instituteId: user.instituteId, // ✅ SECURITY: Multi-tenant isolation
-                batchId
+                batchId: batchId || (batchIds && batchIds.length > 0 ? batchIds[0] : null),
+                ...(batchIds && batchIds.length > 0 ? {
+                    batches: { connect: batchIds.map((id: string) => ({ id })) }
+                } : batchId ? {
+                    batches: { connect: [{ id: batchId }] }
+                } : {})
             }
         });
         res.json(test);
@@ -50,6 +55,9 @@ export const getTests = async (req: Request, res: Response) => {
                 },
                 batch: {
                     select: { name: true, className: true }
+                },
+                batches: {
+                    select: { id: true, name: true, className: true }
                 }
             }
         });
@@ -165,6 +173,12 @@ export const getTestDetails = async (req: Request, res: Response) => {
             include: {
                 marks: {
                     include: { student: true }
+                },
+                batch: {
+                    select: { name: true, className: true }
+                },
+                batches: {
+                    select: { id: true, name: true, className: true }
                 }
             }
         });
@@ -319,7 +333,7 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
         // Fetch test details (lightweight query)
         const test = await prisma.test.findUnique({
             where: { id: String(id) },
-            select: { teacherId: true, batchId: true, className: true } // Fetch batchId
+            select: { teacherId: true, batchId: true, className: true, batches: { select: { id: true } } } // Fetch batchId and batches
         });
 
         if (!test) return res.status(404).json({ error: 'Test not found' });
@@ -328,15 +342,20 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        const students = await prisma.test.findUnique({ where: { id: String(id) } }).then(async (testData) => {
+        const students = await prisma.test.findUnique({ where: { id: String(id) }, include: { batches: true } }).then(async (testData) => {
             if(!testData) return [];
             
-            // If test has a specific batchId, ONLY show students from that batch
-            if (testData.batchId) {
+            const linkedBatchIds = testData.batches?.map((b: any) => b.id) || [];
+            if (testData.batchId && !linkedBatchIds.includes(testData.batchId)) {
+                linkedBatchIds.push(testData.batchId);
+            }
+
+            // If test has specific batchIds, ONLY show students from those batches
+            if (linkedBatchIds.length > 0) {
                 return prisma.student.findMany({
                     where: {
                         academicYearId: currentAcademicYearId,
-                        batchId: testData.batchId,
+                        batchId: { in: linkedBatchIds },
                         status: 'APPROVED',
                         marks: {
                             none: {
@@ -410,6 +429,7 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                 teacherId: true,
                 instituteId: true,
                 batchId: true,
+                batches: { select: { id: true } },
                 institute: { select: { name: true } }
             }
         });
@@ -421,12 +441,17 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
 
         let students = [];
 
-        if (test.batchId) {
+        const testBatchIds = test.batches?.map(b => b.id) || [];
+        if (test.batchId && !testBatchIds.includes(test.batchId)) {
+            testBatchIds.push(test.batchId);
+        }
+
+        if (testBatchIds.length > 0) {
             // Precise batch scoped tests don't need marks to know who should get messages!
             students = await prisma.student.findMany({
                 where: {
                     academicYearId: currentAcademicYearId,
-                    batchId: test.batchId,
+                    batchId: { in: testBatchIds },
                     status: 'APPROVED'
                 },
                 include: {
@@ -444,7 +469,7 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                 select: { student: { select: { batchId: true } } }
             });
 
-            const testBatchIds = Array.from(new Set(
+            const fallbackBatchIds = Array.from(new Set(
                 testMarks.map(m => m.student?.batchId).filter(Boolean)
             )) as string[];
 

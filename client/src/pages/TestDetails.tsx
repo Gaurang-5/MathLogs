@@ -30,6 +30,8 @@ interface TestDetailsResponse {
     name: string;
     subject: string;
     className?: string | null;
+    batch?: { name: string, className?: string | null } | null;
+    batches?: { id: string, name: string, className?: string | null }[] | null;
     date: string;
     maxMarks: number;
     marks: TestMark[];
@@ -294,7 +296,11 @@ export default function TestDetails() {
                             <h1 className="text-2xl md:text-3xl font-bold text-app-text break-words mb-2">{test.name}</h1>
                             <div className="flex flex-wrap items-center gap-2 text-app-text-secondary">
                                 <span className="bg-neutral-100 text-app-text border border-neutral-200 px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap">{test.subject}</span>
-                                {test.className && <span className="bg-neutral-100 text-app-text border border-neutral-200 px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap">{test.className}</span>}
+                                {test.className && !test.batch && (!test.batches || test.batches.length === 0) && <span className="bg-neutral-100 text-app-text border border-neutral-200 px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap">{test.className}</span>}
+                                {test.batch && (!test.batches || test.batches.length === 0) && <span className="bg-neutral-100 text-app-text border border-neutral-200 px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap">{test.batch.name}</span>}
+                                {test.batches && test.batches.length > 0 && test.batches.map(b => (
+                                    <span key={b.id} className="bg-neutral-100 text-app-text border border-neutral-200 px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap">{b.name}</span>
+                                ))}
                                 <span className="hidden md:inline">•</span>
                                 <span className="text-sm whitespace-nowrap">{new Date(test.date).toLocaleDateString()}</span>
                             </div>

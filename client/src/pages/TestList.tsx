@@ -15,7 +15,8 @@ interface Test {
     maxMarks: number;
     className?: string;
     batchId?: string;
-    batch?: { name: string; className?: string };
+    batch?: { id: string; name: string; className?: string };
+    batches?: { id: string; name: string; className?: string }[];
     _count: { marks: number };
 }
 
@@ -39,7 +40,7 @@ export default function TestList() {
     // Form State
     const [showForm, setShowForm] = useState(false);
     const [name, setName] = useState('');
-    const [selectedBatchId, setSelectedBatchId] = useState('');
+    const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
     const [date, setDate] = useState('');
     const [maxMarks, setMaxMarks] = useState('');
 
@@ -63,7 +64,13 @@ export default function TestList() {
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        const batch = batches.find(b => b.id === selectedBatchId);
+        
+        if (selectedBatchIds.length === 0) {
+            alert('Please select at least one batch');
+            return;
+        }
+
+        const batch = batches.find(b => b.id === selectedBatchIds[0]);
         const subject = batch?.subject || 'General';
         const className = batch?.className;
 
@@ -74,7 +81,7 @@ export default function TestList() {
                 date,
                 maxMarks: parseFloat(maxMarks), // Convert to number
                 className,
-                batchId: selectedBatchId // Added batchId Support
+                batchIds: selectedBatchIds
             });
             // Navigate to Dashboard immediately
             navigate(`/tests/${res.id}`);
@@ -83,45 +90,58 @@ export default function TestList() {
         }
     };
 
-    // Group tests by batch
-    const groupedByBatch = tests.reduce((acc: Record<string, { batchName: string, tests: Test[] }>, test) => {
-        const batchKey = test.batchId || 'no-batch';
-        const batchName = test.batch ? test.batch.name : (test.className || 'Other');
-        
-        if (!acc[batchKey]) {
-            acc[batchKey] = {
-                batchName: batchName,
+    // Group tests by Month & Year to prevent visual duplication of multi-batch tests
+    const groupedByMonth = tests.reduce((acc: Record<string, { label: string, tests: Test[] }>, test) => {
+        const dateObj = new Date(test.date);
+        // Create a sortable key like "2026-03" (YYYY-MM)
+        const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+        const label = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); // e.g. "April 2026"
+
+        if (!acc[monthKey]) {
+            acc[monthKey] = {
+                label,
                 tests: []
             };
         }
-        acc[batchKey].tests.push(test);
+        acc[monthKey].tests.push(test);
         return acc;
     }, {});
 
-    const TestCard = ({ test }: { test: Test }) => (
-        <div
-            onClick={() => navigate(`/tests/${test.id}`)}
-            className="bg-app-surface border-[1.5px] border-black/5 rounded-[32px] p-6 hover:shadow-lg transition-all cursor-pointer group hover:border-app-text/20 relative overflow-hidden"
-        >
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-app-bg border border-app-border rounded-xl group-hover:bg-app-surface-hover transition-colors">
-                    <FileText className="w-6 h-6 text-app-text" />
+    // Sort the month groups so newest months appear first
+    const sortedGroups = Object.entries(groupedByMonth).sort(([keyA], [keyB]) => keyB.localeCompare(keyA));
+
+    const TestCard = ({ test }: { test: Test }) => {
+        const batchString = (test.batches && test.batches.length > 0) 
+            ? test.batches.map(b => b.name).join(', ')
+            : (test.batch?.name ? test.batch.name : (test.className || ''));
+            
+        return (
+            <div
+                onClick={() => navigate(`/tests/${test.id}`)}
+                className="bg-app-surface border-[1.5px] border-black/5 rounded-[32px] p-6 hover:shadow-lg transition-all cursor-pointer group hover:border-app-text/20 relative overflow-hidden"
+            >
+                <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-app-bg border border-app-border rounded-xl group-hover:bg-app-surface-hover transition-colors">
+                        <FileText className="w-6 h-6 text-app-text" />
+                    </div>
+                    <div className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100 flex items-center">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        {test._count.marks} Results
+                    </div>
                 </div>
-                <div className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100 flex items-center">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    {test._count.marks} Results
+
+                <h3 className="text-xl font-bold text-app-text mb-1 truncate" title={test.name}>{test.name}</h3>
+                <p className="text-app-text-secondary text-sm font-medium mb-4 truncate" title={`${batchString} • ${test.subject}`}>
+                    {batchString ? `${batchString} • ` : ''}{test.subject}
+                </p>
+
+                <div className="mt-4 pt-4 border-t border-black/5 flex items-center text-xs font-bold text-app-text-tertiary tracking-wide uppercase">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    {new Date(test.date).toLocaleDateString()}
                 </div>
             </div>
-
-            <h3 className="text-xl font-bold text-app-text mb-1 truncate">{test.name}</h3>
-            <p className="text-app-text-secondary text-sm font-medium mb-4">{test.batch?.name ? `${test.batch.name} • ` : (test.className ? `${test.className} • ` : '')}{test.subject}</p>
-
-            <div className="mt-4 pt-4 border-t border-black/5 flex items-center text-xs font-bold text-app-text-tertiary tracking-wide uppercase">
-                <Calendar className="w-4 h-4 mr-2" />
-                {new Date(test.date).toLocaleDateString()}
-            </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <Layout title="Manage Tests">
@@ -162,17 +182,23 @@ export default function TestList() {
                                 </div>
 
                                 <div className="mt-[-8px]">
-                                    <Dropdown
-                                        label="Batch"
-                                        value={selectedBatchId}
-                                        onChange={setSelectedBatchId}
-                                        placeholder="Select a batch"
-                                        required={true}
-                                        options={batches.map(batch => ({
-                                            value: batch.id,
-                                            label: `${batch.name} ${batch.className ? `(${batch.className})` : ''} - ${batch.subject || 'Maths'}`
-                                        }))}
-                                    />
+                                    <label className="block text-xs font-semibold text-app-text-secondary uppercase tracking-wider mb-2">Select Batches</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-neutral-50 border-[1.5px] border-black/5 rounded-xl">
+                                        {batches.map(batch => (
+                                            <label key={batch.id} className="flex items-center space-x-3 p-3 bg-white border border-black/5 rounded-xl cursor-pointer hover:bg-neutral-50 transition-colors">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="w-4 h-4 text-accent rounded border-gray-300 focus:ring-accent"
+                                                    checked={selectedBatchIds.includes(batch.id)}
+                                                    onChange={() => {
+                                                        setSelectedBatchIds(prev => prev.includes(batch.id) ? prev.filter(id => id !== batch.id) : [...prev, batch.id])
+                                                    }}
+                                                />
+                                                <span className="text-sm font-medium text-app-text">{batch.name} {batch.className ? `(${batch.className})` : ''} - {batch.subject || 'Maths'}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    {selectedBatchIds.length === 0 && <p className="text-xs text-red-500 mt-2">Please select at least one batch.</p>}
                                 </div>
 
                                 <div>
@@ -214,9 +240,12 @@ export default function TestList() {
                 <div className="text-center py-20 animate-pulse text-app-text-secondary">Loading tests...</div>
             ) : (
                 <div className="space-y-12 pb-20">
-                    {Object.entries(groupedByBatch).map(([batchId, group]) => (
-                        <section key={batchId}>
-                            <h3 className="text-lg font-bold text-app-text mb-6">{group.batchName} Tests</h3>
+                    {sortedGroups.map(([monthKey, group]) => (
+                        <section key={monthKey}>
+                            <h3 className="text-lg font-bold text-app-text mb-6 flex items-center">
+                                <Calendar className="w-5 h-5 mr-2 text-app-text-tertiary" />
+                                {group.label} Tests
+                            </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {group.tests.map(test => <TestCard key={test.id} test={test} />)}
                             </div>

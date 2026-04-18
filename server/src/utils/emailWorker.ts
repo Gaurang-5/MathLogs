@@ -47,9 +47,13 @@ export class EmailWorker {
                 });
 
                 // Return the full job details
+                // Return the full job details
                 return await tx.emailJob.findMany({
                     where: { id: { in: ids } }
                 });
+            }, {
+                maxWait: 5000, // 5 seconds max waiting for connection
+                timeout: 10000 // 10 seconds max for transaction
             });
 
             if (claimedJobs.length === 0) {

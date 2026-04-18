@@ -117,6 +117,7 @@ model Batch {
   attendanceSweepRuns AttendanceSweepRun[]
   studentLeads        StudentLead[]
   tests               Test[]
+  sharedTests         Test[]               @relation("TestBatches")
 
   @@index([teacherId, academicYearId, className])
   @@index([instituteId, academicYearId])
@@ -191,6 +192,7 @@ model Test {
   institute       Institute?    @relation(fields: [instituteId], references: [id])
   teacher         Admin?        @relation(fields: [teacherId], references: [id])
   batch           Batch?        @relation(fields: [batchId], references: [id])
+  batches         Batch[]       @relation("TestBatches")
 
   @@index([teacherId, academicYearId])
   @@index([date])
