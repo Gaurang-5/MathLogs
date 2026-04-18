@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save, Mail, Send } from 'lucide-react';
+import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save, Mail, Send, Search, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Dropdown from '../components/Dropdown';
 
@@ -12,6 +12,8 @@ interface StudentSummary {
     id: string;
     name: string;
     batchName?: string | null;
+    humanId?: string | null;
+    parentWhatsapp?: string | null;
 }
 
 interface TestMark {
@@ -62,6 +64,7 @@ export default function TestDetails() {
     const [showAddResult, setShowAddResult] = useState(false);
     const [eligibleStudents, setEligibleStudents] = useState<StudentSummary[]>([]);
     const [selectedStudentId, setSelectedStudentId] = useState('');
+    const [studentSearch, setStudentSearch] = useState('');
     const [newScore, setNewScore] = useState('');
     const [loadingStudents, setLoadingStudents] = useState(false);
     const [sendingResults, setSendingResults] = useState(false);
@@ -262,6 +265,14 @@ export default function TestDetails() {
     }
 
     if (!test) return <Layout title="Error">Test not found</Layout>;
+
+    const filteredEligibleStudents = studentSearch.trim()
+        ? eligibleStudents.filter(s =>
+            s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+            (s.humanId && s.humanId.toLowerCase().includes(studentSearch.toLowerCase())) ||
+            (s.parentWhatsapp && s.parentWhatsapp.includes(studentSearch.trim()))
+        ).slice(0, 5)
+        : [];
 
     const averageScore = test.marks.length > 0
         ? (test.marks.reduce((total, mark) => total + mark.score, 0) / test.marks.length).toFixed(1)
@@ -580,27 +591,69 @@ export default function TestDetails() {
                             </div>
 
                             <form onSubmit={handleSubmitNewResult} className="p-6 space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Select Student</label>
+                                <div className="space-y-2 relative">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Select Student</label>
                                     {loadingStudents ? (
-                                        <div className="text-sm text-gray-400">Loading students...</div>
+                                        <div className="text-sm text-gray-400 ml-1">Loading students...</div>
                                     ) : eligibleStudents.length === 0 ? (
                                         <div className="text-sm text-orange-500 bg-orange-50 p-3 rounded-lg border border-orange-100">
                                             No eligible students found. All students in this batch might already have marks.
                                         </div>
-                                    ) : (
-                                        <div className="mt-[-8px]">
-                                            <Dropdown
-                                                label=""
-                                                value={selectedStudentId}
-                                                onChange={setSelectedStudentId}
-                                                placeholder="-- Select Student --"
-                                                required={true}
-                                                options={eligibleStudents.map((s) => ({
-                                                    value: s.id,
-                                                    label: s.batchName ? `${s.name} (${s.batchName.split('(')[0].trim()})` : s.name
-                                                }))}
+                                    ) : !selectedStudentId ? (
+                                        <div className="relative">
+                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Search by name, ID, or phone..."
+                                                className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl pl-12 pr-4 py-3.5 outline-none transition-all font-medium"
+                                                value={studentSearch}
+                                                onChange={(e) => setStudentSearch(e.target.value)}
                                             />
+                                            {/* Dropdown Results */}
+                                            {studentSearch && filteredEligibleStudents.length > 0 && (
+                                                <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-xl border border-gray-100 overflow-y-auto max-h-56 z-50">
+                                                    {filteredEligibleStudents.map(student => (
+                                                        <button
+                                                            key={student.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedStudentId(student.id);
+                                                                setStudentSearch('');
+                                                            }}
+                                                            className="w-full text-left px-4 py-3 hover:bg-blue-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-none"
+                                                        >
+                                                            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                                                {student.humanId?.slice(-3) || 'STU'}
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-bold text-gray-900">{student.name}</div>
+                                                                <div className="text-xs text-gray-500">{student.batchName ? student.batchName.split('(')[0].trim() : 'No Batch'}</div>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center justify-between group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                                                    <User className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-gray-900">{eligibleStudents.find(s => s.id === selectedStudentId)?.name}</div>
+                                                    <div className="text-xs text-blue-600 font-medium">
+                                                        {eligibleStudents.find(s => s.id === selectedStudentId)?.batchName?.split('(')[0].trim() || 'No Batch'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedStudentId('')}
+                                                className="p-2 hover:bg-white rounded-lg text-blue-400 hover:text-red-500 transition-colors"
+                                            >
+                                                <X className="w-5 h-5" />
+                                            </button>
                                         </div>
                                     )}
                                 </div>

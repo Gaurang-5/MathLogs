@@ -379,7 +379,9 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
         const eligibleStudents = students.map((s: any) => ({
             id: s.id,
             name: s.name,
-            batchName: s.batch?.name
+            batchName: s.batch?.name,
+            humanId: s.humanId,
+            parentWhatsapp: s.parentWhatsapp
         }));
 
         res.json(eligibleStudents);
