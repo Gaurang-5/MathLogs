@@ -42,6 +42,8 @@ const DASHBOARD_INSIGHTS = [
     { text: 'Keep track of batch performance', type: 'info' }
 ] as const;
 
+const formatIndianRupee = (value: number) => new Intl.NumberFormat('en-IN').format(value);
+
 export default function Dashboard() {
     const [stats, setStats] = useState({ batches: 0, students: 0 });
     const [growthData, setGrowthData] = useState<GrowthPoint[]>([]);
@@ -220,13 +222,13 @@ export default function Dashboard() {
                         className="group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
                     >
                         <div className="absolute top-0 right-0 w-20 h-20 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
-                        <div className="flex items-center gap-3 sm:gap-4 relative z-10">
-                            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-black text-white rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0">
-                                <Users className="w-5 h-5" strokeWidth={2} />
+                        <div className="flex items-center gap-2 min-[375px]:gap-3 sm:gap-4 relative z-10">
+                            <div className="w-8 h-8 min-[375px]:w-10 min-[375px]:h-10 sm:w-11 sm:h-11 bg-black text-white rounded-lg sm:rounded-2xl flex items-center justify-center shrink-0">
+                                <Users className="w-4 h-4 min-[375px]:w-5 min-[375px]:h-5" strokeWidth={2} />
                             </div>
                             <div className="min-w-0">
                                 <p className="text-[10px] sm:text-xs text-app-text-tertiary font-bold uppercase tracking-widest mb-0.5">Students</p>
-                                <p className="text-2xl sm:text-3xl font-extrabold text-black tracking-tighter">
+                                <p className="text-xl min-[375px]:text-2xl sm:text-3xl font-extrabold text-black tracking-tighter truncate">
                                     <CountUp end={stats.students} duration={2} />
                                 </p>
                             </div>
@@ -245,13 +247,13 @@ export default function Dashboard() {
                         className="group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
                     >
                         <div className="absolute top-0 right-0 w-20 h-20 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
-                        <div className="flex items-center gap-3 sm:gap-4 relative z-10">
-                            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-black text-white rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0">
-                                <BookOpen className="w-5 h-5" strokeWidth={2} />
+                        <div className="flex items-center gap-2 min-[375px]:gap-3 sm:gap-4 relative z-10">
+                            <div className="w-8 h-8 min-[375px]:w-10 min-[375px]:h-10 sm:w-11 sm:h-11 bg-black text-white rounded-lg sm:rounded-2xl flex items-center justify-center shrink-0">
+                                <BookOpen className="w-4 h-4 min-[375px]:w-5 min-[375px]:h-5" strokeWidth={2} />
                             </div>
                             <div className="min-w-0">
                                 <p className="text-[10px] sm:text-xs text-app-text-tertiary font-bold uppercase tracking-widest mb-0.5">Batches</p>
-                                <p className="text-2xl sm:text-3xl font-extrabold text-black tracking-tighter">
+                                <p className="text-xl min-[375px]:text-2xl sm:text-3xl font-extrabold text-black tracking-tighter truncate">
                                     <CountUp end={stats.batches} duration={2} />
                                 </p>
                             </div>
@@ -270,8 +272,8 @@ export default function Dashboard() {
                         className="group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
                     >
                         <div className="absolute top-0 right-0 w-20 h-20 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
-                        <div className="flex items-center gap-3 sm:gap-4 relative z-10">
-                            <div className="relative w-10 h-10 sm:w-11 sm:h-11 shrink-0">
+                        <div className="flex items-center gap-2 min-[375px]:gap-3 sm:gap-4 relative z-10">
+                            <div className="relative w-8 h-8 min-[375px]:w-10 min-[375px]:h-10 sm:w-11 sm:h-11 shrink-0">
                                 <svg className="w-full h-full transform -rotate-90">
                                     <circle cx="50%" cy="50%" r="42%" stroke="#f0f0f0" strokeWidth="3.5" fill="none" />
                                     <motion.circle
@@ -288,12 +290,12 @@ export default function Dashboard() {
                                     />
                                 </svg>
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <Wallet className="w-4 h-4 text-black" strokeWidth={2} />
+                                    <Wallet className="w-3.5 h-3.5 min-[375px]:w-4 min-[375px]:h-4 text-black" strokeWidth={2} />
                                 </div>
                             </div>
                             <div className="min-w-0">
                                 <p className="text-[10px] sm:text-xs text-app-text-tertiary font-bold uppercase tracking-widest mb-0.5">Collection</p>
-                                <p className="text-2xl sm:text-3xl font-extrabold text-black tracking-tighter">
+                                <p className="text-xl min-[375px]:text-2xl sm:text-3xl font-extrabold text-black tracking-tighter truncate">
                                     <CountUp end={collectionRate} duration={2} suffix="%" />
                                 </p>
                             </div>
@@ -312,27 +314,27 @@ export default function Dashboard() {
                         className="group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
                     >
                         <div className="absolute top-0 right-0 w-20 h-20 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
-                        <div className="flex items-center gap-3 sm:gap-4 relative z-10">
-                            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-black text-white rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0">
-                                <IndianRupee className="w-5 h-5" strokeWidth={2} />
+                        <div className="flex items-center gap-2 min-[375px]:gap-3 sm:gap-4 relative z-10">
+                            <div className="w-8 h-8 min-[375px]:w-10 min-[375px]:h-10 sm:w-11 sm:h-11 bg-black text-white rounded-lg sm:rounded-2xl flex items-center justify-center shrink-0">
+                                <IndianRupee className="w-4 h-4 min-[375px]:w-5 min-[375px]:h-5" strokeWidth={2} />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 mb-0.5">
+                                <div className="flex items-center gap-1 min-[375px]:gap-1.5 mb-0.5 -ml-0.5 sm:ml-0">
                                     <p className="text-[10px] sm:text-xs text-app-text-tertiary font-bold uppercase tracking-widest">This Month</p>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); toggleFeeVisibility(); }}
                                         className="p-1 hover:bg-neutral-200 rounded-md transition-colors z-20 active:scale-90"
                                     >
                                         {showFeeData ? (
-                                            <Eye className="w-4 h-4 text-app-text-tertiary" />
+                                            <Eye className="w-3.5 h-3.5 min-[375px]:w-4 min-[375px]:h-4 text-app-text-tertiary" />
                                         ) : (
-                                            <EyeOff className="w-4 h-4 text-app-text-tertiary" />
+                                            <EyeOff className="w-3.5 h-3.5 min-[375px]:w-4 min-[375px]:h-4 text-app-text-tertiary" />
                                         )}
                                     </button>
                                 </div>
-                                <p className="text-xl sm:text-3xl font-extrabold text-black tracking-tighter truncate">
+                                <p className="text-[17px] min-[375px]:text-xl sm:text-3xl font-extrabold text-black tracking-tighter truncate">
                                     {showFeeData ? (
-                                        <>₹<CountUp end={finances.collected} duration={2} separator="," /></>
+                                        <>₹<CountUp end={finances.collected} duration={2} formattingFn={formatIndianRupee} /></>
                                     ) : (
                                         <span className="text-app-text-tertiary">••••••</span>
                                     )}
@@ -452,7 +454,7 @@ export default function Dashboard() {
                                                 fontSize: '13px'
                                             }}
                                             formatter={(value: number | string, name: string) => [
-                                                showFeeData ? `₹${(value ?? 0).toLocaleString()}` : '₹••••••',
+                                                showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(Number(value) || 0)}` : '₹••••••',
                                                 name === 'Collected' ? 'Collected' : 'Remaining'
                                             ]}
                                         />
@@ -465,11 +467,11 @@ export default function Dashboard() {
                             <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-black/5">
                                 <div className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-md bg-black" />
-                                    <span className="text-xs text-app-text-secondary font-bold">Collected · {showFeeData ? `₹${finances.totalCollected.toLocaleString()}` : '₹••••••'}</span>
+                                    <span className="text-xs text-app-text-secondary font-bold">Collected · {showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(finances.totalCollected)}` : '₹••••••'}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-md bg-neutral-200" />
-                                    <span className="text-xs text-app-text-secondary font-bold">Remaining · {showFeeData ? `₹${finances.pending.toLocaleString()}` : '₹••••••'}</span>
+                                    <span className="text-xs text-app-text-secondary font-bold">Remaining · {showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(finances.pending)}` : '₹••••••'}</span>
                                 </div>
                             </div>
                         </>
@@ -523,7 +525,7 @@ export default function Dashboard() {
                                         <span className="font-bold text-app-text text-sm">{batch.name}</span>
                                     </div>
                                     <span className="text-black font-extrabold text-base sm:text-lg tracking-tight">
-                                        {showFeeData ? `₹${batch.amount.toLocaleString()}` : '₹••••••'}
+                                        {showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(batch.amount)}` : '₹••••••'}
                                     </span>
                                 </motion.div>
                             ))}
