@@ -675,7 +675,7 @@ const Fees: React.FC = () => {
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-0 overflow-visible relative z-10"
                         >
-                            <div className="p-6 border-b border-black/5 flex justify-between items-center bg-gray-50/50">
+                            <div className="p-6 border-b border-black/5 flex justify-between items-center bg-gray-50/50 rounded-t-[24px]">
                                 <div>
                                     <h2 className="text-xl font-black text-gray-900">Download Reports</h2>
                                     <p className="text-xs text-gray-500 font-medium">Select a report to generate</p>

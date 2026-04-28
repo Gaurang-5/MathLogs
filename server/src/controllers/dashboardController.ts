@@ -19,10 +19,15 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
 
         console.log(`[DASHBOARD_DEBUG] Fetching for Teacher: ${teacherId}, Year: ${academicYearId}, Inst: ${user.instituteId}`);
 
-        // Get current month start and end dates
+        // Get current month start and end dates (IST adjusted)
         const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+        const yearNum = istTime.getUTCFullYear();
+        const monthIdx = istTime.getUTCMonth();
+        
+        // Accurate IST boundaries mapped to UTC
+        const monthStart = new Date(Date.UTC(yearNum, monthIdx, 1, -5, -30, 0, 0));
+        const monthEnd = new Date(Date.UTC(yearNum, monthIdx + 1, 1, -5, -30, 0, -1));
 
         // PERF OPTIMIZATION / POOL LIMIT FIX: 
         // Execute queries sequentially. Running 7 queries in Promise.all 

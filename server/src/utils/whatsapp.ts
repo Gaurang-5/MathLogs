@@ -144,6 +144,7 @@ export const sendFeeReminderWhatsApp = async (mobileNumber: string, data: FeeRem
         data.batchName || "the batch",
         data.feeBreakup || "• Balance Due",
         data.totalAmount || "0",
+        "Please contact admin for payment details.",
         data.instituteName || "our institute"
     ];
 
