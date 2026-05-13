@@ -161,17 +161,23 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
             }) as any[]
             : [];
 
-        // Only include tests that happened AFTER the student joined the institute
-        const joinDate = new Date(student.createdAt);
-        const eligibleTests = batchTests.filter(
-            (test: any) => new Date(test.date) >= joinDate
-        );
-
         // Build a map of testId -> mark for fast lookup
         const markMap = new Map<string, any>();
         for (const mark of student.marks) {
             markMap.set(mark.test.id, mark);
         }
+
+        // Only include tests that happened on or after the student joined, OR if the student has a mark for it
+        const joinDate = new Date(student.createdAt);
+        joinDate.setHours(0, 0, 0, 0);
+
+        const eligibleTests = batchTests.filter((test: any) => {
+            if (markMap.has(test.id)) return true;
+            
+            const testDate = new Date(test.date);
+            testDate.setHours(0, 0, 0, 0);
+            return testDate >= joinDate;
+        });
 
         // Build the performance array: scored or absent
         const performance = eligibleTests.map((test: any) => {
