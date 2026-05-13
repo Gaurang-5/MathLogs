@@ -287,6 +287,16 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                         subject: true
                     },
                     orderBy: { date: 'asc' }
+                },
+                sharedTests: {
+                    select: {
+                        id: true,
+                        name: true,
+                        maxMarks: true,
+                        date: true,
+                        subject: true
+                    },
+                    orderBy: { date: 'asc' }
                 }
             }
         });
@@ -297,7 +307,14 @@ export const getBatchDetails = async (req: Request, res: Response) => {
         if (batch.instituteId !== user.instituteId) {
             return res.status(403).json({ error: 'Unauthorized access to batch' });
         }
-        res.json(batch);
+
+        // Merge direct tests + shared tests, deduplicated by id, sorted by date
+        const seenTestIds = new Set<string>();
+        const allTests = [...(batch.tests || []), ...((batch as any).sharedTests || [])]
+            .filter(t => { if (seenTestIds.has(t.id)) return false; seenTestIds.add(t.id); return true; })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        res.json({ ...batch, tests: allTests, sharedTests: undefined });
     } catch (e) {
         console.error('[getBatchDetails] Error:', e);
         res.status(500).json({ error: 'Failed to fetch batch details' });
