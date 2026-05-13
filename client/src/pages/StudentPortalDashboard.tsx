@@ -69,7 +69,7 @@ export default function StudentPortalDashboard() {
     const initials = data.student.name.charAt(0).toUpperCase();
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 pb-24">
+        <div className="min-h-screen bg-gray-50 text-gray-900 pb-32">
 
             {/* ── HEADER ── */}
             <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
@@ -233,26 +233,25 @@ export default function StudentPortalDashboard() {
                 </AnimatePresence>
             </main>
 
-            {/* ── BOTTOM NAV ── */}
-            <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100">
-                <div className="max-w-2xl mx-auto flex">
+            {/* ── BOTTOM NAV — Floating Island (matches teacher dashboard) ── */}
+            <nav className="fixed bottom-6 left-4 right-4 z-50 bg-white/80 backdrop-blur-3xl border border-gray-200/60 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] rounded-[32px] h-[72px]">
+                <div className="flex items-center h-full w-full px-2">
                     {TABS.map(({ key, label, Icon }) => {
                         const active = activeTab === key;
                         return (
                             <button
                                 key={key}
                                 onClick={() => setActiveTab(key)}
-                                className="flex-1 flex flex-col items-center justify-center py-3 gap-1 transition-colors active:bg-gray-50 relative"
+                                className="flex-1 flex flex-col items-center justify-center h-full relative group"
                             >
-                                <Icon className={`w-5 h-5 transition-colors ${active ? 'text-black' : 'text-gray-400'}`} />
-                                <span className={`text-[10px] font-bold transition-colors ${active ? 'text-black' : 'text-gray-400'}`}>
-                                    {label}
-                                </span>
+                                <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${active ? 'text-gray-900' : 'text-gray-400 active:scale-90'}`}>
+                                    <Icon className="w-[22px] h-[22px] mb-1" strokeWidth={active ? 2.5 : 1.5} />
+                                    <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-70'}`}>
+                                        {label}
+                                    </span>
+                                </div>
                                 {active && (
-                                    <motion.div
-                                        layoutId="tab-indicator"
-                                        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-black rounded-full"
-                                    />
+                                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-gray-900 animate-in zoom-in" />
                                 )}
                             </button>
                         );
