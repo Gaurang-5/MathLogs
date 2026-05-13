@@ -48,12 +48,21 @@ interface MarkTest {
     name: string;
     date: string;
     maxMarks: number;
+    subject?: string;
 }
 
 interface StudentMark {
     id: string;
     score: number;
     test: MarkTest;
+}
+
+interface BatchTest {
+    id: string;
+    name: string;
+    date: string;
+    maxMarks: number;
+    subject?: string;
 }
 
 interface Batch {
@@ -69,6 +78,7 @@ interface Batch {
     isRegistrationEnded?: boolean;
     students: Student[];
     feeInstallments: FeeInstallment[];
+    tests?: BatchTest[];
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -1547,110 +1557,164 @@ export default function BatchDetails() {
                                 <button onClick={() => setViewMarksId(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                             </div>
 
-                            <div className="border-[1.5px] border-black/5 rounded-xl overflow-hidden bg-white md:bg-transparent">
-                                {/* Desktop View */}
-                                <div className="hidden md:block overflow-x-auto">
-                                    <table className="w-full text-left min-w-[600px]">
-                                        <thead className="bg-neutral-50/50 border-b border-black/5">
-                                            <tr className="whitespace-nowrap">
-                                                <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Test Name</th>
-                                                <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Date</th>
-                                                <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider text-center">Score</th>
-                                                <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider text-center">Max Marks</th>
-                                                <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider text-right">Normalized (10)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-app-border">
-                                            {viewMarks.marks && viewMarks.marks.map((mark) => {
+                            {(() => {
+                                // Build full performance list: scored + absent (for tests after join date)
+                                const joinDate = new Date(viewMarks.createdAt || 0);
+                                joinDate.setHours(0, 0, 0, 0);
+                                const markedTestIds = new Set((viewMarks.marks || []).map(m => m.test.id));
+                                const batchTests = batch?.tests || [];
+                                
+                                const absentTests = batchTests.filter(t => {
+                                    if (markedTestIds.has(t.id)) return false;
+                                    const td = new Date(t.date);
+                                    td.setHours(0, 0, 0, 0);
+                                    return td >= joinDate;
+                                });
+
+                                // Combine: scored rows + absent rows, sorted by date
+                                type PerformanceRow = 
+                                    | { type: 'scored'; mark: StudentMark }
+                                    | { type: 'absent'; test: BatchTest };
+                                
+                                const rows: PerformanceRow[] = [
+                                    ...(viewMarks.marks || []).map(m => ({ type: 'scored' as const, mark: m })),
+                                    ...absentTests.map(t => ({ type: 'absent' as const, test: t }))
+                                ].sort((a, b) => {
+                                    const dateA = a.type === 'scored' ? a.mark.test.date : a.test.date;
+                                    const dateB = b.type === 'scored' ? b.mark.test.date : b.test.date;
+                                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                                });
+
+                                const scoredRows = rows.filter(r => r.type === 'scored') as { type: 'scored'; mark: StudentMark }[];
+
+                                return (
+                                    <div className="border-[1.5px] border-black/5 rounded-xl overflow-hidden bg-white md:bg-transparent">
+                                        {/* Desktop View */}
+                                        <div className="hidden md:block overflow-x-auto">
+                                            <table className="w-full text-left min-w-[600px]">
+                                                <thead className="bg-neutral-50/50 border-b border-black/5">
+                                                    <tr className="whitespace-nowrap">
+                                                        <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Test Name</th>
+                                                        <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider">Date</th>
+                                                        <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider text-center">Score</th>
+                                                        <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider text-center">Max Marks</th>
+                                                        <th className="px-6 py-4 text-xs font-bold text-app-text-tertiary uppercase tracking-wider text-right">Normalized (10)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-app-border">
+                                                    {rows.length === 0 && (
+                                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-app-text-tertiary">No test records found.</td></tr>
+                                                    )}
+                                                    {rows.map((row, i) => {
+                                                        if (row.type === 'absent') {
+                                                            const parsedDate = row.test.date ? new Date(row.test.date) : null;
+                                                            const dateStr = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate.toLocaleDateString() : '-';
+                                                            return (
+                                                                <tr key={`absent-${row.test.id}`} className="opacity-50 bg-red-50/30">
+                                                                    <td className="px-6 py-4 font-medium text-app-text">{row.test.name}</td>
+                                                                    <td className="px-6 py-4 text-app-text-secondary text-sm">{dateStr}</td>
+                                                                    <td className="px-6 py-4 text-center" colSpan={2}>
+                                                                        <span className="text-xs font-bold text-red-400 bg-red-50 px-2.5 py-1 rounded-full">Absent</span>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-right font-mono font-bold text-red-300">—</td>
+                                                                </tr>
+                                                            );
+                                                        }
+                                                        const mark = row.mark;
+                                                        const max = mark.test.maxMarks || 0;
+                                                        const normalized = max > 0 ? (mark.score / max) * 10 : 0;
+                                                        const parsedDate = mark.test.date ? new Date(mark.test.date) : null;
+                                                        const dateStr = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate.toLocaleDateString() : '-';
+                                                        return (
+                                                            <tr key={mark.id} className="hover:bg-neutral-50/50 transition-colors">
+                                                                <td className="px-6 py-4 font-medium text-app-text">{mark.test.name}</td>
+                                                                <td className="px-6 py-4 text-app-text-secondary text-sm">{dateStr}</td>
+                                                                <td className="px-6 py-4 text-center text-app-text">{mark.score}</td>
+                                                                <td className="px-6 py-4 text-center text-app-text-secondary">{max}</td>
+                                                                <td className="px-6 py-4 text-right font-mono font-bold text-accent">{normalized.toFixed(1)}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                                {scoredRows.length > 0 && (
+                                                    <tfoot className="bg-neutral-50/50 border-t border-black/5">
+                                                        <tr>
+                                                            <td colSpan={4} className="px-6 py-4 text-sm font-bold text-app-text text-right uppercase tracking-wider">Average Normalized Score</td>
+                                                            <td className="px-6 py-4 text-right font-mono font-bold text-xl text-app-text">{getStudentAverage(viewMarks)}</td>
+                                                        </tr>
+                                                    </tfoot>
+                                                )}
+                                            </table>
+                                        </div>
+
+                                        {/* Mobile View */}
+                                        <div className="md:hidden flex flex-col divide-y divide-black/5 bg-neutral-50/30">
+                                            {rows.length === 0 && (
+                                                <div className="p-8 text-center text-app-text-tertiary">No test records found.</div>
+                                            )}
+                                            {rows.map((row) => {
+                                                if (row.type === 'absent') {
+                                                    const parsedDate = row.test.date ? new Date(row.test.date) : null;
+                                                    const dateStr = parsedDate && !isNaN(parsedDate.getTime())
+                                                        ? parsedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
+                                                        : '-';
+                                                    return (
+                                                        <div key={`absent-${row.test.id}`} className="p-4 flex justify-between items-center opacity-50 bg-red-50/30">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-app-text text-[15px] leading-tight">{row.test.name}</span>
+                                                                <span className="text-xs text-app-text-tertiary mt-1.5 flex items-center gap-1.5">
+                                                                    <Clock className="w-3.5 h-3.5" />{dateStr}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-xs font-bold text-red-400 bg-red-50 px-2.5 py-1 rounded-full flex-shrink-0">Absent</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                const mark = row.mark;
                                                 const max = mark.test.maxMarks || 0;
                                                 const normalized = max > 0 ? (mark.score / max) * 10 : 0;
                                                 const parsedDate = mark.test.date ? new Date(mark.test.date) : null;
-                                                const dateStr = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate.toLocaleDateString() : '-';
-                                                
+                                                const dateStr = parsedDate && !isNaN(parsedDate.getTime())
+                                                    ? parsedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
+                                                    : '-';
                                                 return (
-                                                    <tr key={mark.id} className="hover:bg-neutral-50/50/50 transition-colors">
-                                                        <td className="px-6 py-4 font-medium text-app-text">{mark.test.name}</td>
-                                                        <td className="px-6 py-4 text-app-text-secondary text-sm">{dateStr}</td>
-                                                        <td className="px-6 py-4 text-center text-app-text">{mark.score}</td>
-                                                        <td className="px-6 py-4 text-center text-app-text-secondary">{max}</td>
-                                                        <td className="px-6 py-4 text-right font-mono font-bold text-accent">{normalized.toFixed(1)}</td>
-                                                    </tr>
+                                                    <div key={mark.id} className="p-4 flex flex-col gap-3 hover:bg-white transition-colors">
+                                                        <div className="flex justify-between items-start">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-app-text text-[15px] leading-tight">{mark.test.name}</span>
+                                                                <span className="text-xs text-app-text-tertiary mt-1.5 flex items-center gap-1.5">
+                                                                    <Clock className="w-3.5 h-3.5" />{dateStr}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-right flex flex-col items-end">
+                                                                <span className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-wider mb-1">Norm (10)</span>
+                                                                <span className="font-mono font-bold text-xl text-accent leading-none">{normalized.toFixed(1)}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-5 pt-3 border-t border-black/5 mt-1">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-wider mb-0.5">Score</span>
+                                                                <span className="font-bold text-app-text text-sm">{mark.score}</span>
+                                                            </div>
+                                                            <div className="w-px h-6 bg-black/5"></div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-wider mb-0.5">Max</span>
+                                                                <span className="font-medium text-app-text-secondary text-sm">{max}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 );
                                             })}
-                                            {(!viewMarks.marks || viewMarks.marks.length === 0) && (
-                                                <tr>
-                                                    <td colSpan={5} className="px-6 py-12 text-center text-app-text-tertiary">
-                                                        No test records found.
-                                                    </td>
-                                                </tr>
+                                            {scoredRows.length > 0 && (
+                                                <div className="p-4 bg-neutral-50/80 flex justify-between items-center border-t border-black/5">
+                                                    <span className="text-xs font-bold text-app-text uppercase tracking-wider">Average Score</span>
+                                                    <span className="font-mono font-bold text-2xl text-app-text">{getStudentAverage(viewMarks)}</span>
+                                                </div>
                                             )}
-                                        </tbody>
-                                        {viewMarks.marks && viewMarks.marks.length > 0 && (
-                                            <tfoot className="bg-neutral-50/50 border-t border-black/5">
-                                                <tr>
-                                                    <td colSpan={4} className="px-6 py-4 text-sm font-bold text-app-text text-right uppercase tracking-wider">Average Normalized Score</td>
-                                                    <td className="px-6 py-4 text-right font-mono font-bold text-xl text-app-text">
-                                                        {getStudentAverage(viewMarks)}
-                                                    </td>
-                                                </tr>
-                                            </tfoot>
-                                        )}
-                                    </table>
-                                </div>
-
-                                {/* Mobile View */}
-                                <div className="md:hidden flex flex-col divide-y divide-black/5 bg-neutral-50/30">
-                                    {viewMarks.marks && viewMarks.marks.map((mark) => {
-                                        const max = mark.test.maxMarks || 0;
-                                        const normalized = max > 0 ? (mark.score / max) * 10 : 0;
-                                        const parsedDate = mark.test.date ? new Date(mark.test.date) : null;
-                                        const dateStr = parsedDate && !isNaN(parsedDate.getTime()) 
-                                            ? parsedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) 
-                                            : '-';
-                                            
-                                        return (
-                                            <div key={mark.id} className="p-4 flex flex-col gap-3 hover:bg-white transition-colors">
-                                                <div className="flex justify-between items-start">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-bold text-app-text text-[15px] leading-tight">{mark.test.name}</span>
-                                                        <span className="text-xs text-app-text-tertiary mt-1.5 flex items-center gap-1.5">
-                                                            <Clock className="w-3.5 h-3.5" />
-                                                            {dateStr}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-right flex flex-col items-end">
-                                                        <span className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-wider mb-1">Norm (10)</span>
-                                                        <span className="font-mono font-bold text-xl text-accent leading-none">{normalized.toFixed(1)}</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="flex items-center gap-5 pt-3 border-t border-black/5 mt-1">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-wider mb-0.5">Score</span>
-                                                        <span className="font-bold text-app-text text-sm">{mark.score}</span>
-                                                    </div>
-                                                    <div className="w-px h-6 bg-black/5"></div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-wider mb-0.5">Max</span>
-                                                        <span className="font-medium text-app-text-secondary text-sm">{max}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    {(!viewMarks.marks || viewMarks.marks.length === 0) && (
-                                        <div className="p-8 text-center text-app-text-tertiary">
-                                            No test records found.
                                         </div>
-                                    )}
-                                    {viewMarks.marks && viewMarks.marks.length > 0 && (
-                                        <div className="p-4 bg-neutral-50/80 flex justify-between items-center border-t border-black/5">
-                                            <span className="text-xs font-bold text-app-text uppercase tracking-wider">Average Score</span>
-                                            <span className="font-mono font-bold text-2xl text-app-text">{getStudentAverage(viewMarks)}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                                    </div>
+                                );
+                            })()}
                             <div className="h-4 md:hidden"></div>
                         </motion.div>
                     </div>

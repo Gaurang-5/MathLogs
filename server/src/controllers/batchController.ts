@@ -277,6 +277,16 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                         }
                     },
                     orderBy: { name: 'asc' }
+                },
+                tests: {
+                    select: {
+                        id: true,
+                        name: true,
+                        maxMarks: true,
+                        date: true,
+                        subject: true
+                    },
+                    orderBy: { date: 'asc' }
                 }
             }
         });
