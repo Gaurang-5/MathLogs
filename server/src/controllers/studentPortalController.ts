@@ -94,7 +94,10 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
             include: {
                 batch: true,
                 balance: true,
-                fees: {
+                feePayments: {
+                    include: {
+                        installment: true
+                    },
                     orderBy: { date: 'desc' }
                 },
                 marks: {
@@ -123,13 +126,13 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                 balance: student.balance?.balance || 0,
                 totalFees: student.balance?.totalFees || 0,
                 totalPaid: student.balance?.totalPaid || 0,
-                transactions: student.fees.map((record: any) => ({
-                    id: record.id,
-                    amount: record.amount,
-                    date: record.date,
+                transactions: student.feePayments.map((payment: any) => ({
+                    id: payment.id,
+                    amount: payment.amountPaid,
+                    date: payment.date,
                     type: 'PAYMENT',
-                    month: record.month,
-                    status: record.status
+                    label: payment.installment?.name || 'Fee Payment',
+                    status: 'PAID'
                 }))
             },
             performance: student.marks.map((mark: any) => ({
@@ -137,9 +140,9 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                 testName: mark.test.name,
                 subject: mark.test.subject,
                 date: mark.test.date,
-                score: mark.marksObtained,
+                score: mark.score,
                 maxMarks: mark.test.maxMarks,
-                percentage: (mark.marksObtained / mark.test.maxMarks) * 100
+                percentage: (mark.score / mark.test.maxMarks) * 100
             }))
         });
     } catch (error) {

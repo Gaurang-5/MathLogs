@@ -136,12 +136,12 @@ export default function StudentPortalDashboard() {
                                         data.fees.transactions.map((tx: any) => (
                                             <div key={tx.id} className="p-4 flex items-center justify-between">
                                                 <div>
-                                                    <p className="font-bold">{new Date(tx.date).toLocaleDateString()}</p>
-                                                    <p className="text-sm text-gray-500">{tx.month || 'Payment'}</p>
+                                                    <p className="font-bold">{new Date(tx.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                                    <p className="text-sm text-gray-500">{tx.label}</p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="font-black text-green-600">+₹{tx.amount}</p>
-                                                    <p className="text-xs font-bold text-gray-400 uppercase">{tx.status}</p>
+                                                    <p className="font-black text-green-600">+₹{tx.amount.toLocaleString('en-IN')}</p>
+                                                    <p className="text-xs font-bold text-green-500 uppercase">{tx.status}</p>
                                                 </div>
                                             </div>
                                         ))
