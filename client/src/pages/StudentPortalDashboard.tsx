@@ -3,8 +3,21 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, LogOut, TrendingUp, BookOpen, Receipt } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+    Wallet, LogOut, TrendingUp, BookOpen, Receipt,
+    User, Phone, Mail, GraduationCap, Hash, School, X
+} from 'lucide-react';
+import {
+    LineChart, Line, XAxis, YAxis, CartesianGrid,
+    Tooltip, ResponsiveContainer, ReferenceLine
+} from 'recharts';
+
+type Tab = 'performance' | 'fees';
+
+const TABS: { key: Tab; label: string; Icon: React.ElementType }[] = [
+    { key: 'performance', label: 'Tests', Icon: TrendingUp },
+    { key: 'fees', label: 'Fees', Icon: Wallet },
+];
 
 export default function StudentPortalDashboard() {
     const { instituteSlug } = useParams<{ instituteSlug: string }>();
@@ -12,25 +25,19 @@ export default function StudentPortalDashboard() {
 
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState<'fees' | 'performance'>('fees');
+    const [activeTab, setActiveTab] = useState<Tab>('performance');
+    const [profileOpen, setProfileOpen] = useState(false);
 
     useEffect(() => {
         const fetchDashboard = async () => {
             const token = localStorage.getItem(`student_token_${instituteSlug}`);
-            if (!token) {
-                navigate(`/${instituteSlug}/student`);
-                return;
-            }
-
+            if (!token) { navigate(`/${instituteSlug}/student`); return; }
             try {
-                const response = await axios.get('/api/student-portal/dashboard', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
+                const res = await axios.get('/api/student-portal/dashboard', {
+                    headers: { Authorization: `Bearer ${token}` }
                 });
-                setData(response.data);
-            } catch (error) {
-                console.error('Error fetching dashboard:', error);
+                setData(res.data);
+            } catch {
                 localStorage.removeItem(`student_token_${instituteSlug}`);
                 toast.error('Session expired. Please log in again.');
                 navigate(`/${instituteSlug}/student`);
@@ -38,7 +45,6 @@ export default function StudentPortalDashboard() {
                 setLoading(false);
             }
         };
-
         fetchDashboard();
     }, [instituteSlug, navigate]);
 
@@ -50,191 +56,313 @@ export default function StudentPortalDashboard() {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-[3px] border-black border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
-
     if (!data) return null;
 
+    const avgScore = data.performance.length
+        ? data.performance.reduce((s: number, t: any) => s + t.percentage, 0) / data.performance.length
+        : 0;
+
+    const initials = data.student.name.charAt(0).toUpperCase();
+
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20 md:pb-8">
-            {/* Header */}
-            <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
-                <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-                    <div>
-                        <h1 className="font-bold text-lg">{data.student.name}</h1>
-                        <p className="text-xs text-gray-500">{data.student.batchName}</p>
+        <div className="min-h-screen bg-gray-50 text-gray-900 pb-24">
+
+            {/* ── HEADER ── */}
+            <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
+                <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+                    {/* Avatar circle — opens profile sheet */}
+                    <button
+                        onClick={() => setProfileOpen(true)}
+                        className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center font-black text-sm flex-shrink-0 shadow-sm active:scale-95 transition-transform"
+                        aria-label="View profile"
+                    >
+                        {initials}
+                    </button>
+
+                    {/* Name + batch centred */}
+                    <div className="text-center min-w-0 flex-1 px-3">
+                        <p className="font-bold text-sm leading-tight truncate">{data.student.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{data.student.batchName}</p>
                     </div>
-                    <button 
+
+                    {/* Logout */}
+                    <button
                         onClick={handleLogout}
-                        className="p-2 text-gray-500 hover:text-black rounded-lg hover:bg-gray-100 transition-colors"
+                        className="p-2 -mr-1 text-gray-400 hover:text-black rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                        aria-label="Logout"
                     >
                         <LogOut className="w-5 h-5" />
                     </button>
                 </div>
             </header>
 
-            <main className="max-w-4xl mx-auto px-4 mt-6">
-                {/* Tabs */}
-                <div className="flex bg-white rounded-2xl p-1 border border-gray-100 mb-6 shadow-sm">
-                    <button
-                        onClick={() => setActiveTab('fees')}
-                        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
-                            activeTab === 'fees' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-50'
-                        }`}
-                    >
-                        <Wallet className="w-4 h-4" />
-                        Fees Details
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('performance')}
-                        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
-                            activeTab === 'performance' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-50'
-                        }`}
-                    >
-                        <TrendingUp className="w-4 h-4" />
-                        Performance
-                    </button>
-                </div>
-
+            {/* ── CONTENT ── */}
+            <main className="max-w-2xl mx-auto px-4 pt-5">
                 <AnimatePresence mode="wait">
-                    {activeTab === 'fees' && (
-                        <motion.div
-                            key="fees"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-6"
-                        >
-                            {/* Fee Overview Cards */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Total Paid</p>
-                                    <p className="text-2xl font-black text-green-600">₹{data.fees.totalPaid}</p>
-                                </div>
-                                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Pending Dues</p>
-                                    <p className="text-2xl font-black text-red-600">₹{data.fees.balance}</p>
-                                </div>
-                            </div>
 
-                            {/* Transaction History */}
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                <div className="p-5 border-b border-gray-100">
-                                    <h2 className="font-bold flex items-center gap-2">
-                                        <Receipt className="w-5 h-5 text-gray-400" />
-                                        Transaction History
-                                    </h2>
-                                </div>
-                                <div className="divide-y divide-gray-100">
-                                    {data.fees.transactions.length === 0 ? (
-                                        <div className="p-8 text-center text-gray-500">
-                                            No transactions found
-                                        </div>
-                                    ) : (
-                                        data.fees.transactions.map((tx: any) => (
-                                            <div key={tx.id} className="p-4 flex items-center justify-between">
-                                                <div>
-                                                    <p className="font-bold">{new Date(tx.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                                                    <p className="text-sm text-gray-500">{tx.label}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-black text-green-600">+₹{tx.amount.toLocaleString('en-IN')}</p>
-                                                    <p className="text-xs font-bold text-green-500 uppercase">{tx.status}</p>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-
+                    {/* ── PERFORMANCE ── */}
                     {activeTab === 'performance' && (
-                        <motion.div
-                            key="performance"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-6"
+                        <motion.div key="performance"
+                            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}
+                            className="space-y-4"
                         >
-                            {/* Chart */}
                             {data.performance.length > 0 && (
-                                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                                    <h2 className="font-bold mb-4 flex items-center gap-2">
-                                        <TrendingUp className="w-5 h-5 text-gray-400" />
-                                        Progress Chart
-                                    </h2>
-                                    <div className="h-[250px]">
+                                <div className="flex gap-3">
+                                    <StatChip label="Tests Taken" value={data.performance.length} />
+                                    <StatChip
+                                        label="Avg Score" value={`${avgScore.toFixed(1)}%`}
+                                        color={avgScore >= 75 ? 'green' : avgScore >= 40 ? 'orange' : 'red'}
+                                    />
+                                </div>
+                            )}
+
+                            {data.performance.length > 1 && (
+                                <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Score Trend</p>
+                                    <div className="h-48">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={data.performance}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                <XAxis 
-                                                    dataKey="testName" 
-                                                    tickFormatter={(name) => name.substring(0, 10) + '...'}
-                                                    style={{ fontSize: 10, fill: '#9ca3af' }}
+                                            <LineChart data={data.performance} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                                <XAxis
+                                                    dataKey="testName"
+                                                    tick={{ fontSize: 9, fill: '#9ca3af' }}
+                                                    tickFormatter={(n: string) => n.length > 6 ? n.slice(0, 6) + '…' : n}
+                                                    axisLine={false} tickLine={false}
                                                 />
-                                                <YAxis 
-                                                    domain={[0, 100]} 
-                                                    style={{ fontSize: 10, fill: '#9ca3af' }}
+                                                <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                                                <ReferenceLine y={75} stroke="#22c55e" strokeDasharray="4 4" strokeWidth={1} />
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
+                                                    formatter={(v: number) => [`${Number(v).toFixed(1)}%`, 'Score']}
                                                 />
-                                                <Tooltip 
-                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                                    formatter={(value: number) => [`${value.toFixed(1)}%`, 'Percentage']}
-                                                />
-                                                <Line 
-                                                    type="monotone" 
-                                                    dataKey="percentage" 
-                                                    stroke="#000000" 
-                                                    strokeWidth={3}
-                                                    dot={{ fill: '#000000', strokeWidth: 2, r: 4 }}
-                                                />
+                                                <Line type="monotone" dataKey="percentage" stroke="#000" strokeWidth={2.5}
+                                                    dot={{ fill: '#000', r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />
                                             </LineChart>
                                         </ResponsiveContainer>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Tests List */}
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                <div className="p-5 border-b border-gray-100">
-                                    <h2 className="font-bold flex items-center gap-2">
-                                        <BookOpen className="w-5 h-5 text-gray-400" />
-                                        Past Tests
-                                    </h2>
+                                <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                                    <BookOpen className="w-4 h-4 text-gray-400" />
+                                    <span className="font-bold text-sm">All Tests</span>
                                 </div>
-                                <div className="divide-y divide-gray-100">
-                                    {data.performance.length === 0 ? (
-                                        <div className="p-8 text-center text-gray-500">
-                                            No test records found
-                                        </div>
-                                    ) : (
-                                        data.performance.map((test: any) => (
-                                            <div key={test.testId} className="p-4 flex items-center justify-between">
-                                                <div>
-                                                    <p className="font-bold">{test.testName}</p>
-                                                    <p className="text-sm text-gray-500">
-                                                        {new Date(test.date).toLocaleDateString()} · {test.subject}
+                                {data.performance.length === 0 ? (
+                                    <EmptyState message="No test records yet" />
+                                ) : (
+                                    <div className="divide-y divide-gray-50">
+                                        {data.performance.map((test: any) => (
+                                            <div key={test.testId} className="px-4 py-3.5 flex items-center justify-between">
+                                                <div className="min-w-0 mr-3">
+                                                    <p className="font-semibold text-sm truncate">{test.testName}</p>
+                                                    <p className="text-xs text-gray-400 mt-0.5">
+                                                        {new Date(test.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                        &nbsp;·&nbsp;{test.subject}
                                                     </p>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="font-black text-lg">
-                                                        {test.score} <span className="text-sm text-gray-400 font-medium">/ {test.maxMarks}</span>
+                                                <div className="text-right flex-shrink-0">
+                                                    <p className="font-black text-base">
+                                                        {test.score}<span className="text-gray-300 font-normal text-xs">/{test.maxMarks}</span>
                                                     </p>
-                                                    <p className={`text-xs font-bold ${test.percentage >= 75 ? 'text-green-600' : test.percentage >= 40 ? 'text-orange-500' : 'text-red-600'}`}>
+                                                    <p className={`text-xs font-bold ${test.percentage >= 75 ? 'text-green-600' : test.percentage >= 40 ? 'text-orange-500' : 'text-red-500'}`}>
                                                         {test.percentage.toFixed(1)}%
                                                     </p>
                                                 </div>
                                             </div>
-                                        ))
-                                    )}
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* ── FEES ── */}
+                    {activeTab === 'fees' && (
+                        <motion.div key="fees"
+                            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}
+                            className="space-y-4"
+                        >
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Paid</p>
+                                    <p className="text-xl font-black text-green-600 mt-1">₹{data.fees.totalPaid.toLocaleString('en-IN')}</p>
                                 </div>
+                                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pending</p>
+                                    <p className={`text-xl font-black mt-1 ${data.fees.balance > 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                                        ₹{data.fees.balance.toLocaleString('en-IN')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                                    <Receipt className="w-4 h-4 text-gray-400" />
+                                    <span className="font-bold text-sm">Payments</span>
+                                </div>
+                                {data.fees.transactions.length === 0 ? (
+                                    <EmptyState message="No payments recorded yet" />
+                                ) : (
+                                    <div className="divide-y divide-gray-50">
+                                        {data.fees.transactions.map((tx: any) => (
+                                            <div key={tx.id} className="px-4 py-3.5 flex items-center justify-between">
+                                                <div className="min-w-0 mr-3">
+                                                    <p className="font-semibold text-sm">{tx.label}</p>
+                                                    <p className="text-xs text-gray-400 mt-0.5">
+                                                        {new Date(tx.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right flex-shrink-0">
+                                                    <p className="font-black text-green-600 text-base">+₹{tx.amount.toLocaleString('en-IN')}</p>
+                                                    <p className="text-[10px] font-bold text-green-500 uppercase">{tx.status}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
             </main>
+
+            {/* ── BOTTOM NAV ── */}
+            <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100">
+                <div className="max-w-2xl mx-auto flex">
+                    {TABS.map(({ key, label, Icon }) => {
+                        const active = activeTab === key;
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => setActiveTab(key)}
+                                className="flex-1 flex flex-col items-center justify-center py-3 gap-1 transition-colors active:bg-gray-50 relative"
+                            >
+                                <Icon className={`w-5 h-5 transition-colors ${active ? 'text-black' : 'text-gray-400'}`} />
+                                <span className={`text-[10px] font-bold transition-colors ${active ? 'text-black' : 'text-gray-400'}`}>
+                                    {label}
+                                </span>
+                                {active && (
+                                    <motion.div
+                                        layoutId="tab-indicator"
+                                        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-black rounded-full"
+                                    />
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            </nav>
+
+            {/* ── PROFILE BOTTOM SHEET ── */}
+            <AnimatePresence>
+                {profileOpen && (
+                    <>
+                        {/* Backdrop */}
+                        <motion.div
+                            key="backdrop"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"
+                            onClick={() => setProfileOpen(false)}
+                        />
+
+                        {/* Sheet */}
+                        <motion.div
+                            key="sheet"
+                            initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto"
+                        >
+                            {/* Handle */}
+                            <div className="flex justify-center pt-3 pb-1">
+                                <div className="w-10 h-1 bg-gray-200 rounded-full" />
+                            </div>
+
+                            {/* Sheet header */}
+                            <div className="flex items-center justify-between px-5 pt-3 pb-4 border-b border-gray-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center text-xl font-black shadow-sm">
+                                        {initials}
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-base">{data.student.name}</p>
+                                        {data.student.humanId && (
+                                            <p className="text-xs text-gray-400 font-mono">ID: {data.student.humanId}</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setProfileOpen(false)}
+                                    className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Profile rows */}
+                            <div className="px-2 py-2">
+                                <ProfileRow icon={GraduationCap} label="Batch" value={data.student.batchName} />
+                                <ProfileRow icon={User} label="Parent / Guardian" value={data.student.parentName} />
+                                <ProfileRow icon={Phone} label="Mobile" value={data.student.parentWhatsapp} />
+                                {data.student.parentEmail && <ProfileRow icon={Mail} label="Email" value={data.student.parentEmail} />}
+                                {data.student.schoolName && <ProfileRow icon={School} label="School" value={data.student.schoolName} />}
+                            </div>
+
+                            {/* Logout inside sheet */}
+                            <div className="px-5 pt-2 pb-8">
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-red-100 bg-red-50 text-red-600 font-bold text-sm active:scale-95 transition-all"
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                    Sign Out
+                                </button>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
         </div>
     );
+}
+
+/* ── Sub-components ── */
+
+function StatChip({ label, value, color = 'default' }: { label: string; value: string | number; color?: 'green' | 'orange' | 'red' | 'default' }) {
+    const colorMap = {
+        green: 'bg-green-50 text-green-700',
+        orange: 'bg-orange-50 text-orange-700',
+        red: 'bg-red-50 text-red-600',
+        default: 'bg-gray-100 text-gray-700',
+    };
+    return (
+        <div className={`flex-1 rounded-2xl px-4 py-3 ${colorMap[color]}`}>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">{label}</p>
+            <p className="text-xl font-black mt-0.5">{value}</p>
+        </div>
+    );
+}
+
+function ProfileRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+    return (
+        <div className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors">
+            <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <Icon className="w-4 h-4 text-gray-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{label}</p>
+                <p className="font-semibold text-sm text-gray-900 truncate mt-0.5">{value}</p>
+            </div>
+        </div>
+    );
+}
+
+function EmptyState({ message }: { message: string }) {
+    return <div className="py-10 text-center text-sm text-gray-400">{message}</div>;
 }

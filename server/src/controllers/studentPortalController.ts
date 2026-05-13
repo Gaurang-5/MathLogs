@@ -120,7 +120,12 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
             student: {
                 name: student.name,
                 parentName: student.parentName,
-                batchName: student.batch?.name,
+                parentWhatsapp: student.parentWhatsapp,
+                parentEmail: student.parentEmail || null,
+                batchName: student.batch?.name || 'N/A',
+                schoolName: student.schoolName || null,
+                humanId: student.humanId || null,
+                status: student.status,
             },
             fees: {
                 balance: student.balance?.balance || 0,
