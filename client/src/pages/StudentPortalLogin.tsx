@@ -56,24 +56,28 @@ export default function StudentPortalLogin() {
             {/* ─── Animated Background ─── */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                 <div 
-                    className="absolute inset-0 opacity-10" 
+                    className="absolute inset-0 opacity-20" 
                     style={{ background: branding?.primaryColor ? `linear-gradient(180deg, ${branding.primaryColor} 0%, transparent 100%)` : undefined }} 
                 />
                 <motion.div 
                     animate={{ 
-                        y: [0, -20, 0], 
-                        opacity: [0.03, 0.06, 0.03] 
+                        y: [0, -30, 0], 
+                        scale: [1, 1.1, 1],
+                        opacity: [0.15, 0.3, 0.15] 
                     }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute top-0 right-0 w-[400px] h-[400px] bg-accent rounded-full blur-[80px] translate-x-1/3 -translate-y-1/3" 
+                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full blur-[80px] translate-x-1/3 -translate-y-1/3" 
+                    style={{ backgroundColor: branding?.primaryColor || '#1e40af' }}
                 />
                 <motion.div 
                     animate={{ 
-                        y: [0, 30, 0], 
-                        opacity: [0.02, 0.05, 0.02] 
+                        y: [0, 40, 0], 
+                        scale: [1, 1.15, 1],
+                        opacity: [0.1, 0.25, 0.1] 
                     }}
-                    transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                    className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-accent rounded-full blur-[80px] -translate-x-1/3 translate-y-1/3" 
+                    transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                    className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full blur-[80px] -translate-x-1/3 translate-y-1/3" 
+                    style={{ backgroundColor: branding?.primaryColor || '#1e40af' }}
                 />
             </div>
 
