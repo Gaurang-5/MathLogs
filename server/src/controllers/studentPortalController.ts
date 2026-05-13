@@ -153,13 +153,17 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
             return new Date(inst.createdAt) >= studentJoinDate || inst.payments.length > 0;
         });
 
-        // Fetch all tests in the student's batch, sorted by date ascending
-        const batchTests = student.batchId
-            ? await prisma.test.findMany({
-                where: { batchId: student.batchId },
-                orderBy: { date: 'asc' }
-            }) as any[]
-            : [];
+        // Fetch all tests in the student's batch, or tests they have marks for, sorted by date ascending
+        const batchTests = await prisma.test.findMany({
+            where: {
+                OR: [
+                    student.batchId ? { batchId: student.batchId } : {},
+                    student.batchId ? { batches: { some: { id: student.batchId } } } : {},
+                    { marks: { some: { studentId: studentId } } }
+                ].filter(condition => Object.keys(condition).length > 0)
+            },
+            orderBy: { date: 'asc' }
+        }) as any[];
 
         // Build a map of testId -> mark for fast lookup
         const markMap = new Map<string, any>();
