@@ -1389,7 +1389,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     editingStudent && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1525,7 +1525,7 @@ export default function BatchDetails() {
             {/* View Marks Modal */}
             <AnimatePresence>
                 {viewMarks && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1537,18 +1537,19 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-8 max-w-2xl w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-5 md:p-8 max-w-2xl w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
                         >
                             <div className="flex justify-between items-center mb-6">
                                 <div>
-                                    <h3 className="text-xl font-bold text-app-text">{viewMarks.name}'s Performance</h3>
-                                    <p className="text-sm text-app-text-secondary mt-1">Detailed breakdown of test scores</p>
+                                    <h3 className="text-xl md:text-2xl font-bold text-app-text tracking-tight">{viewMarks.name}'s Performance</h3>
+                                    <p className="text-xs md:text-sm text-app-text-secondary mt-1">Detailed breakdown of test scores</p>
                                 </div>
                                 <button onClick={() => setViewMarksId(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                             </div>
 
-                            <div className="border-[1.5px] border-black/5 rounded-xl overflow-hidden">
-                                <div className="overflow-x-auto">
+                            <div className="border-[1.5px] border-black/5 rounded-xl overflow-hidden bg-white md:bg-transparent">
+                                {/* Desktop View */}
+                                <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full text-left min-w-[600px]">
                                         <thead className="bg-neutral-50/50 border-b border-black/5">
                                             <tr className="whitespace-nowrap">
@@ -1563,10 +1564,13 @@ export default function BatchDetails() {
                                             {viewMarks.marks && viewMarks.marks.map((mark) => {
                                                 const max = mark.test.maxMarks || 0;
                                                 const normalized = max > 0 ? (mark.score / max) * 10 : 0;
+                                                const parsedDate = mark.test.date ? new Date(mark.test.date) : null;
+                                                const dateStr = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate.toLocaleDateString() : '-';
+                                                
                                                 return (
                                                     <tr key={mark.id} className="hover:bg-neutral-50/50/50 transition-colors">
                                                         <td className="px-6 py-4 font-medium text-app-text">{mark.test.name}</td>
-                                                        <td className="px-6 py-4 text-app-text-secondary text-sm">{new Date(mark.test.date).toLocaleDateString()}</td>
+                                                        <td className="px-6 py-4 text-app-text-secondary text-sm">{dateStr}</td>
                                                         <td className="px-6 py-4 text-center text-app-text">{mark.score}</td>
                                                         <td className="px-6 py-4 text-center text-app-text-secondary">{max}</td>
                                                         <td className="px-6 py-4 text-right font-mono font-bold text-accent">{normalized.toFixed(1)}</td>
@@ -1584,7 +1588,7 @@ export default function BatchDetails() {
                                         {viewMarks.marks && viewMarks.marks.length > 0 && (
                                             <tfoot className="bg-neutral-50/50 border-t border-black/5">
                                                 <tr>
-                                                    <td colSpan={4} className="px-6 py-4 text-sm font-bold text-app-text text-right">Average Normalized Score</td>
+                                                    <td colSpan={4} className="px-6 py-4 text-sm font-bold text-app-text text-right uppercase tracking-wider">Average Normalized Score</td>
                                                     <td className="px-6 py-4 text-right font-mono font-bold text-xl text-app-text">
                                                         {getStudentAverage(viewMarks)}
                                                     </td>
@@ -1592,6 +1596,59 @@ export default function BatchDetails() {
                                             </tfoot>
                                         )}
                                     </table>
+                                </div>
+
+                                {/* Mobile View */}
+                                <div className="md:hidden flex flex-col divide-y divide-black/5 bg-neutral-50/30">
+                                    {viewMarks.marks && viewMarks.marks.map((mark) => {
+                                        const max = mark.test.maxMarks || 0;
+                                        const normalized = max > 0 ? (mark.score / max) * 10 : 0;
+                                        const parsedDate = mark.test.date ? new Date(mark.test.date) : null;
+                                        const dateStr = parsedDate && !isNaN(parsedDate.getTime()) 
+                                            ? parsedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) 
+                                            : '-';
+                                            
+                                        return (
+                                            <div key={mark.id} className="p-4 flex flex-col gap-3 hover:bg-white transition-colors">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-app-text text-[15px] leading-tight">{mark.test.name}</span>
+                                                        <span className="text-xs text-app-text-tertiary mt-1.5 flex items-center gap-1.5">
+                                                            <Clock className="w-3.5 h-3.5" />
+                                                            {dateStr}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-right flex flex-col items-end">
+                                                        <span className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-wider mb-1">Norm (10)</span>
+                                                        <span className="font-mono font-bold text-xl text-accent leading-none">{normalized.toFixed(1)}</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-5 pt-3 border-t border-black/5 mt-1">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-wider mb-0.5">Score</span>
+                                                        <span className="font-bold text-app-text text-sm">{mark.score}</span>
+                                                    </div>
+                                                    <div className="w-px h-6 bg-black/5"></div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-wider mb-0.5">Max</span>
+                                                        <span className="font-medium text-app-text-secondary text-sm">{max}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {(!viewMarks.marks || viewMarks.marks.length === 0) && (
+                                        <div className="p-8 text-center text-app-text-tertiary">
+                                            No test records found.
+                                        </div>
+                                    )}
+                                    {viewMarks.marks && viewMarks.marks.length > 0 && (
+                                        <div className="p-4 bg-neutral-50/80 flex justify-between items-center border-t border-black/5">
+                                            <span className="text-xs font-bold text-app-text uppercase tracking-wider">Average Score</span>
+                                            <span className="font-mono font-bold text-2xl text-app-text">{getStudentAverage(viewMarks)}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="h-4 md:hidden"></div>
@@ -1604,7 +1661,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showAddStudent && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1669,7 +1726,7 @@ export default function BatchDetails() {
             {/* Delete Student Confirmation Modal */}
             <AnimatePresence>
                 {studentToDelete && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1735,7 +1792,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showEditBatch && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1804,7 +1861,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showWhatsAppModal && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1879,7 +1936,7 @@ export default function BatchDetails() {
             {/* Manage Installments Modal */}
             <AnimatePresence>
                 {showManageInstallments && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1942,7 +1999,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showAddInstallment && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -2004,7 +2061,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     editingInstallment && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -2063,7 +2120,7 @@ export default function BatchDetails() {
             {/* Delete Installment Confirmation Modal */}
             <AnimatePresence>
                 {installmentToDelete && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2113,7 +2170,7 @@ export default function BatchDetails() {
             {/* Payment Confirmation Modal (Menu Style) */}
             <AnimatePresence>
                 {paymentModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2189,7 +2246,7 @@ export default function BatchDetails() {
             {/* View Payment Details / Revoke Menu */}
             <AnimatePresence>
                 {viewPayment && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2265,7 +2322,7 @@ export default function BatchDetails() {
             {/* Permanent Close Confirmation Modal */}
             <AnimatePresence>
                 {showCloseConfirm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2308,7 +2365,7 @@ export default function BatchDetails() {
             {/* Delete Confirmation Modal */}
             <AnimatePresence>
                 {showDeleteConfirm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2362,7 +2419,7 @@ export default function BatchDetails() {
             {/* Sending Progress Modal */}
             <AnimatePresence>
                 {sendingState.isOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2420,7 +2477,7 @@ export default function BatchDetails() {
             {/* Custom Invoice Modal */}
             <AnimatePresence>
                 {showCustomInvoice && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}

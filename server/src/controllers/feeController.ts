@@ -72,7 +72,7 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
         doc.moveDown(2);
 
         // Header
-        doc.fontSize(18).text('Fee Defaulters Report', { align: 'center' });
+        doc.fontSize(18).text('Pending Dues Report', { align: 'center' });
         doc.moveDown(0.5);
         const dateString = new Date().toLocaleDateString();
         doc.fontSize(10).fillColor('gray').text(`Generated on: ${dateString} | Sorted by: ${sortBy === 'date' ? 'Oldest Due First' : 'Highest Amount First'}`, { align: 'center' });

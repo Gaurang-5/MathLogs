@@ -274,7 +274,7 @@ export default function DashboardScreen() {
             ) : (
               <View style={{ padding: 32, alignItems: 'center' }}>
                 <TrendingUp size={32} color={T.textMuted} />
-                <Text style={{ color: T.textSec, fontSize: 14, marginTop: 12 }}>No defaulters! 🎉</Text>
+                <Text style={{ color: T.textSec, fontSize: 14, marginTop: 12 }}>No pending dues! 🎉</Text>
               </View>
             )}
           </View>

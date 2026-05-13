@@ -269,7 +269,8 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                                     select: {
                                         id: true,
                                         name: true,
-                                        maxMarks: true
+                                        maxMarks: true,
+                                        date: true
                                     }
                                 }
                             }

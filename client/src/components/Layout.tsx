@@ -2,7 +2,7 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, FileText, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, Zap, Settings, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
 import ToastProvider from './ToastProvider';
@@ -159,7 +159,7 @@ export default function Layout({ children, title }: LayoutProps) {
                         title="Log Fee"
                     >
                         <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                        <Zap className={cn("w-5 h-5", !isSidebarCollapsed && "mr-2")} fill="currentColor" />
+                        <IndianRupee className={cn("w-5 h-5", !isSidebarCollapsed && "mr-2")} strokeWidth={2.5} />
                         {!isSidebarCollapsed && <span className="font-bold text-sm">Log Fee</span>}
                     </button>
                 </div>
@@ -338,7 +338,7 @@ export default function Layout({ children, title }: LayoutProps) {
                             onClick={() => setShowQuickFeeModal(true)}
                             className="relative flex w-full h-full bg-app-text rounded-full items-center justify-center text-app-bg shadow-[0_8px_24px_rgba(30,41,59,0.3)] border-[5px] border-app-surface/95 overflow-hidden active:scale-90 transition-all duration-300 group"
                         >
-                            <Zap className="w-7 h-7" fill="currentColor" />
+                            <IndianRupee className="w-7 h-7" strokeWidth={2.5} />
                             <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                         </button>
                     </div>

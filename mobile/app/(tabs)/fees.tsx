@@ -120,7 +120,7 @@ export default function FeesDashboardScreen() {
                 style={[s.toggleBtn, viewMode === 'defaulters' && s.toggleBtnActive]}
                 onPress={() => setViewMode('defaulters')}
               >
-                <Text style={[s.toggleText, viewMode === 'defaulters' && s.toggleTextActive]}>Defaulters</Text>
+                <Text style={[s.toggleText, viewMode === 'defaulters' && s.toggleTextActive]}>Pending Dues</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.toggleBtn, viewMode === 'recent' && s.toggleBtnActive]}
@@ -132,12 +132,12 @@ export default function FeesDashboardScreen() {
 
             {viewMode === 'defaulters' ? (
                <Animated.View entering={FadeIn.duration(300)}>
-                 <Text style={s.sectionTitle}>Defaulters List</Text>
+                 <Text style={s.sectionTitle}>Pending Dues List</Text>
                  <View style={s.listContainer}>
                    {defaulters.length === 0 ? (
                      <View style={s.emptyState}>
                        <CheckCircle2 size={40} color={T.emerald} style={{ opacity: 0.5, marginBottom: 12 }} />
-                       <Text style={s.emptyText}>No defaulters! 100% collected.</Text>
+                       <Text style={s.emptyText}>No pending dues! 100% collected.</Text>
                      </View>
                    ) : (
                      defaulters.map((s, i) => (

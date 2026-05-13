@@ -251,7 +251,7 @@ const Fees: React.FC = () => {
                                 onClick={() => setViewMode('defaulters')}
                                 className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'defaulters' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
                             >
-                                Defaulters
+                                Pending Dues
                             </button>
                             <button
                                 onClick={() => setViewMode('recent')}
@@ -697,7 +697,7 @@ const Fees: React.FC = () => {
                                                 <TrendingDown className="w-5 h-5" />
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-gray-900">Defaulters List</h3>
+                                                <h3 className="font-bold text-gray-900">Pending Dues List</h3>
                                                 <p className="text-xs text-gray-500">Pending fees summary</p>
                                             </div>
                                         </div>
@@ -788,7 +788,7 @@ const Fees: React.FC = () => {
                                                 const url = window.URL.createObjectURL(blob);
                                                 const a = document.createElement('a');
                                                 a.href = url;
-                                                a.download = `defaulters_report_${reportBatch}.pdf`;
+                                                a.download = `pending_dues_report_${reportBatch}.pdf`;
                                                 document.body.appendChild(a);
                                                 a.click();
                                                 toast.success('Downloaded!', { id: toastId });
