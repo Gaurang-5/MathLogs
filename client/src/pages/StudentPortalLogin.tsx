@@ -2,24 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { motion } from 'framer-motion';
-import { Phone } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Phone, GraduationCap, ChevronRight, Loader } from 'lucide-react';
 
 interface Branding {
     name: string;
     logoUrl: string | null;
     primaryColor: string | null;
-}
-
-// Derive a dark gradient from a hex color
-function hexToGradient(hex: string): string {
-    // Darken the color for the gradient end
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    const dark = `rgb(${Math.floor(r * 0.3)}, ${Math.floor(g * 0.3)}, ${Math.floor(b * 0.3)})`;
-    const mid = `rgb(${Math.floor(r * 0.5)}, ${Math.floor(g * 0.5)}, ${Math.floor(b * 0.5)})`;
-    return `linear-gradient(135deg, ${mid} 0%, ${dark} 100%)`;
 }
 
 export default function StudentPortalLogin() {
@@ -58,96 +47,101 @@ export default function StudentPortalLogin() {
         }
     };
 
-    const primaryColor = branding?.primaryColor;
-    const bgStyle = primaryColor && /^#[0-9A-Fa-f]{6}$/.test(primaryColor)
-        ? { background: hexToGradient(primaryColor) }
-        : undefined;
-
-    const buttonStyle = primaryColor && /^#[0-9A-Fa-f]{6}$/.test(primaryColor)
-        ? { backgroundColor: primaryColor }
-        : undefined;
+    const inputClass = "w-full bg-neutral-50/80 border border-neutral-200/80 text-app-text pl-11 pr-4 py-3.5 rounded-xl focus:bg-white focus:ring-2 focus:ring-accent/20 focus:border-accent/40 outline-none transition-all placeholder:text-neutral-400 text-[15px]";
+    const iconClass = "absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-neutral-400 group-focus-within:text-accent transition-colors";
 
     return (
-        <div
-            className="min-h-screen flex flex-col items-center justify-center p-5 transition-all duration-500"
-            style={bgStyle ?? { background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }}
-        >
-            {/* Brand area */}
-            <motion.div
-                initial={{ opacity: 0, y: -16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="text-center mb-8"
-            >
-                {/* Logo or fallback initial */}
-                <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center mx-auto mb-4 shadow-xl overflow-hidden">
-                    {branding?.logoUrl ? (
-                        <img
-                            src={branding.logoUrl}
-                            alt={branding.name}
-                            className="w-full h-full object-contain p-1"
-                            onError={e => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                            }}
+        <div className="min-h-screen bg-app-bg font-sans flex flex-col">
+            <AnimatePresence mode="wait">
+                <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
+                    
+                    {/* ─── Branded Hero ─── */}
+                    <div className="relative overflow-hidden">
+                        {/* Decorative gradient background matching primaryColor or accent */}
+                        <div 
+                            className="absolute inset-0 pointer-events-none opacity-10" 
+                            style={{ background: branding?.primaryColor ? `linear-gradient(180deg, ${branding.primaryColor} 0%, transparent 100%)` : undefined }} 
                         />
-                    ) : (
-                        <span className="text-3xl font-black text-gray-900">
-                            {branding?.name?.charAt(0)?.toUpperCase() ?? 'S'}
-                        </span>
-                    )}
-                </div>
+                        <div className="absolute inset-0 bg-gradient-to-b from-accent/[0.06] via-accent/[0.02] to-transparent pointer-events-none" />
+                        <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-accent/[0.04] rounded-full blur-[80px] translate-x-1/3 -translate-y-1/3 pointer-events-none" />
 
-                <h1 className="text-white text-2xl font-black tracking-tight drop-shadow">
-                    {branding?.name ?? 'Student Portal'}
-                </h1>
-                <p className="text-white/60 text-sm mt-1">Sign in to view your progress</p>
-            </motion.div>
+                        <div className="relative max-w-md mx-auto pt-8 sm:pt-10 pb-8 px-4">
+                            <div className="flex flex-row items-center justify-center gap-4 sm:gap-6">
+                                {/* Institute Brand Icon/Logo */}
+                                <div className={`w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 shrink-0 rounded-2xl flex items-center justify-center overflow-hidden bg-white ${branding?.logoUrl ? 'border border-neutral-100 shadow-sm p-1' : 'bg-accent/10 ring-4 ring-accent/5'}`}>
+                                    {branding?.logoUrl ? (
+                                        <img src={branding.logoUrl} alt={branding.name} className="w-full h-full object-contain drop-shadow-sm" />
+                                    ) : (
+                                        <GraduationCap className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-accent" />
+                                    )}
+                                </div>
 
-            {/* Login card */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-                className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6"
-            >
-                <form onSubmit={handleLogin} className="space-y-5">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                            Registered Mobile Number
-                        </label>
-                        <div className="relative">
-                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                type="tel"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                value={mobileNumber}
-                                onChange={e => setMobileNumber(e.target.value)}
-                                className="w-full pl-11 pr-4 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50 focus:border-black focus:bg-white outline-none transition-all text-lg font-semibold"
-                                placeholder="98765 43210"
-                                required
-                                autoComplete="tel"
-                            />
+                                {/* Text Container */}
+                                <div className="flex flex-col items-start text-left gap-1 sm:gap-1.5 flex-1">
+                                    {/* Institute Name */}
+                                    <h1 className="text-[20px] sm:text-[24px] font-bold text-app-text tracking-tight leading-tight">
+                                        {branding?.name || 'Student Portal'}
+                                    </h1>
+                                    {/* Badge */}
+                                    <div className="inline-flex items-center gap-2 bg-neutral-100/90 rounded-full px-3 py-1 shadow-sm w-fit mt-0.5 border border-neutral-200/50">
+                                        <span className="text-xs font-semibold text-app-text tracking-wide uppercase">Dashboard Login</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <p className="text-xs text-gray-400 mt-2">
-                            Use the mobile number registered at your institute.
+                    </div>
+
+                    {/* ─── Form Card ─── */}
+                    <div className="px-4 pb-10 flex-1">
+                        <motion.div
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.08 }}
+                            className="max-w-md mx-auto bg-app-surface-opaque rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/60 p-6 sm:p-8"
+                        >
+                            <h2 className="text-xl font-bold text-app-text mb-1">Welcome Back!</h2>
+                            <p className="text-app-text-secondary text-sm mb-6">Enter your registered mobile number to view your progress, attendance, and fees.</p>
+
+                            <form onSubmit={handleLogin} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Mobile Number</label>
+                                    <div className="relative group">
+                                        <Phone className={iconClass} />
+                                        <input 
+                                            type="tel" 
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            value={mobileNumber} 
+                                            onChange={(e) => setMobileNumber(e.target.value)} 
+                                            placeholder="Enter 10-digit number" 
+                                            className={inputClass}
+                                            maxLength={15} 
+                                            required 
+                                        />
+                                    </div>
+                                </div>
+
+                                <button 
+                                    type="submit" 
+                                    disabled={loading || mobileNumber.replace(/\D/g, '').length < 10} 
+                                    className="w-full py-3.5 text-white font-bold rounded-xl shadow-md transition-all duration-200 disabled:opacity-50 disabled:shadow-none hover:shadow-lg focus:ring-2 focus:ring-offset-2 flex items-center justify-center gap-2 group active:scale-[0.98]"
+                                    style={{
+                                        backgroundColor: branding?.primaryColor && /^#[0-9A-Fa-f]{6}$/.test(branding.primaryColor) ? branding.primaryColor : '#111827',
+                                    }}
+                                >
+                                    {loading ? <Loader className="w-5 h-5 animate-spin" /> : <>View Dashboard <ChevronRight className="w-[18px] h-[18px] group-hover:translate-x-0.5 transition-transform" /></>}
+                                </button>
+                            </form>
+                        </motion.div>
+                        
+                        {/* Footer branding */}
+                        <p className="text-center text-app-text-tertiary text-xs mt-6 tracking-wide">
+                            Powered by <span className="font-semibold text-app-text-secondary">MathLogs</span>
                         </p>
                     </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full text-white py-4 rounded-2xl font-bold text-base active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg"
-                        style={buttonStyle ?? { backgroundColor: '#111827' }}
-                    >
-                        {loading ? (
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                            'View My Dashboard →'
-                        )}
-                    </button>
-                </form>
-            </motion.div>
+                </motion.div>
+            </AnimatePresence>
         </div>
     );
 }

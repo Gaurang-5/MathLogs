@@ -126,13 +126,6 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                     include: { installment: true },
                     orderBy: { date: 'desc' }
                 },
-                feeInstallments: {
-                    include: {
-                        payments: {
-                            where: { studentId: decoded.studentId }
-                        }
-                    }
-                },
                 marks: {
                     include: { test: true }
                 }
@@ -143,6 +136,22 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
             res.status(404).json({ error: 'Student not found' });
             return;
         }
+
+        const studentJoinDate = new Date(student.createdAt);
+
+        // Fetch installments for this student (batch + custom)
+        const batchInstallments = student.batchId ? await prisma.feeInstallment.findMany({
+            where: { batchId: student.batchId },
+            include: {
+                payments: { where: { studentId } }
+            }
+        }) : [];
+
+        const eligibleInstallments = batchInstallments.filter((inst: any) => {
+            if (inst.studentId && inst.studentId !== studentId) return false;
+            if (inst.studentId === studentId) return true;
+            return new Date(inst.createdAt) >= studentJoinDate || inst.payments.length > 0;
+        });
 
         // Fetch all tests in the student's batch, sorted by date ascending
         const batchTests = student.batchId
@@ -214,7 +223,7 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                     label: payment.installment?.name || 'Fee Payment',
                     status: 'PAID'
                 })),
-                installmentBreakdown: student.feeInstallments.map((inst: any) => {
+                installmentBreakdown: eligibleInstallments.map((inst: any) => {
                     const paid = inst.payments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
                     const pending = Math.max(0, inst.amount - paid);
                     return {
