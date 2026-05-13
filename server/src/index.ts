@@ -157,6 +157,7 @@ export function createApp() {
 
     app.use(express.static(path.join(__dirname, '../../client/dist')));
     app.use('/api', apiRoutes);
+    app.use('/api/student-portal', require('./routes/studentPortalRoutes').default);
 
     app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
         console.error('[ERROR]', err);

@@ -23,6 +23,8 @@ const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
 const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
+const StudentPortalLogin = lazy(() => import('./pages/StudentPortalLogin'));
+const StudentPortalDashboard = lazy(() => import('./pages/StudentPortalDashboard'));
 // Onboarding is eagerly imported above (only 15KB) for instant navigation from Sign Up/Get Started
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -97,6 +99,9 @@ function App() {
             <Route path="/kiosk/register/:batchId" element={<Register mode="kiosk" />} />
             <Route path="/check-status/:batchId" element={<CheckStatus />} />
             <Route path="/pay/:slug" element={<StudentPaymentPortal />} />
+
+            <Route path="/:instituteSlug/student" element={<StudentPortalLogin />} />
+            <Route path="/:instituteSlug/student/dashboard" element={<StudentPortalDashboard />} />
 
             {/* Legal / Info Pages */}
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
