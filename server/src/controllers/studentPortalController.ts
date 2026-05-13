@@ -5,6 +5,34 @@ import jwt from 'jsonwebtoken';
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 
+// GET /api/student-portal/branding/:slug — public, no auth
+export const getInstituteBranding = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const slug = req.params.slug as string;
+        const institute = await prisma.institute.findUnique({
+            where: { slug: slug.toLowerCase() },
+            select: { name: true, config: true, websiteConfig: true }
+        });
+
+        if (!institute) {
+            res.status(404).json({ error: 'Institute not found' });
+            return;
+        }
+
+        const config = institute.config as any;
+        const wc = institute.websiteConfig as any;
+
+        res.json({
+            name: institute.name,
+            logoUrl: config?.logo || null,
+            primaryColor: wc?.theme?.primaryColor || config?.primaryColor || null,
+        });
+    } catch (error) {
+        console.error('Error fetching branding:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 // POST /api/student-portal/login
 // Body: { instituteSlug: string, mobileNumber: string }
 export const loginStudent = async (req: Request, res: Response): Promise<void> => {
