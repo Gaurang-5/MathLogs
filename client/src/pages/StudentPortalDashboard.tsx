@@ -111,15 +111,20 @@ export default function StudentPortalDashboard() {
                             exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}
                             className="space-y-4"
                         >
-                            {data.performance.length > 0 && (
-                                <div className="flex gap-3">
-                                    <StatChip label="Tests Taken" value={data.performance.length} />
-                                    <StatChip
-                                        label="Avg Score" value={`${avgScore.toFixed(1)}%`}
-                                        color={avgScore >= 75 ? 'green' : avgScore >= 40 ? 'orange' : 'red'}
-                                    />
-                                </div>
-                            )}
+                            {data.performance.length > 0 && (() => {
+                                const scored = data.performance.filter((t: any) => t.status === 'SCORED');
+                                const absent = data.performance.filter((t: any) => t.status === 'ABSENT');
+                                const avg = scored.length
+                                    ? scored.reduce((s: number, t: any) => s + t.percentage, 0) / scored.length
+                                    : 0;
+                                return (
+                                    <div className="flex gap-3">
+                                        <StatChip label="Tests Given" value={scored.length} />
+                                        {absent.length > 0 && <StatChip label="Missed" value={absent.length} color="red" />}
+                                        {scored.length > 0 && <StatChip label="Avg Score" value={`${avg.toFixed(1)}%`} color={avg >= 75 ? 'green' : avg >= 40 ? 'orange' : 'red'} />}
+                                    </div>
+                                );
+                            })()}
 
                             {data.performance.length > 1 && (
                                 <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
@@ -157,25 +162,34 @@ export default function StudentPortalDashboard() {
                                     <EmptyState message="No test records yet" />
                                 ) : (
                                     <div className="divide-y divide-gray-50">
-                                        {data.performance.map((test: any) => (
-                                            <div key={test.testId} className="px-4 py-3.5 flex items-center justify-between">
-                                                <div className="min-w-0 mr-3">
-                                                    <p className="font-semibold text-sm truncate">{test.testName}</p>
-                                                    <p className="text-xs text-gray-400 mt-0.5">
-                                                        {new Date(test.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                                        &nbsp;·&nbsp;{test.subject}
-                                                    </p>
+                                        {data.performance.map((test: any) => {
+                                            const isAbsent = test.status === 'ABSENT';
+                                            return (
+                                                <div key={test.testId} className={`px-4 py-3.5 flex items-center justify-between ${isAbsent ? 'opacity-60' : ''}`}>
+                                                    <div className="min-w-0 mr-3">
+                                                        <p className="font-semibold text-sm truncate">{test.testName}</p>
+                                                        <p className="text-xs text-gray-400 mt-0.5">
+                                                            {new Date(test.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                            &nbsp;·&nbsp;{test.subject}
+                                                        </p>
+                                                    </div>
+                                                    {isAbsent ? (
+                                                        <span className="text-xs font-bold text-red-400 bg-red-50 px-2.5 py-1 rounded-full flex-shrink-0">
+                                                            Absent
+                                                        </span>
+                                                    ) : (
+                                                        <div className="text-right flex-shrink-0">
+                                                            <p className="font-black text-base">
+                                                                {test.score}<span className="text-gray-300 font-normal text-xs">/{test.maxMarks}</span>
+                                                            </p>
+                                                            <p className={`text-xs font-bold ${test.percentage >= 75 ? 'text-green-600' : test.percentage >= 40 ? 'text-orange-500' : 'text-red-500'}`}>
+                                                                {test.percentage.toFixed(1)}%
+                                                            </p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="text-right flex-shrink-0">
-                                                    <p className="font-black text-base">
-                                                        {test.score}<span className="text-gray-300 font-normal text-xs">/{test.maxMarks}</span>
-                                                    </p>
-                                                    <p className={`text-xs font-bold ${test.percentage >= 75 ? 'text-green-600' : test.percentage >= 40 ? 'text-orange-500' : 'text-red-500'}`}>
-                                                        {test.percentage.toFixed(1)}%
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -228,6 +242,47 @@ export default function StudentPortalDashboard() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Pending fee breakdown */}
+                            {data.fees.installmentBreakdown?.length > 0 && (
+                                <div className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
+                                    <div className="px-4 py-3 border-b border-red-100 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                                            <span className="font-bold text-sm text-red-600">Pending Breakdown</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-red-500">
+                                            ₹{data.fees.installmentBreakdown.reduce((s: number, i: any) => s + i.pending, 0).toLocaleString('en-IN')} due
+                                        </span>
+                                    </div>
+                                    <div className="divide-y divide-red-50">
+                                        {data.fees.installmentBreakdown.map((inst: any) => (
+                                            <div key={inst.id} className="px-4 py-3.5">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="font-semibold text-sm">{inst.name}</p>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                        inst.status === 'PARTIAL' ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'
+                                                    }`}>
+                                                        {inst.status}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-xs text-gray-500">
+                                                    <span>Total: ₹{inst.totalAmount.toLocaleString('en-IN')}</span>
+                                                    {inst.paid > 0 && <span className="text-green-600">Paid: ₹{inst.paid.toLocaleString('en-IN')}</span>}
+                                                    <span className="text-red-600 font-bold">Due: ₹{inst.pending.toLocaleString('en-IN')}</span>
+                                                </div>
+                                                {/* Progress bar */}
+                                                <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-green-500 rounded-full transition-all"
+                                                        style={{ width: `${Math.min(100, (inst.paid / inst.totalAmount) * 100)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </motion.div>
                     )}
                 </AnimatePresence>

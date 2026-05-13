@@ -95,18 +95,18 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                 batch: true,
                 balance: true,
                 feePayments: {
-                    include: {
-                        installment: true
-                    },
+                    include: { installment: true },
                     orderBy: { date: 'desc' }
                 },
-                marks: {
+                feeInstallments: {
                     include: {
-                        test: true
-                    },
-                    orderBy: {
-                        test: { date: 'asc' }
+                        payments: {
+                            where: { studentId: decoded.studentId }
+                        }
                     }
+                },
+                marks: {
+                    include: { test: true }
                 }
             }
         }) as any;
@@ -115,6 +115,53 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
             res.status(404).json({ error: 'Student not found' });
             return;
         }
+
+        // Fetch all tests in the student's batch, sorted by date ascending
+        const batchTests = student.batchId
+            ? await prisma.test.findMany({
+                where: { batchId: student.batchId },
+                orderBy: { date: 'asc' }
+            }) as any[]
+            : [];
+
+        // Only include tests that happened AFTER the student joined the institute
+        const joinDate = new Date(student.createdAt);
+        const eligibleTests = batchTests.filter(
+            (test: any) => new Date(test.date) >= joinDate
+        );
+
+        // Build a map of testId -> mark for fast lookup
+        const markMap = new Map<string, any>();
+        for (const mark of student.marks) {
+            markMap.set(mark.test.id, mark);
+        }
+
+        // Build the performance array: scored or absent
+        const performance = eligibleTests.map((test: any) => {
+            const mark = markMap.get(test.id);
+            if (mark) {
+                return {
+                    testId: test.id,
+                    testName: test.name,
+                    subject: test.subject,
+                    date: test.date,
+                    status: 'SCORED' as const,
+                    score: mark.score,
+                    maxMarks: test.maxMarks,
+                    percentage: (mark.score / test.maxMarks) * 100
+                };
+            }
+            return {
+                testId: test.id,
+                testName: test.name,
+                subject: test.subject,
+                date: test.date,
+                status: 'ABSENT' as const,
+                score: null,
+                maxMarks: test.maxMarks,
+                percentage: null
+            };
+        });
 
         res.json({
             student: {
@@ -138,17 +185,21 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                     type: 'PAYMENT',
                     label: payment.installment?.name || 'Fee Payment',
                     status: 'PAID'
-                }))
+                })),
+                installmentBreakdown: student.feeInstallments.map((inst: any) => {
+                    const paid = inst.payments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
+                    const pending = Math.max(0, inst.amount - paid);
+                    return {
+                        id: inst.id,
+                        name: inst.name,
+                        totalAmount: inst.amount,
+                        paid,
+                        pending,
+                        status: pending <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID'
+                    };
+                }).filter((inst: any) => inst.pending > 0) // Only show unpaid/partial
             },
-            performance: student.marks.map((mark: any) => ({
-                testId: mark.test.id,
-                testName: mark.test.name,
-                subject: mark.test.subject,
-                date: mark.test.date,
-                score: mark.score,
-                maxMarks: mark.test.maxMarks,
-                percentage: (mark.score / mark.test.maxMarks) * 100
-            }))
+            performance
         });
     } catch (error) {
         console.error('Error fetching student dashboard:', error);
