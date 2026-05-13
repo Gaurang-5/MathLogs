@@ -160,7 +160,7 @@ export default function SetupAccount() {
     // ── LOADING ──────────────────────────────────────────────────────────────
     if (step === 'loading') {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))]">
                 <Loader2 className="h-10 w-10 text-black animate-spin mb-4" />
                 <p className="text-gray-500 font-medium">Verifying your link...</p>
             </div>
@@ -170,7 +170,7 @@ export default function SetupAccount() {
     // ── INVALID ───────────────────────────────────────────────────────────────
     if (step === 'invalid') {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))]">
                 <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-md w-full text-center">
                     <div className="mx-auto bg-red-50 h-16 w-16 rounded-full flex items-center justify-center mb-6">
                         <AlertTriangle className="h-8 w-8 text-red-500" />
@@ -239,7 +239,7 @@ export default function SetupAccount() {
     // ── SUCCESS ───────────────────────────────────────────────────────────────
     if (step === 'done') {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))]">
                 <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}

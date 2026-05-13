@@ -1389,7 +1389,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     editingStudent && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1525,7 +1525,7 @@ export default function BatchDetails() {
             {/* View Marks Modal */}
             <AnimatePresence>
                 {viewMarks && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1661,7 +1661,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showAddStudent && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1726,7 +1726,7 @@ export default function BatchDetails() {
             {/* Delete Student Confirmation Modal */}
             <AnimatePresence>
                 {studentToDelete && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1792,7 +1792,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showEditBatch && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1861,7 +1861,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showWhatsAppModal && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1936,7 +1936,7 @@ export default function BatchDetails() {
             {/* Manage Installments Modal */}
             <AnimatePresence>
                 {showManageInstallments && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1999,7 +1999,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     showAddInstallment && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -2061,7 +2061,7 @@ export default function BatchDetails() {
             <AnimatePresence>
                 {
                     editingInstallment && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -2120,7 +2120,7 @@ export default function BatchDetails() {
             {/* Delete Installment Confirmation Modal */}
             <AnimatePresence>
                 {installmentToDelete && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2170,7 +2170,7 @@ export default function BatchDetails() {
             {/* Payment Confirmation Modal (Menu Style) */}
             <AnimatePresence>
                 {paymentModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2246,7 +2246,7 @@ export default function BatchDetails() {
             {/* View Payment Details / Revoke Menu */}
             <AnimatePresence>
                 {viewPayment && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2322,7 +2322,7 @@ export default function BatchDetails() {
             {/* Permanent Close Confirmation Modal */}
             <AnimatePresence>
                 {showCloseConfirm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2365,7 +2365,7 @@ export default function BatchDetails() {
             {/* Delete Confirmation Modal */}
             <AnimatePresence>
                 {showDeleteConfirm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2419,7 +2419,7 @@ export default function BatchDetails() {
             {/* Sending Progress Modal */}
             <AnimatePresence>
                 {sendingState.isOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2477,7 +2477,7 @@ export default function BatchDetails() {
             {/* Custom Invoice Modal */}
             <AnimatePresence>
                 {showCustomInvoice && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-24 pb-10 md:p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}

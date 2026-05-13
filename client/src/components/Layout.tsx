@@ -216,7 +216,8 @@ export default function Layout({ children, title }: LayoutProps) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-40 bg-app-bg pt-24 px-6 xl:hidden backdrop-blur-3xl"
+                        className="fixed inset-0 z-40 bg-app-bg px-6 xl:hidden backdrop-blur-3xl overflow-y-auto"
+                        style={{ paddingTop: 'calc(5.5rem + env(safe-area-inset-top))' }}
                     >
                         <nav className="space-y-2">
                             {/* Navigation items are moved to Bottom Bar. Keeping menu for system actions only. */}

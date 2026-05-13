@@ -52,7 +52,7 @@ export default function CheckStatus() {
     };
 
     return (
-        <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 relative overflow-hidden font-sans">
+        <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] relative overflow-hidden font-sans">
             <Toaster position="top-center" />
 
             {/* Background Effects */}

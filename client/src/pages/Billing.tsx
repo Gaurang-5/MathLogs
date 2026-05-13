@@ -659,7 +659,7 @@ export default function Billing() {
 
             {/* Cancel Subscription Modal */}
             {showCancelModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))]">
                     <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 max-w-md w-full shadow-2xl border border-neutral-200 dark:border-zinc-800 animate-in fade-in zoom-in duration-200">
                         <div className="flex items-center gap-4 mb-6">
                             <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center shrink-0">

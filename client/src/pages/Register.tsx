@@ -200,7 +200,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     // ─── Not Found ───
     if (!batchStatus || batchStatus.error) {
         return (
-            <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 font-sans">
+            <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] font-sans">
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -219,7 +219,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     // ─── Registration Ended ───
     if (batchStatus.isRegistrationEnded) {
         return (
-            <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 font-sans">
+            <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] font-sans">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -254,7 +254,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     // ─── Registration Paused ───
     if (!batchStatus.isRegistrationOpen) {
         return (
-            <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 font-sans">
+            <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] font-sans">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}

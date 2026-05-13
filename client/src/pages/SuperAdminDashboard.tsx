@@ -400,7 +400,7 @@ export default function SuperAdminDashboard() {
 
             {/* Institute Profile Modal */}
             {selectedProfile && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <div>
@@ -480,7 +480,7 @@ export default function SuperAdminDashboard() {
 
             {/* Config Modal */}
             {selectedInstitute && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                             <h3 className="text-lg font-bold">Configuration: {selectedInstitute.name}</h3>
@@ -524,7 +524,7 @@ export default function SuperAdminDashboard() {
 
             {/* Edit Details Modal */}
             {editDetailsModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <div>
@@ -599,7 +599,7 @@ export default function SuperAdminDashboard() {
 
             {/* Edit Plan Modal */}
             {editPlanModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <div>
@@ -1058,7 +1058,7 @@ export default function SuperAdminDashboard() {
             {/* Onboard Institute Modal */}
             {
                 showOnboardForm && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowOnboardForm(false)}>
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))]" onClick={() => setShowOnboardForm(false)}>
                         <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-xl font-bold flex items-center gap-2 text-black">

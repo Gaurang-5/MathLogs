@@ -67,7 +67,7 @@ export default function AdminLogin() {
     };
 
     return (
-        <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-500">
+        <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] relative overflow-hidden transition-colors duration-500">
             {/* Background Effects */}
             <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[128px] -translate-y-1/2 pointer-events-none"></div>
 

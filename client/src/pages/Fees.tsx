@@ -569,7 +569,7 @@ const Fees: React.FC = () => {
             {/* Payment Modal */}
             <AnimatePresence>
                 {selectedStudent && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))]">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -661,7 +661,7 @@ const Fees: React.FC = () => {
 
                 {/* Reports Modal */}
                 {showReportsModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))]">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}

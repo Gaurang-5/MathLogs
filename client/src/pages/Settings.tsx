@@ -540,7 +540,7 @@ export default function Settings() {
 
                 {/* Delete Confirmation Modal */}
                 {deleteModal?.isOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] bg-black/40 backdrop-blur-sm animate-fadeIn">
                         <div className="!bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-gray-100 transform transition-all scale-100">
                             <div className="p-8">
                                 <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center mb-6 text-red-600 dark:text-red-400">
@@ -590,7 +590,7 @@ export default function Settings() {
 
                 {/* Switch Confirmation Modal */}
                 {switchModal?.isOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] bg-black/40 backdrop-blur-sm animate-fadeIn">
                         <div className="!bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-gray-100 transform transition-all scale-100">
                             <div className="p-8">
                                 <div className="w-12 h-12 bg-app-bg rounded-2xl flex items-center justify-center mb-6 text-app-text">
