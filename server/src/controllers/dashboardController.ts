@@ -29,118 +29,116 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
         const monthStart = new Date(Date.UTC(yearNum, monthIdx, 1, -5, -30, 0, 0));
         const monthEnd = new Date(Date.UTC(yearNum, monthIdx + 1, 1, -5, -30, 0, -1));
 
-        // PERF OPTIMIZATION / POOL LIMIT FIX: 
-        // Execute queries sequentially. Running 7 queries in Promise.all 
-        // exceeds the Prisma connection pool limit on serverless DBs (Neon Free), causing a 'too many connections' 500 error.
+        // PERF OPTIMIZATION: Combine 5 separate queries into a single SQL execution.
+        // This drastically reduces connection pool usage (preventing pool exhaustion)
+        // and cuts down network roundtrips, making the dashboard load instantly.
+        
+        const [statsResult, batchDefaulters, institute] = await Promise.all([
+            prisma.$queryRaw<[{ 
+                batches_count: number; 
+                students_count: number; 
+                monthly_collected: number; 
+                total_collected: number; 
+                total_pending: number 
+            }]>`
+                SELECT
+                    (
+                        SELECT COUNT(*)
+                        FROM "Batch"
+                        WHERE "teacherId" = ${teacherId}
+                            AND "academicYearId" = ${academicYearId}
+                            AND "instituteId" = ${user.instituteId}
+                    ) as batches_count,
+                    
+                    (
+                        SELECT COUNT(*)
+                        FROM "Student" s
+                        JOIN "Batch" b ON b.id = s."batchId"
+                        WHERE s.status = 'APPROVED'
+                            AND b."teacherId" = ${teacherId}
+                            AND s."academicYearId" = ${academicYearId}
+                    ) as students_count,
+                    
+                    (
+                        SELECT COALESCE(SUM(fr.amount), 0)
+                        FROM "FeeRecord" fr
+                        JOIN "Student" s ON s.id = fr."studentId"
+                        JOIN "Batch" b ON b.id = s."batchId"
+                        WHERE fr.date >= ${monthStart}::timestamp
+                            AND fr.date <= ${monthEnd}::timestamp
+                            AND fr.status = 'PAID'
+                            AND b."teacherId" = ${teacherId}
+                            AND s."academicYearId" = ${academicYearId}
+                            AND s.status = 'APPROVED'
+                    ) + (
+                        SELECT COALESCE(SUM(fp."amountPaid"), 0)
+                        FROM "FeePayment" fp
+                        JOIN "Student" s ON s.id = fp."studentId"
+                        JOIN "Batch" b ON b.id = s."batchId"
+                        WHERE fp.date >= ${monthStart}::timestamp
+                            AND fp.date <= ${monthEnd}::timestamp
+                            AND b."teacherId" = ${teacherId}
+                            AND s."academicYearId" = ${academicYearId}
+                            AND s.status = 'APPROVED'
+                    ) as monthly_collected,
+                    
+                    (
+                        SELECT COALESCE(SUM(fr.amount), 0)
+                        FROM "FeeRecord" fr
+                        JOIN "Student" s ON s.id = fr."studentId"
+                        JOIN "Batch" b ON b.id = s."batchId"
+                        WHERE fr.status = 'PAID'
+                            AND b."teacherId" = ${teacherId}
+                            AND s."academicYearId" = ${academicYearId}
+                            AND s.status = 'APPROVED'
+                    ) + (
+                        SELECT COALESCE(SUM(fp."amountPaid"), 0)
+                        FROM "FeePayment" fp
+                        JOIN "Student" s ON s.id = fp."studentId"
+                        JOIN "Batch" b ON b.id = s."batchId"
+                        WHERE b."teacherId" = ${teacherId}
+                            AND s."academicYearId" = ${academicYearId}
+                            AND s.status = 'APPROVED'
+                    ) as total_collected,
+                    
+                    (
+                        SELECT COALESCE(SUM(sb.balance), 0)
+                        FROM "StudentBalance" sb
+                        JOIN "Student" s ON s.id = sb."studentId"
+                        JOIN "Batch" b ON b.id = s."batchId"
+                        WHERE s.status = 'APPROVED'
+                            AND b."teacherId" = ${teacherId}
+                            AND s."academicYearId" = ${academicYearId}
+                    ) as total_pending
+            `,
 
-        // Query 1: Get batch count
-        const batches = await prisma.batch.count({
-            where: {
-                teacherId,
-                academicYearId,
-                instituteId: user.instituteId
-            }
-        });
+            // Query 6: Top 5 defaulting batches
+            prisma.$queryRaw<Array<{ name: string; amount: number }>>`
+                SELECT b.name as name, SUM(sb.balance) as amount
+                FROM "StudentBalance" sb
+                JOIN "Student" s ON s.id = sb."studentId"
+                JOIN "Batch" b ON b.id = s."batchId"
+                WHERE s.status = 'APPROVED'
+                    AND b."teacherId" = ${teacherId}
+                    AND s."academicYearId" = ${academicYearId}
+                    AND sb.balance > 0
+                GROUP BY b.id, b.name
+                ORDER BY amount DESC
+                LIMIT 5
+            `,
 
-        // Query 2: Get approved students count
-        const students = await prisma.student.count({
-            where: {
-                status: 'APPROVED',
-                batch: { teacherId },
-                academicYearId
-            }
-        });
+            // Query 7: Get teacher name
+            user.instituteId ? prisma.institute.findUnique({
+                where: { id: user.instituteId },
+                select: { teacherName: true }
+            }) : Promise.resolve(null)
+        ]);
 
-        // Query 3: Monthly collection
-        const monthlyCollectedResult = await prisma.$queryRaw<[{ total: number }]>`
-            SELECT COALESCE(
-                (
-                    SELECT COALESCE(SUM(fr.amount), 0)
-                    FROM "FeeRecord" fr
-                    JOIN "Student" s ON s.id = fr."studentId"
-                    JOIN "Batch" b ON b.id = s."batchId"
-                    WHERE fr.date >= ${monthStart}::timestamp
-                        AND fr.date <= ${monthEnd}::timestamp
-                        AND fr.status = 'PAID'
-                        AND b."teacherId" = ${teacherId}
-                        AND s."academicYearId" = ${academicYearId}
-                        AND s.status = 'APPROVED'
-                ), 0
-            ) + COALESCE(
-                (
-                    SELECT COALESCE(SUM(fp."amountPaid"), 0)
-                    FROM "FeePayment" fp
-                    JOIN "Student" s ON s.id = fp."studentId"
-                    JOIN "Batch" b ON b.id = s."batchId"
-                    WHERE fp.date >= ${monthStart}::timestamp
-                        AND fp.date <= ${monthEnd}::timestamp
-                        AND b."teacherId" = ${teacherId}
-                        AND s."academicYearId" = ${academicYearId}
-                        AND s.status = 'APPROVED'
-                ), 0
-            ) as total
-        `;
-        const monthlyCollected = Number(monthlyCollectedResult[0]?.total || 0);
-
-        // Query 4: Total collection
-        const totalCollectedResult = await prisma.$queryRaw<[{ total: number }]>`
-            SELECT COALESCE(
-                (
-                    SELECT COALESCE(SUM(fr.amount), 0)
-                    FROM "FeeRecord" fr
-                    JOIN "Student" s ON s.id = fr."studentId"
-                    JOIN "Batch" b ON b.id = s."batchId"
-                    WHERE fr.status = 'PAID'
-                        AND b."teacherId" = ${teacherId}
-                        AND s."academicYearId" = ${academicYearId}
-                        AND s.status = 'APPROVED'
-                ), 0
-            ) + COALESCE(
-                (
-                    SELECT COALESCE(SUM(fp."amountPaid"), 0)
-                    FROM "FeePayment" fp
-                    JOIN "Student" s ON s.id = fp."studentId"
-                    JOIN "Batch" b ON b.id = s."batchId"
-                    WHERE b."teacherId" = ${teacherId}
-                        AND s."academicYearId" = ${academicYearId}
-                        AND s.status = 'APPROVED'
-                ), 0
-            ) as total
-        `;
-        const totalCollected = Number(totalCollectedResult[0]?.total || 0);
-
-        // Query 5: Total pending fees
-        const totalPendingResult = await prisma.$queryRaw<[{ pending: number }]>`
-            SELECT COALESCE(SUM(sb.balance), 0) as pending
-            FROM "StudentBalance" sb
-            JOIN "Student" s ON s.id = sb."studentId"
-            JOIN "Batch" b ON b.id = s."batchId"
-            WHERE s.status = 'APPROVED'
-                AND b."teacherId" = ${teacherId}
-                AND s."academicYearId" = ${academicYearId}
-        `;
-        const totalPending = Number(totalPendingResult[0]?.pending || 0);
-
-        // Query 6: Top 5 defaulting batches
-        const batchDefaulters = await prisma.$queryRaw<Array<{ name: string; amount: number }>>`
-            SELECT b.name as name, SUM(sb.balance) as amount
-            FROM "StudentBalance" sb
-            JOIN "Student" s ON s.id = sb."studentId"
-            JOIN "Batch" b ON b.id = s."batchId"
-            WHERE s.status = 'APPROVED'
-                AND b."teacherId" = ${teacherId}
-                AND s."academicYearId" = ${academicYearId}
-                AND sb.balance > 0
-            GROUP BY b.id, b.name
-            ORDER BY amount DESC
-            LIMIT 5
-        `;
-
-        // Query 7: Get teacher name
-        const institute = user.instituteId ? await prisma.institute.findUnique({
-            where: { id: user.instituteId },
-            select: { teacherName: true }
-        }) : null;
+        const batches = Number(statsResult[0]?.batches_count || 0);
+        const students = Number(statsResult[0]?.students_count || 0);
+        const monthlyCollected = Number(statsResult[0]?.monthly_collected || 0);
+        const totalCollected = Number(statsResult[0]?.total_collected || 0);
+        const totalPending = Number(statsResult[0]?.total_pending || 0);
 
         // Convert batchDefaulters to expected format
         const defaulters = batchDefaulters.map(d => ({
