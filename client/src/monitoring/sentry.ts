@@ -28,7 +28,11 @@ export const initializeSentry = () => {
                 maskAllText: true, // GDPR: Mask all text
                 blockAllMedia: true, // GDPR: Block all media
             }),
+            Sentry.captureConsoleIntegration({ levels: ["log", "warn", "error"] }),
         ],
+
+        // Enable logs to be sent to Sentry
+        enableLogs: true,
 
         // Performance traces sample rate
         tracesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,
