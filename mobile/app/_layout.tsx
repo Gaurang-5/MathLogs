@@ -1,15 +1,15 @@
 /**
  * Root Layout — wraps the entire app with providers.
- * AuthProvider, React Query, and theme handling.
+ * Handles auth-guarding: unauthenticated users are sent to /login.
  */
 import { useEffect } from 'react';
-import { useColorScheme, StatusBar } from 'react-native';
-import { Stack } from 'expo-router';
+import { StatusBar, View, ActivityIndicator } from 'react-native';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from '../contexts/AuthContext';
-import { Colors } from '../constants/theme';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
 
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -17,20 +17,51 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      retry: 1,
       staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes (formerly cacheTime)
+      gcTime: 1000 * 60 * 30,
     },
   },
 });
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? Colors.dark : Colors.light;
+/**
+ * Auth guard — runs inside AuthProvider so it has access to auth state.
+ * Redirects to /login when not authenticated; redirects away from /login when authenticated.
+ */
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
 
+  useEffect(() => {
+    if (isLoading) return; // Wait until session is checked
+
+    const inAuthGroup = segments[0] === '(tabs)';
+    const inLoginPage = segments[0] === 'login';
+
+    if (!isLoggedIn && inAuthGroup) {
+      // Not logged in but trying to access protected tab — redirect to login
+      router.replace('/login');
+    } else if (isLoggedIn && inLoginPage) {
+      // Already logged in but on login page — redirect to dashboard
+      router.replace('/(tabs)');
+    }
+  }, [isLoggedIn, isLoading, segments]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F7' }}>
+        <ActivityIndicator color="#111827" />
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    // System fonts are used; add custom fonts here if needed later
+    // System fonts are used — add custom fonts here if needed
   });
 
   useEffect(() => {
@@ -44,30 +75,30 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <StatusBar
-          barStyle="dark-content"
-          backgroundColor="#F5F5F7"
-        />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: '#F5F5F7' },
-            animation: 'slide_from_right',
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="modal"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-      </AuthProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <AuthGuard>
+            <StatusBar barStyle="dark-content" backgroundColor="#F5F5F7" />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: '#F5F5F7' },
+                animation: 'ios_from_right',
+              }}
+            >
+              <Stack.Screen name="login" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="quick-fee-modal" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+              <Stack.Screen
+                name="modal"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+          </AuthGuard>
+        </AuthProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }

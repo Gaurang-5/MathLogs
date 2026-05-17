@@ -1,14 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TextInput,
   RefreshControl, Dimensions, Platform, TouchableOpacity, Alert,
+  Modal, ScrollView, KeyboardAvoidingView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInRight, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import { SkeletonLoader } from '../../components/ui';
-import { Search, Users as UsersIcon, BookOpen, ChevronRight, Plus, Clock, ExternalLink } from 'lucide-react-native';
+import { Search, Users as UsersIcon, BookOpen, ChevronRight, Plus, Clock, ExternalLink, X, Type, GraduationCap, Hash } from 'lucide-react-native';
 import api from '../../services/api';
 import * as Haptics from 'expo-haptics';
 
@@ -16,8 +17,8 @@ const { width } = Dimensions.get('window');
 
 const T = {
   bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#0d7ff2',
-  teal: '#0d9488', emerald: '#10b981', amber: '#f59e0b',
+  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
+  teal: '#4B5563', emerald: '#10b981', amber: '#f59e0b', red: '#ef4444',
   border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
 };
 
@@ -32,9 +33,19 @@ interface Batch {
   _count: { students: number };
 }
 
+interface InstituteConfig {
+  requiresGrades?: boolean;
+  allowedClasses?: string[];
+  subjects?: string[];
+}
+
+interface InstituteResponse {
+  config?: InstituteConfig;
+}
+
 function BatchCard({ item, index }: { item: Batch; index: number }) {
   const router = useRouter();
-  const colors = ['#0d7ff2', '#0d9488', '#10b981', '#f59e0b', '#ef4444'];
+  const colors = ['#111827', '#4B5563', '#10b981', '#f59e0b', '#ef4444'];
   const c = colors[index % colors.length];
   return (
     <Animated.View entering={FadeInRight.duration(400).delay(index * 50)}>
@@ -77,6 +88,19 @@ function BatchCard({ item, index }: { item: Batch; index: number }) {
 
 export default function BatchesScreen() {
   const [search, setSearch] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  
+  // Form State
+  const [batchNumber, setBatchNumber] = useState('');
+  const [customName, setCustomName] = useState('');
+  const [subject, setSubject] = useState('Mathematics');
+  const [allowedSubjects, setAllowedSubjects] = useState<string[]>([]);
+  const [timeSlot, setTimeSlot] = useState('');
+  const [className, setClassName] = useState('');
+  
+  // Config
+  const [requiresGrades, setRequiresGrades] = useState(true);
+  const [allowedClasses, setAllowedClasses] = useState<string[]>([]);
 
   const { data: batches, isLoading, refetch, isRefetching } = useQuery<Batch[]>({
     queryKey: ['batches'],
@@ -85,6 +109,26 @@ export default function BatchesScreen() {
       return res.data;
     },
   });
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const res = await api.get('/institute/me');
+        const config = res.data?.config || {};
+        setRequiresGrades(config.requiresGrades !== false);
+        if (Array.isArray(config.allowedClasses)) {
+          setAllowedClasses(config.allowedClasses);
+        }
+        if (Array.isArray(config.subjects)) {
+          setAllowedSubjects(config.subjects);
+          if (config.subjects.length > 0) setSubject(config.subjects[0]);
+        }
+      } catch (e) {
+        console.error("Failed to load config", e);
+      }
+    };
+    loadConfig();
+  }, []);
 
   const filtered = useMemo(() => {
     if (!batches) return [];
@@ -100,6 +144,30 @@ export default function BatchesScreen() {
   const totalStudents = useMemo(() =>
     (batches || []).reduce((sum, b) => sum + b._count.students, 0), [batches]);
 
+  const handleCreate = async () => {
+    if (!batchNumber || !timeSlot || (!className && requiresGrades) || !subject) {
+      Alert.alert('Missing Fields', 'Please fill in all required fields.');
+      return;
+    }
+
+    try {
+      await api.post('/batches', {
+        batchNumber,
+        customName,
+        subject,
+        timeSlot,
+        feeAmount: 0,
+        className: requiresGrades ? className : undefined
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowForm(false);
+      setBatchNumber(''); setCustomName(''); setTimeSlot(''); setClassName('');
+      refetch();
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to create batch');
+    }
+  };
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <Animated.View entering={FadeInDown.duration(400)} style={s.headerArea}>
@@ -108,6 +176,13 @@ export default function BatchesScreen() {
             <Text style={s.title}>Batches</Text>
             <Text style={s.subtitle}>{batches?.length ?? 0} batches • {totalStudents} students</Text>
           </View>
+          <TouchableOpacity 
+            style={s.createBtn}
+            onPress={() => setShowForm(true)}
+          >
+            <Plus size={16} color={T.white} />
+            <Text style={s.createBtnText}>New Batch</Text>
+          </TouchableOpacity>
         </View>
         <View style={s.searchWrap}>
           <Search size={18} color={T.textMuted} />
@@ -136,11 +211,97 @@ export default function BatchesScreen() {
             <View style={s.empty}>
               <BookOpen size={48} color={T.textMuted} />
               <Text style={s.emptyTitle}>No batches yet</Text>
-              <Text style={s.emptyDesc}>Create your first batch from the web dashboard</Text>
+              <Text style={s.emptyDesc}>Create your first batch using the button above.</Text>
             </View>
           )
         }
       />
+
+      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowForm(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.modalContainer}>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>Create New Batch</Text>
+            <TouchableOpacity onPress={() => setShowForm(false)} style={s.closeBtn}>
+              <X size={20} color={T.textSec} />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView contentContainerStyle={s.modalContent} showsVerticalScrollIndicator={false}>
+            {requiresGrades && (
+              <View style={s.inputGroup}>
+                <Text style={s.label}>Class / Grade</Text>
+                <View style={s.inputWrap}>
+                  <GraduationCap size={18} color={T.textMuted} style={s.inputIcon} />
+                  <TextInput 
+                    style={s.input} 
+                    placeholder="e.g. Class 10" 
+                    value={className} 
+                    onChangeText={setClassName} 
+                  />
+                </View>
+              </View>
+            )}
+
+            <View style={s.inputGroup}>
+              <Text style={s.label}>Batch Number</Text>
+              <View style={s.inputWrap}>
+                <Hash size={18} color={T.textMuted} style={s.inputIcon} />
+                <TextInput 
+                  style={s.input} 
+                  placeholder="e.g. 1" 
+                  keyboardType="number-pad"
+                  value={batchNumber} 
+                  onChangeText={setBatchNumber} 
+                />
+              </View>
+            </View>
+
+            <View style={s.inputGroup}>
+              <Text style={s.label}>Batch Name (Optional)</Text>
+              <View style={s.inputWrap}>
+                <Type size={18} color={T.textMuted} style={s.inputIcon} />
+                <TextInput 
+                  style={s.input} 
+                  placeholder="e.g. Target 2026 Batch" 
+                  value={customName} 
+                  onChangeText={setCustomName} 
+                />
+              </View>
+            </View>
+
+            <View style={s.inputGroup}>
+              <Text style={s.label}>Subject</Text>
+              <View style={s.inputWrap}>
+                <BookOpen size={18} color={T.textMuted} style={s.inputIcon} />
+                <TextInput 
+                  style={s.input} 
+                  placeholder="e.g. Mathematics" 
+                  value={subject} 
+                  onChangeText={setSubject} 
+                />
+              </View>
+            </View>
+
+            <View style={s.inputGroup}>
+              <Text style={s.label}>Time Slot</Text>
+              <View style={s.inputWrap}>
+                <Clock size={18} color={T.textMuted} style={s.inputIcon} />
+                <TextInput 
+                  style={s.input} 
+                  placeholder="e.g. Mon-Wed-Fri 4 PM" 
+                  value={timeSlot} 
+                  onChangeText={setTimeSlot} 
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity style={s.submitBtn} onPress={handleCreate}>
+              <Text style={s.submitBtnText}>Save Batch</Text>
+              <ChevronRight size={18} color={T.white} />
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -150,6 +311,11 @@ const s = StyleSheet.create({
   headerArea: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   title: { color: T.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { color: T.textSec, fontSize: 14, fontWeight: '500', marginTop: 4, marginBottom: 16 },
+  createBtn: {
+    backgroundColor: T.accent, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6,
+  },
+  createBtnText: { color: T.white, fontWeight: '600', fontSize: 13 },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
     borderRadius: 14, paddingHorizontal: 14, height: 46,
@@ -178,4 +344,29 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyTitle: { color: T.text, fontSize: 18, fontWeight: '600', marginTop: 16 },
   emptyDesc: { color: T.textSec, fontSize: 14, marginTop: 6, textAlign: 'center' },
+  
+  modalContainer: { flex: 1, backgroundColor: T.bg },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 24, paddingVertical: 20, backgroundColor: T.white,
+    borderBottomWidth: 1, borderBottomColor: T.border,
+  },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: T.text },
+  closeBtn: { padding: 4, backgroundColor: T.bg, borderRadius: 999 },
+  modalContent: { padding: 24, gap: 20 },
+  inputGroup: { gap: 8 },
+  label: { fontSize: 12, fontWeight: '700', color: T.textSec, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 4 },
+  inputWrap: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
+    borderWidth: 1, borderColor: T.border, borderRadius: 16, paddingHorizontal: 16, height: 56,
+  },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, fontSize: 16, color: T.text, fontWeight: '500' },
+  submitBtn: {
+    backgroundColor: T.accent, height: 56, borderRadius: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    marginTop: 12, shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1, shadowRadius: 12, elevation: 4,
+  },
+  submitBtnText: { color: T.white, fontSize: 16, fontWeight: '700' },
 });

@@ -61,6 +61,11 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Exclude student portal routes from SW navigation fallback
+        // This prevents SW startup errors on /mbcs/student pages
+        navigateFallbackDenylist: [/^\/[^/]+\/student/, /^\/api\//],
+        // Exclude source maps and very large files from precache (prevents SW startup errors)
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3MB
         // Cache-first for static assets
         runtimeCaching: [
           {

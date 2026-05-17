@@ -85,9 +85,9 @@ export function BrandButton({
       <LinearGradient
         colors={
           isPrimary
-            ? [Colors.primary, Colors.primaryDark]
+            ? ['#1D1D1F', '#111827']
             : isDanger
-            ? [Colors.error, '#DC2626']
+            ? ['#ef4444', '#DC2626']
             : ['transparent', 'transparent']
         }
         start={{ x: 0, y: 0 }}
@@ -102,7 +102,7 @@ export function BrandButton({
             borderColor: isGhost
               ? 'transparent'
               : variant === 'secondary'
-              ? Colors.primary
+              ? '#1D1D1F'
               : 'transparent',
           },
         ]}
@@ -121,7 +121,7 @@ export function BrandButton({
                     isPrimary || isDanger
                       ? '#FFFFFF'
                       : variant === 'secondary'
-                      ? Colors.primary
+                      ? '#1D1D1F'
                       : colorScheme === 'dark'
                       ? Colors.dark.text
                       : Colors.light.text,

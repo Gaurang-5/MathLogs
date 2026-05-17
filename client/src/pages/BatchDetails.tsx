@@ -5,7 +5,7 @@ import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt } from 'lucide-react';
+import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Monitor, Copy, Share2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
@@ -534,7 +534,7 @@ export default function BatchDetails() {
                 // Link an existing global invoice to this student
                 const existingInst = batch?.feeInstallments?.find(i => i.id === customInvoice.existingInstallmentId);
                 const paymentAmount = customInvoice.markAsPaid ? Number(existingInst?.amount || 0) : 0;
-                
+
                 await apiRequest(`/fees/pay-installment`, 'POST', {
                     studentId: showCustomInvoice.id,
                     installmentId: customInvoice.existingInstallmentId,
@@ -556,22 +556,22 @@ export default function BatchDetails() {
                     studentId: showCustomInvoice.id
                 });
 
-            // If "Mark as Paid" is checked, immediately log a payment
-            if (customInvoice.markAsPaid && installment?.id) {
-                await apiRequest(`/fees/pay-installment`, 'POST', {
-                    studentId: showCustomInvoice.id,
-                    installmentId: installment.id,
-                    amount: Number(customInvoice.amount),
-                    date: new Date().toISOString().split('T')[0]
-                });
-            }
+                // If "Mark as Paid" is checked, immediately log a payment
+                if (customInvoice.markAsPaid && installment?.id) {
+                    await apiRequest(`/fees/pay-installment`, 'POST', {
+                        studentId: showCustomInvoice.id,
+                        installmentId: installment.id,
+                        amount: Number(customInvoice.amount),
+                        date: new Date().toISOString().split('T')[0]
+                    });
+                }
 
-            toast.success(
-                customInvoice.markAsPaid
-                    ? 'Custom invoice created & marked paid'
-                    : 'Custom invoice created',
-                { id: toastId }
-            );
+                toast.success(
+                    customInvoice.markAsPaid
+                        ? 'Custom invoice created & marked paid'
+                        : 'Custom invoice created',
+                    { id: toastId }
+                );
             }
 
             setShowCustomInvoice(null);
@@ -680,8 +680,13 @@ export default function BatchDetails() {
     if (loading) {
         return (
             <Layout>
-                <div className="flex items-center justify-center h-96 text-app-text-secondary animate-pulse">
-                    Loading batch details...
+                <div className="flex flex-col items-center justify-center h-96 gap-4">
+                    <div className="flex gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-neutral-300 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2.5 h-2.5 rounded-full bg-neutral-300 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2.5 h-2.5 rounded-full bg-neutral-300 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <p className="text-xs font-bold text-app-text-tertiary uppercase tracking-widest">Loading Batch</p>
                 </div>
             </Layout>
         );
@@ -692,155 +697,240 @@ export default function BatchDetails() {
     return (
         <Layout title={batch.name}>
             <div className="mb-6 sm:mb-8">
+                {/* ── Back navigation ── */}
                 <button
                     onClick={() => navigate('/batches')}
-                    className="flex items-center text-app-text-secondary hover:text-black mb-6 transition-colors font-bold text-sm uppercase tracking-widest"
+                    className="inline-flex items-center gap-2 text-app-text-tertiary hover:text-black mb-8 transition-colors text-xs font-bold uppercase tracking-widest group"
                 >
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Back to Batches
+                    <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" /> Back to Batches
                 </button>
 
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-                    {/* Batch Info Card */}
-                    <div className="xl:col-span-2 bg-white/70 backdrop-blur-2xl border-[1.5px] border-black/5 p-5 md:p-8 rounded-2xl md:rounded-[32px] shadow-sm flex flex-col gap-6 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-accent-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 -translate-y-1/2 translate-x-1/3" />
-                        <div className="flex justify-between items-start gap-4 relative z-10">
-                            <div className="flex-1 min-w-0">
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                    <h2 className="text-2xl md:text-4xl font-extrabold text-black tracking-tighter break-words">{batch.name}</h2>
-                                    <span className="bg-black text-white text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap">{batch.subject}</span>
-                                    {batch.className && <span className="bg-neutral-100 text-black text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap">{batch.className}</span>}
+                {/* ══════════════════════════════════════════════
+                    HEADER BLOCK — editorial typographic approach
+                ══════════════════════════════════════════════ */}
+                <div className="flex flex-col lg:flex-row gap-6">
+
+                    {/* ── Left column: Title + Meta + Actions ── */}
+                    <div className="flex-1 min-w-0">
+
+                        {/* Title section */}
+                        <div className="bg-white border border-black/[0.06] rounded-2xl p-6 md:p-8 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] mb-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                    {/* Eyebrow */}
+                                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-app-text-tertiary border border-black/10 px-2.5 py-1 rounded-md">
+                                            {batch.subject}
+                                        </span>
+                                        {batch.className && (
+                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-app-text-tertiary border border-black/10 px-2.5 py-1 rounded-md">
+                                                {batch.className}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Batch name — editorial headline */}
+                                    <h1 className="text-3xl md:text-[2.75rem] font-black text-black tracking-tight leading-[1.05] break-words mb-4">
+                                        {batch.name}
+                                    </h1>
+
+                                    {/* Meta pills */}
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <div className="flex items-center gap-2 bg-neutral-50 border border-black/[0.06] rounded-lg px-3 py-1.5">
+                                            <Clock className="w-3.5 h-3.5 text-app-text-tertiary" />
+                                            <span className="text-sm font-semibold text-app-text-secondary">{batch.timeSlot}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 bg-neutral-50 border border-black/[0.06] rounded-lg px-3 py-1.5">
+                                            <Users className="w-3.5 h-3.5 text-app-text-tertiary" />
+                                            <span className="text-sm font-semibold text-app-text-secondary">
+                                                <span className="text-black font-black">{batch.students.length}</span> Students
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex items-center text-app-text-secondary gap-4 md:gap-6 mt-3 text-sm font-bold flex-wrap">
-                                    <span className="flex items-center whitespace-nowrap"><Clock className="w-4 h-4 mr-2 text-black" /> {batch.timeSlot}</span>
-                                    <span className="flex items-center whitespace-nowrap"><Users className="w-4 h-4 mr-2 text-black" /> {batch.students.length} Students</span>
+
+                                {/* Edit / Delete controls */}
+                                <div className="flex gap-1.5 shrink-0">
+                                    <button
+                                        onClick={openEditBatch}
+                                        className="p-2.5 text-app-text-tertiary hover:text-black hover:bg-neutral-100 rounded-xl transition-all border border-black/[0.06]"
+                                        title="Edit Batch Details"
+                                    >
+                                        <Settings className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteBatch}
+                                        className="p-2.5 text-app-text-tertiary hover:text-danger hover:bg-red-50 rounded-xl transition-all border border-black/[0.06]"
+                                        title="Delete Batch"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </div>
-                            </div>
-                            <div className="flex gap-2 shrink-0">
-                                <button
-                                    onClick={openEditBatch}
-                                    className="p-2 text-app-text-tertiary hover:text-accent hover:bg-accent/10 rounded-xl transition-all border border-transparent hover:border-accent/10"
-                                    title="Edit Batch Details"
-                                >
-                                    <Settings className="w-5 h-5" />
-                                </button>
-                                <button
-                                    onClick={handleDeleteBatch}
-                                    className="p-2 text-app-text-tertiary hover:text-danger hover:bg-danger/10 rounded-xl transition-all border border-transparent hover:border-danger/10"
-                                    title="Delete Batch"
-                                >
-                                    <Trash2 className="w-5 h-5" />
-                                </button>
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-3 w-full mt-auto">
-                            <button
-                                onClick={handleDownloadPDF}
-                                className="bg-neutral-50/80 hover:bg-neutral-100/80 text-black px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center border-[1.5px] border-black/5 transition-all active:scale-95 flex-1"
-                            >
-                                <Download className="w-5 h-5 mr-2" /> Download List
-                            </button>
-                            <button
-                                onClick={handlePrintStickers}
-                                className="bg-neutral-50/80 hover:bg-neutral-100/80 text-black px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center border-[1.5px] border-black/5 transition-all active:scale-95 flex-1"
-                            >
-                                <Printer className="w-5 h-5 mr-2" /> Print Stickers
-                            </button>
-                            <button
-                                onClick={() => setShowAddStudent(true)}
-                                className="bg-black hover:bg-black/90 text-white px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center transition-all active:scale-95 flex-1 shadow-sm shadow-black/10"
-                            >
-                                <Plus className="w-5 h-5 mr-2" /> Add Student
-                            </button>
-                            <button
-                                onClick={() => setShowManageInstallments(true)}
-                                className="bg-neutral-50/80 hover:bg-neutral-100/80 text-black px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center border-[1.5px] border-black/5 transition-all active:scale-95 flex-1"
-                            >
-                                <Settings className="w-5 h-5 mr-2" /> Fee Columns
-                            </button>
-                            <button
-                                onClick={openWhatsappModal}
-                                className={cn(
-                                    "px-6 py-3.5 rounded-xl font-bold flex items-center justify-center border transition-all active:scale-95 flex-1",
-                                    batch.whatsappGroupLink
-                                        ? "bg-neutral-50/50 hover:bg-neutral-50/50-hover text-app-text border-black/5"
-                                        : "bg-neutral-50/50 border-dashed border-app-text-tertiary text-app-text hover:border-app-text"
-                                )}
-                            >
-                                <Phone className="w-5 h-5 mr-2" />
-                                {batch.whatsappGroupLink ? 'Edit Group Link' : 'Add Group Link'}
-                            </button>
-                            <button
-                                onClick={handleSendWhatsappInvite}
-                                disabled={!batch.whatsappGroupLink}
-                                className="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-6 py-3.5 rounded-xl font-bold flex items-center justify-center transition-all active:scale-95 flex-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-50/50 disabled:text-app-text-tertiary disabled:border-black/5"
-                            >
-                                <Mail className="w-5 h-5 mr-2" /> Send Invites
-                            </button>
+                        {/* ── Action strip ── */}
+                        {/* Desktop: flex-wrap pill row | Mobile: horizontal scroll icon tabs */}
+                        <div className="bg-white border border-black/[0.06] rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] overflow-hidden">
+                            {/* Mobile: icon tab strip — scrollable, no wrapping */}
+                            <div className="flex md:hidden overflow-x-auto scrollbar-hide">
+                                {/* Primary CTA — fills to left */}
+                                <button
+                                    onClick={() => setShowAddStudent(true)}
+                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 bg-black text-white active:bg-neutral-800 transition-colors"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                    <span className="text-[10px] font-black uppercase tracking-wide whitespace-nowrap">Add Student</span>
+                                </button>
+
+                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+
+                                <button
+                                    onClick={handleDownloadPDF}
+                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                >
+                                    <Download className="w-5 h-5" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Download</span>
+                                </button>
+
+                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+
+                                <button
+                                    onClick={handlePrintStickers}
+                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                >
+                                    <Printer className="w-5 h-5" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Stickers</span>
+                                </button>
+
+                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+
+                                <button
+                                    onClick={() => setShowManageInstallments(true)}
+                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                >
+                                    <Settings className="w-5 h-5" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Fee Cols</span>
+                                </button>
+
+                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+
+                                <button
+                                    onClick={openWhatsappModal}
+                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                >
+                                    <Phone className="w-5 h-5" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                        {batch.whatsappGroupLink ? 'WA Link' : 'Add WA'}
+                                    </span>
+                                </button>
+
+                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+
+                                <button
+                                    onClick={handleSendWhatsappInvite}
+                                    disabled={!batch.whatsappGroupLink}
+                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                                >
+                                    <Mail className="w-5 h-5" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Invites</span>
+                                </button>
+                            </div>
+
+                            {/* Desktop: wrapped pill row */}
+                            <div className="hidden md:flex flex-wrap gap-2 p-3">
+                                <button
+                                    onClick={() => setShowAddStudent(true)}
+                                    className="flex items-center gap-2 bg-black hover:bg-neutral-800 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all active:scale-[0.97] shadow-sm shadow-black/20"
+                                >
+                                    <Plus className="w-4 h-4" /> Add Student
+                                </button>
+                                <div className="w-px bg-black/[0.06] self-stretch mx-1" />
+                                <button onClick={handleDownloadPDF} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
+                                    <Download className="w-4 h-4 text-app-text-tertiary" /> Download
+                                </button>
+                                <button onClick={handlePrintStickers} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
+                                    <Printer className="w-4 h-4 text-app-text-tertiary" /> Stickers
+                                </button>
+                                <button onClick={() => setShowManageInstallments(true)} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
+                                    <Settings className="w-4 h-4 text-app-text-tertiary" /> Fee Cols
+                                </button>
+                                <div className="w-px bg-black/[0.06] self-stretch mx-1" />
+                                <button
+                                    onClick={openWhatsappModal}
+                                    className={cn(
+                                        "flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border transition-all active:scale-[0.97]",
+                                        batch.whatsappGroupLink ? "bg-neutral-50 hover:bg-neutral-100 text-black border-black/[0.06]" : "bg-neutral-50 border-dashed border-neutral-300 text-app-text-secondary hover:border-black/30"
+                                    )}
+                                >
+                                    <Phone className="w-4 h-4 text-app-text-tertiary" />
+                                    {batch.whatsappGroupLink ? 'WA Link' : 'Add WA Link'}
+                                </button>
+                                <button
+                                    onClick={handleSendWhatsappInvite}
+                                    disabled={!batch.whatsappGroupLink}
+                                    className="flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold px-4 py-2.5 rounded-xl border border-emerald-200 transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <Mail className="w-4 h-4" /> Send Invites
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Registration Control Card */}
+                    {/* ── Right column: Registration Card (conditionally shown) ── */}
+
                     {!batch.isRegistrationEnded && (
-                        <div className="bg-white/70 backdrop-blur-2xl border-[1.5px] border-black/5 p-5 md:p-6 rounded-2xl md:rounded-[32px] shadow-sm flex flex-col items-center text-center relative group overflow-hidden">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
-                            <div className="flex items-center justify-between w-full mb-6 relative z-10">
-                                <div className="flex items-center gap-3">
-                                    <span className="font-bold text-app-text-secondary text-xs uppercase tracking-wider">Registration</span>
+                        <div className="w-full lg:w-72 xl:w-80 shrink-0 bg-white border border-black/[0.06] rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] overflow-hidden">
+
+                            {/* Header row */}
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.05]">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-black uppercase tracking-[0.1em] text-app-text-tertiary">Registration</span>
                                     <div className={cn(
-                                        "px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide",
+                                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-black border uppercase tracking-wider",
                                         batch.isRegistrationOpen
-                                            ? 'bg-success/10 text-success border-success/20'
-                                            : 'bg-warning/10 text-orange-500 border-warning/20'
+                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                            : 'bg-amber-50 text-amber-600 border-amber-200'
                                     )}>
+                                        <span className={cn(
+                                            "w-1.5 h-1.5 rounded-full",
+                                            batch.isRegistrationOpen ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                                        )} />
                                         {batch.isRegistrationOpen ? 'Live' : 'Paused'}
                                     </div>
                                 </div>
 
+                                {/* ⋮ Options menu */}
                                 <div className="relative">
                                     <button
                                         onClick={() => setShowRegMenu(!showRegMenu)}
-                                        className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors text-app-text-secondary active:scale-95"
+                                        className="p-2 hover:bg-black/5 rounded-xl transition-colors text-app-text-tertiary active:scale-95"
                                     >
-                                        <MoreVertical className="w-5 h-5" />
+                                        <MoreVertical className="w-4 h-4" />
                                     </button>
 
                                     <AnimatePresence>
                                         {showRegMenu && (
                                             <>
-                                                <div
-                                                    className="fixed inset-0 z-40 cursor-default"
-                                                    onClick={(e) => { e.stopPropagation(); setShowRegMenu(false); }}
-                                                />
+                                                <div className="fixed inset-0 z-40 cursor-default" onClick={(e) => { e.stopPropagation(); setShowRegMenu(false); }} />
                                                 <motion.div
                                                     initial={{ opacity: 0, scale: 0.95, y: -5 }}
                                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                                                    className="absolute right-0 top-10 min-w-[220px] !bg-white border border-neutral-200 rounded-xl shadow-2xl z-50 py-1.5 text-left text-sm font-medium"
+                                                    className="absolute right-0 top-10 min-w-[200px] bg-white border border-black/[0.08] rounded-xl shadow-xl z-50 py-1.5 overflow-hidden"
                                                 >
-                                                    <div className="px-3 py-2 text-xs font-bold text-neutral-400 uppercase tracking-wider mb-1">Options</div>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleToggleRegistration(); setShowRegMenu(false); }}
-                                                        className="w-full text-left px-4 py-2.5 hover:bg-neutral-50 dark:hover:bg-neutral-700/50 text-app-text flex items-center gap-3 transition-colors"
-                                                    >
+                                                    <div className="px-4 py-2 text-[10px] font-black text-app-text-tertiary uppercase tracking-widest">Options</div>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleToggleRegistration(); setShowRegMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-neutral-50 text-app-text flex items-center gap-3 text-sm transition-colors">
                                                         {batch.isRegistrationOpen ? <Pause className="w-4 h-4 text-app-text-tertiary" /> : <Play className="w-4 h-4 text-app-text-tertiary" />}
                                                         {batch.isRegistrationOpen ? 'Pause temporarily' : 'Resume registration'}
                                                     </button>
-                                                    <div className="h-px bg-neutral-200 dark:bg-neutral-700 my-1 mx-4" />
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleEndRegistration(); setShowRegMenu(false); }}
-                                                        className="w-full text-left px-4 py-2.5 hover:bg-neutral-50 dark:hover:bg-neutral-700/50 text-app-text flex items-center gap-3 transition-colors"
-                                                    >
-                                                        <Archive className="w-4 h-4 text-app-text-tertiary" />
-                                                        Close permanently
+                                                    <div className="h-px bg-black/[0.06] mx-4" />
+                                                    <button onClick={(e) => { e.stopPropagation(); handleEndRegistration(); setShowRegMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-neutral-50 text-app-text flex items-center gap-3 text-sm transition-colors">
+                                                        <Archive className="w-4 h-4 text-app-text-tertiary" /> Close permanently
                                                     </button>
-                                                    <div className="h-px bg-neutral-200 dark:bg-neutral-700 my-1 mx-4" />
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); setShowRegMenu(false); }}
-                                                        className="w-full text-left px-4 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/10 text-danger flex items-center gap-3 transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                        Delete Batch
+                                                    <div className="h-px bg-black/[0.06] mx-4" />
+                                                    <button onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); setShowRegMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-red-50 text-danger flex items-center gap-3 text-sm transition-colors">
+                                                        <Trash2 className="w-4 h-4" /> Delete Batch
                                                     </button>
                                                 </motion.div>
                                             </>
@@ -849,75 +939,74 @@ export default function BatchDetails() {
                                 </div>
                             </div>
 
-                            <div className="bg-white p-5 rounded-[24px] mb-6 shadow-sm border border-black/5 flex flex-col items-center gap-4">
-                                <QRCode value={`${window.location.origin}/register/${batch.id}`} size={140} />
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            const token = localStorage.getItem('token');
-                                            const response = await fetch(`${API_URL}/batches/${batch.id}/qr-pdf`, {
-                                                headers: { Authorization: `Bearer ${token}` }
-                                            });
-                                            if (!response.ok) throw new Error('Failed to download');
-                                            const blob = await response.blob();
-                                            const url = window.URL.createObjectURL(blob);
-                                            const a = document.createElement('a');
-                                            a.href = url;
-                                            a.download = `QR-${batch.name.replace(/\s+/g, '-')}.pdf`;
-                                            document.body.appendChild(a);
-                                            a.click();
-                                            window.URL.revokeObjectURL(url);
-                                            document.body.removeChild(a);
-                                        } catch {
-                                            toast.error('Failed to download QR PDF');
-                                        }
-                                    }}
-                                    className="text-xs font-bold text-app-text-tertiary hover:text-black flex items-center gap-1.5 transition-colors bg-neutral-50 px-4 py-2 rounded-xl border border-black/5 hover:border-black/10"
-                                >
-                                    <Download className="w-3.5 h-3.5" /> Download QR
-                                </button>
-                            </div>
+                            {/* Body — horizontal on mobile (QR left | actions right), vertical on desktop */}
+                            <div className="flex flex-row md:flex-col gap-0">
 
-                            <div className="w-full space-y-3">
-                                <div>
-                                    <p className="text-[10px] text-app-text-tertiary mb-2 px-2 uppercase font-bold tracking-widest text-left">Quick Actions</p>
-                                    <div className="grid grid-cols-1 gap-3 text-center">
-                                        <button
-                                            onClick={() => window.open(`/kiosk/register/${batch.id}`, '_blank')}
-                                            className="py-3.5 rounded-2xl bg-neutral-50/80 hover:bg-neutral-100/80 text-black border-[1.5px] border-black/5 text-xs font-bold transition-all w-full"
-                                        >
-                                            Open Fullscreen Kiosk
-                                        </button>
-                                        <div className="flex gap-2 w-full">
-                                            <button
-                                                onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`); toast.success('Invite Link Copied'); }}
-                                                className="py-3.5 rounded-2xl bg-neutral-50/80 hover:bg-neutral-100/80 text-black border-[1.5px] border-black/5 text-xs font-bold transition-all flex-[2] text-center"
-                                            >
-                                                Copy Web Link
-                                            </button>
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        if (navigator.share) {
-                                                            await navigator.share({
-                                                                title: 'Batch Registration',
-                                                                text: `Please use this link to register for ${batch.name}.`,
-                                                                url: `${window.location.origin}/register/${batch.id}`
-                                                            });
-                                                        } else {
-                                                            navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`);
-                                                            toast.success('Share api not supported. Link copied!');
-                                                        }
-                                                    } catch (err) {
-                                                        console.error('Share failed', err);
-                                                    }
-                                                }}
-                                                className="py-3.5 rounded-2xl bg-neutral-50/80 hover:bg-neutral-100/80 text-black border-[1.5px] border-black/5 text-xs font-bold transition-all flex-1 text-center"
-                                            >
-                                                Share
-                                            </button>
-                                        </div>
+                                {/* QR + Download */}
+                                <div className="flex flex-col items-center justify-center gap-3 p-4 bg-neutral-50/60 border-r md:border-r-0 md:border-b border-black/[0.05] shrink-0">
+                                    <div className="bg-white p-2.5 rounded-xl border border-black/[0.06] shadow-sm">
+                                        <QRCode value={`${window.location.origin}/register/${batch.id}`} size={100} />
                                     </div>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const token = localStorage.getItem('token');
+                                                const response = await fetch(`${API_URL}/batches/${batch.id}/qr-pdf`, {
+                                                    headers: { Authorization: `Bearer ${token}` }
+                                                });
+                                                if (!response.ok) throw new Error('Failed to download');
+                                                const blob = await response.blob();
+                                                const url = window.URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = `QR-${batch.name.replace(/\s+/g, '-')}.pdf`;
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                window.URL.revokeObjectURL(url);
+                                                document.body.removeChild(a);
+                                            } catch {
+                                                toast.error('Failed to download QR PDF');
+                                            }
+                                        }}
+                                        className="flex items-center gap-1.5 text-[11px] font-bold text-app-text-secondary hover:text-black bg-white px-3 py-2 rounded-lg border border-black/[0.06] hover:border-black/20 transition-all w-full justify-center active:scale-[0.97]"
+                                    >
+                                        <Download className="w-3.5 h-3.5" /> QR PDF
+                                    </button>
+                                </div>
+
+                                {/* Quick links — stacked */}
+                                <div className="flex-1 flex flex-col p-3 gap-2">
+                                    <p className="text-[9px] font-black text-app-text-tertiary uppercase tracking-widest px-1 mb-0.5">Quick Links</p>
+                                    <button
+                                        onClick={() => window.open(`/kiosk/register/${batch.id}`, '_blank')}
+                                        className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-black border border-black/[0.06] text-xs font-semibold transition-all w-full active:scale-[0.98] text-left"
+                                    >
+                                        <Monitor className="w-4 h-4 text-app-text-tertiary shrink-0" />
+                                        <span>Fullscreen Kiosk</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`); toast.success('Invite Link Copied'); }}
+                                        className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-black border border-black/[0.06] text-xs font-semibold transition-all w-full active:scale-[0.98] text-left"
+                                    >
+                                        <Copy className="w-4 h-4 text-app-text-tertiary shrink-0" />
+                                        <span>Copy Link</span>
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                if (navigator.share) {
+                                                    await navigator.share({ title: 'Batch Registration', text: `Register for ${batch.name}`, url: `${window.location.origin}/register/${batch.id}` });
+                                                } else {
+                                                    navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`);
+                                                    toast.success('Link copied!');
+                                                }
+                                            } catch (err) { console.error('Share failed', err); }
+                                        }}
+                                        className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-black border border-black/[0.06] text-xs font-semibold transition-all w-full active:scale-[0.98] text-left"
+                                    >
+                                        <Share2 className="w-4 h-4 text-app-text-tertiary shrink-0" />
+                                        <span>Share Link</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -925,34 +1014,36 @@ export default function BatchDetails() {
                 </div>
             </div>
 
-            <div className="bg-white/70 backdrop-blur-2xl border-[1.5px] border-black/5 rounded-[32px] shadow-sm mt-8 overflow-hidden">
-                {/* Search Header */}
-                <div className="p-5 border-b-[1.5px] border-black/5 bg-white/40 backdrop-blur-md sticky top-0 z-10">
-                    <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                        <div className="relative max-w-md w-full">
-                            <Search className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" />
+            <div className="bg-white border border-black/[0.06] rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] mt-6 overflow-hidden">
+                {/* Search Header — sticky, mobile-first */}
+                <div className="px-4 py-3 md:px-5 md:py-4 border-b border-black/[0.06] bg-white sticky top-0 z-10">
+                    <div className="flex items-center gap-3">
+                        {/* Search input — takes most space */}
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-tertiary pointer-events-none" />
                             <input
                                 type="text"
                                 placeholder="Search students..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-white border-2 border-transparent pl-12 pr-4 py-3 rounded-2xl text-app-text outline-none focus:border-black/10 shadow-sm transition-all placeholder:text-gray-400 font-semibold"
+                                className="w-full bg-neutral-50 border border-black/[0.06] pl-10 pr-4 py-2.5 rounded-xl text-sm text-app-text outline-none focus:border-black/20 focus:bg-white transition-all placeholder:text-app-text-tertiary font-medium"
                             />
                         </div>
-                        <div className="flex items-center gap-1 bg-neutral-100/80 p-1.5 rounded-2xl self-end md:self-auto border border-black/5">
+                        {/* Font size toggle — hidden on mobile, visible md+ */}
+                        <div className="hidden md:flex items-center gap-1 bg-neutral-50 border border-black/[0.06] p-1 rounded-xl">
                             <button
                                 onClick={() => setTableFontSize(Math.max(0, tableFontSize - 1))}
                                 disabled={tableFontSize === 0}
-                                className="p-2 text-app-text-tertiary hover:text-app-text disabled:opacity-30 disabled:hover:text-app-text-tertiary transition-colors"
+                                className="w-8 h-8 flex items-center justify-center text-app-text-tertiary hover:text-black hover:bg-white rounded-lg disabled:opacity-30 transition-all"
                                 title="Decrease Font Size"
                             >
                                 <span className="text-xs font-bold">A-</span>
                             </button>
-                            <div className="w-px h-4 bg-app-border"></div>
+                            <div className="w-px h-4 bg-black/[0.06]"></div>
                             <button
                                 onClick={() => setTableFontSize(Math.min(4, tableFontSize + 1))}
                                 disabled={tableFontSize === 4}
-                                className="p-2 text-app-text-tertiary hover:text-app-text disabled:opacity-30 disabled:hover:text-app-text-tertiary transition-colors"
+                                className="w-8 h-8 flex items-center justify-center text-app-text-tertiary hover:text-black hover:bg-white rounded-lg disabled:opacity-30 transition-all"
                                 title="Increase Font Size"
                             >
                                 <span className="text-lg font-bold">A+</span>
@@ -1203,197 +1294,217 @@ export default function BatchDetails() {
                     </table>
                 </div>
 
-                {/* Mobile Student List Card View */}
+                {/* Mobile Student List — premium card layout */}
                 <div className="md:hidden">
-                    <div className="divide-y divide-black/5">
+                    <div className="divide-y divide-black/[0.05]">
                         {filteredStudents.map((student) => {
-                            // Dynamic Fee Logic (Virtual Allocation) - Mobile
                             const instPaidMap = getInstallmentPaidMap(student, batch.feeInstallments || []);
+                            const avg = getStudentAverage(student);
 
                             return (
-                                <div key={student.id} className="p-5 flex flex-col gap-3 bg-white hover:bg-neutral-50/50 transition-colors">
-                                    <div className="flex flex-col gap-3">
-                                        <div className="flex justify-between items-start">
-                                            <div className="flex-1 min-w-0 pr-4">
-                                                <h4 className={cn("font-extrabold text-black tracking-tighter break-words leading-tight", getTextSizeClass('body'))}>{student.name}</h4>
+                                <div key={student.id} className="bg-white active:bg-neutral-50 transition-colors">
+                                    {/* Card body */}
+                                    <div className="px-4 pt-4 pb-3">
+                                        {/* Row 1: Name + ID pill */}
+                                        <div className="flex items-start justify-between gap-3 mb-2">
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-black text-[17px] text-black tracking-tight leading-snug break-words">
+                                                    {student.name}
+                                                </h4>
                                                 {student.humanId && (
-                                                    <span className={cn("inline-block mt-1.5 font-mono bg-neutral-100 px-2.5 py-0.5 rounded-full text-app-text-tertiary font-bold border border-black/5", getTextSizeClass('sub'))}>
+                                                    <span className="inline-flex items-center gap-1 mt-1 font-mono text-[11px] bg-neutral-100 border border-black/[0.06] px-2 py-0.5 rounded-md text-app-text-secondary font-bold">
                                                         {student.humanId}
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex gap-1.5 shrink-0 flex-wrap justify-end max-w-[140px]">
-                                                <button onClick={() => setViewMarksId(student.id)} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all"><Eye className={getIconSizeClass()} /></button>
-                                                <a href={`tel:${student.parentWhatsapp}`} className="p-2 bg-neutral-50 hover:bg-green-50 text-green-600 border border-black/5 rounded-xl active:scale-90 transition-all"><Phone className={getIconSizeClass()} /></a>
-                                                <button onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all" title="Custom Invoice"><Receipt className={getIconSizeClass()} /></button>
-                                                <button onClick={() => setEditingStudent(student)} className="p-2 bg-neutral-50 hover:bg-black hover:text-white text-black border border-black/5 rounded-xl active:scale-90 transition-all"><Edit2 className={getIconSizeClass()} /></button>
-                                                <button onClick={() => handleDelete(student)} className="p-2 bg-neutral-50 hover:bg-red-50 text-red-600 border border-black/5 rounded-xl active:scale-90 transition-all"><Trash2 className={getIconSizeClass()} /></button>
+                                            {/* Avg score badge */}
+                                            <div className="shrink-0 flex flex-col items-end">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-app-text-tertiary">Avg</span>
+                                                <span className="font-mono font-black text-xl text-black leading-none">{avg}</span>
+                                                <span className="text-[9px] text-app-text-tertiary font-bold">/10</span>
                                             </div>
                                         </div>
 
-                                        <div className={cn("grid grid-cols-1 gap-1.5 text-app-text-secondary pl-0.5", getTextSizeClass('sub'))}>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-5 flex justify-center"><Book className="w-3.5 h-3.5 text-app-text-tertiary" /></div>
-                                                <span className="truncate">{student.schoolName || <span className="text-app-text-tertiary italic">No School</span>}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-5 flex justify-center"><User className="w-3.5 h-3.5 text-app-text-tertiary" /></div>
-                                                <span className="truncate">{student.parentName}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-accent font-bold mt-1">
-                                                <div className="w-5 flex justify-center"><FileText className="w-3.5 h-3.5" /></div>
-                                                <span>Avg: {getStudentAverage(student)} / 10</span>
-                                            </div>
+                                        {/* Row 2: School & Parent meta */}
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-app-text-secondary mb-3">
+                                            <span className="flex items-center gap-1.5">
+                                                <Book className="w-3.5 h-3.5 text-app-text-tertiary shrink-0" />
+                                                <span className="truncate max-w-[130px]">{student.schoolName || <span className="italic text-app-text-tertiary">No school</span>}</span>
+                                            </span>
+                                            <span className="flex items-center gap-1.5">
+                                                <User className="w-3.5 h-3.5 text-app-text-tertiary shrink-0" />
+                                                <span className="truncate max-w-[130px]">{student.parentName}</span>
+                                            </span>
                                         </div>
+
+                                        {/* Fee pills — horizontal scroll */}
+                                        {batch.feeInstallments && batch.feeInstallments.filter(i => !i.studentId).length > 0 && (
+                                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 mb-1">
+                                                {batch.feeInstallments.filter((inst) => {
+                                                    if (inst.studentId) return false;
+                                                    const studentJoinDate = getStudentJoinDate(student.createdAt);
+                                                    const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
+                                                    const hasPayment = student.feePayments?.some(p => p.installmentId === inst.id);
+                                                    return instDate >= studentJoinDate || hasPayment;
+                                                }).map((inst) => {
+                                                    const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
+                                                    const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);
+                                                    const isFullyPaid = paidAmount >= inst.amount;
+                                                    const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
+
+                                                    return (
+                                                        <button
+                                                            key={inst.id}
+                                                            onClick={() => {
+                                                                if (isFullyPaid) {
+                                                                    if (payments.length > 0) {
+                                                                        setViewPayment({ student, installment: inst, payments });
+                                                                    } else {
+                                                                        toast.success('Paid via Account Balance');
+                                                                    }
+                                                                } else {
+                                                                    const remaining = inst.amount - paidAmount;
+                                                                    setPaymentModal({
+                                                                        student,
+                                                                        installment: { ...inst, amount: remaining },
+                                                                        date: new Date().toISOString().split('T')[0]
+                                                                    });
+                                                                }
+                                                            }}
+                                                            className={cn(
+                                                                "flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold whitespace-nowrap transition-all active:scale-95",
+                                                                isFullyPaid
+                                                                    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                                                    : isPartiallyPaid
+                                                                        ? "bg-amber-50 border-amber-200 text-amber-700"
+                                                                        : "bg-neutral-50 border-black/[0.06] text-app-text-secondary"
+                                                            )}
+                                                        >
+                                                            <div className={cn(
+                                                                "w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] shrink-0",
+                                                                isFullyPaid
+                                                                    ? "border-emerald-600 bg-emerald-600"
+                                                                    : isPartiallyPaid
+                                                                        ? "border-amber-500"
+                                                                        : "border-neutral-300"
+                                                            )}>
+                                                                {isFullyPaid && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                                                {isPartiallyPaid && <div className="text-[6px] font-black text-amber-600">P</div>}
+                                                            </div>
+                                                            <div className="flex flex-col items-start leading-none">
+                                                                <span>{inst.name}</span>
+                                                                {isPartiallyPaid && (
+                                                                    <span className="text-[9px] text-amber-600 font-bold mt-0.5">₹{inst.amount - paidAmount} due</span>
+                                                                )}
+                                                                {!isFullyPaid && !isPartiallyPaid && (
+                                                                    <span className="text-[9px] text-app-text-tertiary font-bold mt-0.5">₹{inst.amount}</span>
+                                                                )}
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
+                                                {/* Custom student-specific invoices */}
+                                                {batch.feeInstallments.filter(inst => inst.studentId === student.id).map((inst) => {
+                                                    const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
+                                                    const paidAmount = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+                                                    const isFullyPaid = paidAmount >= inst.amount;
+                                                    const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
+                                                    return (
+                                                        <button
+                                                            key={inst.id}
+                                                            onClick={() => {
+                                                                if (isFullyPaid) {
+                                                                    if (payments.length > 0) setViewPayment({ student, installment: inst, payments });
+                                                                    else toast.success('Paid via Account Balance');
+                                                                } else {
+                                                                    const remaining = inst.amount - paidAmount;
+                                                                    setPaymentModal({ student, installment: { ...inst, amount: remaining }, date: new Date().toISOString().split('T')[0] });
+                                                                }
+                                                            }}
+                                                            className={cn(
+                                                                "flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold whitespace-nowrap transition-all active:scale-95",
+                                                                isFullyPaid ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                                                    : isPartiallyPaid ? "bg-amber-50 border-amber-200 text-amber-700"
+                                                                        : "bg-neutral-50 border-black/[0.06] text-app-text-secondary"
+                                                            )}
+                                                        >
+                                                            <div className={cn(
+                                                                "w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] shrink-0",
+                                                                isFullyPaid ? "border-emerald-600 bg-emerald-600" : isPartiallyPaid ? "border-amber-500" : "border-neutral-300"
+                                                            )}>
+                                                                {isFullyPaid && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                                                {isPartiallyPaid && <div className="text-[6px] font-black text-amber-600">P</div>}
+                                                            </div>
+                                                            <span>{inst.name}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Mobile Fees Scroll View */}
-                                    {
-                                        batch.feeInstallments && batch.feeInstallments.filter(i => !i.studentId).length > 0 && (
-                                            <div className="mt-2 pt-3 border-t border-black/5/50">
-                                                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
-                                                    {batch.feeInstallments.filter((inst) => {
-                                                        if (inst.studentId) return false; // Skip custom invoices
-                                                        const studentJoinDate = getStudentJoinDate(student.createdAt);
-                                                        const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
-                                                        const hasPayment = student.feePayments?.some(p => p.installmentId === inst.id);
-                                                        return instDate >= studentJoinDate || hasPayment;
-                                                    }).map((inst) => {
-                                                        const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
-                                                        // Use calculated amount from map
-                                                        const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);
-                                                        const isFullyPaid = paidAmount >= inst.amount;
-                                                        const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
-
-                                                        return (
-                                                            <button
-                                                                key={inst.id}
-                                                                onClick={() => {
-                                                                    if (isFullyPaid) {
-                                                                        if (payments.length > 0) {
-                                                                            setViewPayment({ student, installment: inst, payments });
-                                                                        } else {
-                                                                            toast.success('Paid via Account Balance');
-                                                                        }
-                                                                    } else {
-                                                                        // Calculate remaining
-                                                                        const remaining = inst.amount - paidAmount;
-                                                                        setPaymentModal({
-                                                                            student,
-                                                                            installment: { ...inst, amount: remaining },
-                                                                            date: new Date().toISOString().split('T')[0]
-                                                                        });
-                                                                    }
-                                                                }}
-                                                                className={cn(
-                                                                    "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border font-medium whitespace-nowrap transition-all",
-                                                                    "bg-neutral-50/50 hover:bg-neutral-50/50-hover border-black/5 text-app-text",
-                                                                    getTextSizeClass('body')
-                                                                )}
-                                                            >
-                                                                {/* Circle Indicator matching Desktop */}
-                                                                <div className={cn(
-                                                                    "rounded-full flex items-center justify-center border transition-all relative",
-                                                                    getIconSizeClass(),
-                                                                    isFullyPaid
-                                                                        ? "border-app-text"
-                                                                        : isPartiallyPaid
-                                                                            ? "border-orange-400 text-orange-500 bg-orange-50"
-                                                                            : "border-app-text-tertiary text-app-text"
-                                                                )}>
-                                                                    {isFullyPaid && <div className={cn("bg-current rounded-full", getPaymentInnerSize())} />}
-                                                                    {isPartiallyPaid && <div className="text-[6px] font-bold">P</div>}
-                                                                </div>
-
-                                                                <div className="flex flex-col items-start leading-none gap-0.5">
-                                                                    <span>{inst.name}</span>
-                                                                    {isPartiallyPaid && (
-                                                                        <span className="text-[9px] text-orange-500 font-bold">Due: ₹{inst.amount - paidAmount}</span>
-                                                                    )}
-                                                                </div>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )
-                                    }
-                                    {/* Custom student-specific invoices — rendered as regular mobile fee pills */}
-                                    {
-                                        batch.feeInstallments && batch.feeInstallments.filter(i => i.studentId === student.id).length > 0 && (
-                                            <div className={cn(batch.feeInstallments.filter(i => !i.studentId).length === 0 ? "mt-2 pt-3 border-t border-black/5/50" : "")}>
-                                                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
-                                                    {batch.feeInstallments.filter(inst => inst.studentId === student.id).map((inst) => {
-                                                        const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
-                                                        const paidAmount = payments.reduce((sum, p) => sum + p.amountPaid, 0);
-                                                        const isFullyPaid = paidAmount >= inst.amount;
-                                                        const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
-
-                                                        return (
-                                                            <button
-                                                                key={inst.id}
-                                                                onClick={() => {
-                                                                    if (isFullyPaid) {
-                                                                        if (payments.length > 0) {
-                                                                            setViewPayment({ student, installment: inst, payments });
-                                                                        } else {
-                                                                            toast.success('Paid via Account Balance');
-                                                                        }
-                                                                    } else {
-                                                                        const remaining = inst.amount - paidAmount;
-                                                                        setPaymentModal({
-                                                                            student,
-                                                                            installment: { ...inst, amount: remaining },
-                                                                            date: new Date().toISOString().split('T')[0]
-                                                                        });
-                                                                    }
-                                                                }}
-                                                                className={cn(
-                                                                    "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border font-medium whitespace-nowrap transition-all",
-                                                                    "bg-neutral-50/50 hover:bg-neutral-50/50-hover border-black/5 text-app-text",
-                                                                    getTextSizeClass('body')
-                                                                )}
-                                                            >
-                                                                <div className={cn(
-                                                                    "rounded-full flex items-center justify-center border transition-all relative",
-                                                                    getIconSizeClass(),
-                                                                    isFullyPaid
-                                                                        ? "border-app-text"
-                                                                        : isPartiallyPaid
-                                                                            ? "border-orange-400 text-orange-500 bg-orange-50"
-                                                                            : "border-app-text-tertiary text-app-text"
-                                                                )}>
-                                                                    {isFullyPaid && <div className={cn("bg-current rounded-full", getPaymentInnerSize())} />}
-                                                                    {isPartiallyPaid && <div className="text-[6px] font-bold">P</div>}
-                                                                </div>
-
-                                                                <div className="flex flex-col items-start leading-none gap-0.5">
-                                                                    <span>{inst.name}</span>
-                                                                    {isPartiallyPaid && (
-                                                                        <span className="text-[9px] text-orange-500 font-bold">Due: ₹{inst.amount - paidAmount}</span>
-                                                                    )}
-                                                                </div>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )
-                                    }
+                                    {/* Bottom action row — native-app style, 48px touch targets */}
+                                    <div className="flex border-t border-black/[0.05]">
+                                        <button
+                                            onClick={() => setViewMarksId(student.id)}
+                                            className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                            <span className="text-[9px] font-bold uppercase tracking-wide">Marks</span>
+                                        </button>
+                                        <div className="w-px bg-black/[0.05] self-stretch" />
+                                        <a
+                                            href={`tel:${student.parentWhatsapp}`}
+                                            className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition-colors"
+                                        >
+                                            <Phone className="w-4 h-4" />
+                                            <span className="text-[9px] font-bold uppercase tracking-wide">Call</span>
+                                        </a>
+                                        <div className="w-px bg-black/[0.05] self-stretch" />
+                                        <button
+                                            onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
+                                            className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                        >
+                                            <Receipt className="w-4 h-4" />
+                                            <span className="text-[9px] font-bold uppercase tracking-wide">Invoice</span>
+                                        </button>
+                                        <div className="w-px bg-black/[0.05] self-stretch" />
+                                        <button
+                                            onClick={() => setEditingStudent(student)}
+                                            className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                            <span className="text-[9px] font-bold uppercase tracking-wide">Edit</span>
+                                        </button>
+                                        <div className="w-px bg-black/[0.05] self-stretch" />
+                                        <button
+                                            onClick={() => handleDelete(student)}
+                                            className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-red-400 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span className="text-[9px] font-bold uppercase tracking-wide">Delete</span>
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         })}
                     </div>
-                    {
-                        filteredStudents.length === 0 && (
-                            <div className="p-12 text-center text-app-text-tertiary flex flex-col items-center justify-center">
-                                <Users className="w-10 h-10 mb-3 opacity-20" />
-                                <p className="text-sm">{searchQuery ? 'No match found.' : 'No students yet.'}</p>
+
+                    {filteredStudents.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+                            <div className="w-16 h-16 rounded-2xl bg-neutral-50 border border-black/[0.06] flex items-center justify-center mb-4">
+                                <Users className="w-7 h-7 text-app-text-tertiary" />
                             </div>
-                        )
-                    }
+                            <p className="font-bold text-app-text text-base mb-1">
+                                {searchQuery ? 'No results found' : 'No students yet'}
+                            </p>
+                            <p className="text-sm text-app-text-tertiary">
+                                {searchQuery ? `Nothing matched "${searchQuery}"` : 'Add your first student to get started.'}
+                            </p>
+                        </div>
+                    )}
                 </div>
-            </div >
+            </div>
 
             {/* Edit Modal */}
             <AnimatePresence>
@@ -1563,7 +1674,7 @@ export default function BatchDetails() {
                                 joinDate.setHours(0, 0, 0, 0);
                                 const markedTestIds = new Set((viewMarks.marks || []).map(m => m.test.id));
                                 const batchTests = batch?.tests || [];
-                                
+
                                 const absentTests = batchTests.filter(t => {
                                     if (markedTestIds.has(t.id)) return false;
                                     const td = new Date(t.date);
@@ -1572,10 +1683,10 @@ export default function BatchDetails() {
                                 });
 
                                 // Combine: scored rows + absent rows, sorted by date
-                                type PerformanceRow = 
+                                type PerformanceRow =
                                     | { type: 'scored'; mark: StudentMark }
                                     | { type: 'absent'; test: BatchTest };
-                                
+
                                 const rows: PerformanceRow[] = [
                                     ...(viewMarks.marks || []).map(m => ({ type: 'scored' as const, mark: m })),
                                     ...absentTests.map(t => ({ type: 'absent' as const, test: t }))

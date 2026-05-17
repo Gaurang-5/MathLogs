@@ -1,20 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TextInput,
-  RefreshControl, Dimensions, Platform, TouchableOpacity,
+  RefreshControl, Dimensions, Platform, TouchableOpacity, Alert,
+  Modal, ScrollView, KeyboardAvoidingView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SkeletonLoader } from '../../components/ui';
-import { Search, FileText, Calendar, ChevronRight, BarChart2 } from 'lucide-react-native';
+import { Search, FileText, Calendar, ChevronRight, BarChart2, Plus, X, CheckSquare, Square } from 'lucide-react-native';
 import api from '../../services/api';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
 const T = {
   bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#0d7ff2',
+  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
   emerald: '#10b981', amber: '#f59e0b', red: '#ef4444',
   border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
 };
@@ -29,6 +32,13 @@ interface Test {
   _count: { marks: number };
 }
 
+interface Batch {
+  id: string;
+  name: string;
+  className: string | null;
+  subject: string | null;
+}
+
 function getTestStatus(test: Test): { color: string; label: string } {
   const testDate = new Date(test.date);
   const now = new Date();
@@ -40,13 +50,14 @@ function getTestStatus(test: Test): { color: string; label: string } {
 
 function TestCard({ item, index }: { item: Test; index: number }) {
   const st = getTestStatus(item);
+  const router = useRouter();
   const dateStr = new Date(item.date).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric',
   });
 
   return (
     <Animated.View entering={FadeInRight.duration(400).delay(index * 50)}>
-      <TouchableOpacity activeOpacity={0.7} style={s.card}>
+      <TouchableOpacity activeOpacity={0.7} style={s.card} onPress={() => router.push(`/test/${item.id}`)}>
         <View style={[s.testIcon, { backgroundColor: `${st.color}12` }]}>
           <FileText size={20} color={st.color} />
         </View>
@@ -79,11 +90,26 @@ function TestCard({ item, index }: { item: Test; index: number }) {
 
 export default function TestsScreen() {
   const [search, setSearch] = useState('');
+  const [showForm, setShowForm] = useState(false);
+
+  // Form State
+  const [name, setName] = useState('');
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [maxMarks, setMaxMarks] = useState('');
 
   const { data: tests, isLoading, refetch, isRefetching } = useQuery<Test[]>({
     queryKey: ['tests'],
     queryFn: async () => {
       const res = await api.get('/tests');
+      return res.data;
+    },
+  });
+
+  const { data: batches = [] } = useQuery<Batch[]>({
+    queryKey: ['batches'],
+    queryFn: async () => {
+      const res = await api.get('/batches');
       return res.data;
     },
   });
@@ -105,11 +131,53 @@ export default function TestsScreen() {
   const pendingCount = useMemo(() =>
     (tests || []).filter(t => new Date(t.date) <= new Date() && t._count.marks === 0).length, [tests]);
 
+  const handleCreate = async () => {
+    if (!name || selectedBatchIds.length === 0 || !date || !maxMarks) {
+      Alert.alert('Missing Fields', 'Please fill in all required fields and select at least one batch.');
+      return;
+    }
+
+    const batch = batches.find(b => b.id === selectedBatchIds[0]);
+    const subject = batch?.subject || 'General';
+    const className = batch?.className;
+
+    try {
+      await api.post('/tests', {
+        name,
+        subject,
+        date,
+        maxMarks: parseFloat(maxMarks),
+        className,
+        batchIds: selectedBatchIds
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowForm(false);
+      setName(''); setSelectedBatchIds([]); setMaxMarks('');
+      refetch();
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to create test');
+    }
+  };
+
+  const toggleBatch = (id: string) => {
+    setSelectedBatchIds(prev => 
+      prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
+    );
+  };
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <Animated.View entering={FadeInDown.duration(400)} style={s.headerArea}>
-        <Text style={s.title}>Tests</Text>
-        <Text style={s.subtitle}>{tests?.length ?? 0} total tests</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View>
+            <Text style={s.title}>Tests</Text>
+            <Text style={s.subtitle}>{tests?.length ?? 0} total tests</Text>
+          </View>
+          <TouchableOpacity style={s.createBtn} onPress={() => setShowForm(true)}>
+            <Plus size={16} color={T.white} />
+            <Text style={s.createBtnText}>New Test</Text>
+          </TouchableOpacity>
+        </View>
         <View style={s.searchWrap}>
           <Search size={18} color={T.textMuted} />
           <TextInput
@@ -155,11 +223,95 @@ export default function TestsScreen() {
             <View style={s.empty}>
               <FileText size={48} color={T.textMuted} />
               <Text style={s.emptyTitle}>No tests yet</Text>
-              <Text style={s.emptyDesc}>Create your first test from the web dashboard</Text>
+              <Text style={s.emptyDesc}>Create your first test using the button above.</Text>
             </View>
           )
         }
       />
+
+      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowForm(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.modalContainer}>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>Create New Test</Text>
+            <TouchableOpacity onPress={() => setShowForm(false)} style={s.closeBtn}>
+              <X size={20} color={T.textSec} />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView contentContainerStyle={s.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={s.inputGroup}>
+              <Text style={s.label}>Test Name</Text>
+              <View style={s.inputWrap}>
+                <FileText size={18} color={T.textMuted} style={s.inputIcon} />
+                <TextInput 
+                  style={s.input} 
+                  placeholder="e.g. Unit Test 1" 
+                  value={name} 
+                  onChangeText={setName} 
+                />
+              </View>
+            </View>
+
+            <View style={s.inputGroup}>
+              <Text style={s.label}>Select Batches</Text>
+              <View style={s.batchesContainer}>
+                {batches.map(batch => {
+                  const isSelected = selectedBatchIds.includes(batch.id);
+                  return (
+                    <TouchableOpacity 
+                      key={batch.id} 
+                      style={[s.batchOption, isSelected && s.batchOptionSelected]}
+                      onPress={() => toggleBatch(batch.id)}
+                      activeOpacity={0.7}
+                    >
+                      {isSelected ? (
+                        <CheckSquare size={20} color={T.accent} />
+                      ) : (
+                        <Square size={20} color={T.textMuted} />
+                      )}
+                      <Text style={[s.batchOptionText, isSelected && s.batchOptionTextSelected]}>
+                        {batch.name} {batch.className ? `(${batch.className})` : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={s.inputGroup}>
+              <Text style={s.label}>Date (YYYY-MM-DD)</Text>
+              <View style={s.inputWrap}>
+                <Calendar size={18} color={T.textMuted} style={s.inputIcon} />
+                <TextInput 
+                  style={s.input} 
+                  placeholder="2026-05-17" 
+                  value={date} 
+                  onChangeText={setDate} 
+                />
+              </View>
+            </View>
+
+            <View style={s.inputGroup}>
+              <Text style={s.label}>Max Marks</Text>
+              <View style={s.inputWrap}>
+                <BarChart2 size={18} color={T.textMuted} style={s.inputIcon} />
+                <TextInput 
+                  style={s.input} 
+                  placeholder="e.g. 50" 
+                  keyboardType="numeric"
+                  value={maxMarks} 
+                  onChangeText={setMaxMarks} 
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity style={s.submitBtn} onPress={handleCreate}>
+              <Text style={s.submitBtnText}>Create Test</Text>
+              <ChevronRight size={18} color={T.white} />
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -169,6 +321,11 @@ const s = StyleSheet.create({
   headerArea: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   title: { color: T.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { color: T.textSec, fontSize: 14, fontWeight: '500', marginTop: 4, marginBottom: 16 },
+  createBtn: {
+    backgroundColor: T.accent, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6,
+  },
+  createBtnText: { color: T.white, fontWeight: '600', fontSize: 13 },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
     borderRadius: 14, paddingHorizontal: 14, height: 46,
@@ -205,4 +362,40 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyTitle: { color: T.text, fontSize: 18, fontWeight: '600', marginTop: 16 },
   emptyDesc: { color: T.textSec, fontSize: 14, marginTop: 6, textAlign: 'center' },
+  
+  modalContainer: { flex: 1, backgroundColor: T.bg },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 24, paddingVertical: 20, backgroundColor: T.white,
+    borderBottomWidth: 1, borderBottomColor: T.border,
+  },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: T.text },
+  closeBtn: { padding: 4, backgroundColor: T.bg, borderRadius: 999 },
+  modalContent: { padding: 24, gap: 20 },
+  inputGroup: { gap: 8 },
+  label: { fontSize: 12, fontWeight: '700', color: T.textSec, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 4 },
+  inputWrap: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
+    borderWidth: 1, borderColor: T.border, borderRadius: 16, paddingHorizontal: 16, height: 56,
+  },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, fontSize: 16, color: T.text, fontWeight: '500' },
+  batchesContainer: {
+    backgroundColor: T.white, borderWidth: 1, borderColor: T.border, borderRadius: 16,
+    padding: 8, gap: 4, maxHeight: 200,
+  },
+  batchOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12,
+    borderRadius: 12, backgroundColor: T.bg,
+  },
+  batchOptionSelected: { backgroundColor: `${T.accent}08` },
+  batchOptionText: { fontSize: 15, color: T.textSec, fontWeight: '500' },
+  batchOptionTextSelected: { color: T.accent, fontWeight: '600' },
+  submitBtn: {
+    backgroundColor: T.accent, height: 56, borderRadius: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    marginTop: 12, shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1, shadowRadius: 12, elevation: 4, marginBottom: 40,
+  },
+  submitBtnText: { color: T.white, fontSize: 16, fontWeight: '700' },
 });

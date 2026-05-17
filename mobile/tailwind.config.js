@@ -7,7 +7,7 @@ module.exports = {
       colors: {
         background: '#0a0a0b',
         surface: '#151516',
-        accent: '#0d7ff2', // from Stitch
+        accent: '#111827', // Dark minimalist Apple theme
         'accent-dark': '#0a6ccb',
         danger: '#ef4444',
       },

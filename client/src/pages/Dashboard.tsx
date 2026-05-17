@@ -365,8 +365,8 @@ export default function Dashboard() {
                             <div className="w-7 h-7 border-2 border-black border-t-transparent rounded-full animate-spin" />
                         </div>
                     ) : growthData.length > 0 ? (
-                        <div className="h-[260px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
+                        <div style={{ width: '100%', height: 260 }}>
+                            <ResponsiveContainer width="100%" height={260}>
                                 <LineChart data={growthData}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                                     <XAxis dataKey="name" stroke="#9ca3af" style={{ fontSize: '11px', fontWeight: 600 }} />
@@ -425,8 +425,8 @@ export default function Dashboard() {
                         </div>
                     ) : financeGrowthData.length > 0 ? (
                         <>
-                            <div className="h-[260px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
+                            <div style={{ width: '100%', height: 260 }}>
+                                <ResponsiveContainer width="100%" height={260}>
                                     <BarChart
                                         data={adjustedFinanceGrowthData}
                                         margin={{ top: 10, right: 10, left: 0, bottom: 0 }}

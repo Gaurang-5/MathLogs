@@ -5,7 +5,6 @@
 
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
-import { Express } from 'express';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const SENTRY_DSN = process.env.SENTRY_DSN;
@@ -14,7 +13,7 @@ const SENTRY_DSN = process.env.SENTRY_DSN;
  * Initialize Sentry monitoring
  * Should be called BEFORE any other app code
  */
-export const initializeSentry = (app: Express) => {
+export const initializeSentry = () => {
     if (!SENTRY_DSN) {
         if (IS_PRODUCTION) {
             console.error('[SENTRY] ⚠️ SENTRY_DSN not set in production!');
@@ -65,9 +64,6 @@ export const initializeSentry = (app: Express) => {
             'Invalid credentials' // Don't log failed login attempts to Sentry
         ]
     });
-
-    // Setup Express error handler
-    Sentry.setupExpressErrorHandler(app);
 
     console.log('[SENTRY] ✅ Initialized successfully');
     console.log(`[SENTRY] Environment: ${process.env.NODE_ENV}`);

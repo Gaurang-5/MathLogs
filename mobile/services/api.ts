@@ -6,7 +6,9 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getItemAsync, deleteItemAsync } from './storage';
 import { Platform } from 'react-native';
 
-const DEV_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.100.3.216:3001';
+// We are pointing DEV to PROD by default so that data works seamlessly for testing
+// Change this back to your local IP if you want to test with a local backend
+const DEV_URL = process.env.EXPO_PUBLIC_API_URL || 'https://mathlogs.app';
 
 const PROD_URL = 'https://mathlogs.app';
 

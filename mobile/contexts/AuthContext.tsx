@@ -14,6 +14,7 @@ interface User {
   role: string;
   instituteId?: string;
   instituteName?: string;
+  logo?: string;
 }
 
 interface AuthContextData {
@@ -21,8 +22,7 @@ interface AuthContextData {
   token: string | null;
   isLoading: boolean;
   isLoggedIn: boolean;
-  sendOtp: (phone: string) => Promise<void>;
-  verifyOtp: (phone: string, otp: string) => Promise<void>;
+  loginWithPassword: (identifier: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -45,10 +45,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const storedUser = await getItemAsync('user_data');
 
       if (storedToken && storedUser) {
-        // Set token directly in api client headers as well
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
         setToken(storedToken);
+        // Load cached user immediately so UI is instant
         setUser(JSON.parse(storedUser));
+
+        // Then silently refresh profile from server to pick up logo / name changes
+        try {
+          const profileRes = await api.get('/auth/me');
+          const p = profileRes.data;
+          const parsed = JSON.parse(storedUser);
+          const refreshed: User = {
+            ...parsed,
+            name: p.username || parsed.name,
+            email: p.email || parsed.email,
+            instituteName: p.instituteName || parsed.instituteName,
+            logo: p.logo ?? parsed.logo,
+          };
+          setUser(refreshed);
+          await setItemAsync('user_data', JSON.stringify(refreshed));
+        } catch {
+          // Silently fail — cached user is still set
+        }
       }
     } catch (error) {
       console.warn('Failed to load stored session:', error);
@@ -57,41 +75,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const sendOtp = useCallback(async (phone: string) => {
+  const loginWithPassword = useCallback(async (identifier: string, password: string) => {
     try {
-      await api.post('/auth/send-otp', { phone: `+91${phone}` });
-    } catch (error) {
-      // Re-throw the error so the UI can handle it
-      throw error;
+      console.log('[AUTH] Attempting login with identifier:', identifier);
+      console.log('[AUTH] API base URL:', api.defaults.baseURL);
+      
+      const response = await api.post('/auth/login', { username: identifier, password });
+      
+      console.log('[AUTH] Login response status:', response.status);
+      console.log('[AUTH] Login response data:', JSON.stringify(response.data));
+
+      if (!response.data.success) {
+         throw new Error(response.data.error || 'Login failed');
+      }
+
+      const { token: newToken, adminId, role } = response.data;
+
+      // Immediately set token in api defaults so the next request succeeds
+      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+
+      // Fetch full profile info to get names/institute info
+      let profile;
+      try {
+         const profileResponse = await api.get('/auth/me');
+         profile = profileResponse.data;
+         console.log('[AUTH] Profile fetched:', JSON.stringify(profile));
+      } catch (e: any) {
+         console.warn('[AUTH] Could not fetch /auth/me:', e?.response?.status, e?.message);
+         profile = { username: 'Admin', email: identifier };
+      }
+
+      const userData: User = {
+        id: adminId || '',
+        name: profile.username || 'Admin',
+        email: profile.email || identifier,
+        role: role || 'ADMIN',
+        instituteId: profile.instituteId,
+        instituteName: profile.instituteName,
+        logo: profile.logo,
+      };
+
+      // Store securely in device keychain
+      await setItemAsync('auth_token', newToken);
+      await setItemAsync('user_data', JSON.stringify(userData));
+
+      setToken(newToken);
+      setUser(userData);
+      console.log('[AUTH] Login successful, user stored.');
+    } catch (error: any) {
+      console.error('[AUTH] Login FAILED:');
+      console.error('[AUTH]   message:', error?.message);
+      console.error('[AUTH]   status:', error?.response?.status);
+      console.error('[AUTH]   data:', JSON.stringify(error?.response?.data));
+      console.error('[AUTH]   code:', error?.code);
+      if (error.response?.data?.reason) {
+         throw new Error(error.response.data.reason);
+      }
+      // Surface the actual server error message if available
+      const serverMsg = error?.response?.data?.error || error?.message || 'Login failed';
+      throw new Error(serverMsg);
     }
-  }, []);
-
-  const verifyOtp = useCallback(async (phone: string, otp: string) => {
-    const response = await api.post('/auth/verify-otp', { phone, otp });
-    const { token: newToken, adminId, role } = response.data;
-
-    // Immediately set token in api defaults so the next request succeeds
-    api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-
-    // Fetch full profile info to get names/institute info
-    const profileResponse = await api.get('/auth/me');
-    const profile = profileResponse.data;
-
-    const userData: User = {
-      id: adminId,
-      name: profile.username || 'Teacher',
-      email: profile.email || '',
-      role: role,
-      instituteId: profile.instituteId,
-      instituteName: profile.instituteName,
-    };
-
-    // Store securely in device keychain
-    await setItemAsync('auth_token', newToken);
-    await setItemAsync('user_data', JSON.stringify(userData));
-
-    setToken(newToken);
-    setUser(userData);
   }, []);
 
   const logout = useCallback(async () => {
@@ -108,10 +151,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     token,
     isLoading,
     isLoggedIn: !!token,
-    sendOtp,
-    verifyOtp,
+    loginWithPassword,
     logout,
-  }), [user, token, isLoading, sendOtp, verifyOtp, logout]);
+  }), [user, token, isLoading, loginWithPassword, logout]);
 
   return (
     <AuthContext.Provider value={value}>

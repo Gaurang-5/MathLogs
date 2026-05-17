@@ -38,7 +38,7 @@ export const getInstituteBranding = async (req: Request, res: Response): Promise
 export const loginStudent = async (req: Request, res: Response): Promise<void> => {
     try {
         const { instituteSlug, mobileNumber } = req.body;
-        
+
         if (!instituteSlug || !mobileNumber) {
             res.status(400).json({ error: 'Institute slug and mobile number are required' });
             return;
@@ -73,12 +73,12 @@ export const loginStudent = async (req: Request, res: Response): Promise<void> =
         const student = students[0];
 
         const token = jwt.sign(
-            { 
+            {
                 studentId: student.id,
                 instituteId: institute.id,
                 role: 'STUDENT'
-            }, 
-            JWT_SECRET, 
+            },
+            JWT_SECRET,
             { expiresIn: '30d' }
         );
 
@@ -177,7 +177,7 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
 
         const eligibleTests = batchTests.filter((test: any) => {
             if (markMap.has(test.id)) return true;
-            
+
             const testDate = new Date(test.date);
             testDate.setHours(0, 0, 0, 0);
             return testDate >= joinDate;

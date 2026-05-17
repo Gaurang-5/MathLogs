@@ -129,8 +129,8 @@ export default function StudentPortalDashboard() {
                             {data.performance.filter((t: any) => t.status === 'SCORED').length > 0 && (
                                 <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Score Trend</p>
-                                    <div className="h-48">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                    <div style={{ width: '100%', height: 192 }}>
+                                        <ResponsiveContainer width="100%" height={192}>
                                             <LineChart data={data.performance.filter((t: any) => t.status === 'SCORED')} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                                                 <XAxis

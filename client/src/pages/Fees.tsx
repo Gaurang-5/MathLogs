@@ -210,32 +210,36 @@ const Fees: React.FC = () => {
                 3. Better typography and whitespace.
             */}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <div className="bg-white p-6 md:p-8 border-[1.5px] border-black/5 rounded-[32px] shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:scale-110 transition-transform">
-                        <TrendingUp className="w-24 h-24" />
-                    </div>
-                    <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Total Collected</div>
-                    <div className="text-3xl font-black text-gray-800">₹{stats.totalCollected.toLocaleString()}</div>
-                    <div className="h-1 w-12 bg-green-500 rounded-full mt-4"></div>
+            {/* iOS-Style Summary Widget */}
+            <div className="bg-white rounded-[32px] p-6 md:p-8 border-[1.5px] border-black/5 shadow-sm mb-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-[0.02]">
+                    <TrendingUp className="w-40 h-40" />
                 </div>
-
-                <div className="bg-white p-6 md:p-8 border-[1.5px] border-black/5 rounded-[32px] shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:scale-110 transition-transform">
-                        <TrendingDown className="w-24 h-24" />
+                <div className="relative z-10">
+                    <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
+                        <div>
+                            <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Collected</div>
+                            <div className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight">₹{stats.totalCollected.toLocaleString()}</div>
+                        </div>
+                        <div className="text-left md:text-right">
+                            <div className="text-[11px] font-bold text-red-400 uppercase tracking-widest mb-1">Outstanding Dues</div>
+                            <div className="text-2xl md:text-3xl font-black text-red-500 tracking-tight">₹{stats.totalDue.toLocaleString()}</div>
+                        </div>
                     </div>
-                    <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Outstanding Dues</div>
-                    <div className="text-3xl font-black text-red-500">₹{stats.totalDue.toLocaleString()}</div>
-                    <div className="h-1 w-12 bg-red-500 rounded-full mt-4"></div>
-                </div>
-
-                <div className="bg-white p-6 md:p-8 border-[1.5px] border-black/5 rounded-[32px] shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:scale-110 transition-transform">
-                        <IndianRupee className="w-24 h-24" />
+                    
+                    {/* Collection Progress Bar */}
+                    <div className="mt-4 bg-gray-50/50 p-4 rounded-2xl border border-black-[0.02]">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-[13px] font-bold text-gray-600">Collection Rate</span>
+                            <span className="text-[15px] font-black text-blue-600">{stats.collectionRate}%</span>
+                        </div>
+                        <div className="w-full h-3.5 bg-gray-200/80 rounded-full overflow-hidden shadow-inner">
+                            <div 
+                                className="h-full bg-blue-500 rounded-full transition-all duration-1000 ease-out shadow-sm" 
+                                style={{ width: `${stats.collectionRate}%` }}
+                            ></div>
+                        </div>
                     </div>
-                    <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Collection Rate</div>
-                    <div className="text-3xl font-black text-blue-600">{stats.collectionRate}%</div>
-                    <div className="h-1 w-12 bg-blue-500 rounded-full mt-4"></div>
                 </div>
             </div>
 
@@ -244,57 +248,59 @@ const Fees: React.FC = () => {
                 <div className="space-y-6">
 
                     {/* Toolbar */}
-                    <div className="bg-white p-5 md:p-6 border-[1.5px] border-black/5 rounded-[32px] shadow-sm flex flex-col gap-4">
-                        {/* View Toggle */}
-                        <div className="flex flex-wrap bg-neutral-100/80 border border-black/5 p-1.5 rounded-[20px] w-full">
-                            <button
-                                onClick={() => setViewMode('defaulters')}
-                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'defaulters' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
-                            >
-                                Pending Dues
-                            </button>
-                            <button
-                                onClick={() => setViewMode('recent')}
-                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'recent' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
-                            >
-                                Recent Payments
-                            </button>
-                            <button
-                                onClick={() => setViewMode('upi')}
-                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'upi' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
-                            >
-                                UPI Approvals
-                            </button>
-                            <button
-                                onClick={() => setViewMode('custom')}
-                                className={cn("flex-1 px-4 py-2 rounded-xl text-center text-sm font-bold transition-all whitespace-nowrap", viewMode === 'custom' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
-                            >
-                                Custom Invoices
-                                {customInvoices.length > 0 && (
-                                    <span className={cn("ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold", viewMode === 'custom' ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-500")}>
-                                        {customInvoices.length}
-                                    </span>
-                                )}
-                            </button>
+                    <div className="bg-white p-4 md:p-6 border-[1.5px] border-black/5 rounded-[28px] shadow-sm flex flex-col gap-4">
+                        {/* iOS Segmented Control */}
+                        <div className="flex overflow-x-auto custom-scrollbar pb-1 -mx-2 px-2 md:mx-0 md:px-0">
+                            <div className="flex bg-neutral-100/80 border border-black/5 p-1 rounded-[20px] w-max md:w-full min-w-full">
+                                <button
+                                    onClick={() => setViewMode('defaulters')}
+                                    className={cn("flex-1 px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap", viewMode === 'defaulters' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                >
+                                    Pending Dues
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('recent')}
+                                    className={cn("flex-1 px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap", viewMode === 'recent' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                >
+                                    Recent Payments
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('upi')}
+                                    className={cn("flex-1 px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap", viewMode === 'upi' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                >
+                                    UPI Approvals
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('custom')}
+                                    className={cn("flex-1 px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5", viewMode === 'custom' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                >
+                                    Custom Invoices
+                                    {customInvoices.length > 0 && (
+                                        <span className={cn("px-1.5 py-0.5 rounded-full text-[10px] font-bold", viewMode === 'custom' ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-500")}>
+                                            {customInvoices.length}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Search & Filter */}
                         <div className="flex flex-col md:flex-row gap-3">
                             <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input
                                     type="text"
                                     placeholder="Search student..."
-                                    className="w-full bg-white border-2 border-transparent focus:border-black/10 rounded-2xl shadow-sm pl-9 pr-4 py-2.5 text-sm outline-none transition-all"
+                                    className="w-full bg-gray-50 border-[1.5px] border-transparent focus:bg-white focus:border-black/10 rounded-2xl pl-10 pr-4 py-3 text-[14px] outline-none transition-all placeholder:text-gray-400"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>
-                            <div className="flex gap-2 w-full md:w-auto flex-wrap pb-0">
+                            <div className="flex gap-2 w-full md:w-auto flex-wrap">
                                 <div className="relative flex-1 md:flex-none">
                                     <button
                                         onClick={() => setShowBatchMenu(!showBatchMenu)}
-                                        className="w-full md:w-48 bg-white border-[1.5px] border-black/5 hover:border-black/10 focus:border-black/20 rounded-2xl shadow-sm px-4 py-2.5 text-sm font-medium text-gray-600 outline-none transition-all flex items-center justify-between gap-2"
+                                        className="w-full md:w-48 bg-gray-50 hover:bg-white border-[1.5px] border-transparent hover:border-black/10 focus:border-black/20 rounded-2xl px-4 py-3 text-[13px] font-bold text-gray-600 outline-none transition-all flex items-center justify-between gap-2"
                                     >
                                         <span className="truncate">{selectedBatch === 'All' ? 'All Batches' : selectedBatch}</span>
                                         <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform", showBatchMenu && "rotate-180")} />
@@ -303,10 +309,10 @@ const Fees: React.FC = () => {
                                     {showBatchMenu && (
                                         <>
                                             <div className="fixed inset-0 z-10" onClick={() => setShowBatchMenu(false)}></div>
-                                            <div className="absolute left-0 top-full mt-2 w-full md:w-56 bg-white rounded-xl shadow-xl border border-black/5 p-1 z-20 max-h-64 overflow-y-auto custom-scrollbar">
+                                            <div className="absolute left-0 top-full mt-2 w-full md:w-56 bg-white rounded-2xl shadow-xl border border-black/5 p-1.5 z-20 max-h-64 overflow-y-auto custom-scrollbar">
                                                 <button
                                                     onClick={() => { setSelectedBatch('All'); setShowBatchMenu(false); }}
-                                                    className={cn("w-full text-left px-3 py-2 rounded-lg text-sm font-medium flex justify-between items-center transition-colors", selectedBatch === 'All' ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
+                                                    className={cn("w-full text-left px-3 py-2 rounded-xl text-sm font-bold flex justify-between items-center transition-colors", selectedBatch === 'All' ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
                                                 >
                                                     All Batches
                                                     {selectedBatch === 'All' && <Check className="w-4 h-4" />}
@@ -315,7 +321,7 @@ const Fees: React.FC = () => {
                                                     <button
                                                         key={b}
                                                         onClick={() => { setSelectedBatch(b); setShowBatchMenu(false); }}
-                                                        className={cn("w-full text-left px-3 py-2 rounded-lg text-sm font-medium flex justify-between items-center transition-colors", selectedBatch === b ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
+                                                        className={cn("w-full text-left px-3 py-2 rounded-xl text-sm font-bold flex justify-between items-center transition-colors", selectedBatch === b ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
                                                     >
                                                         <span className="truncate">{b}</span>
                                                         {selectedBatch === b && <Check className="w-4 h-4" />}
@@ -329,29 +335,29 @@ const Fees: React.FC = () => {
                                 <div className="relative">
                                     <button
                                         onClick={() => setShowSortMenu(!showSortMenu)}
-                                        className={cn("p-2.5 rounded-xl transition-all border", showSortMenu ? "bg-gray-900 text-white border-gray-900" : "bg-gray-50 hover:bg-white text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-200")}
+                                        className={cn("p-3 rounded-2xl transition-all border-[1.5px]", showSortMenu ? "bg-gray-900 text-white border-gray-900" : "bg-gray-50 hover:bg-white text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-200")}
                                         title="Sort List"
                                     >
-                                        <ArrowUpDown className="w-5 h-5" />
+                                        <ArrowUpDown className="w-4 h-4" />
                                     </button>
                                     {showSortMenu && (
                                         <>
                                             <div className="fixed inset-0 z-10" onClick={() => setShowSortMenu(false)}></div>
-                                            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-black/5 p-1 z-20">
-                                                <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-widest">Sort List By</div>
+                                            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-black/5 p-1.5 z-20">
+                                                <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sort List By</div>
                                                 <button
                                                     onClick={() => { setListSort('amount'); setShowSortMenu(false); }}
-                                                    className={cn("w-full text-left px-3 py-2 rounded-lg text-sm font-bold flex justify-between items-center", listSort === 'amount' ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
+                                                    className={cn("w-full text-left px-3 py-2 rounded-xl text-sm font-bold flex justify-between items-center", listSort === 'amount' ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
                                                 >
                                                     Highest Amount
-                                                    {listSort === 'amount' && <CheckCircle className="w-3 h-3" />}
+                                                    {listSort === 'amount' && <CheckCircle className="w-4 h-4" />}
                                                 </button>
                                                 <button
                                                     onClick={() => { setListSort('date'); setShowSortMenu(false); }}
-                                                    className={cn("w-full text-left px-3 py-2 rounded-lg text-sm font-bold flex justify-between items-center", listSort === 'date' ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
+                                                    className={cn("w-full text-left px-3 py-2 rounded-xl text-sm font-bold flex justify-between items-center", listSort === 'date' ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50")}
                                                 >
                                                     Oldest Pending
-                                                    {listSort === 'date' && <CheckCircle className="w-3 h-3" />}
+                                                    {listSort === 'date' && <CheckCircle className="w-4 h-4" />}
                                                 </button>
                                             </div>
                                         </>
@@ -360,7 +366,7 @@ const Fees: React.FC = () => {
 
                                 <button
                                     onClick={() => setShowReportsModal(true)}
-                                    className="bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-gray-200 hover:bg-black transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap"
+                                    className="bg-gray-900 text-white px-5 py-3 rounded-2xl text-[13px] font-bold shadow-lg shadow-gray-200 hover:bg-black transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap"
                                 >
                                     <FileText className="w-4 h-4" /> Reports
                                 </button>
@@ -369,7 +375,7 @@ const Fees: React.FC = () => {
                     </div>
 
                     {viewMode === 'recent' ? (
-                        <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-black/5 p-6 md:p-8">
+                        <div className="bg-white rounded-[28px] shadow-sm overflow-hidden min-h-[500px] border border-black/5 p-6 md:p-8">
                             <div className="flex items-center justify-between mb-8">
                                 <h3 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
                                     <History className="w-5 h-5 text-gray-500" /> Recent Transactions
@@ -401,97 +407,90 @@ const Fees: React.FC = () => {
                             </div>
                         </div>
                     ) : viewMode === 'defaulters' ? (
-                    <div className="bg-white rounded-[24px] shadow-sm overflow-hidden min-h-[500px] border border-black/5">
+                    <div className="bg-white rounded-[28px] shadow-sm overflow-hidden min-h-[500px] border border-black/5">
                         {loading ? (
                             <div className="flex flex-col items-center justify-center h-96 text-gray-400">
                                 <Loader className="w-8 h-8 animate-spin mb-4 text-blue-500" />
-                                <p>Loading records...</p>
+                                <p className="font-medium text-sm">Loading records...</p>
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead className="bg-gray-50/50 border-b border-black/5">
-                                        <tr>
-                                            <th className="p-5 pl-8 font-bold text-gray-400 text-xs uppercase tracking-wider">Student Details</th>
-                                            <th className="p-5 font-bold text-gray-400 text-xs uppercase tracking-wider text-right">Balance</th>
-                                            <th className="p-5 pr-8 font-bold text-gray-400 text-xs uppercase tracking-wider text-center">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {filteredStudents.map(student => (
-                                            <tr key={student.id} className="hover:bg-blue-50/30 transition-colors group">
-                                                <td className="p-5 pl-8">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center font-bold text-sm shrink-0">
-                                                            {student.name.charAt(0)}
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-bold text-gray-800">{student.name}</div>
-                                                            <div className="text-xs text-gray-500 mt-0.5 font-medium">{student.humanId} • {student.batchName}</div>
-                                                            {student.breakdown && student.breakdown.length > 0 && (
-                                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                                    {student.breakdown.slice(0, 2).map((item, i) => (
-                                                                        <span key={i} className="px-1.5 py-0.5 bg-red-50 text-red-600 text-[10px] rounded font-semibold border border-red-100">
-                                                                            {item.name}
-                                                                        </span>
-                                                                    ))}
-                                                                    {student.breakdown.length > 2 && (
-                                                                        <span className="text-[10px] text-gray-400">+{student.breakdown.length - 2} more</span>
-                                                                    )}
-                                                                </div>
+                            <div className="divide-y divide-black/[0.03]">
+                                {filteredStudents.length === 0 ? (
+                                    <div className="p-16 text-center">
+                                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <CheckCircle className="w-8 h-8 text-gray-300" />
+                                        </div>
+                                        <p className="text-gray-500 font-medium">No pending dues found.</p>
+                                    </div>
+                                ) : (
+                                    filteredStudents.map(student => (
+                                        <div key={student.id} className="p-4 sm:p-5 hover:bg-gray-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center font-bold text-base shrink-0 shadow-inner">
+                                                    {student.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-gray-900 text-[15px]">{student.name}</div>
+                                                    <div className="text-[12px] text-gray-500 mt-0.5 font-medium flex items-center gap-1.5">
+                                                        {student.humanId} <span className="w-1 h-1 bg-gray-300 rounded-full"></span> {student.batchName}
+                                                    </div>
+                                                    {student.breakdown && student.breakdown.length > 0 && (
+                                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                                            {student.breakdown.slice(0, 2).map((item, i) => (
+                                                                <span key={i} className="px-2 py-0.5 bg-red-50 text-red-600 text-[10px] rounded-md font-bold border border-red-100">
+                                                                    {item.name}
+                                                                </span>
+                                                            ))}
+                                                            {student.breakdown.length > 2 && (
+                                                                <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-1.5 py-0.5 rounded-md">+{student.breakdown.length - 2} more</span>
                                                             )}
                                                         </div>
-                                                    </div>
-                                                </td>
-                                                <td className="p-5 text-right">
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto pl-16 sm:pl-0">
+                                                <div className="text-left sm:text-right">
                                                     {student.balance > 0 ? (
-                                                        <div className="flex flex-col items-end">
-                                                            <span className="font-mono font-bold text-red-500 text-lg">₹{student.balance.toLocaleString()}</span>
-                                                            <span className="text-xs text-red-400 font-medium">{student.breakdown?.length || 0} Dues</span>
+                                                        <div className="flex flex-col sm:items-end">
+                                                            <span className="font-mono font-black text-red-500 text-lg tracking-tight">₹{student.balance.toLocaleString()}</span>
+                                                            <span className="text-[11px] text-red-400 font-bold">{student.breakdown?.length || 0} Dues Pending</span>
                                                         </div>
                                                     ) : (
-                                                        <span className="font-mono font-bold text-green-500 text-lg">₹0</span>
+                                                        <span className="font-mono font-black text-green-500 text-lg tracking-tight">₹0</span>
                                                     )}
-                                                </td>
-                                                <td className="p-5 pr-8">
-                                                    <div className="flex items-center justify-center gap-2 opacity-100 sm:opacity-60 sm:group-hover:opacity-100 transition-opacity">
-                                                        {student.balance > 0 ? (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => handleSendReminder(student)}
-                                                                    className="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                                                                    title="Send Payment Reminder"
-                                                                >
-                                                                    <Mail className="w-5 h-5" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setSelectedStudent(student);
-                                                                        setPaymentAmount(student.balance.toString());
-                                                                    }}
-                                                                    className="px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-lg shadow-gray-200 transition-all flex items-center gap-2 active:scale-95"
-                                                                >
-                                                                    Collect <ArrowUpRight className="w-3 h-3" />
-                                                                </button>
-                                                            </>
-                                                        ) : (
-                                                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-bold">
-                                                                <CheckCircle className="w-4 h-4" /> Paid
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {filteredStudents.length === 0 && (
-                                            <tr>
-                                                <td colSpan={3} className="p-20 text-center text-gray-400">
-                                                    No students found matching your criteria.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-2">
+                                                    {student.balance > 0 ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleSendReminder(student)}
+                                                                className="p-2.5 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100"
+                                                                title="Send Payment Reminder"
+                                                            >
+                                                                <Mail className="w-5 h-5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedStudent(student);
+                                                                    setPaymentAmount(student.balance.toString());
+                                                                }}
+                                                                className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white text-[13px] font-bold rounded-xl shadow-md shadow-gray-200 transition-all flex items-center gap-1.5 active:scale-95"
+                                                            >
+                                                                Collect
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1.5 px-4 py-2 bg-green-50 border border-green-100 text-green-600 rounded-xl text-xs font-bold">
+                                                            <CheckCircle className="w-4 h-4" /> Paid
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         )}
                     </div>

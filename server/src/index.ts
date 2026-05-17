@@ -8,10 +8,11 @@ import { prisma } from './prisma';
 import { configureSecurityHeaders, apiLimiter } from './middleware/security';
 import { authenticateToken } from './middleware/auth';
 import { initializeSentry } from './monitoring/sentry';
+import * as Sentry from '@sentry/node';
 import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
 import { emailWorker } from './utils/emailWorker';
 
-import * as Sentry from '@sentry/node';
+
 
 const PORT = process.env.PORT || 3001;
 
@@ -48,7 +49,7 @@ export function createApp() {
     const app = express();
 
     if (process.env.NODE_ENV !== 'test') {
-        initializeSentry(app);
+        initializeSentry();
     }
 
     configureSecurityHeaders(app);
@@ -159,8 +160,17 @@ export function createApp() {
     app.use('/api', apiRoutes);
     app.use('/api/student-portal', require('./routes/studentPortalRoutes').default);
 
+    // Sentry error handler MUST be registered after all routes and BEFORE other error handlers
+    if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
+        Sentry.setupExpressErrorHandler(app);
+    }
+
     app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
         console.error('[ERROR]', err);
+        // Forward to Sentry if not already handled
+        if (process.env.SENTRY_DSN) {
+            Sentry.captureException(err);
+        }
         const statusCode = err.statusCode || 500;
         const message = process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message;
         res.status(statusCode).json({ error: message });

@@ -10,10 +10,10 @@ export const Colors = {
   primaryDark: '#030712',
   primaryGlow: 'rgba(17, 24, 39, 0.15)',
 
-  // Accent (Matches --accent-primary Apple Blue)
-  accent: '#0071e3',
-  accentLight: '#0077ed',
-  accentDark: '#005bb5',
+  // Accent - Dark Minimalist (Apple Black/Grey, replacing Blue)
+  accent: '#111827',
+  accentLight: '#1f2937',
+  accentDark: '#030712',
 
   // Success / Error / Warning
   success: '#34c759',
@@ -25,8 +25,8 @@ export const Colors = {
   warning: '#ffcc00',
   warningLight: '#ffd60a',
   warningBg: 'rgba(255, 204, 0, 0.12)',
-  info: '#0071e3',
-  infoBg: 'rgba(0, 113, 227, 0.12)',
+  info: '#111827',
+  infoBg: 'rgba(17, 24, 39, 0.12)',
 
   // Dark Theme
   // Retained a deeply premium dark mode

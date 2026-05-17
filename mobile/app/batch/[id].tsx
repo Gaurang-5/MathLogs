@@ -9,8 +9,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import {
   BookOpen, Users, Clock, ChevronLeft, AlertCircle, Phone, Mail, FileText,
-  Book, User as UserIcon, Eye, Download, Printer, Plus, Settings, Edit2, Trash2, X
+  Book, User as UserIcon, Eye, Download, Printer, Plus, Settings, Edit2, Trash2, X, QrCode, MonitorPlay, Send, Receipt, Check, IndianRupee
 } from 'lucide-react-native';
+import QRCode from 'react-native-qrcode-svg';
 import api from '../../services/api';
 import { SkeletonLoader, BrandButton } from '../../components/ui';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -21,8 +22,8 @@ const { width } = Dimensions.get('window');
 
 const T = {
   bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#0d7ff2',
-  teal: '#0d9488', emerald: '#10b981', amber: '#f59e0b', red: '#ef4444',
+  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
+  teal: '#4B5563', emerald: '#10b981', amber: '#f59e0b', red: '#ef4444', blue: '#3b82f6',
   border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
 };
 
@@ -69,16 +70,28 @@ export default function BatchDetailScreen() {
       const res = await api.get(`/batches/${id}`);
       return res.data;
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ name: '', humanId: '', parentName: '', parentWhatsapp: '', schoolName: '' });
+  const [inviteWhatsapp, setInviteWhatsapp] = useState('');
 
   const [editStudentId, setEditStudentId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: '', humanId: '', parentName: '', parentWhatsapp: '', schoolName: '' });
 
   const [viewMarksStudent, setViewMarksStudent] = useState<any>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isQrOpen, setIsQrOpen] = useState(false);
+
+  // Custom Invoice State
+  const [showCustomInvoice, setShowCustomInvoice] = useState<any>(null);
+  const [customInvoice, setCustomInvoice] = useState({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
+  const [isBatchSettingsOpen, setIsBatchSettingsOpen] = useState(false);
+  const [batchForm, setBatchForm] = useState({ name: '', subject: '', className: '', timeSlot: '', whatsappGroupLink: '', feeAmount: '' });
+  const [isFeeSettingsOpen, setIsFeeSettingsOpen] = useState(false);
+  const [feeForm, setFeeForm] = useState({ name: '', amount: '' });
+  const [editInstallment, setEditInstallment] = useState<{ id: string; name: string; amount: string } | null>(null);
 
   const handleDownload = async (type: 'pdf' | 'stickers') => {
     setIsDownloading(true);
@@ -105,14 +118,113 @@ export default function BatchDetailScreen() {
   };
 
   const handleAddSubmit = async () => {
-    if (!addForm.name || !addForm.parentWhatsapp) return Alert.alert("Required", "Name and Parent WhatsApp are mandatory");
+    if (!inviteWhatsapp || inviteWhatsapp.length < 10) return Alert.alert("Required", "10-digit WhatsApp number is mandatory");
     try {
-      await api.post('/students', { ...addForm, batchId: id });
+      await api.post(`/batches/${id}/invite`, { whatsappNumber: inviteWhatsapp });
       setIsAddOpen(false);
-      setAddForm({ name: '', humanId: '', parentName: '', parentWhatsapp: '', schoolName: '' });
+      setInviteWhatsapp('');
+      Alert.alert("Success", "Invite link sent to WhatsApp!");
+    } catch(e: any) {
+      Alert.alert("Error", e.response?.data?.error || "Failed to send invite");
+    }
+  };
+
+  const handleToggleRegistration = async () => {
+    try {
+      await api.put(`/batches/${id}`, { isRegistrationOpen: !batch?.isRegistrationOpen });
       refetch();
     } catch(e: any) {
-      Alert.alert("Error", e.response?.data?.error || "Failed to add student");
+      Alert.alert("Error", "Failed to toggle registration");
+    }
+  };
+
+  const openBatchSettings = () => {
+    if (!batch) return;
+    setBatchForm({
+      name: batch.name || '',
+      subject: batch.subject || '',
+      className: batch.className || '',
+      timeSlot: batch.timeSlot || '',
+      whatsappGroupLink: batch.whatsappGroupLink || '',
+      feeAmount: batch.feeAmount ? batch.feeAmount.toString() : ''
+    });
+    setIsBatchSettingsOpen(true);
+  };
+
+  const handleBatchSettingsSave = async () => {
+    if (!batchForm.name) return Alert.alert("Required", "Batch name is mandatory");
+    try {
+      await api.put(`/batches/${id}`, {
+        name: batchForm.name,
+        subject: batchForm.subject,
+        className: batchForm.className,
+        timeSlot: batchForm.timeSlot,
+        whatsappGroupLink: batchForm.whatsappGroupLink,
+        feeAmount: Number(batchForm.feeAmount) || 0
+      });
+      setIsBatchSettingsOpen(false);
+      refetch();
+      Alert.alert("Success", "Batch settings updated");
+    } catch(e: any) {
+      Alert.alert("Error", e.response?.data?.error || "Failed to update batch");
+    }
+  };
+
+  const handleFeeInstallmentAdd = async () => {
+    if (!feeForm.name || !feeForm.amount) return Alert.alert("Required", "Name and Amount are mandatory");
+    try {
+      await api.post(`/batches/${id}/installments`, {
+        name: feeForm.name,
+        amount: Number(feeForm.amount)
+      });
+      setFeeForm({ name: '', amount: '' });
+      setIsFeeSettingsOpen(false);
+      refetch();
+      Alert.alert("Success", "Installment created");
+    } catch(e: any) {
+      Alert.alert("Error", e.response?.data?.error || "Failed to create installment");
+    }
+  };
+
+  const handleFeeInstallmentEdit = async () => {
+    if (!editInstallment || !editInstallment.name || !editInstallment.amount) return;
+    try {
+      await api.put(`/installments/${editInstallment.id}`, {
+        name: editInstallment.name,
+        amount: Number(editInstallment.amount)
+      });
+      setEditInstallment(null);
+      refetch();
+      Alert.alert('Updated', 'Installment updated successfully');
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to update installment');
+    }
+  };
+
+  const handleCreateCustomInvoice = async () => {
+    if (!showCustomInvoice) return;
+    try {
+      if (customInvoice.existingInstallmentId) {
+        await api.post('/fees/custom-invoices', {
+          studentId: showCustomInvoice.id,
+          installmentId: customInvoice.existingInstallmentId,
+          markAsPaid: customInvoice.markAsPaid
+        });
+      } else {
+        if (!customInvoice.name || !customInvoice.amount) return Alert.alert("Required", "Invoice Name and Amount are mandatory");
+        await api.post('/fees/custom-invoices', {
+          name: customInvoice.name,
+          amount: Number(customInvoice.amount),
+          studentId: showCustomInvoice.id,
+          markAsPaid: customInvoice.markAsPaid
+        });
+      }
+      setShowCustomInvoice(null);
+      setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
+      refetch();
+      Alert.alert("Success", "Invoice created successfully");
+    } catch(e: any) {
+      Alert.alert("Error", e.response?.data?.error || "Failed to create invoice");
     }
   };
 
@@ -172,7 +284,7 @@ export default function BatchDetailScreen() {
         <Text style={s.navTitle} numberOfLines={1}>{batch?.name || 'Batch Details'}</Text>
         <View style={s.navRight}>
            {!isLoading && batch && (
-             <TouchableOpacity style={s.headerActionBtn}>
+             <TouchableOpacity style={s.headerActionBtn} onPress={openBatchSettings}>
                <Settings size={20} color={T.text} />
              </TouchableOpacity>
            )}
@@ -224,6 +336,10 @@ export default function BatchDetailScreen() {
 
               {/* Quick Actions mimicking web */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
+                <TouchableOpacity style={s.qActionBtn} onPress={() => setIsQrOpen(true)}>
+                  <QrCode size={16} color={T.text} />
+                  <Text style={s.qActionText}>QR Code</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={s.qActionBtn} onPress={() => handleDownload('pdf')} disabled={isDownloading}>
                   <Download size={16} color={T.text} />
                   <Text style={s.qActionText}>PDF</Text>
@@ -233,27 +349,30 @@ export default function BatchDetailScreen() {
                   <Text style={s.qActionText}>Stickers</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.qActionBtn} onPress={() => setIsAddOpen(true)}>
-                  <Plus size={16} color={T.text} />
-                  <Text style={s.qActionText}>Student</Text>
+                  <Send size={16} color={T.text} />
+                  <Text style={s.qActionText}>Invite</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={s.qActionBtn}>
+                <TouchableOpacity style={s.qActionBtn} onPress={handleToggleRegistration}>
                   <Settings size={16} color={T.text} />
-                  <Text style={s.qActionText}>Fees</Text>
+                  <Text style={s.qActionText}>{batch.isRegistrationOpen ? 'Close Reg' : 'Open Reg'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.qActionBtn} onPress={() => setIsFeeSettingsOpen(true)}>
+                  <IndianRupee size={16} color={T.text} />
+                  <Text style={s.qActionText}>Fee Cols</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.qActionBtn} onPress={async () => {
+                  const url = `https://mathlogs.app/batch/${id}/kiosk`;
+                  const canOpen = await Linking.canOpenURL(url);
+                  if (canOpen) {
+                    await Linking.openURL(url);
+                  } else {
+                    Alert.alert('Cannot Open', `Open this URL in your browser:\n${url}`);
+                  }
+                }}>
+                  <MonitorPlay size={16} color={T.text} />
+                  <Text style={s.qActionText}>Kiosk</Text>
                 </TouchableOpacity>
               </ScrollView>
-            </Animated.View>
-
-            <Animated.View entering={FadeInDown.duration(400).delay(100)} style={s.financeContainer}>
-              <View style={s.financeGrid}>
-                <View style={[s.finCard, { borderLeftColor: T.emerald }]}>
-                  <Text style={s.finLabel}>Collected</Text>
-                  <Text style={[s.finValue, { color: T.emerald }]}>₹{totalCollected.toLocaleString()}</Text>
-                </View>
-                <View style={[s.finCard, { borderLeftColor: T.red }]}>
-                  <Text style={s.finLabel}>Pending</Text>
-                  <Text style={[s.finValue, { color: T.red }]}>₹{totalPending.toLocaleString()}</Text>
-                </View>
-              </View>
             </Animated.View>
 
             <Animated.View entering={FadeInDown.duration(400).delay(200)} style={s.studentsContainer}>
@@ -298,6 +417,12 @@ export default function BatchDetailScreen() {
                           <View style={s.stActions}>
                              <TouchableOpacity style={s.stActionIcon} onPress={() => setViewMarksStudent(student)}>
                                <Eye size={18} color={T.text} />
+                             </TouchableOpacity>
+                             <TouchableOpacity 
+                                style={[s.stActionIcon, { backgroundColor: `${T.blue}15` }]} 
+                                onPress={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
+                             >
+                                <Receipt size={18} color={T.blue} />
                              </TouchableOpacity>
                              <TouchableOpacity style={[s.stActionIcon, { backgroundColor: `${T.emerald}15` }]} onPress={() => onCall(student.parentWhatsapp)}>
                                 <Phone size={18} color={T.emerald} />
@@ -375,31 +500,28 @@ export default function BatchDetailScreen() {
         )}
       </ScrollView>
 
-      {/* Add Student Modal */}
+      {/* Invite Student Modal */}
       <Modal visible={isAddOpen} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <KeyboardAvoidingView style={s.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Add Student</Text>
+              <View>
+                 <Text style={s.modalTitle}>Invite Student</Text>
+                 <Text style={s.modalSub}>Send a secure registration link via WhatsApp.</Text>
+              </View>
               <TouchableOpacity onPress={() => setIsAddOpen(false)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
             </View>
             <ScrollView style={{ padding: 20 }}>
-              <Text style={s.inputLabel}>Student Name *</Text>
-              <TextInput style={s.input} placeholder="e.g. Rahul Kumar" value={addForm.name} onChangeText={t => setAddForm({...addForm, name: t})} />
-              
-              <Text style={s.inputLabel}>Student ID</Text>
-              <TextInput style={s.input} placeholder="e.g. STD001" value={addForm.humanId} onChangeText={t => setAddForm({...addForm, humanId: t})} />
-
-              <Text style={s.inputLabel}>Parent Name</Text>
-              <TextInput style={s.input} placeholder="e.g. Mr. Kumar" value={addForm.parentName} onChangeText={t => setAddForm({...addForm, parentName: t})} />
-
-              <Text style={s.inputLabel}>Parent WhatsApp *</Text>
-              <TextInput style={s.input} placeholder="e.g. 9876543210" keyboardType="phone-pad" value={addForm.parentWhatsapp} onChangeText={t => setAddForm({...addForm, parentWhatsapp: t})} />
-
-              <Text style={s.inputLabel}>School Name</Text>
-              <TextInput style={s.input} placeholder="e.g. DPS" value={addForm.schoolName} onChangeText={t => setAddForm({...addForm, schoolName: t})} />
-
-              <BrandButton title="Add Student" onPress={handleAddSubmit} style={{ marginTop: 12, marginBottom: 40 }} />
+              <Text style={s.inputLabel}>Student's WhatsApp</Text>
+              <TextInput 
+                 style={s.input} 
+                 placeholder="10-digit Number" 
+                 keyboardType="phone-pad" 
+                 maxLength={10}
+                 value={inviteWhatsapp} 
+                 onChangeText={setInviteWhatsapp} 
+              />
+              <BrandButton title="Send Invite Link" onPress={handleAddSubmit} style={{ marginTop: 24, marginBottom: 40 }} />
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
@@ -464,6 +586,213 @@ export default function BatchDetailScreen() {
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* QR Code Modal */}
+      <Modal visible={isQrOpen} animationType="fade" transparent>
+        <View style={s.modalOverlayDark}>
+          <View style={[s.modalContent, { maxHeight: '70%', height: 'auto', marginTop: 'auto', alignItems: 'center', paddingBottom: 40 }]}>
+            <View style={[s.modalHeader, { width: '100%' }]}>
+              <Text style={s.modalTitle}>Batch QR Code</Text>
+              <TouchableOpacity onPress={() => setIsQrOpen(false)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
+            </View>
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <QRCode
+                value={`mathlogs://batch/${id}`}
+                size={240}
+                color={T.accent}
+                backgroundColor={T.white}
+              />
+              <Text style={{ marginTop: 24, fontSize: 16, color: T.textSec, textAlign: 'center' }}>
+                Scan to join {batch?.name}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Custom Invoice Modal */}
+      <Modal visible={!!showCustomInvoice} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <KeyboardAvoidingView style={s.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={s.modalHeader}>
+              <View>
+                 <Text style={s.modalTitle}>Custom Invoice</Text>
+                 <Text style={s.modalSub}>For {showCustomInvoice?.name}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowCustomInvoice(null)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
+            </View>
+            <ScrollView style={{ padding: 20 }}>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                 <TouchableOpacity 
+                   style={[s.tabBtn, !customInvoice.existingInstallmentId && s.tabBtnActive]} 
+                   onPress={() => setCustomInvoice({ ...customInvoice, existingInstallmentId: '' })}
+                 >
+                    <Text style={[s.tabBtnText, !customInvoice.existingInstallmentId && s.tabBtnTextActive]}>New Custom</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity 
+                   style={[s.tabBtn, !!customInvoice.existingInstallmentId && s.tabBtnActive]} 
+                   onPress={() => setCustomInvoice({ ...customInvoice, existingInstallmentId: batch?.feeInstallments?.[0]?.id || '' })}
+                 >
+                    <Text style={[s.tabBtnText, !!customInvoice.existingInstallmentId && s.tabBtnTextActive]}>Link Global</Text>
+                 </TouchableOpacity>
+              </View>
+
+              {customInvoice.existingInstallmentId ? (
+                <View>
+                   <Text style={s.inputLabel}>Select Installment</Text>
+                   {/* In a real app we'd use a picker, but we can list them as buttons for now */}
+                   {batch?.feeInstallments?.map(inst => (
+                     <TouchableOpacity 
+                       key={inst.id} 
+                       style={[s.instSelectBtn, customInvoice.existingInstallmentId === inst.id && s.instSelectBtnActive]}
+                       onPress={() => setCustomInvoice({ ...customInvoice, existingInstallmentId: inst.id })}
+                     >
+                       <Text style={[s.instSelectText, customInvoice.existingInstallmentId === inst.id && { color: T.white }]}>{inst.name} (₹{inst.amount})</Text>
+                     </TouchableOpacity>
+                   ))}
+                </View>
+              ) : (
+                <View>
+                  <Text style={s.inputLabel}>Invoice Name</Text>
+                  <TextInput 
+                     style={s.input} 
+                     placeholder="e.g. Study Material" 
+                     value={customInvoice.name} 
+                     onChangeText={t => setCustomInvoice({...customInvoice, name: t})} 
+                  />
+                  <Text style={s.inputLabel}>Amount (₹)</Text>
+                  <TextInput 
+                     style={s.input} 
+                     placeholder="e.g. 500" 
+                     keyboardType="numeric"
+                     value={customInvoice.amount} 
+                     onChangeText={t => setCustomInvoice({...customInvoice, amount: t})} 
+                  />
+                </View>
+              )}
+
+              <TouchableOpacity 
+                style={s.checkboxRow}
+                onPress={() => setCustomInvoice({...customInvoice, markAsPaid: !customInvoice.markAsPaid})}
+              >
+                <View style={[s.checkbox, customInvoice.markAsPaid && s.checkboxActive]}>
+                   {customInvoice.markAsPaid && <Check size={12} color={T.white} />}
+                </View>
+                <Text style={s.checkboxLabel}>Mark as Paid immediately</Text>
+              </TouchableOpacity>
+
+              <BrandButton title="Create Invoice" onPress={handleCreateCustomInvoice} style={{ marginTop: 24, marginBottom: 40 }} />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+      {/* Batch Settings Modal */}
+      <Modal visible={isBatchSettingsOpen} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <KeyboardAvoidingView style={s.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>Batch Settings</Text>
+              <TouchableOpacity onPress={() => setIsBatchSettingsOpen(false)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
+            </View>
+            <ScrollView style={{ padding: 20 }}>
+              <Text style={s.inputLabel}>Batch Name *</Text>
+              <TextInput style={s.input} placeholder="e.g. Morning Batch" value={batchForm.name} onChangeText={t => setBatchForm({...batchForm, name: t})} />
+              
+              <Text style={s.inputLabel}>Subject</Text>
+              <TextInput style={s.input} placeholder="e.g. Mathematics" value={batchForm.subject} onChangeText={t => setBatchForm({...batchForm, subject: t})} />
+
+              <Text style={s.inputLabel}>Class</Text>
+              <TextInput style={s.input} placeholder="e.g. 10th" value={batchForm.className} onChangeText={t => setBatchForm({...batchForm, className: t})} />
+
+              <Text style={s.inputLabel}>Total Fee (₹)</Text>
+              <TextInput style={s.input} placeholder="e.g. 15000" keyboardType="numeric" value={batchForm.feeAmount} onChangeText={t => setBatchForm({...batchForm, feeAmount: t})} />
+
+              <Text style={s.inputLabel}>Time Slot</Text>
+              <TextInput style={s.input} placeholder="e.g. 4:00 PM - 5:00 PM" value={batchForm.timeSlot} onChangeText={t => setBatchForm({...batchForm, timeSlot: t})} />
+
+              <Text style={s.inputLabel}>WhatsApp Group Link</Text>
+              <TextInput style={s.input} placeholder="https://chat.whatsapp.com/..." value={batchForm.whatsappGroupLink} onChangeText={t => setBatchForm({...batchForm, whatsappGroupLink: t})} />
+
+              <BrandButton title="Save Changes" onPress={handleBatchSettingsSave} style={{ marginTop: 24, marginBottom: 40 }} />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* Fee Settings Modal */}
+      <Modal visible={isFeeSettingsOpen && !editInstallment} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <KeyboardAvoidingView style={s.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>Fee Columns</Text>
+              <TouchableOpacity onPress={() => setIsFeeSettingsOpen(false)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
+            </View>
+            <ScrollView style={{ padding: 20 }}>
+              <View style={{ marginBottom: 24 }}>
+                <Text style={[s.sectionTitle, { marginLeft: 0 }]}>Existing Installments</Text>
+                {batch?.feeInstallments?.length === 0 ? (
+                  <Text style={{ color: T.textMuted }}>No installments configured.</Text>
+                ) : (
+                  batch?.feeInstallments?.map(inst => (
+                    <View key={inst.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: T.white, borderRadius: 12, borderWidth: 1, borderColor: T.border, marginBottom: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: '700', color: T.text }}>{inst.name}</Text>
+                        <Text style={{ fontWeight: '600', color: T.textSec, fontSize: 13 }}>₹{inst.amount}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setEditInstallment({ id: inst.id, name: inst.name, amount: String(inst.amount) })}
+                        style={{ padding: 8, backgroundColor: `${T.blue}12`, borderRadius: 10 }}
+                      >
+                        <Edit2 size={15} color={T.blue} />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              <Text style={[s.sectionTitle, { marginLeft: 0 }]}>Add New Installment</Text>
+              <Text style={s.inputLabel}>Installment Name</Text>
+              <TextInput style={s.input} placeholder="e.g. First Installment" value={feeForm.name} onChangeText={t => setFeeForm({...feeForm, name: t})} />
+              
+              <Text style={s.inputLabel}>Amount (₹)</Text>
+              <TextInput style={s.input} placeholder="e.g. 5000" keyboardType="numeric" value={feeForm.amount} onChangeText={t => setFeeForm({...feeForm, amount: t})} />
+
+              <BrandButton title="Create Installment" onPress={handleFeeInstallmentAdd} style={{ marginTop: 24, marginBottom: 40 }} />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* ── Edit Installment Modal ── */}
+      <Modal visible={!!editInstallment} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditInstallment(null)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: T.border }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: T.text }}>Edit Installment</Text>
+              <TouchableOpacity onPress={() => setEditInstallment(null)} style={{ padding: 8 }}>
+                <X size={22} color={T.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ padding: 20 }}>
+              <Text style={s.inputLabel}>Name</Text>
+              <TextInput
+                style={s.input}
+                value={editInstallment?.name || ''}
+                onChangeText={t => setEditInstallment(e => e ? { ...e, name: t } : null)}
+                placeholder="Installment name"
+              />
+              <Text style={s.inputLabel}>Amount (₹)</Text>
+              <TextInput
+                style={s.input}
+                value={editInstallment?.amount || ''}
+                onChangeText={t => setEditInstallment(e => e ? { ...e, amount: t } : null)}
+                keyboardType="numeric"
+                placeholder="e.g. 5000"
+              />
+              <BrandButton title="Save Changes" onPress={handleFeeInstallmentEdit} style={{ marginTop: 24, marginBottom: 40 }} />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -566,5 +895,19 @@ const s = StyleSheet.create({
   markRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: T.white, padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: T.border },
   markName: { fontSize: 15, fontWeight: '700', color: T.text },
   markMax: { fontSize: 12, color: T.textSec, marginTop: 4 },
-  markScore: { fontSize: 24, fontWeight: '800', color: T.accent }
+  markScore: { fontSize: 24, fontWeight: '800', color: T.accent },
+
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: T.white, borderRadius: 12, borderWidth: 1, borderColor: T.border },
+  tabBtnActive: { backgroundColor: T.text, borderColor: T.text },
+  tabBtnText: { fontSize: 14, fontWeight: '700', color: T.textSec },
+  tabBtnTextActive: { color: T.white },
+
+  instSelectBtn: { padding: 16, backgroundColor: T.white, borderRadius: 12, borderWidth: 1, borderColor: T.border, marginBottom: 8 },
+  instSelectBtnActive: { backgroundColor: T.text, borderColor: T.text },
+  instSelectText: { fontSize: 14, fontWeight: '700', color: T.text },
+
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 12, paddingVertical: 8 },
+  checkbox: { width: 24, height: 24, borderRadius: 8, borderWidth: 2, borderColor: T.border, alignItems: 'center', justifyContent: 'center', backgroundColor: T.white },
+  checkboxActive: { backgroundColor: T.text, borderColor: T.text },
+  checkboxLabel: { fontSize: 14, color: T.text, fontWeight: '600' }
 });
