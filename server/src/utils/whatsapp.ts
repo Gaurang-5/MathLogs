@@ -52,6 +52,27 @@ export interface TestMarksWAData {
     instituteId?: string;
 }
 
+export interface QuizScheduleWAData {
+    studentName: string;
+    instituteName: string;
+    quizTitle: string;
+    topic: string;
+    availableFrom: string;
+    availableUntil: string;
+    durationMins: string;
+    instituteId?: string;
+}
+
+export interface OnlineQuizMarksWAData {
+    studentName: string;
+    instituteName: string;
+    quizTitle: string;
+    marksObtained: string;
+    totalMarks: string;
+    percentage: string;
+    instituteId?: string;
+}
+
 export interface PaymentReceiptWAData {
     studentName: string;
     amountPaid: string;
@@ -178,6 +199,37 @@ export const sendTestMarksWhatsApp = async (mobileNumber: string, data: TestMark
     ];
 
     return await enqueueWhatsApp(mobileNumber, TEST_TEMPLATE_NAME, componentValues, data.instituteId);
+};
+
+export const sendQuizScheduleWhatsApp = async (mobileNumber: string, data: QuizScheduleWAData) => {
+    const QUIZ_SCHEDULE_TEMPLATE = process.env.WHATSAPP_TEMPLATE_QUIZ_SCHEDULE || 'online_quiz_schedule';
+
+    const componentValues = [
+        data.studentName || 'Student',
+        data.instituteName || 'our institute',
+        data.quizTitle || 'Online Quiz',
+        data.topic || 'the assigned topic',
+        data.availableFrom || 'the scheduled start time',
+        data.availableUntil || 'the scheduled end time',
+        data.durationMins || '30'
+    ];
+
+    return await enqueueWhatsApp(mobileNumber, QUIZ_SCHEDULE_TEMPLATE, componentValues, data.instituteId);
+};
+
+export const sendOnlineQuizMarksWhatsApp = async (mobileNumber: string, data: OnlineQuizMarksWAData) => {
+    const QUIZ_MARKS_TEMPLATE = process.env.WHATSAPP_TEMPLATE_QUIZ_MARKS || 'online_quiz_marks_update';
+
+    const componentValues = [
+        data.studentName || 'Student',
+        data.instituteName || 'our institute',
+        data.quizTitle || 'Online Quiz',
+        data.marksObtained || '0',
+        data.totalMarks || '0',
+        data.percentage || '0%'
+    ];
+
+    return await enqueueWhatsApp(mobileNumber, QUIZ_MARKS_TEMPLATE, componentValues, data.instituteId);
 };
 
 export const sendSetupLinkWhatsApp = async (mobileNumber: string, data: { ownerName: string, setupLink: string, tuitionName: string }) => {

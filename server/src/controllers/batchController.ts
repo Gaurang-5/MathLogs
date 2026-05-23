@@ -270,7 +270,8 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                                         id: true,
                                         name: true,
                                         maxMarks: true,
-                                        date: true
+                                        date: true,
+                                        isQuiz: true
                                     }
                                 }
                             }
@@ -284,7 +285,8 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                         name: true,
                         maxMarks: true,
                         date: true,
-                        subject: true
+                        subject: true,
+                        isQuiz: true
                     },
                     orderBy: { date: 'asc' }
                 },
@@ -294,7 +296,8 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                         name: true,
                         maxMarks: true,
                         date: true,
-                        subject: true
+                        subject: true,
+                        isQuiz: true
                     },
                     orderBy: { date: 'asc' }
                 }

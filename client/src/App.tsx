@@ -12,6 +12,7 @@ const BatchDetails = lazy(() => import('./pages/BatchDetails'));
 const Register = lazy(() => import('./pages/Register'));
 const Approvals = lazy(() => import('./pages/Approvals'));
 const TestList = lazy(() => import('./pages/TestList'));
+const QuizList = lazy(() => import('./pages/QuizList'));
 const TestDetails = lazy(() => import('./pages/TestDetails'));
 const ScanMarks = lazy(() => import('./pages/ScanMarks'));
 const Fees = lazy(() => import('./pages/Fees'));
@@ -25,6 +26,7 @@ const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
 const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
 const StudentPortalLogin = lazy(() => import('./pages/StudentPortalLogin'));
 const StudentPortalDashboard = lazy(() => import('./pages/StudentPortalDashboard'));
+const TakeQuiz = lazy(() => import('./pages/student/TakeQuiz'));
 // Onboarding is eagerly imported above (only 15KB) for instant navigation from Sign Up/Get Started
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -87,6 +89,7 @@ function App() {
             <Route path="/batches" element={<PrivateRoute><BatchList /></PrivateRoute>} />
             <Route path="/batches/:id" element={<PrivateRoute><BatchDetails /></PrivateRoute>} />
             <Route path="/tests" element={<PrivateRoute><TestList /></PrivateRoute>} />
+            <Route path="/quizzes" element={<PrivateRoute><QuizList /></PrivateRoute>} />
             <Route path="/tests/:id" element={<PrivateRoute><TestDetails /></PrivateRoute>} />
             <Route path="/scan" element={<PrivateRoute><ScanMarks /></PrivateRoute>} />
             <Route path="/fees" element={<PrivateRoute><Fees /></PrivateRoute>} />
@@ -102,6 +105,7 @@ function App() {
 
             <Route path="/:instituteSlug/student" element={<StudentPortalLogin />} />
             <Route path="/:instituteSlug/student/dashboard" element={<StudentPortalDashboard />} />
+            <Route path="/:instituteSlug/student/quiz/:quizId" element={<TakeQuiz />} />
 
             {/* Legal / Info Pages */}
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />

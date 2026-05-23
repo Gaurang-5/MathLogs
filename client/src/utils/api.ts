@@ -33,10 +33,11 @@ function clearSessionAndRedirect() {
 }
 
 function createRequestInit(method: HttpMethod, headers: Record<string, string>, body?: unknown, signal?: AbortSignal): RequestInit {
+    const isFormData = typeof window !== 'undefined' && body instanceof FormData;
     return {
         method,
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: body ? (isFormData ? (body as any) : JSON.stringify(body)) : undefined,
         signal,
     };
 }
@@ -45,10 +46,21 @@ async function parseJsonResponse<T>(res: Response): Promise<T> {
     return res.json() as Promise<T>;
 }
 
-async function request<T = unknown>(endpoint: string, method: HttpMethod = 'GET', body?: unknown, timeoutMs?: number): Promise<T> {
-    const headers: Record<string, string> = {};
-    if (method !== 'GET' && method !== 'DELETE') {
+async function request<T = unknown>(
+    endpoint: string, 
+    method: HttpMethod = 'GET', 
+    body?: unknown, 
+    options?: { headers?: Record<string, string>; timeoutMs?: number }
+): Promise<T> {
+    const headers: Record<string, string> = { ...options?.headers };
+    const isFormData = typeof window !== 'undefined' && body instanceof FormData;
+    
+    if (method !== 'GET' && method !== 'DELETE' && !isFormData && !headers['Content-Type']) {
         headers['Content-Type'] = 'application/json';
+    }
+    
+    if (isFormData) {
+        delete headers['Content-Type'];
     }
 
     const token = localStorage.getItem('token');
@@ -57,7 +69,7 @@ async function request<T = unknown>(endpoint: string, method: HttpMethod = 'GET'
     }
 
     // Determine timeout: registration needs extra time for SQLite sequential writes
-    const timeout = timeoutMs || (endpoint.includes('/public/register') ? 40000 : 30000);
+    const timeout = options?.timeoutMs || (endpoint.includes('/public/register') ? 40000 : 30000);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -193,10 +205,14 @@ async function request<T = unknown>(endpoint: string, method: HttpMethod = 'GET'
 }
 
 export const api = {
-    get: <T = unknown>(endpoint: string) => request<T>(endpoint, 'GET'),
-    post: <T = unknown>(endpoint: string, body: unknown) => request<T>(endpoint, 'POST', body),
-    put: <T = unknown>(endpoint: string, body: unknown) => request<T>(endpoint, 'PUT', body),
-    delete: <T = unknown>(endpoint: string, body?: unknown) => request<T>(endpoint, 'DELETE', body),
+    get: <T = unknown>(endpoint: string, options?: { headers?: Record<string, string>; timeoutMs?: number }) => 
+        request<T>(endpoint, 'GET', undefined, options),
+    post: <T = unknown>(endpoint: string, body: unknown, options?: { headers?: Record<string, string>; timeoutMs?: number }) => 
+        request<T>(endpoint, 'POST', body, options),
+    put: <T = unknown>(endpoint: string, body: unknown, options?: { headers?: Record<string, string>; timeoutMs?: number }) => 
+        request<T>(endpoint, 'PUT', body, options),
+    delete: <T = unknown>(endpoint: string, body?: unknown, options?: { headers?: Record<string, string>; timeoutMs?: number }) => 
+        request<T>(endpoint, 'DELETE', body, options),
 };
 
 export const apiRequest = request;

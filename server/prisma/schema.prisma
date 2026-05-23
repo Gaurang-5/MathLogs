@@ -38,6 +38,7 @@ model Institute {
   studentLeads            StudentLead[]
   systemLogs              SystemLog[]
   upiPaymentVerifications UpiPaymentVerification[]
+  onlineQuizzes           OnlineQuiz[]
 }
 
 model InviteToken {
@@ -66,6 +67,7 @@ model Admin {
   tests                   Test[]
   manualAttendanceRecords AttendanceRecord[] @relation("ManualAttendanceBy")
   refreshTokens           RefreshToken[]
+  onlineQuizzes           OnlineQuiz[]
 }
 
 model AcademicYear {
@@ -118,6 +120,8 @@ model Batch {
   studentLeads        StudentLead[]
   tests               Test[]
   sharedTests         Test[]               @relation("TestBatches")
+  onlineQuizzes       OnlineQuiz[]
+  sharedOnlineQuizzes OnlineQuiz[]         @relation("OnlineQuizBatches")
 
   @@index([teacherId, academicYearId, className])
   @@index([instituteId, academicYearId])
@@ -147,6 +151,7 @@ model Student {
   institute               Institute?               @relation(fields: [instituteId], references: [id])
   balance                 StudentBalance?
   upiPaymentVerifications UpiPaymentVerification[]
+  quizSubmissions         QuizSubmission[]
 
   @@unique([humanId, academicYearId])
   @@unique([name, parentWhatsapp, batchId], name: "student_natural_key")
@@ -187,6 +192,7 @@ model Test {
   academicYearId  String?
   instituteId     String?
   batchId         String?
+  isQuiz          Boolean       @default(false)
   marks           Mark[]
   academicYearRef AcademicYear? @relation(fields: [academicYearId], references: [id])
   institute       Institute?    @relation(fields: [instituteId], references: [id])
@@ -494,7 +500,7 @@ model UpiPaymentVerification {
   storageKey      String // The S3 or local path key of the screenshot
   status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
   rejectionReason String?
-  paidByName      String?  // Name of person who made the payment
+  paidByName      String? // Name of person who made the payment
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -504,4 +510,102 @@ model UpiPaymentVerification {
 
   @@index([instituteId, status])
   @@index([studentId])
+}
+
+model OnlineQuiz {
+  id             String    @id @default(uuid())
+  title          String
+  topic          String?
+  difficulty     String?
+  timeLimitMins  Int       @default(30)
+  totalMarks     Float
+  availableFrom  DateTime?
+  availableUntil DateTime?
+  isFinalized    Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  instituteId String
+  batchId     String?
+  teacherId   String?
+
+  institute Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  batch     Batch?    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  teacher   Admin?    @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  batches              Batch[]         @relation("OnlineQuizBatches")
+  studentQuestionCount Int?
+  questions            QuizQuestion[]
+  submissions          QuizSubmission[]
+
+  @@index([instituteId])
+  @@index([batchId])
+  @@index([batchId, createdAt])
+  @@index([batchId, availableFrom, availableUntil])
+  @@index([teacherId, instituteId, createdAt])
+}
+
+model QuizQuestion {
+  id            String  @id @default(uuid())
+  quizId        String
+  questionText  String
+  orderIndex    Int     @default(0)
+  options       Json // Array of strings
+  correctOption String // The exact string of the correct option
+  marks         Float   @default(1)
+  variantGroup  String? // Null = standalone; same value = sibling variants (one picked per student)
+
+  quiz    OnlineQuiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers QuizAnswer[]
+
+  @@index([quizId, orderIndex])
+  @@index([quizId, variantGroup])
+}
+
+model QuizSubmission {
+  id               String    @id @default(uuid())
+  quizId           String
+  studentId        String
+  score            Float? // Null if not yet graded/submitted
+  autoSavedAnswers Json      @default("{}")
+  startedAt        DateTime  @default(now())
+  submittedAt      DateTime?
+  shuffledQuestions Json?
+
+  quiz           OnlineQuiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  student        Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers        QuizAnswer[]
+  cheatingEvents CheatingEvent[]
+
+  @@unique([quizId, studentId])
+  @@index([studentId])
+  @@index([quizId])
+}
+
+model CheatingEvent {
+  id           String   @id @default(uuid())
+  submissionId String
+  eventType    String
+  metadata     Json?
+  timestamp    DateTime @default(now())
+
+  submission QuizSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId, timestamp])
+  @@index([eventType])
+}
+
+model QuizAnswer {
+  id             String  @id @default(uuid())
+  submissionId   String
+  questionId     String
+  selectedOption String? // Null if they skipped it
+  isCorrect      Boolean @default(false)
+  marksObtained  Float   @default(0)
+
+  submission QuizSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  question   QuizQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, questionId])
+  @@index([submissionId])
 }

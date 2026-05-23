@@ -8,7 +8,8 @@ import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatch
 import { registerStudent, getPendingStudents, approveStudent, rejectStudent, updateStudent, addStudentManually, getStudentGrowthStats } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
-import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail } from '../controllers/testController';
+import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute } from '../controllers/testController';
+import { getOnlineQuizAnalytics, getLiveQuizStatus } from '../controllers/analyticsController';
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
 
@@ -45,6 +46,28 @@ const upload = multer({
             cb(null, true);
         } else {
             cb(new Error('Invalid file type. Only JPEG, PNG and WebP are allowed.'));
+        }
+    }
+});
+
+const testDocUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+        files: 5
+    },
+    fileFilter: (req: any, file: any, cb: any) => {
+        const allowedTypes = [
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'application/pdf',
+            'text/plain'
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only JPEG, PNG, WebP, PDF, and TXT files are allowed.'));
         }
     }
 });
@@ -254,6 +277,19 @@ router.get('/stickers/download', authenticateToken as any, generateStickerSheet 
 // Tests
 router.get('/tests', authenticateToken as any, getTests as any);
 router.post('/tests', authenticateToken as any, validateRequest(createTestSchema), createTest as any);
+router.post('/tests/generate', authenticateToken as any, testDocUpload.array('files', 5), generateAITest as any);
+router.post('/tests/generate-single-question', authenticateToken as any, generateSingleQuestionRoute as any);
+router.post('/tests/generate-variant-question', authenticateToken as any, generateVariantQuestionRoute as any);
+router.post('/tests/online', authenticateToken as any, saveOnlineQuiz as any);
+router.get('/tests/online', authenticateToken as any, getOnlineQuizzes as any);
+router.put('/tests/online/:id', authenticateToken as any, updateOnlineQuiz as any);
+router.delete('/tests/online/:id', authenticateToken as any, deleteOnlineQuiz as any);
+router.get('/tests/online/:id/analytics', authenticateToken as any, getOnlineQuizAnalytics as any);
+router.get('/tests/online/:id/monitor', authenticateToken as any, getLiveQuizStatus as any);
+router.post('/tests/online/:id/finalize', authenticateToken as any, bulkNotifyLimiter, finalizeOnlineQuiz as any);
+router.get('/tests/online/:id/report', authenticateToken as any, downloadOnlineQuizReport as any);
+router.get('/tests/online/:id/questions-pdf', authenticateToken as any, downloadOnlineQuizQuestionsPdf as any);
+router.get('/tests/online/:id/report-pdf', authenticateToken as any, downloadOnlineQuizReportPdf as any);
 router.get('/tests/:id', authenticateToken as any, getTestDetails as any);
 router.put('/tests/:id', authenticateToken as any, validateRequest(updateTestSchema), updateTest as any);
 router.delete('/tests/:id', authenticateToken as any, deleteTest as any);

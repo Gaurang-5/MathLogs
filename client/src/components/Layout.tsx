@@ -2,7 +2,7 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, FileText, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Sparkles, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
 import ToastProvider from './ToastProvider';
@@ -12,9 +12,10 @@ import PWAInstallPrompt from './PWAInstallPrompt';
 interface LayoutProps {
     children: React.ReactNode;
     title?: string;
+    hideMobileNav?: boolean;
 }
 
-export default function Layout({ children, title }: LayoutProps) {
+export default function Layout({ children, title, hideMobileNav = false }: LayoutProps) {
     const location = useLocation();
     const navigate = useNavigate();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -63,7 +64,7 @@ export default function Layout({ children, title }: LayoutProps) {
         startYRef.current = 0;
     };
 
-    const showMobileNav = ['/dashboard', '/batches', '/tests', '/fees', '/scan', '/settings', '/billing'].includes(location.pathname);
+    const showMobileNav = !hideMobileNav && ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing'].includes(location.pathname);
 
     const handleLogout = () => {
         localStorage.clear();
@@ -74,6 +75,7 @@ export default function Layout({ children, title }: LayoutProps) {
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Batches', path: '/batches', icon: Users },
         { name: 'Tests', path: '/tests', icon: FileText },
+        { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
         { name: 'Scan Marks', path: '/scan', icon: Scan },
         { name: 'Fees', path: '/fees', icon: Receipt },
         { name: 'Billing', path: '/billing', icon: CreditCard },
@@ -180,34 +182,36 @@ export default function Layout({ children, title }: LayoutProps) {
             </aside>
 
             {/* Mobile Header - Floating Pill */}
-            <header className="fixed top-0 left-0 right-0 z-50 xl:hidden px-4 transition-all duration-300" style={{
-                paddingTop: 'calc(0.75rem + env(safe-area-inset-top))'
-            }}>
-                <div className="bg-app-surface/90 backdrop-blur-2xl border border-app-border shadow-[0_8px_32px_rgba(0,0,0,0.08)] rounded-[24px] flex items-center justify-between px-4 h-14">
-                    <Link to="/dashboard" className="flex items-center gap-2 group active:scale-95 transition-transform">
-                        <img
-                            src="/icon-512x512.png"
-                            alt="MathLogs Logo"
-                            width={32}
-                            height={32}
-                            className="w-8 h-8 rounded-full shadow-md object-cover border border-app-border/50"
-                        />
-                        <span className="font-semibold text-[15px] text-app-text tracking-tight">Math<span className="text-accent opacity-90 group-hover:opacity-100 transition-opacity">Logs</span></span>
-                    </Link>
-                    <div className="flex items-center gap-2">
-                        <Link
-                            to="/scan"
-                            className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90"
-                        >
-                            <Scan className="w-[18px] h-[18px]" strokeWidth={2.5} />
+            {!hideMobileNav && (
+                <header className="fixed top-0 left-0 right-0 z-50 xl:hidden px-4 transition-all duration-300" style={{
+                    paddingTop: 'calc(0.75rem + env(safe-area-inset-top))'
+                }}>
+                    <div className="bg-app-surface/90 backdrop-blur-2xl border border-app-border shadow-[0_8px_32px_rgba(0,0,0,0.08)] rounded-[24px] flex items-center justify-between px-4 h-14">
+                        <Link to="/dashboard" className="flex items-center gap-2 group active:scale-95 transition-transform">
+                            <img
+                                src="/icon-512x512.png"
+                                alt="MathLogs Logo"
+                                width={32}
+                                height={32}
+                                className="w-8 h-8 rounded-full shadow-md object-cover border border-app-border/50"
+                            />
+                            <span className="font-semibold text-[15px] text-app-text tracking-tight">Math<span className="text-accent opacity-90 group-hover:opacity-100 transition-opacity">Logs</span></span>
                         </Link>
-                        <div className="w-[1px] h-4 bg-app-border/80 mx-0.5"></div>
-                        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90">
-                            {mobileMenuOpen ? <X size={20} strokeWidth={2.5} /> : <Menu size={20} strokeWidth={2.5} />}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <Link
+                                to="/scan"
+                                className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90"
+                            >
+                                <Scan className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                            </Link>
+                            <div className="w-[1px] h-4 bg-app-border/80 mx-0.5"></div>
+                            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90">
+                                {mobileMenuOpen ? <X size={20} strokeWidth={2.5} /> : <Menu size={20} strokeWidth={2.5} />}
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
+            )}
 
             {/* Mobile Menu Overlay */}
             <AnimatePresence>
@@ -222,6 +226,14 @@ export default function Layout({ children, title }: LayoutProps) {
                         <nav className="space-y-2">
                             {/* Navigation items are moved to Bottom Bar. Keeping menu for system actions only. */}
                             <div className="pt-2">
+                                <Link
+                                    to="/quizzes"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center w-full px-4 py-4 text-base font-medium text-indigo-600 hover:bg-indigo-50/10 hover:text-indigo-700 rounded-2xl animate-pulse-subtle border border-indigo-100/20 bg-indigo-50/5"
+                                >
+                                    <Sparkles className="w-6 h-6 mr-4 text-indigo-500" />
+                                    Quizzes
+                                </Link>
                                 <Link
                                     to="/billing"
                                     onClick={() => setMobileMenuOpen(false)}
@@ -258,7 +270,7 @@ export default function Layout({ children, title }: LayoutProps) {
                 onTouchEnd={handleTouchEnd}
                 className={cn(
                     "flex-1 flex flex-col min-h-screen bg-app-bg relative transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] min-w-0 xl:pb-0",
-                    showMobileNav ? "pb-32" : "pb-6",
+                    showMobileNav ? "pb-44" : "pb-6",
                     isSidebarCollapsed ? "xl:pl-[8rem]" : "xl:pl-[20rem]"
                 )}
             >
@@ -272,7 +284,7 @@ export default function Layout({ children, title }: LayoutProps) {
                     </div>
                 </div>
 
-                <div className="xl:hidden" style={{ height: 'calc(4rem + env(safe-area-inset-top))' }}></div> {/* Spacer for mobile header with safe area */}
+                {!hideMobileNav && <div className="xl:hidden" style={{ height: 'calc(4rem + env(safe-area-inset-top))' }}></div>} {/* Spacer for mobile header with safe area */}
 
                 <div className="flex-1 p-4 lg:p-8 w-full max-w-full mx-auto animate-fadeIn relative z-0 overflow-x-hidden">
                     {title && (
