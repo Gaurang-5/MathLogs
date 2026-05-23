@@ -48,7 +48,7 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
             const diff = currentY - startYRef.current;
             if (diff > 0) {
                 // simple resistance
-                setPullY(Math.min(diff * 0.4, 80)); 
+                setPullY(Math.min(diff * 0.4, 80));
             }
         }
     };
@@ -90,7 +90,7 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
             {/* Sidebar (Desktop) - Premium Glass Style */}
             <aside
                 className={cn(
-                    "bg-transparent fixed inset-y-4 left-4 hidden xl:flex flex-col z-20 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+                    "glass fixed inset-y-4 left-4 rounded-[24px] hidden xl:flex flex-col z-20 shadow-xl overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
                     isSidebarCollapsed ? "w-24" : "w-72"
                 )}
             >
@@ -131,20 +131,20 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                                 {isActive && (
                                     <motion.div
                                         layoutId="sidebar-active"
-                                        className={cn("absolute inset-0 bg-accent-subtle dark:bg-accent/10 rounded-2xl", isSidebarCollapsed ? "mx-2" : "")}
+                                        className={cn("absolute inset-0 bg-black/5 dark:bg-white/10 rounded-2xl", isSidebarCollapsed ? "mx-2" : "")}
                                         initial={false}
                                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                     />
                                 )}
                                 <item.icon
                                     className={cn(
-                                        "w-[22px] h-[22px] transition-transform duration-200",
+                                        "relative z-10 w-[22px] h-[22px] transition-transform duration-200",
                                         isActive ? "opacity-100" : "opacity-80 group-hover:opacity-100 group-hover:scale-110",
                                         !isSidebarCollapsed && "mr-3.5"
                                     )}
                                     strokeWidth={isActive ? 2.5 : 2}
                                 />
-                                {!isSidebarCollapsed && <span className="tracking-wide">{item.name}</span>}
+                                {!isSidebarCollapsed && <span className="relative z-10 tracking-wide">{item.name}</span>}
                             </Link>
                         );
                     })}
@@ -277,12 +277,12 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                 )}
             >
                 {/* Pull-to-refresh spinner */}
-                <div 
+                <div
                     className="flex justify-center items-center w-full overflow-hidden transition-all duration-300 pointer-events-none xl:hidden"
                     style={{ height: `${pullY}px`, opacity: pullY > 10 ? 1 : 0 }}
                 >
                     <div className="w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center">
-                         <div className={cn("w-5 h-5 border-2 border-accent border-t-transparent rounded-full", (isRefreshing || pullY >= 60) ? "animate-spin" : "")}></div>
+                        <div className={cn("w-5 h-5 border-2 border-accent border-t-transparent rounded-full", (isRefreshing || pullY >= 60) ? "animate-spin" : "")}></div>
                     </div>
                 </div>
 
