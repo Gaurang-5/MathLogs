@@ -3,8 +3,10 @@ import { PrismaClient } from '@prisma/client';
 import { queryPerformanceMiddleware } from './middleware/queryMonitor';
 
 // Production-grade Prisma configuration with connection pooling and query logging
-const CONNECTION_LIMIT = parseInt(process.env.DB_CONNECTION_LIMIT || '25', 10);
-const POOL_TIMEOUT = parseInt(process.env.DB_POOL_TIMEOUT || '20', 10);
+// HEROKU TIP: Basic/Mini Postgres has a 20 connection limit. 
+// If scaling to multiple dynos, keep CONNECTION_LIMIT low (e.g. 3-5) or use PgBouncer.
+const CONNECTION_LIMIT = parseInt(process.env.DB_CONNECTION_LIMIT || '15', 10);
+const POOL_TIMEOUT = parseInt(process.env.DB_POOL_TIMEOUT || '30', 10);
 
 export const prisma = new PrismaClient({
     log: process.env.NODE_ENV === 'production'

@@ -6,7 +6,7 @@ declare global {
     }
 }
 
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 type QueueEntry = { resolve: (value: string | null) => void; reject: (reason?: unknown) => void };
 
 const isCapacitor = typeof window !== 'undefined' && window.Capacitor?.isNative;
@@ -26,6 +26,27 @@ const processQueue = (error: Error | null, token: string | null = null) => {
 };
 
 function clearSessionAndRedirect() {
+    const pathname = window.location.pathname;
+    const isStudentPortal = pathname.includes('/student');
+    const isLiveQuiz = pathname.includes('/student/quiz/');
+
+    if (isLiveQuiz) {
+        console.warn('[AUTH] Session validation failed during active quiz. Redirect bypassed to protect student progress.');
+        return;
+    }
+
+    if (isStudentPortal) {
+        // Extract institute slug from /:slug/student/...
+        const match = pathname.match(/^\/([^\/]+)\/student/);
+        const slug = match ? match[1] : null;
+        
+        if (slug) {
+            localStorage.removeItem(`student_token_${slug}`);
+            window.location.href = `/${slug}/student`;
+            return;
+        }
+    }
+
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('adminId');
@@ -64,7 +85,7 @@ async function request<T = unknown>(
     }
 
     const token = localStorage.getItem('token');
-    if (token) {
+    if (token && !headers['Authorization']) {
         headers['Authorization'] = `Bearer ${token}`;
     }
 

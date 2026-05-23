@@ -36,12 +36,6 @@ interface DashboardSummaryResponse {
     userName?: string;
 }
 
-const DASHBOARD_INSIGHTS = [
-    { text: 'Monitor fee collection regularly', type: 'warning' },
-    { text: 'Student growth trending upward', type: 'success' },
-    { text: 'Keep track of batch performance', type: 'info' }
-] as const;
-
 const formatIndianRupee = (value: number) => new Intl.NumberFormat('en-IN').format(value);
 
 export default function Dashboard() {
@@ -58,19 +52,17 @@ export default function Dashboard() {
     // Privacy toggle for fee data — persisted across sessions
     const [showFeeData, setShowFeeData] = useState(() => {
         const saved = localStorage.getItem('mathlogs_hide_fees');
-        return saved === null ? true : saved !== 'true';
+        if (saved !== null) return saved === 'false';
+        return true;
     });
 
-    const toggleFeeVisibility = () => {
-        setShowFeeData(prev => {
+    const toggleFeePrivacy = () => {
+        setShowFeeData((prev) => {
             const next = !prev;
             localStorage.setItem('mathlogs_hide_fees', next ? 'false' : 'true');
             return next;
         });
     };
-
-    // Rotating insights
-    const [currentInsight, setCurrentInsight] = useState(0);
 
     useEffect(() => {
         // OPTIMIZATION 1: Load critical summary data FIRST (non-blocking)
@@ -131,13 +123,6 @@ export default function Dashboard() {
         loadCharts();
     }, []);
 
-    // Rotate insights every 4 seconds
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setCurrentInsight((prev) => (prev + 1) % DASHBOARD_INSIGHTS.length);
-        }, 4000);
-        return () => clearInterval(interval);
-    }, []);
 
     // Collection rate based on total collected (all-time), not monthly
     const collectionRate = finances.totalCollected + finances.pending > 0
@@ -150,10 +135,10 @@ export default function Dashboard() {
         if (!financeGrowthData.length) return [];
         const lastBar = financeGrowthData[financeGrowthData.length - 1];
         if (!lastBar || finances.pending <= 0) return financeGrowthData;
-        
+
         const diff = finances.pending - lastBar.remaining;
         if (diff === 0) return financeGrowthData;
-        
+
         return financeGrowthData.map(d => ({
             ...d,
             remaining: Math.max(0, d.remaining + diff)
@@ -178,36 +163,6 @@ export default function Dashboard() {
                 <p className="text-app-text-secondary font-medium text-sm sm:text-base">Here's what's happening with your institute today.</p>
             </motion.div>
 
-            {/* Smart Insights Card - Animated Rotation */}
-            <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="mb-6 p-4 rounded-2xl bg-app-surface-opaque border-[1.5px] border-black/5 relative overflow-hidden shadow-sm"
-            >
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={currentInsight}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ duration: 0.4 }}
-                        className="flex items-center gap-3 relative z-10"
-                    >
-                        <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse shrink-0" />
-                        <p className="text-sm font-semibold text-app-text">{DASHBOARD_INSIGHTS[currentInsight].text}</p>
-                    </motion.div>
-                </AnimatePresence>
-                <div className="absolute bottom-2 right-4 flex gap-1.5">
-                    {DASHBOARD_INSIGHTS.map((_, i) => (
-                        <div
-                            key={i}
-                            className={`h-1.5 rounded-full transition-all duration-300 ${i === currentInsight ? 'bg-black w-5' : 'bg-black/15 w-1.5'
-                                }`}
-                        />
-                    ))}
-                </div>
-            </motion.div>
 
             {/* Stats Overview - Premium Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">

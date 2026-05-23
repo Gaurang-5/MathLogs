@@ -85,7 +85,7 @@ export const payInstallmentSchema = z.object({
     body: z.object({
         studentId: z.string().uuid("Invalid Student ID"),
         installmentId: z.string().uuid("Invalid Installment ID"),
-        amount: z.number().nonnegative("Amount must be positive or zero"),
+        amount: z.number().positive("Amount must be positive"),
         date: z.string().optional() // Accept any date string format (datetime or YYYY-MM-DD)
     })
 });

@@ -20,15 +20,40 @@ export interface GeneratedTest {
     hasVariants?: boolean; // true when 2N questions generated in N pairs
 }
 
-// Shared model factory to avoid repetition
-function makeModel(temperature = 0.7) {
-    return genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+// Shared model factory with fallback support
+async function runWithFallback<T>(
+    operation: (model: any) => Promise<T>,
+    temperature = 0.7,
+    schema?: any
+): Promise<T> {
+    const primaryModel = "gemini-3-flash-preview";
+    const secondaryModel = "gemini-2.5-flash";
+
+    const getConfig = (modelName: string) => ({
+        model: modelName,
         generationConfig: {
             temperature,
-            responseMimeType: "application/json"
+            responseMimeType: "application/json",
+            ...(schema ? { responseSchema: schema } : {})
         }
     });
+
+    try {
+        // Attempt with Primary Model
+        const model = genAI.getGenerativeModel(getConfig(primaryModel));
+        return await operation(model);
+    } catch (e: any) {
+        // If Primary fails with Overloaded/High Demand (503) or generic failure, try Fallback
+        console.warn(`[AI_FALLBACK] Primary model (${primaryModel}) failed. Retrying with ${secondaryModel}...`, e.message);
+        
+        try {
+            const fallbackModel = genAI.getGenerativeModel(getConfig(secondaryModel));
+            return await operation(fallbackModel);
+        } catch (fallbackError: any) {
+            console.error(`[AI_CRITICAL] Both primary and fallback models failed.`, fallbackError.message);
+            throw fallbackError;
+        }
+    }
 }
 
 function buildFileContents(files?: Array<{ buffer: Buffer; mimetype: string }>): any[] {
@@ -54,35 +79,28 @@ export async function generateTest(
 ): Promise<GeneratedTest> {
     if (!geminiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
-    const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        generationConfig: {
-            temperature: 0.7,
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: SchemaType.OBJECT,
-                properties: {
-                    title: { type: SchemaType.STRING, description: "An engaging title for the test based on the topic." },
-                    description: { type: SchemaType.STRING, description: "A short description or instructions for the students." },
-                    totalMarks: { type: SchemaType.NUMBER, description: "Total marks for the test (sum of all question marks)." },
-                    questions: {
-                        type: SchemaType.ARRAY,
-                        items: {
-                            type: SchemaType.OBJECT,
-                            properties: {
-                                questionText: { type: SchemaType.STRING, description: "The text of the question." },
-                                options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of 4 multiple-choice options. (Leave empty if subjective)." },
-                                correctAnswer: { type: SchemaType.STRING, description: "The correct option or a short answer key." },
-                                marks: { type: SchemaType.NUMBER, description: "Marks awarded for this question." }
-                            },
-                            required: ["questionText", "marks", "correctAnswer"]
-                        }
-                    }
-                },
-                required: ["title", "description", "totalMarks", "questions"]
+    const schema = {
+        type: SchemaType.OBJECT,
+        properties: {
+            title: { type: SchemaType.STRING, description: "An engaging title for the test based on the topic." },
+            description: { type: SchemaType.STRING, description: "A short description or instructions for the students." },
+            totalMarks: { type: SchemaType.NUMBER, description: "Total marks for the test (sum of all question marks)." },
+            questions: {
+                type: SchemaType.ARRAY,
+                items: {
+                    type: SchemaType.OBJECT,
+                    properties: {
+                        questionText: { type: SchemaType.STRING, description: "The text of the question." },
+                        options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of 4 multiple-choice options. (Leave empty if subjective)." },
+                        correctAnswer: { type: SchemaType.STRING, description: "The correct option or a short answer key." },
+                        marks: { type: SchemaType.NUMBER, description: "Marks awarded for this question." }
+                    },
+                    required: ["questionText", "marks", "correctAnswer"]
+                }
             }
-        }
-    });
+        },
+        required: ["title", "description", "totalMarks", "questions"]
+    };
 
     let prompt = `You are an expert teacher. Generate a test on the topic "${topic}" for ${grade} grade students.
 The difficulty level should be ${difficulty}.
@@ -99,13 +117,10 @@ Make sure the questions are clear, accurate, and age-appropriate. Include multip
     }
     contents.push(prompt);
 
-    try {
+    return runWithFallback(async (model) => {
         const result = await model.generateContent(contents);
         return JSON.parse(result.response.text()) as GeneratedTest;
-    } catch (e: any) {
-        console.error("Test Generation Failed:", e);
-        throw new Error("Failed to generate test: " + e.message);
-    }
+    }, 0.7, schema);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -122,57 +137,50 @@ export async function generateTestWithVariants(
 ): Promise<GeneratedTest> {
     if (!geminiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
-    const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        generationConfig: {
-            temperature: 0.8,
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: SchemaType.OBJECT,
-                properties: {
-                    title: { type: SchemaType.STRING },
-                    description: { type: SchemaType.STRING },
-                    totalMarks: { type: SchemaType.NUMBER },
-                    // pairs: N groups, each with 2 sibling questions
-                    pairs: {
-                        type: SchemaType.ARRAY,
-                        description: `Exactly ${questionCount} concept groups. Each group has 2 variant questions testing the same concept differently.`,
-                        items: {
+    const schema = {
+        type: SchemaType.OBJECT,
+        properties: {
+            title: { type: SchemaType.STRING },
+            description: { type: SchemaType.STRING },
+            totalMarks: { type: SchemaType.NUMBER },
+            // pairs: N groups, each with 2 sibling questions
+            pairs: {
+                type: SchemaType.ARRAY,
+                description: `Exactly ${questionCount} concept groups. Each group has 2 variant questions testing the same concept differently.`,
+                items: {
+                    type: SchemaType.OBJECT,
+                    properties: {
+                        groupLabel: {
+                            type: SchemaType.STRING,
+                            description: "Short label for the concept being tested (e.g. 'Speed-Distance-Time', 'Area of Triangle')"
+                        },
+                        variantA: {
                             type: SchemaType.OBJECT,
                             properties: {
-                                groupLabel: {
-                                    type: SchemaType.STRING,
-                                    description: "Short label for the concept being tested (e.g. 'Speed-Distance-Time', 'Area of Triangle')"
-                                },
-                                variantA: {
-                                    type: SchemaType.OBJECT,
-                                    properties: {
-                                        questionText: { type: SchemaType.STRING },
-                                        options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                                        correctAnswer: { type: SchemaType.STRING },
-                                        marks: { type: SchemaType.NUMBER }
-                                    },
-                                    required: ["questionText", "marks", "correctAnswer"]
-                                },
-                                variantB: {
-                                    type: SchemaType.OBJECT,
-                                    properties: {
-                                        questionText: { type: SchemaType.STRING },
-                                        options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                                        correctAnswer: { type: SchemaType.STRING },
-                                        marks: { type: SchemaType.NUMBER }
-                                    },
-                                    required: ["questionText", "marks", "correctAnswer"]
-                                }
+                                questionText: { type: SchemaType.STRING },
+                                options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+                                correctAnswer: { type: SchemaType.STRING },
+                                marks: { type: SchemaType.NUMBER }
                             },
-                            required: ["groupLabel", "variantA", "variantB"]
+                            required: ["questionText", "marks", "correctAnswer"]
+                        },
+                        variantB: {
+                            type: SchemaType.OBJECT,
+                            properties: {
+                                questionText: { type: SchemaType.STRING },
+                                options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+                                correctAnswer: { type: SchemaType.STRING },
+                                marks: { type: SchemaType.NUMBER }
+                            },
+                            required: ["questionText", "marks", "correctAnswer"]
                         }
-                    }
-                },
-                required: ["title", "description", "totalMarks", "pairs"]
+                    },
+                    required: ["groupLabel", "variantA", "variantB"]
+                }
             }
-        }
-    });
+        },
+        required: ["title", "description", "totalMarks", "pairs"]
+    };
 
     let prompt = `You are an expert teacher creating an anti-cheating quiz.
 
@@ -204,7 +212,7 @@ Make sure Variant B is substantially different from Variant A (different numbers
     }
     contents.push(prompt);
 
-    try {
+    return runWithFallback(async (model) => {
         const result = await model.generateContent(contents);
         const raw = JSON.parse(result.response.text()) as {
             title: string;
@@ -221,7 +229,6 @@ Make sure Variant B is substantially different from Variant A (different numbers
         const questions: GeneratedQuestion[] = [];
         for (let i = 0; i < raw.pairs.length; i++) {
             const pair = raw.pairs[i];
-            // Use a stable group ID based on index — controller will replace with real UUID on save
             const groupId = `group-${i}`;
             questions.push({
                 questionText: pair.variantA.questionText,
@@ -239,7 +246,6 @@ Make sure Variant B is substantially different from Variant A (different numbers
             });
         }
 
-        // Recalculate total marks as sum of one variant per group (A side)
         const totalMarks = raw.pairs.reduce((sum, pair) => sum + pair.variantA.marks, 0);
 
         return {
@@ -249,10 +255,7 @@ Make sure Variant B is substantially different from Variant A (different numbers
             totalMarks,
             hasVariants: true
         };
-    } catch (e: any) {
-        console.error("Variant Test Generation Failed:", e);
-        throw new Error("Failed to generate variant test: " + e.message);
-    }
+    }, 0.8, schema);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -268,23 +271,16 @@ export async function generateSingleQuestion(
 ): Promise<GeneratedQuestion> {
     if (!geminiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
-    const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        generationConfig: {
-            temperature: 0.7,
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: SchemaType.OBJECT,
-                properties: {
-                    questionText: { type: SchemaType.STRING, description: "The text of the question." },
-                    options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of 4 multiple-choice options." },
-                    correctAnswer: { type: SchemaType.STRING, description: "The correct option or a short answer key." },
-                    marks: { type: SchemaType.NUMBER, description: "Marks awarded for this question." }
-                },
-                required: ["questionText", "marks", "correctAnswer"]
-            }
-        }
-    });
+    const schema = {
+        type: SchemaType.OBJECT,
+        properties: {
+            questionText: { type: SchemaType.STRING, description: "The text of the question." },
+            options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of 4 multiple-choice options." },
+            correctAnswer: { type: SchemaType.STRING, description: "The correct option or a short answer key." },
+            marks: { type: SchemaType.NUMBER, description: "Marks awarded for this question." }
+        },
+        required: ["questionText", "marks", "correctAnswer"]
+    };
 
     let prompt = `You are an expert teacher. Generate exactly ONE question on the topic "${topic}" for ${grade} grade students.
 The difficulty level should be ${difficulty}.
@@ -305,13 +301,10 @@ It should be a multiple-choice question.`;
     }
     contents.push(prompt);
 
-    try {
+    return runWithFallback(async (model) => {
         const result = await model.generateContent(contents);
         return JSON.parse(result.response.text()) as GeneratedQuestion;
-    } catch (e: any) {
-        console.error("Single Question Generation Failed:", e);
-        throw new Error("Failed to generate question: " + e.message);
-    }
+    }, 0.7, schema);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -326,23 +319,16 @@ export async function generateVariantQuestion(
 ): Promise<GeneratedQuestion> {
     if (!geminiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
-    const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        generationConfig: {
-            temperature: 0.8,
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: SchemaType.OBJECT,
-                properties: {
-                    questionText: { type: SchemaType.STRING },
-                    options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                    correctAnswer: { type: SchemaType.STRING },
-                    marks: { type: SchemaType.NUMBER }
-                },
-                required: ["questionText", "marks", "correctAnswer"]
-            }
-        }
-    });
+    const schema = {
+        type: SchemaType.OBJECT,
+        properties: {
+            questionText: { type: SchemaType.STRING },
+            options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+            correctAnswer: { type: SchemaType.STRING },
+            marks: { type: SchemaType.NUMBER }
+        },
+        required: ["questionText", "marks", "correctAnswer"]
+    };
 
     let prompt = `You are an expert teacher. Create a VARIANT of the following question that tests the SAME concept but uses different numbers, a different scenario, or a different real-world context.
 
@@ -364,11 +350,8 @@ Topic: "${topic}"`;
 
     const contents: any[] = [prompt];
 
-    try {
+    return runWithFallback(async (model) => {
         const result = await model.generateContent(contents);
         return JSON.parse(result.response.text()) as GeneratedQuestion;
-    } catch (e: any) {
-        console.error("Variant Question Generation Failed:", e);
-        throw new Error("Failed to generate variant question: " + e.message);
-    }
+    }, 0.8, schema);
 }

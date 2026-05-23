@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
+import { quizCache } from '../utils/redis';
 import PDFDocument from 'pdfkit';
 import { addMathLogsHeader } from '../utils/pdfUtils';
 import { generateTest, generateSingleQuestion, generateTestWithVariants, generateVariantQuestion } from '../utils/ai/test-generator';
@@ -1051,8 +1052,10 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
             });
         }
 
+        await quizCache.invalidate(quizId);
         res.json(updatedQuiz);
     } catch (e: any) {
+
         console.error("Update Online Quiz Error:", e);
         if (e.message?.startsWith('Question ')) {
             return res.status(400).json({ error: e.message });
@@ -1090,6 +1093,7 @@ export const deleteOnlineQuiz = async (req: Request, res: Response) => {
             where: { id: quizId }
         });
 
+        await quizCache.invalidate(quizId);
         res.json({ success: true, message: 'Quiz deleted successfully' });
     } catch (e: any) {
         console.error("Delete Online Quiz Error:", e);

@@ -48,9 +48,20 @@ export default function StudentPortalDashboard() {
     const { instituteSlug } = useParams<{ instituteSlug: string }>();
     const navigate = useNavigate();
 
-    const [loading, setLoading] = useState(true);
-    const [data, setData] = useState<any>(null);
-    const [quizzes, setQuizzes] = useState<OnlineQuiz[]>([]);
+    const [loading, setLoading] = useState(!sessionStorage.getItem(`student_dash_${instituteSlug}`));
+    const [data, setData] = useState<any>(() => {
+        const cached = sessionStorage.getItem(`student_dash_${instituteSlug}`);
+        return cached ? JSON.parse(cached) : null;
+    });
+    const [quizzes, setQuizzes] = useState<OnlineQuiz[]>(() => {
+        const cached = sessionStorage.getItem(`student_quizzes_${instituteSlug}`);
+        try {
+            const parsed = cached ? JSON.parse(cached) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    });
     const [activeTab, setActiveTab] = useState<Tab>('performance');
     const [profileOpen, setProfileOpen] = useState(false);
     const [lockedQuizTitle, setLockedQuizTitle] = useState<string | null>(null);
@@ -59,16 +70,26 @@ export default function StudentPortalDashboard() {
         const fetchDashboard = async () => {
             const token = localStorage.getItem(`student_token_${instituteSlug}`);
             if (!token) { navigate(`/${instituteSlug}/student`); return; }
+            const headers = { Authorization: `Bearer ${token}` };
+
             try {
-                const headers = { Authorization: `Bearer ${token}` };
+                // Fetch in parallel
                 const [dashboardRes, quizRes] = await Promise.all([
                     axios.get('/api/student-portal/dashboard', { headers }),
                     axios.get('/api/student-portal/quizzes', { headers })
                 ]);
+                
                 setData(dashboardRes.data);
-                setQuizzes(quizRes.data);
+                const quizData = Array.isArray(quizRes.data) ? quizRes.data : [];
+                setQuizzes(quizData);
+                
+                // PERF: Cache for instant loading on next visit
+                sessionStorage.setItem(`student_dash_${instituteSlug}`, JSON.stringify(dashboardRes.data));
+                sessionStorage.setItem(`student_quizzes_${instituteSlug}`, JSON.stringify(quizData));
             } catch {
                 localStorage.removeItem(`student_token_${instituteSlug}`);
+                sessionStorage.removeItem(`student_dash_${instituteSlug}`);
+                sessionStorage.removeItem(`student_quizzes_${instituteSlug}`);
                 toast.error('Session expired. Please log in again.');
                 navigate(`/${instituteSlug}/student`);
             } finally {
@@ -93,9 +114,10 @@ export default function StudentPortalDashboard() {
     if (!data) return null;
 
     const initials = data.student.name.charAt(0).toUpperCase();
-    const scheduledQuizzes = quizzes.filter(quiz => quiz.availabilityStatus === 'SCHEDULED');
-    const pendingQuizzes = quizzes.filter(quiz => !quiz.submission?.submittedAt && quiz.availabilityStatus !== 'LOCKED' && quiz.availabilityStatus !== 'SCHEDULED');
-    const submittedQuizzes = quizzes.filter(quiz => quiz.submission?.submittedAt);
+    const quizzesArray = Array.isArray(quizzes) ? quizzes : [];
+    const scheduledQuizzes = quizzesArray.filter(quiz => quiz.availabilityStatus === 'SCHEDULED');
+    const pendingQuizzes = quizzesArray.filter(quiz => !quiz.submission?.submittedAt && quiz.availabilityStatus !== 'LOCKED' && quiz.availabilityStatus !== 'SCHEDULED');
+    const submittedQuizzes = quizzesArray.filter(quiz => quiz.submission?.submittedAt);
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 pb-32">
@@ -242,11 +264,11 @@ export default function StudentPortalDashboard() {
                                     <ClipboardCheck className="w-4 h-4 text-gray-400" />
                                     <span className="font-bold text-sm">Online Quizzes</span>
                                 </div>
-                                {quizzes.length === 0 ? (
+                                {quizzesArray.length === 0 ? (
                                     <EmptyState message="No online quizzes assigned yet" />
                                 ) : (
                                     <div className="divide-y divide-gray-50">
-                                        {quizzes.map((quiz) => {
+                                        {quizzesArray.map((quiz) => {
                                             const submitted = Boolean(quiz.submission?.submittedAt);
                                             const missed = quiz.availabilityStatus === 'MISSED';
                                             const locked = quiz.availabilityStatus === 'LOCKED';

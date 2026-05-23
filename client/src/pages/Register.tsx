@@ -209,7 +209,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                     <div className="w-14 h-14 bg-danger/10 rounded-full flex items-center justify-center mx-auto mb-4">
                         <AlertCircle className="w-7 h-7 text-danger" />
                     </div>
-                    <h1 className="text-xl font-bold text-app-text mb-2">Batch Not Found</h1>
+                    <h2 className="text-xl font-bold text-app-text mb-2">Batch Not Found</h2>
                     <p className="text-app-text-secondary text-sm">This registration link may have expired or is invalid. Please contact your coach.</p>
                 </motion.div>
             </div>
@@ -234,9 +234,9 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                             )}
                         </div>
                         {batchStatus?.institute?.name && (
-                            <h1 className="text-xl font-bold text-app-text tracking-tight leading-tight">
+                            <h2 className="text-xl font-bold text-app-text tracking-tight leading-tight">
                                 {batchStatus.institute.name}
-                            </h1>
+                            </h2>
                         )}
                     </div>
                     <div className="w-12 h-12 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4 mt-4">
@@ -269,9 +269,9 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                             )}
                         </div>
                         {batchStatus?.institute?.name && (
-                            <h1 className="text-xl font-bold text-app-text tracking-tight leading-tight">
+                            <h2 className="text-xl font-bold text-app-text tracking-tight leading-tight">
                                 {batchStatus.institute.name}
-                            </h1>
+                            </h2>
                         )}
                     </div>
                     <div className="w-12 h-12 bg-warning/10 rounded-full flex items-center justify-center mx-auto mb-4 mt-4">

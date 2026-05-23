@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Loader, X, TrendingUp, TrendingDown, IndianRupee, Mail, History, CheckCircle, Download, ArrowUpRight, FileText, ArrowUpDown, ChevronDown, Check, Receipt } from 'lucide-react';
+import { Search, Loader, X, TrendingUp, TrendingDown, IndianRupee, Mail, History, CheckCircle, Download, ArrowUpRight, FileText, ArrowUpDown, ChevronDown, Check, Receipt, MessageSquare, Send, ChevronRight, AlertCircle, Phone, Calendar, User, Square, CheckSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../utils/cn';
 import UpiVerificationList from '../components/UpiVerificationList';
@@ -77,6 +77,18 @@ const Fees: React.FC = () => {
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [showReportsModal, setShowReportsModal] = useState(false);
     const [showBatchMenu, setShowBatchMenu] = useState(false);
+
+    // New Redesign States
+    const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+    const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+    const [bulkSending, setBulkSending] = useState(false);
+    const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+    // Reset selection and expansion on view/filter changes
+    useEffect(() => {
+        setSelectedStudentIds([]);
+        setExpandedStudentId(null);
+    }, [viewMode, selectedBatch, debouncedSearchTerm]);
 
     // Report Dropdown States
     const [showReportBatchMenu, setShowReportBatchMenu] = useState(false);
@@ -158,6 +170,39 @@ const Fees: React.FC = () => {
         }
     };
 
+    const handleSendBulkReminders = async () => {
+        if (selectedStudentIds.length === 0) return;
+        setBulkSending(true);
+        const toastId = toast.loading(`Sending reminders to ${selectedStudentIds.length} students...`);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const id of selectedStudentIds) {
+            const student = students.find(s => s.id === id);
+            if (!student) continue;
+            try {
+                await api.post('/fees/remind', {
+                    studentId: student.id,
+                    amountDue: student.balance
+                });
+                successCount++;
+            } catch {
+                failCount++;
+            }
+        }
+
+        setBulkSending(false);
+        setSelectedStudentIds([]);
+
+        if (failCount === 0) {
+            toast.success(`Successfully sent all ${successCount} reminders!`, { id: toastId });
+        } else if (successCount === 0) {
+            toast.error(`Failed to send reminders. Check email setup.`, { id: toastId });
+        } else {
+            toast.success(`Sent ${successCount} reminders. ${failCount} failed.`, { id: toastId });
+        }
+    };
+
     const batches = Array.from(new Set(students.map(s => s.batchName))).filter(b => b !== 'N/A').sort();
 
     // PERF: Memoize filtering to prevent lag when typing in search
@@ -208,36 +253,44 @@ const Fees: React.FC = () => {
                 1. Cleaner Stats cards with no border and shadow.
                 2. Unified List layout.
                 3. Better typography and whitespace.
-            */}
-
-            {/* iOS-Style Summary Widget */}
-            <div className="bg-white rounded-[32px] p-6 md:p-8 border-[1.5px] border-black/5 shadow-sm mb-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-[0.02]">
-                    <TrendingUp className="w-40 h-40" />
-                </div>
-                <div className="relative z-10">
-                    <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
-                        <div>
-                            <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Collected</div>
-                            <div className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight">₹{stats.totalCollected.toLocaleString()}</div>
+            *            {/* Compact Stats Header */}
+            <div className="mb-8 bg-white rounded-[24px] p-5 md:p-6 relative overflow-hidden border border-black/5 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)]">
+                <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, black 1px, transparent 0)', backgroundSize: '16px 16px' }}></div>
+                
+                <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div className="flex items-center gap-8 md:gap-12">
+                        <div className="space-y-1">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Total Collected
+                            </div>
+                            <div className="text-2xl md:text-3xl font-black tracking-tight font-mono text-gray-900">
+                                ₹{stats.totalCollected.toLocaleString()}
+                            </div>
                         </div>
-                        <div className="text-left md:text-right">
-                            <div className="text-[11px] font-bold text-red-400 uppercase tracking-widest mb-1">Outstanding Dues</div>
-                            <div className="text-2xl md:text-3xl font-black text-red-500 tracking-tight">₹{stats.totalDue.toLocaleString()}</div>
+                        
+                        <div className="space-y-1">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                Outstanding Dues
+                            </div>
+                            <div className="text-xl md:text-2xl font-black text-rose-500 tracking-tight font-mono">
+                                ₹{stats.totalDue.toLocaleString()}
+                            </div>
                         </div>
                     </div>
-                    
-                    {/* Collection Progress Bar */}
-                    <div className="mt-4 bg-gray-50/50 p-4 rounded-2xl border border-black-[0.02]">
-                        <div className="flex justify-between items-center mb-3">
-                            <span className="text-[13px] font-bold text-gray-600">Collection Rate</span>
-                            <span className="text-[15px] font-black text-blue-600">{stats.collectionRate}%</span>
+
+                    <div className="w-full md:w-72 space-y-1.5">
+                        <div className="flex justify-end">
+                            <span className="text-xl font-black text-emerald-600 font-mono leading-none">{stats.collectionRate}%</span>
                         </div>
-                        <div className="w-full h-3.5 bg-gray-200/80 rounded-full overflow-hidden shadow-inner">
-                            <div 
-                                className="h-full bg-blue-500 rounded-full transition-all duration-1000 ease-out shadow-sm" 
-                                style={{ width: `${stats.collectionRate}%` }}
-                            ></div>
+                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${stats.collectionRate}%` }}
+                                transition={{ duration: 1.2, ease: "easeOut" }}
+                                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
+                            ></motion.div>
                         </div>
                     </div>
                 </div>
@@ -250,33 +303,47 @@ const Fees: React.FC = () => {
                     {/* Toolbar */}
                     <div className="bg-white p-4 md:p-6 border-[1.5px] border-black/5 rounded-[28px] shadow-sm flex flex-col gap-4">
                         {/* iOS Segmented Control */}
-                        <div className="flex overflow-x-auto custom-scrollbar pb-1 -mx-2 px-2 md:mx-0 md:px-0">
-                            <div className="flex bg-neutral-100/80 border border-black/5 p-1 rounded-[20px] w-max md:w-full min-w-full">
+                        <div className="overflow-x-auto custom-scrollbar pb-1 -mx-2 px-2 md:mx-0 md:px-0">
+                            <div className="flex bg-neutral-100/80 border border-black/5 p-1 rounded-[20px] w-[640px] md:w-full min-w-full relative">
+                                {/* Smooth Sliding Pill Background */}
+                                <div 
+                                    className="absolute top-1 bottom-1 left-1 rounded-[16px] bg-white shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+                                    style={{
+                                        width: 'calc(25% - 2px)',
+                                        transform: `translateX(${
+                                            viewMode === 'defaulters' ? '0%' :
+                                            viewMode === 'recent' ? '100%' :
+                                            viewMode === 'upi' ? '200%' :
+                                            '300%'
+                                        })`
+                                    }}
+                                />
+
                                 <button
                                     onClick={() => setViewMode('defaulters')}
-                                    className={cn("flex-1 px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap", viewMode === 'defaulters' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                    className={cn("flex-1 min-w-0 px-2 md:px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap relative z-10", viewMode === 'defaulters' ? "text-gray-900" : "text-gray-500 hover:text-gray-700")}
                                 >
                                     Pending Dues
                                 </button>
                                 <button
                                     onClick={() => setViewMode('recent')}
-                                    className={cn("flex-1 px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap", viewMode === 'recent' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                    className={cn("flex-1 min-w-0 px-2 md:px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap relative z-10", viewMode === 'recent' ? "text-gray-900" : "text-gray-500 hover:text-gray-700")}
                                 >
                                     Recent Payments
                                 </button>
                                 <button
                                     onClick={() => setViewMode('upi')}
-                                    className={cn("flex-1 px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap", viewMode === 'upi' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                    className={cn("flex-1 min-w-0 px-2 md:px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap relative z-10", viewMode === 'upi' ? "text-gray-900" : "text-gray-500 hover:text-gray-700")}
                                 >
                                     UPI Approvals
                                 </button>
                                 <button
                                     onClick={() => setViewMode('custom')}
-                                    className={cn("flex-1 px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5", viewMode === 'custom' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                                    className={cn("flex-1 min-w-0 px-2 md:px-5 py-2.5 rounded-[16px] text-center text-[13px] font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 relative z-10", viewMode === 'custom' ? "text-gray-900" : "text-gray-500 hover:text-gray-700")}
                                 >
                                     Custom Invoices
                                     {customInvoices.length > 0 && (
-                                        <span className={cn("px-1.5 py-0.5 rounded-full text-[10px] font-bold", viewMode === 'custom' ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-500")}>
+                                        <span className={cn("px-1.5 py-0.5 rounded-full text-[10px] font-bold relative z-20", viewMode === 'custom' ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-500")}>
                                             {customInvoices.length}
                                         </span>
                                     )}
@@ -375,36 +442,69 @@ const Fees: React.FC = () => {
                     </div>
 
                     {viewMode === 'recent' ? (
-                        <div className="bg-white rounded-[28px] shadow-sm overflow-hidden min-h-[500px] border border-black/5 p-6 md:p-8">
+                        <div className="bg-white rounded-[28px] shadow-sm border border-black/5 p-6 md:p-8 min-h-[500px]">
                             <div className="flex items-center justify-between mb-8">
-                                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
-                                    <History className="w-5 h-5 text-gray-500" /> Recent Transactions
+                                <h3 className="font-extrabold text-neutral-800 flex items-center gap-2.5 text-lg">
+                                    <History className="w-5 h-5 text-neutral-500" /> Recent Transactions
                                 </h3>
+                                <span className="text-xs font-bold text-neutral-400 bg-neutral-50 px-3 py-1 rounded-full border border-neutral-100/50">
+                                    {filteredTransactions.length} Completed
+                                </span>
                             </div>
-                            <div className="space-y-4">
-                                {filteredTransactions.length === 0 ? (
-                                    <div className="text-center text-gray-400 text-sm py-10">No recent transactions</div>
-                                ) : (
-                                    filteredTransactions.map(tx => (
-                                        <div key={tx.id} className="group flex items-start justify-between p-5 rounded-2xl hover:bg-gray-50 transition-colors border border-black/5/80 hover:border-gray-200">
-                                            <div className="flex gap-4">
-                                                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0">
-                                                    {tx.studentName.charAt(0)}
+                            {filteredTransactions.length === 0 ? (
+                                <div className="text-center text-neutral-400 text-sm py-20 flex flex-col items-center justify-center">
+                                    <History className="w-12 h-12 text-neutral-200 mb-3" />
+                                    <p className="font-semibold">No recent transactions found</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {filteredTransactions.map(tx => {
+                                        const initials = tx.studentName
+                                            ? tx.studentName.split(/\s+/).filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                                            : '??';
+                                        return (
+                                            <div 
+                                                key={tx.id} 
+                                                onClick={() => setSelectedTransaction(tx)}
+                                                className="group flex items-center justify-between p-4 rounded-2xl bg-neutral-50/50 hover:bg-white hover:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] transition-all duration-300 border border-transparent hover:border-black/[0.04] cursor-pointer"
+                                            >
+                                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                                    {/* Initials Badge */}
+                                                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                                                        {initials}
+                                                    </div>
+
+                                                    {/* Content Details */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-bold text-neutral-800 group-hover:text-emerald-600 transition-colors duration-200 truncate">
+                                                            {tx.studentName}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <div className="text-[11px] text-neutral-400 font-bold tracking-wider truncate">
+                                                                {tx.batchName}
+                                                            </div>
+                                                            <span className="w-1 h-1 rounded-full bg-neutral-200 shrink-0"></span>
+                                                            <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest shrink-0 whitespace-nowrap">
+                                                                {tx.type.replace('Installment: ', '')}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <div className="text-base font-bold text-gray-800">{tx.studentName}</div>
-                                                    <div className="text-xs text-gray-400 uppercase tracking-wide font-bold mt-1">{tx.batchName}</div>
-                                                    <div className="text-[11px] text-gray-500 mt-2 bg-gray-100 px-2 py-1 rounded-md mb-0.5 inline-block font-medium">{tx.type.replace('Installment: ', '')}</div>
+
+                                                {/* Amount & Date */}
+                                                <div className="text-right flex flex-col items-end shrink-0 pl-4">
+                                                    <div className="text-base font-black text-emerald-600 font-mono">
+                                                        +₹{tx.amount.toLocaleString()}
+                                                    </div>
+                                                    <div className="text-[11px] text-neutral-400 font-bold mt-1">
+                                                        {new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="text-right flex flex-col items-end">
-                                                <div className="text-lg font-bold text-green-600 font-mono">+₹{tx.amount.toLocaleString()}</div>
-                                                <div className="text-xs text-gray-400 mt-1.5 font-medium">{new Date(tx.date).toLocaleDateString()}</div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     ) : viewMode === 'defaulters' ? (
                     <div className="bg-white rounded-[28px] shadow-sm overflow-hidden min-h-[500px] border border-black/5">
@@ -414,83 +514,234 @@ const Fees: React.FC = () => {
                                 <p className="font-medium text-sm">Loading records...</p>
                             </div>
                         ) : (
-                            <div className="divide-y divide-black/[0.03]">
-                                {filteredStudents.length === 0 ? (
-                                    <div className="p-16 text-center">
-                                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                            <CheckCircle className="w-8 h-8 text-gray-300" />
-                                        </div>
-                                        <p className="text-gray-500 font-medium">No pending dues found.</p>
+                            <div className="flex flex-col">
+                                {/* Defaulters List Header with Select All checkbox */}
+                                <div className="px-5 py-4 bg-neutral-50/80 border-b border-neutral-100 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <button 
+                                            onClick={() => {
+                                                if (selectedStudentIds.length === filteredStudents.length) {
+                                                    setSelectedStudentIds([]);
+                                                } else {
+                                                    setSelectedStudentIds(filteredStudents.map(s => s.id));
+                                                }
+                                            }}
+                                            className="text-neutral-500 hover:text-neutral-800 transition-colors"
+                                        >
+                                            {selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0 ? (
+                                                <CheckSquare className="w-5 h-5 text-neutral-900" />
+                                            ) : (
+                                                <Square className="w-5 h-5 text-neutral-400" />
+                                            )}
+                                        </button>
+                                        <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                                            {filteredStudents.length} {filteredStudents.length === 1 ? 'Defaulter' : 'Defaulters'}
+                                        </span>
                                     </div>
-                                ) : (
-                                    filteredStudents.map(student => (
-                                        <div key={student.id} className="p-4 sm:p-5 hover:bg-gray-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center font-bold text-base shrink-0 shadow-inner">
-                                                    {student.name.charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-gray-900 text-[15px]">{student.name}</div>
-                                                    <div className="text-[12px] text-gray-500 mt-0.5 font-medium flex items-center gap-1.5">
-                                                        {student.humanId} <span className="w-1 h-1 bg-gray-300 rounded-full"></span> {student.batchName}
-                                                    </div>
-                                                    {student.breakdown && student.breakdown.length > 0 && (
-                                                        <div className="mt-2 flex flex-wrap gap-1.5">
-                                                            {student.breakdown.slice(0, 2).map((item, i) => (
-                                                                <span key={i} className="px-2 py-0.5 bg-red-50 text-red-600 text-[10px] rounded-md font-bold border border-red-100">
-                                                                    {item.name}
-                                                                </span>
-                                                            ))}
-                                                            {student.breakdown.length > 2 && (
-                                                                <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-1.5 py-0.5 rounded-md">+{student.breakdown.length - 2} more</span>
+                                    <span className="text-[11px] text-neutral-400 font-bold">
+                                        Total Pending: ₹{filteredStudents.reduce((sum, s) => sum + s.balance, 0).toLocaleString()}
+                                    </span>
+                                </div>
+
+                                <div className="divide-y divide-black/[0.03]">
+                                    {filteredStudents.length === 0 ? (
+                                        <div className="p-16 text-center">
+                                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <CheckCircle className="w-8 h-8 text-gray-300" />
+                                            </div>
+                                            <p className="text-gray-500 font-medium">No pending dues found.</p>
+                                        </div>
+                                    ) : (
+                                        filteredStudents.map(student => (
+                                            <div key={student.id} className="flex flex-col">
+                                                {/* Main List Row */}
+                                                <div 
+                                                    onClick={() => setExpandedStudentId(expandedStudentId === student.id ? null : student.id)}
+                                                    className={cn(
+                                                        "p-4 sm:p-5 hover:bg-neutral-50/40 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer",
+                                                        selectedStudentIds.includes(student.id) && "bg-neutral-50/70"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        {/* Checkbox and letter avatar group */}
+                                                        <div 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedStudentIds(prev => 
+                                                                    prev.includes(student.id) 
+                                                                        ? prev.filter(id => id !== student.id) 
+                                                                        : [...prev, student.id]
+                                                                );
+                                                            }}
+                                                            className="relative shrink-0 w-9 h-9"
+                                                        >
+                                                            {selectedStudentIds.includes(student.id) ? (
+                                                                <div className="w-9 h-9 rounded-xl bg-neutral-900 text-white flex items-center justify-center border border-neutral-800 shadow-sm transition-all scale-100">
+                                                                    <Check className="w-4 h-4" />
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="w-9 h-9 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-sm shrink-0 shadow-inner group-hover:opacity-0 absolute inset-0 transition-opacity">
+                                                                        {student.name.charAt(0)}
+                                                                    </div>
+                                                                    <div className="w-9 h-9 rounded-xl border-2 border-neutral-300 hover:border-neutral-800 flex items-center justify-center transition-opacity opacity-0 group-hover:opacity-100 absolute inset-0 bg-white">
+                                                                        <div className="w-1.5 h-1.5 rounded-sm bg-transparent"></div>
+                                                                    </div>
+                                                                </>
                                                             )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto pl-16 sm:pl-0">
-                                                <div className="text-left sm:text-right">
-                                                    {student.balance > 0 ? (
-                                                        <div className="flex flex-col sm:items-end">
-                                                            <span className="font-mono font-black text-red-500 text-lg tracking-tight">₹{student.balance.toLocaleString()}</span>
-                                                            <span className="text-[11px] text-red-400 font-bold">{student.breakdown?.length || 0} Dues Pending</span>
+
+                                                        {/* Student Name, ID, Batch and Dues Breakdown tags */}
+                                                        <div>
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="font-bold text-neutral-900 text-[15px]">{student.name}</span>
+                                                                <ChevronRight className={cn("w-3.5 h-3.5 text-neutral-400 transition-transform hidden sm:inline-block", expandedStudentId === student.id && "rotate-90")} />
+                                                            </div>
+                                                            <div className="text-[12px] text-neutral-500 mt-0.5 font-medium flex items-center gap-1.5 flex-wrap">
+                                                                <span>{student.humanId}</span>
+                                                                <span className="w-1 h-1 bg-neutral-300 rounded-full"></span>
+                                                                <span>{student.batchName}</span>
+                                                                {student.lastPaymentDate && (
+                                                                    <>
+                                                                        <span className="w-1 h-1 bg-neutral-300 rounded-full"></span>
+                                                                        <span className="text-neutral-400 font-normal">Paid: {new Date(student.lastPaymentDate).toLocaleDateString()}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Color-coded breakdowns of what is due */}
+                                                            {student.breakdown && student.breakdown.length > 0 && (
+                                                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                                                    {student.breakdown.map((item, idx) => (
+                                                                        <span key={idx} className="px-2 py-0.5 bg-rose-50 text-rose-600 text-[10px] rounded-md font-bold border border-rose-100/50">
+                                                                            {item.name}: ₹{item.due.toLocaleString()}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    ) : (
-                                                        <span className="font-mono font-black text-green-500 text-lg tracking-tight">₹0</span>
-                                                    )}
-                                                </div>
-                                                
-                                                <div className="flex items-center gap-2">
-                                                    {student.balance > 0 ? (
-                                                        <>
-                                                            <button
-                                                                onClick={() => handleSendReminder(student)}
-                                                                className="p-2.5 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100"
-                                                                title="Send Payment Reminder"
-                                                            >
-                                                                <Mail className="w-5 h-5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedStudent(student);
-                                                                    setPaymentAmount(student.balance.toString());
-                                                                }}
-                                                                className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white text-[13px] font-bold rounded-xl shadow-md shadow-gray-200 transition-all flex items-center gap-1.5 active:scale-95"
-                                                            >
-                                                                Collect
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <div className="flex items-center gap-1.5 px-4 py-2 bg-green-50 border border-green-100 text-green-600 rounded-xl text-xs font-bold">
-                                                            <CheckCircle className="w-4 h-4" /> Paid
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pl-13 sm:pl-0">
+                                                        <div className="text-left sm:text-right">
+                                                            {student.balance > 0 ? (
+                                                                <div className="flex flex-col sm:items-end">
+                                                                    <span className="font-mono font-black text-rose-500 text-lg tracking-tight">₹{student.balance.toLocaleString()}</span>
+                                                                    <span className="text-[11px] text-rose-400 font-bold">{student.breakdown?.length || 0} Dues Pending</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="font-mono font-black text-green-500 text-lg tracking-tight">₹0</span>
+                                                            )}
                                                         </div>
-                                                    )}
+
+                                                        {/* Quick action buttons / Chevron indicator */}
+                                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                            {student.balance > 0 ? (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleSendReminder(student)}
+                                                                        className="p-2.5 text-neutral-400 hover:text-neutral-900 bg-neutral-50 hover:bg-neutral-100 rounded-xl transition-all border border-neutral-200/50"
+                                                                        title="Send Reminder"
+                                                                    >
+                                                                        <Mail className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setSelectedStudent(student);
+                                                                            setPaymentAmount(student.balance.toString());
+                                                                        }}
+                                                                        className="px-4 py-2 bg-neutral-900 hover:bg-black text-white text-[13px] font-bold rounded-xl shadow-md transition-all active:scale-95 whitespace-nowrap"
+                                                                    >
+                                                                        Collect
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-100 text-green-600 rounded-xl text-xs font-bold">
+                                                                    <CheckCircle className="w-3.5 h-3.5" /> Paid
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
+
+                                                {/* Expanded Ledger Detail Panel */}
+                                                <AnimatePresence>
+                                                    {expandedStudentId === student.id && (
+                                                        <motion.div
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: "auto", opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                                                            className="overflow-hidden bg-neutral-50/50 border-t border-neutral-100"
+                                                        >
+                                                            <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                                                {/* Detailed Ledger List */}
+                                                                <div className="space-y-3">
+                                                                    <h4 className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                                        <FileText className="w-3.5 h-3.5" /> Pending Ledger Details
+                                                                    </h4>
+                                                                    <div className="bg-white border border-neutral-200/60 rounded-2xl overflow-hidden shadow-sm">
+                                                                        <div className="divide-y divide-neutral-100 text-xs">
+                                                                            {student.breakdown && student.breakdown.length > 0 ? (
+                                                                                student.breakdown.map((item, idx) => (
+                                                                                    <div key={idx} className="flex justify-between items-center px-4 py-3 hover:bg-neutral-50/30 transition-colors">
+                                                                                        <span className="font-medium text-neutral-600">{item.name}</span>
+                                                                                        <span className="font-mono font-bold text-rose-500">₹{item.due.toLocaleString()}</span>
+                                                                                    </div>
+                                                                                ))
+                                                                            ) : (
+                                                                                <div className="px-4 py-3 text-neutral-400 text-center">No details available</div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Contact & Actions Panel */}
+                                                                <div className="space-y-3">
+                                                                    <h4 className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                                        <User className="w-3.5 h-3.5" /> Parent Information & Actions
+                                                                    </h4>
+                                                                    <div className="bg-white border border-neutral-200/60 rounded-2xl p-4 shadow-sm space-y-3">
+                                                                        {student.parentEmail ? (
+                                                                            <div className="flex items-center gap-2 text-xs text-neutral-600 bg-neutral-50 p-2.5 rounded-xl border border-neutral-100">
+                                                                                <Mail className="w-4 h-4 text-neutral-400" />
+                                                                                <span className="truncate font-medium">{student.parentEmail}</span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="text-xs text-neutral-400 italic bg-neutral-50 p-2.5 rounded-xl border border-neutral-100 text-center">
+                                                                                No contact details registered
+                                                                            </div>
+                                                                        )}
+
+                                                                        <div className="flex flex-wrap gap-2 pt-2 border-t border-neutral-100">
+                                                                            <button
+                                                                                onClick={() => handleSendReminder(student)}
+                                                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold rounded-xl transition-all border border-neutral-200"
+                                                                            >
+                                                                                <Mail className="w-3.5 h-3.5" />
+                                                                                Send Alert
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setSelectedStudent(student);
+                                                                                    setPaymentAmount(student.balance.toString());
+                                                                                }}
+                                                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
+                                                                            >
+                                                                                <IndianRupee className="w-3.5 h-3.5" />
+                                                                                Record
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
-                                        </div>
-                                    ))
-                                )}
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -907,6 +1158,122 @@ const Fees: React.FC = () => {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Floating Bulk Actions Bar */}
+            <AnimatePresence>
+                {selectedStudentIds.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 50, scale: 0.95 }}
+                        className="fixed bottom-28 xl:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white rounded-2xl px-6 py-4 shadow-2xl border border-neutral-800 flex items-center justify-between gap-6 max-w-lg w-[calc(100%-2rem)]"
+                    >
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setSelectedStudentIds([])}
+                                className="text-neutral-400 hover:text-neutral-200 transition-colors p-1 rounded-lg hover:bg-neutral-800"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                            <span className="text-sm font-bold tracking-tight">
+                                {selectedStudentIds.length} {selectedStudentIds.length === 1 ? 'student' : 'students'} selected
+                            </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleSendBulkReminders}
+                                disabled={bulkSending}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-700/50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 shrink-0"
+                            >
+                                <Send className="w-3.5 h-3.5" />
+                                {bulkSending ? 'Sending...' : 'Remind Selected'}
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Transaction Details Modal */}
+            <AnimatePresence>
+                {selectedTransaction && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedTransaction(null)}
+                            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-white rounded-[24px] shadow-2xl z-[110] overflow-hidden"
+                        >
+                            <div className="p-6 md:p-8">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-lg font-black text-gray-900">Transaction Details</h3>
+                                    <button 
+                                        onClick={() => setSelectedTransaction(null)}
+                                        className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                
+                                <div className="flex flex-col items-center justify-center mb-6 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
+                                        <CheckCircle className="w-8 h-8 text-emerald-600" />
+                                    </div>
+                                    <div className="text-3xl font-black text-emerald-600 font-mono mb-1">
+                                        +₹{selectedTransaction.amount.toLocaleString()}
+                                    </div>
+                                    <div className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+                                        Payment Successful
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4 bg-gray-50 rounded-xl p-5 border border-black/5">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium text-gray-500">Student</span>
+                                        <span className="text-sm font-bold text-gray-900">{selectedTransaction.studentName}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium text-gray-500">Batch</span>
+                                        <span className="text-sm font-bold text-gray-900 text-right max-w-[150px]">{selectedTransaction.batchName}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium text-gray-500">Type</span>
+                                        <span className="text-sm font-bold text-gray-900">{selectedTransaction.type.replace('Installment: ', '')}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-4 border-t border-black/5">
+                                        <span className="text-sm font-medium text-gray-500">Date & Time</span>
+                                        <span className="text-sm font-bold text-gray-900">
+                                            {new Date(selectedTransaction.date).toLocaleString(undefined, { 
+                                                month: 'short', day: 'numeric', year: 'numeric',
+                                                hour: 'numeric', minute: '2-digit', hour12: true 
+                                            })}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div className="mt-6">
+                                    <button 
+                                        onClick={() => setSelectedTransaction(null)}
+                                        className="w-full py-3 bg-gray-900 hover:bg-black text-white rounded-xl font-bold transition-all active:scale-95 shadow-md shadow-gray-200"
+                                    >
+                                        Done
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* Bottom spacer to prevent content clipping by mobile nav dock */}
+            <div className="h-28 md:h-8" />
         </Layout >
     );
 };

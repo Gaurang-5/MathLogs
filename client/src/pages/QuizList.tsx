@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { API_URL, apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
 import {
@@ -114,6 +114,13 @@ export default function QuizList() {
 
     // Active Selected Quiz & Current Cockpit Tab
     const [activeQuiz, setActiveQuiz] = useState<OnlineQuiz | null>(null);
+    const activeQuizRef = useRef<OnlineQuiz | null>(null);
+
+    const changeActiveQuiz = (quiz: OnlineQuiz | null) => {
+        activeQuizRef.current = quiz;
+        setActiveQuiz(quiz);
+    };
+
     const [activeTab, setActiveTab] = useState<'monitor' | 'analytics' | 'submissions'>('monitor');
 
     // Quiz editing
@@ -149,9 +156,10 @@ export default function QuizList() {
             setOnlineQuizzes(quizzesData);
             setBatches(batchesData);
 
-            if (activeQuiz) {
-                const refreshedActive = quizzesData.find(q => q.id === activeQuiz.id);
-                if (refreshedActive) setActiveQuiz(refreshedActive);
+            const currentActive = activeQuizRef.current;
+            if (currentActive) {
+                const refreshedActive = quizzesData.find(q => q.id === currentActive.id);
+                if (refreshedActive) changeActiveQuiz(refreshedActive);
             }
         } catch (error) {
             console.error('Failed to fetch quizzes data:', error);
@@ -169,9 +177,10 @@ export default function QuizList() {
         try {
             const quizzesData = await apiRequest<OnlineQuiz[]>('/tests/online');
             setOnlineQuizzes(quizzesData);
-            if (activeQuiz) {
-                const refreshedActive = quizzesData.find(q => q.id === activeQuiz.id);
-                if (refreshedActive) setActiveQuiz(refreshedActive);
+            const currentActive = activeQuizRef.current;
+            if (currentActive) {
+                const refreshedActive = quizzesData.find(q => q.id === currentActive.id);
+                if (refreshedActive) changeActiveQuiz(refreshedActive);
             }
         } catch (error) {
             console.error('Failed to refresh quizzes:', error);
@@ -235,7 +244,7 @@ export default function QuizList() {
             await apiRequest(`/tests/online/${quiz.id}`, 'DELETE');
             toast.success('Quiz deleted successfully');
             setDeleteConfirmQuiz(null);
-            setActiveQuiz(null);
+            changeActiveQuiz(null);
             await refreshOnlineQuizzes();
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to delete quiz.');
@@ -333,8 +342,23 @@ export default function QuizList() {
         }
     };
 
+    const getEnrolledStudents = (quiz: OnlineQuiz) => {
+        const studentsMap = new Map<string, any>();
+        if (quiz.batch?.students) {
+            quiz.batch.students.forEach((s: any) => studentsMap.set(s.id, s));
+        }
+        if (quiz.batches) {
+            quiz.batches.forEach((b: any) => {
+                if (b.students) {
+                    b.students.forEach((s: any) => studentsMap.set(s.id, s));
+                }
+            });
+        }
+        return Array.from(studentsMap.values());
+    };
+
     const getQuizProgressData = (quiz: OnlineQuiz) => {
-        const enrolled = quiz.batch?.students.length || 0;
+        const enrolled = getEnrolledStudents(quiz).length;
         const completed = quiz.submissions.filter(s => s.submittedAt !== null).length;
         const active = quiz.submissions.filter(s => s.startedAt !== null && s.submittedAt === null).length;
         const unattempted = Math.max(0, enrolled - (completed + active));
@@ -365,7 +389,7 @@ export default function QuizList() {
         return (
             <div
                 onClick={() => {
-                    setActiveQuiz(quiz);
+                    changeActiveQuiz(quiz);
                     setActiveTab('monitor');
                 }}
                 className="bg-white border-[1.5px] border-neutral-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-emerald-500/35 transition-all duration-300 cursor-pointer flex flex-col justify-between group"
@@ -520,7 +544,7 @@ export default function QuizList() {
                         <div className="flex flex-col gap-4 border-b border-black/5 pb-5">
                             <button
                                 onClick={() => {
-                                    setActiveQuiz(null);
+                                    changeActiveQuiz(null);
                                     refreshOnlineQuizzes();
                                 }}
                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-app-text-secondary hover:text-emerald-700 transition-colors uppercase tracking-wider"
@@ -764,7 +788,7 @@ export default function QuizList() {
                                     </div>
 
                                     <div className="md:hidden divide-y divide-black/5">
-                                        {(activeQuiz.batch?.students || []).map((student) => {
+                                        {getEnrolledStudents(activeQuiz).map((student) => {
                                             const sub = activeQuiz.submissions.find(s => s.studentId === student.id);
                                             let statusLabel = 'Not Started';
                                             let statusBadge = 'bg-neutral-100 text-neutral-700 border-neutral-250';
@@ -846,7 +870,7 @@ export default function QuizList() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-black/5">
-                                                {(activeQuiz.batch?.students || []).map((student) => {
+                                                {getEnrolledStudents(activeQuiz).map((student) => {
                                                     const sub = activeQuiz.submissions.find(s => s.studentId === student.id);
 
                                                     let statusLabel = 'Not Started';

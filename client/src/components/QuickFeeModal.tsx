@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Search, Loader, IndianRupee, User, Wallet } from 'lucide-react';
+import { X, Search, Loader, IndianRupee, User, Wallet, Sparkles } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -27,6 +27,8 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [scanningImage, setScanningImage] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -59,6 +61,37 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
             (s.phone && s.phone.includes(search.trim()))
         ).slice(0, 5)
         : [];
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setScanningImage(true);
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const data: any = await api.post('/fees/scan-receipt', formData, {
+                // api.ts automatically handles multipart headers if FormData is passed in axios, 
+                // but since it's fetch wrapper we just pass body: formData and omit Content-Type.
+            });
+            
+            if (data.amountPaid) {
+                setAmount(data.amountPaid.toString());
+                toast.success(`Scanned ₹${data.amountPaid} from receipt!`);
+                if (data.senderName) {
+                    setSearch(data.senderName);
+                }
+            } else {
+                toast.error("Could not detect amount from image.");
+            }
+        } catch (error) {
+            toast.error("Receipt scanning failed.");
+        } finally {
+            setScanningImage(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -112,6 +145,20 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
                             </div>
 
                             <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                                {/* Scan Receipt Section */}
+                                <div>
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={scanningImage}
+                                        className="w-full bg-indigo-50 text-indigo-600 font-bold py-3 rounded-xl hover:bg-indigo-100/70 disabled:opacity-50 transition-all flex items-center justify-center gap-2 border border-indigo-100"
+                                    >
+                                        {scanningImage ? <Loader className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                                        {scanningImage ? 'Scanning Receipt...' : 'Scan Screenshot ✨'}
+                                    </button>
+                                    <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+                                </div>
+
                                 {/* Student Selection */}
                                 <div className="space-y-2 relative">
                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Select Student</label>

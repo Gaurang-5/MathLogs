@@ -244,3 +244,63 @@ export const bulkNotifyLimiter = rateLimit({
         });
     }
 });
+
+// Student Portal: General Limiter for Dashboard and Read Routes
+export const studentPortalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 300, // Limit each IP to 300 requests per 15 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests. Please try again later.' },
+    handler: (req: Request, res: Response) => {
+        console.warn('[RATE_LIMIT_EXCEEDED]', {
+            type: 'student_portal',
+            ip: req.ip,
+            path: req.path,
+            timestamp: new Date().toISOString()
+        });
+        res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+});
+
+// Student Portal: Login Rate Limiter
+export const studentLoginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // 20 login attempts per IP per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many login attempts. Please try again later.' },
+    handler: (req: Request, res: Response) => {
+        console.warn('[RATE_LIMIT_EXCEEDED]', {
+            type: 'student_login',
+            ip: req.ip,
+            path: req.path,
+            timestamp: new Date().toISOString(),
+            severity: 'MEDIUM',
+            message: 'Student portal login rate limit hit'
+        });
+        res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+    }
+});
+
+// Student Portal: Quiz Activity Rate Limiter (heartbeat, autosave, cheating events)
+// Tuned for classroom NAT: ~30 students behind one IP, each sending heartbeat + autosave every ~15s
+export const quizActivityLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 120, // 120 req/min per IP (supports ~30 students on shared Wi-Fi)
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests. Please wait a moment.' },
+    handler: (req: Request, res: Response) => {
+        console.warn('[RATE_LIMIT_EXCEEDED]', {
+            type: 'quiz_activity',
+            ip: req.ip,
+            path: req.path,
+            method: req.method,
+            timestamp: new Date().toISOString(),
+            severity: 'HIGH',
+            message: 'Quiz activity rate limit hit - possible bot or spam'
+        });
+        res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
+    }
+});

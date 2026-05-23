@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
-import { activeHeartbeats } from './studentPortalController';
+import { heartbeatManager } from '../utils/redis';
+import { autoFinalizeExpiredSubmissions } from './studentPortalController';
 
 
 const SCORE_BINS = [
@@ -16,6 +17,9 @@ export const getOnlineQuizAnalytics = async (req: Request, res: Response) => {
         const quizId = String(req.params.id);
         const teacherId = (req as any).user?.id;
         const instituteId = (req as any).user?.instituteId;
+
+        // Auto-finalize any expired submissions to update database state before aggregates
+        await autoFinalizeExpiredSubmissions(quizId);
 
         const quiz = await prisma.onlineQuiz.findFirst({
             where: { id: quizId, teacherId, instituteId },
@@ -149,6 +153,9 @@ export const getLiveQuizStatus = async (req: Request, res: Response) => {
         const teacherId = (req as any).user?.id;
         const instituteId = (req as any).user?.instituteId;
 
+        // Auto-finalize any expired submissions to clean up database state before fetching
+        await autoFinalizeExpiredSubmissions(quizId);
+
         const quiz = await prisma.onlineQuiz.findFirst({
             where: { id: quizId, teacherId, instituteId },
             select: {
@@ -196,6 +203,11 @@ export const getLiveQuizStatus = async (req: Request, res: Response) => {
         });
 
         const now = Date.now();
+
+        // Fetch all heartbeats from Redis in one pipeline call
+        const submissionIds = submissions.map(s => s.id);
+        const heartbeats = await heartbeatManager.getMultiple(submissionIds);
+
         const defaultStudentQuestionCount = quiz.studentQuestionCount && quiz.studentQuestionCount > 0
             ? Math.min(quiz.studentQuestionCount, quiz._count.questions)
             : quiz._count.questions;
@@ -223,7 +235,7 @@ export const getLiveQuizStatus = async (req: Request, res: Response) => {
             }
 
             // Connection health check (heartbeat within last 60s, or started within last 60s)
-            const lastActive = activeHeartbeats.get(sub.id) || 0;
+            const lastActive = heartbeats[sub.id] || 0;
             const elapsedSinceLastActive = now - lastActive;
             const elapsedSinceStart = now - new Date(sub.startedAt).getTime();
             const isOffline = !sub.submittedAt && elapsedSinceLastActive > 60000 && elapsedSinceStart > 60000;

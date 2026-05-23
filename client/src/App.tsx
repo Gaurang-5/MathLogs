@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy, type ReactNode } from 'react';
+import { Toaster } from 'react-hot-toast';
 import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
 import Onboarding from './pages/Onboarding';
 import { readTokenPayload } from './utils/auth';
@@ -69,6 +70,7 @@ const Loading = () => (
 function App() {
   return (
     <ChunkErrorBoundary>
+      <Toaster position="top-center" reverseOrder={false} />
       <BrowserRouter>
         <Suspense fallback={<Loading />}>
           <Routes>

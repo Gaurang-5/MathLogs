@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { apiRequest } from '../utils/api';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, GraduationCap, ChevronRight, Loader } from 'lucide-react';
@@ -17,31 +17,55 @@ export default function StudentPortalLogin() {
 
     const [mobileNumber, setMobileNumber] = useState('');
     const [loading, setLoading] = useState(false);
-    const [branding, setBranding] = useState<Branding | null>(null);
+    
+    // PERF: Load branding from sessionStorage first for instant "Return" experience
+    const [branding, setBranding] = useState<Branding | null>(() => {
+        const cached = sessionStorage.getItem(`branding_${instituteSlug}`);
+        return cached ? JSON.parse(cached) : null;
+    });
 
     useEffect(() => {
-        axios.get(`/api/student-portal/branding/${instituteSlug}`)
-            .then(res => setBranding(res.data))
-            .catch(() => setBranding({ name: 'Student Portal', logoUrl: null, primaryColor: null }));
+        const fetchBranding = async () => {
+            try {
+                const data = await apiRequest<Branding>(`/student-portal/branding/${instituteSlug}`);
+                setBranding(data);
+                sessionStorage.setItem(`branding_${instituteSlug}`, JSON.stringify(data));
+            } catch (err) {
+                if (!branding) {
+                    setBranding({ name: 'Student Portal', logoUrl: null, primaryColor: null });
+                }
+            }
+        };
+        fetchBranding();
     }, [instituteSlug]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (mobileNumber.replace(/\D/g, '').length < 10) {
+        
+        const cleanMobile = mobileNumber.replace(/\D/g, '');
+        if (cleanMobile.length < 10) {
             toast.error('Enter a valid 10-digit mobile number');
             return;
         }
+
         setLoading(true);
         try {
-            const response = await axios.post<{ token: string; student: any }>(
-                '/api/student-portal/login',
-                { instituteSlug, mobileNumber: mobileNumber.replace(/\D/g, '') }
+            const data = await apiRequest<{ token: string; student: any }>(
+                '/student-portal/login',
+                'POST',
+                { instituteSlug, mobileNumber: cleanMobile }
             );
-            localStorage.setItem(`student_token_${instituteSlug}`, response.data.token);
-            toast.success(`Welcome, ${response.data.student.name}!`);
+            
+            localStorage.setItem(`student_token_${instituteSlug}`, data.token);
+            toast.success(`Welcome, ${data.student.name}!`);
             navigate(`/${instituteSlug}/student/dashboard`);
         } catch (error: any) {
-            toast.error(error?.response?.data?.error || 'Mobile number not found. Please try again.');
+            // apiRequest automatically throws Error(serverMessage)
+            toast.error(error.message || 'Login failed. Please try again.', {
+                duration: 5000,
+                id: 'login-error' // prevent duplicate toasts
+            });
+            console.error('[LOGIN_ERROR]', error);
         } finally {
             setLoading(false);
         }
@@ -52,31 +76,31 @@ export default function StudentPortalLogin() {
 
     return (
         <div className="min-h-screen bg-app-bg font-sans flex flex-col overflow-hidden relative">
+            <style>{`
+                @keyframes float-top {
+                    0%, 100% { transform: translate(33%, -33%) scale(1); opacity: 0.15; }
+                    50% { transform: translate(33%, -35%) scale(1.1); opacity: 0.3; }
+                }
+                @keyframes float-bottom {
+                    0%, 100% { transform: translate(-33%, 33%) scale(1); opacity: 0.1; }
+                    50% { transform: translate(-33%, 35%) scale(1.15); opacity: 0.25; }
+                }
+                .animate-float-top { animation: float-top 5s ease-in-out infinite; }
+                .animate-float-bottom { animation: float-bottom 7s ease-in-out infinite; }
+            `}</style>
             
             {/* ─── Animated Background ─── */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                 <div 
-                    className="absolute inset-0 opacity-20" 
+                    className="absolute inset-0 opacity-20 transition-all duration-1000" 
                     style={{ background: branding?.primaryColor ? `linear-gradient(180deg, ${branding.primaryColor} 0%, transparent 100%)` : undefined }} 
                 />
-                <motion.div 
-                    animate={{ 
-                        y: [0, -30, 0], 
-                        scale: [1, 1.1, 1],
-                        opacity: [0.15, 0.3, 0.15] 
-                    }}
-                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full blur-[80px] translate-x-1/3 -translate-y-1/3" 
+                <div 
+                    className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full blur-[80px] animate-float-top" 
                     style={{ backgroundColor: branding?.primaryColor || '#1e40af' }}
                 />
-                <motion.div 
-                    animate={{ 
-                        y: [0, 40, 0], 
-                        scale: [1, 1.15, 1],
-                        opacity: [0.1, 0.25, 0.1] 
-                    }}
-                    transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                    className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full blur-[80px] -translate-x-1/3 translate-y-1/3" 
+                <div 
+                    className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full blur-[80px] animate-float-bottom" 
                     style={{ backgroundColor: branding?.primaryColor || '#1e40af' }}
                 />
             </div>

@@ -10,7 +10,7 @@ import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute } from '../controllers/testController';
 import { getOnlineQuizAnalytics, getLiveQuizStatus } from '../controllers/analyticsController';
-import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices } from '../controllers/feeController';
+import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, scanReceipt } from '../controllers/feeController';
 import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
 
 
@@ -312,6 +312,7 @@ router.get('/fees/upi-verifications', authenticateToken as any, getUpiVerificati
 router.post('/fees/upi-verifications/:id/approve', authenticateToken as any, paymentLimiter, approveUpiVerification as any);
 router.post('/fees/upi-verifications/:id/reject', authenticateToken as any, paymentLimiter, rejectUpiVerification as any);
 router.get('/fees/custom-invoices', authenticateToken as any, getCustomInvoices as any);
+router.post('/fees/scan-receipt', authenticateToken as any, ocrLimiter, upload.single('image'), scanReceipt as any);
 
 // Stats
 router.get('/stats/growth', authenticateToken as any, getStudentGrowthStats as any);
@@ -357,7 +358,6 @@ router.get('/admin-onboarding/links', authenticateToken as any, listAdminOnboard
 router.get('/admin-onboarding/:token', publicLimiter, getAdminOnboardingLink as any);
 router.post('/admin-onboarding/create-order', publicLimiter, createAdminOnboardingOrder as any);
 router.post('/admin-onboarding/verify-payment', publicLimiter, verifyAdminOnboardingPayment as any);
-
 
 
 export default router;

@@ -5,7 +5,7 @@ import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Monitor, Copy, Share2 } from 'lucide-react';
+import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Monitor, Copy, Share2, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
@@ -93,6 +93,7 @@ export default function BatchDetails() {
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [showAddStudent, setShowAddStudent] = useState(false);
     const [showRegMenu, setShowRegMenu] = useState(false);
+    const [showRegModal, setShowRegModal] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteCodeInput, setDeleteCodeInput] = useState('');
@@ -127,9 +128,9 @@ export default function BatchDetails() {
         whatsappGroupLink: ''
     });
 
-    // Fee Installment State
-    const [showAddInstallment, setShowAddInstallment] = useState(false);
-    const [showManageInstallments, setShowManageInstallments] = useState(false);
+    // Fee Installment State — unified multi-step modal
+    const [showFeeModal, setShowFeeModal] = useState(false);
+    const [feeView, setFeeView] = useState<'list' | 'add' | 'edit' | 'delete-confirm'>('list');
     const [newInstallment, setNewInstallment] = useState({ name: '', amount: '' });
     const [editingInstallment, setEditingInstallment] = useState<FeeInstallment | null>(null);
     const [installmentToDelete, setInstallmentToDelete] = useState<FeeInstallment | null>(null);
@@ -214,6 +215,9 @@ export default function BatchDetails() {
     };
 
     // ... existing handlers ...
+
+    const openFeeModal = () => { setFeeView('list'); setShowFeeModal(true); };
+    const closeFeeModal = () => { setShowFeeModal(false); setTimeout(() => setFeeView('list'), 300); };
 
     const openEditBatch = () => {
         if (batch) {
@@ -510,18 +514,18 @@ export default function BatchDetails() {
 
     const handleAddInstallment = async (e: React.FormEvent) => {
         e.preventDefault();
-        const toastId = toast.loading('Creating installment...');
+        const toastId = toast.loading('Creating fee column...');
         try {
             await apiRequest(`/batches/${id}/installments`, 'POST', {
                 name: newInstallment.name,
-                amount: Number(newInstallment.amount) // Ensure amount is number
+                amount: Number(newInstallment.amount)
             });
-            toast.success('Installment created', { id: toastId });
-            setShowAddInstallment(false);
+            toast.success('Fee column created', { id: toastId });
             setNewInstallment({ name: '', amount: '' });
+            setFeeView('list');
             setTimeout(() => fetchDetails(), 300);
         } catch {
-            toast.error('Failed to create installment', { id: toastId });
+            toast.error('Failed to create fee column', { id: toastId });
         }
     };
 
@@ -695,7 +699,7 @@ export default function BatchDetails() {
     if (!batch) return null;
 
     return (
-        <Layout title={batch.name}>
+        <Layout>
             <div className="mb-6 sm:mb-8">
                 {/* ── Back navigation ── */}
                 <button
@@ -708,66 +712,54 @@ export default function BatchDetails() {
                 {/* ══════════════════════════════════════════════
                     HEADER BLOCK — editorial typographic approach
                 ══════════════════════════════════════════════ */}
-                <div className="flex flex-col lg:flex-row gap-6">
+                <div>
 
-                    {/* ── Left column: Title + Meta + Actions ── */}
-                    <div className="flex-1 min-w-0">
-
-                        {/* Title section */}
-                        <div className="bg-white border border-black/[0.06] rounded-2xl p-6 md:p-8 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] mb-4">
-                            <div className="flex items-start justify-between gap-4">
+                        {/* Title section — compact */}
+                        <div className="bg-white border border-black/[0.06] rounded-2xl px-5 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] mb-4">
+                            <div className="flex items-center justify-between gap-4">
                                 <div className="flex-1 min-w-0">
-                                    {/* Eyebrow */}
-                                    <div className="flex flex-wrap items-center gap-2 mb-3">
-                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-app-text-tertiary border border-black/10 px-2.5 py-1 rounded-md">
-                                            {batch.subject}
-                                        </span>
-                                        {batch.className && (
-                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-app-text-tertiary border border-black/10 px-2.5 py-1 rounded-md">
-                                                {batch.className}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Batch name — editorial headline */}
-                                    <h1 className="text-3xl md:text-[2.75rem] font-black text-black tracking-tight leading-[1.05] break-words mb-4">
+                                    {/* Batch name headline */}
+                                    <h1 className="text-xl md:text-2xl font-black text-black tracking-tight leading-tight break-words mb-2">
                                         {batch.name}
                                     </h1>
 
-                                    {/* Meta pills */}
-                                    <div className="flex flex-wrap items-center gap-3">
-                                        <div className="flex items-center gap-2 bg-neutral-50 border border-black/[0.06] rounded-lg px-3 py-1.5">
-                                            <Clock className="w-3.5 h-3.5 text-app-text-tertiary" />
-                                            <span className="text-sm font-semibold text-app-text-secondary">{batch.timeSlot}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 bg-neutral-50 border border-black/[0.06] rounded-lg px-3 py-1.5">
-                                            <Users className="w-3.5 h-3.5 text-app-text-tertiary" />
-                                            <span className="text-sm font-semibold text-app-text-secondary">
-                                                <span className="text-black font-black">{batch.students.length}</span> Students
-                                            </span>
-                                        </div>
+                                    {/* Single meta line: MATH · CLASS 10 · 4–6pm · 53 Students */}
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span className="text-[11px] font-black uppercase tracking-[0.1em] text-app-text-tertiary">{batch.subject}</span>
+                                        {batch.className && (
+                                            <>
+                                                <span className="text-app-text-tertiary/40 text-[11px]">·</span>
+                                                <span className="text-[11px] font-black uppercase tracking-[0.1em] text-app-text-tertiary">{batch.className}</span>
+                                            </>
+                                        )}
+                                        {batch.timeSlot && (
+                                            <>
+                                                <span className="text-app-text-tertiary/40 text-[11px]">·</span>
+                                                <span className="flex items-center gap-1 text-[11px] font-semibold text-app-text-tertiary">
+                                                    <Clock className="w-3 h-3" />{batch.timeSlot}
+                                                </span>
+                                            </>
+                                        )}
+                                        <span className="text-app-text-tertiary/40 text-[11px]">·</span>
+                                        <span className="flex items-center gap-1 text-[11px] font-semibold text-app-text-tertiary">
+                                            <Users className="w-3 h-3" />
+                                            <span className="font-black text-black">{batch.students.length}</span> Students
+                                        </span>
                                     </div>
                                 </div>
 
                                 {/* Edit / Delete controls */}
                                 <div className="flex gap-1.5 shrink-0">
-                                    <button
-                                        onClick={openEditBatch}
-                                        className="p-2.5 text-app-text-tertiary hover:text-black hover:bg-neutral-100 rounded-xl transition-all border border-black/[0.06]"
-                                        title="Edit Batch Details"
-                                    >
+                                    <button onClick={openEditBatch} className="p-2 text-app-text-tertiary hover:text-black hover:bg-neutral-100 rounded-xl transition-all border border-black/[0.06]" title="Edit Batch Details">
                                         <Settings className="w-4 h-4" />
                                     </button>
-                                    <button
-                                        onClick={handleDeleteBatch}
-                                        className="p-2.5 text-app-text-tertiary hover:text-danger hover:bg-red-50 rounded-xl transition-all border border-black/[0.06]"
-                                        title="Delete Batch"
-                                    >
+                                    <button onClick={handleDeleteBatch} className="p-2 text-app-text-tertiary hover:text-danger hover:bg-red-50 rounded-xl transition-all border border-black/[0.06]" title="Delete Batch">
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>
                         </div>
+
 
                         {/* ── Action strip ── */}
                         {/* Desktop: flex-wrap pill row | Mobile: horizontal scroll icon tabs */}
@@ -806,7 +798,7 @@ export default function BatchDetails() {
                                 <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
 
                                 <button
-                                    onClick={() => setShowManageInstallments(true)}
+                                    onClick={openFeeModal}
                                     className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
                                 >
                                     <Settings className="w-5 h-5" />
@@ -814,6 +806,7 @@ export default function BatchDetails() {
                                 </button>
 
                                 <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+
 
                                 <button
                                     onClick={openWhatsappModal}
@@ -835,6 +828,19 @@ export default function BatchDetails() {
                                     <Mail className="w-5 h-5" />
                                     <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Invites</span>
                                 </button>
+
+                                {!batch.isRegistrationEnded && (
+                                    <>
+                                        <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+                                        <button
+                                            onClick={() => setShowRegModal(true)}
+                                            className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                        >
+                                            <Share2 className="w-5 h-5" />
+                                            <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Reg. QR</span>
+                                        </button>
+                                    </>
+                                )}
                             </div>
 
                             {/* Desktop: wrapped pill row */}
@@ -852,7 +858,7 @@ export default function BatchDetails() {
                                 <button onClick={handlePrintStickers} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
                                     <Printer className="w-4 h-4 text-app-text-tertiary" /> Stickers
                                 </button>
-                                <button onClick={() => setShowManageInstallments(true)} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
+                                <button onClick={openFeeModal} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
                                     <Settings className="w-4 h-4 text-app-text-tertiary" /> Fee Cols
                                 </button>
                                 <div className="w-px bg-black/[0.06] self-stretch mx-1" />
@@ -873,144 +879,17 @@ export default function BatchDetails() {
                                 >
                                     <Mail className="w-4 h-4" /> Send Invites
                                 </button>
+                                {!batch.isRegistrationEnded && (
+                                    <button
+                                        onClick={() => setShowRegModal(true)}
+                                        className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]"
+                                    >
+                                        <Share2 className="w-4 h-4 text-app-text-tertiary" /> Registration QR
+                                    </button>
+                                )}
                             </div>
                         </div>
-                    </div>
 
-                    {/* ── Right column: Registration Card (conditionally shown) ── */}
-
-                    {!batch.isRegistrationEnded && (
-                        <div className="w-full lg:w-72 xl:w-80 shrink-0 bg-white border border-black/[0.06] rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] overflow-hidden">
-
-                            {/* Header row */}
-                            <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.05]">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-black uppercase tracking-[0.1em] text-app-text-tertiary">Registration</span>
-                                    <div className={cn(
-                                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-black border uppercase tracking-wider",
-                                        batch.isRegistrationOpen
-                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                            : 'bg-amber-50 text-amber-600 border-amber-200'
-                                    )}>
-                                        <span className={cn(
-                                            "w-1.5 h-1.5 rounded-full",
-                                            batch.isRegistrationOpen ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                                        )} />
-                                        {batch.isRegistrationOpen ? 'Live' : 'Paused'}
-                                    </div>
-                                </div>
-
-                                {/* ⋮ Options menu */}
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setShowRegMenu(!showRegMenu)}
-                                        className="p-2 hover:bg-black/5 rounded-xl transition-colors text-app-text-tertiary active:scale-95"
-                                    >
-                                        <MoreVertical className="w-4 h-4" />
-                                    </button>
-
-                                    <AnimatePresence>
-                                        {showRegMenu && (
-                                            <>
-                                                <div className="fixed inset-0 z-40 cursor-default" onClick={(e) => { e.stopPropagation(); setShowRegMenu(false); }} />
-                                                <motion.div
-                                                    initial={{ opacity: 0, scale: 0.95, y: -5 }}
-                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                    exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                                                    className="absolute right-0 top-10 min-w-[200px] bg-white border border-black/[0.08] rounded-xl shadow-xl z-50 py-1.5 overflow-hidden"
-                                                >
-                                                    <div className="px-4 py-2 text-[10px] font-black text-app-text-tertiary uppercase tracking-widest">Options</div>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleToggleRegistration(); setShowRegMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-neutral-50 text-app-text flex items-center gap-3 text-sm transition-colors">
-                                                        {batch.isRegistrationOpen ? <Pause className="w-4 h-4 text-app-text-tertiary" /> : <Play className="w-4 h-4 text-app-text-tertiary" />}
-                                                        {batch.isRegistrationOpen ? 'Pause temporarily' : 'Resume registration'}
-                                                    </button>
-                                                    <div className="h-px bg-black/[0.06] mx-4" />
-                                                    <button onClick={(e) => { e.stopPropagation(); handleEndRegistration(); setShowRegMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-neutral-50 text-app-text flex items-center gap-3 text-sm transition-colors">
-                                                        <Archive className="w-4 h-4 text-app-text-tertiary" /> Close permanently
-                                                    </button>
-                                                    <div className="h-px bg-black/[0.06] mx-4" />
-                                                    <button onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); setShowRegMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-red-50 text-danger flex items-center gap-3 text-sm transition-colors">
-                                                        <Trash2 className="w-4 h-4" /> Delete Batch
-                                                    </button>
-                                                </motion.div>
-                                            </>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            </div>
-
-                            {/* Body — horizontal on mobile (QR left | actions right), vertical on desktop */}
-                            <div className="flex flex-row md:flex-col gap-0">
-
-                                {/* QR + Download */}
-                                <div className="flex flex-col items-center justify-center gap-3 p-4 bg-neutral-50/60 border-r md:border-r-0 md:border-b border-black/[0.05] shrink-0">
-                                    <div className="bg-white p-2.5 rounded-xl border border-black/[0.06] shadow-sm">
-                                        <QRCode value={`${window.location.origin}/register/${batch.id}`} size={100} />
-                                    </div>
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                const token = localStorage.getItem('token');
-                                                const response = await fetch(`${API_URL}/batches/${batch.id}/qr-pdf`, {
-                                                    headers: { Authorization: `Bearer ${token}` }
-                                                });
-                                                if (!response.ok) throw new Error('Failed to download');
-                                                const blob = await response.blob();
-                                                const url = window.URL.createObjectURL(blob);
-                                                const a = document.createElement('a');
-                                                a.href = url;
-                                                a.download = `QR-${batch.name.replace(/\s+/g, '-')}.pdf`;
-                                                document.body.appendChild(a);
-                                                a.click();
-                                                window.URL.revokeObjectURL(url);
-                                                document.body.removeChild(a);
-                                            } catch {
-                                                toast.error('Failed to download QR PDF');
-                                            }
-                                        }}
-                                        className="flex items-center gap-1.5 text-[11px] font-bold text-app-text-secondary hover:text-black bg-white px-3 py-2 rounded-lg border border-black/[0.06] hover:border-black/20 transition-all w-full justify-center active:scale-[0.97]"
-                                    >
-                                        <Download className="w-3.5 h-3.5" /> QR PDF
-                                    </button>
-                                </div>
-
-                                {/* Quick links — stacked */}
-                                <div className="flex-1 flex flex-col p-3 gap-2">
-                                    <p className="text-[9px] font-black text-app-text-tertiary uppercase tracking-widest px-1 mb-0.5">Quick Links</p>
-                                    <button
-                                        onClick={() => window.open(`/kiosk/register/${batch.id}`, '_blank')}
-                                        className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-black border border-black/[0.06] text-xs font-semibold transition-all w-full active:scale-[0.98] text-left"
-                                    >
-                                        <Monitor className="w-4 h-4 text-app-text-tertiary shrink-0" />
-                                        <span>Fullscreen Kiosk</span>
-                                    </button>
-                                    <button
-                                        onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`); toast.success('Invite Link Copied'); }}
-                                        className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-black border border-black/[0.06] text-xs font-semibold transition-all w-full active:scale-[0.98] text-left"
-                                    >
-                                        <Copy className="w-4 h-4 text-app-text-tertiary shrink-0" />
-                                        <span>Copy Link</span>
-                                    </button>
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                if (navigator.share) {
-                                                    await navigator.share({ title: 'Batch Registration', text: `Register for ${batch.name}`, url: `${window.location.origin}/register/${batch.id}` });
-                                                } else {
-                                                    navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`);
-                                                    toast.success('Link copied!');
-                                                }
-                                            } catch (err) { console.error('Share failed', err); }
-                                        }}
-                                        className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-black border border-black/[0.06] text-xs font-semibold transition-all w-full active:scale-[0.98] text-left"
-                                    >
-                                        <Share2 className="w-4 h-4 text-app-text-tertiary shrink-0" />
-                                        <span>Share Link</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -2108,235 +1987,178 @@ export default function BatchDetails() {
                 }
             </AnimatePresence>
 
-            {/* Manage Installments Modal */}
+            {/* ═══════════════════════════════════════════
+                UNIFIED FEE COLUMNS MODAL
+                List → Add | Edit | Delete-Confirm
+                All views live in one sheet — no modal-hopping.
+            ═══════════════════════════════════════════ */}
             <AnimatePresence>
-                {showManageInstallments && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
+                {showFeeModal && (
+                    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        {/* Backdrop — only closes from list view */}
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-md"
-                            onClick={() => setShowManageInstallments(false)}
+                            className="absolute inset-0 bg-black/50 backdrop-blur-md"
+                            onClick={feeView === 'list' ? closeFeeModal : undefined}
                         />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 md:p-8 max-w-md w-full shadow-2xl relative z-10 flex flex-col max-h-[90vh]"
-                        >
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-app-text">Fee Columns</h3>
-                                <button onClick={() => setShowManageInstallments(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
-                            </div>
 
-                            <div className="overflow-y-auto pr-2 mb-6 flex-1 min-h-[150px]">
-                                {batch?.feeInstallments && batch.feeInstallments.filter(i => !i.studentId).length > 0 ? (
-                                    <div className="space-y-3">
-                                        {[...batch.feeInstallments].filter(i => !i.studentId).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map(inst => (
-                                            <div key={inst.id} className="flex justify-between items-center p-4 rounded-xl border-[1.5px] border-black/5 bg-neutral-50/50 group">
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-app-text">{inst.name}</span>
-                                                    <span className="text-xs text-app-text-tertiary uppercase tracking-wider">Amount: ₹{inst.amount}</span>
+                        {/* Sheet */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 40, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 40, scale: 0.97 }}
+                            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                            className="!bg-white border border-black/[0.06] rounded-t-[2rem] sm:rounded-[2rem] w-full sm:max-w-md shadow-2xl relative z-10 flex flex-col overflow-hidden"
+                            style={{ maxHeight: 'min(90vh, 620px)' }}
+                        >
+                            <AnimatePresence mode="wait">
+
+                                {/* ── LIST VIEW ── */}
+                                {feeView === 'list' && (
+                                    <motion.div key="fee-list" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.16 }} className="flex flex-col flex-1 overflow-hidden">
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between px-6 py-5 border-b border-black/[0.06] shrink-0">
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-app-text-tertiary mb-0.5">Manage</p>
+                                                <h3 className="text-xl font-black text-black tracking-tight">Fee Columns</h3>
+                                            </div>
+                                            <button onClick={closeFeeModal} className="p-2 hover:bg-neutral-100 rounded-xl transition-colors text-app-text-tertiary hover:text-black">
+                                                <X className="w-5 h-5" />
+                                            </button>
+                                        </div>
+
+                                        {/* Column list */}
+                                        <div className="overflow-y-auto flex-1 p-4 sm:p-5">
+                                            {batch?.feeInstallments && batch.feeInstallments.filter(i => !i.studentId).length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {[...batch.feeInstallments]
+                                                        .filter(i => !i.studentId)
+                                                        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                                                        .map((inst, idx) => (
+                                                            <motion.div key={inst.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }} className="flex items-center justify-between p-4 rounded-2xl border border-black/[0.06] bg-neutral-50/60 hover:bg-neutral-50 transition-colors group">
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="font-bold text-black text-sm truncate">{inst.name}</span>
+                                                                    <span className="text-xs text-app-text-tertiary mt-0.5">₹{inst.amount.toLocaleString('en-IN')}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 ml-3 shrink-0">
+                                                                    <button onClick={() => { setEditingInstallment(inst); setFeeView('edit'); }} className="p-2 hover:bg-blue-50 text-app-text-tertiary hover:text-blue-600 rounded-xl transition-colors" title="Edit">
+                                                                        <Edit2 className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button onClick={() => { setInstallmentToDelete(inst); setFeeView('delete-confirm'); }} className="p-2 hover:bg-red-50 text-app-text-tertiary hover:text-red-500 rounded-xl transition-colors" title="Delete">
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                            </motion.div>
+                                                        ))}
                                                 </div>
-                                                <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => { setShowManageInstallments(false); setEditingInstallment(inst); }} className="p-2 hover:bg-accent/10 text-accent rounded-lg transition-colors" title="Edit">
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button onClick={() => { setShowManageInstallments(false); setInstallmentToDelete(inst); }} className="p-2 hover:bg-danger/10 text-danger rounded-lg transition-colors" title="Delete">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center py-14 text-center">
+                                                    <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center mb-4">
+                                                        <Settings className="w-6 h-6 text-app-text-tertiary" />
+                                                    </div>
+                                                    <p className="font-bold text-black">No fee columns yet</p>
+                                                    <p className="text-sm text-app-text-tertiary mt-1">Add columns like "April–June" or "Q1 Fees"</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Footer CTA */}
+                                        <div className="px-5 py-4 border-t border-black/[0.06] shrink-0">
+                                            <button onClick={() => { setNewInstallment({ name: '', amount: '' }); setFeeView('add'); }} className="w-full bg-black hover:bg-neutral-800 text-white py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                                                <Plus className="w-4 h-4" /> Add Fee Column
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* ── ADD VIEW ── */}
+                                {feeView === 'add' && (
+                                    <motion.div key="fee-add" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.16 }} className="flex flex-col flex-1 overflow-hidden">
+                                        <div className="flex items-center gap-3 px-6 py-5 border-b border-black/[0.06] shrink-0">
+                                            <button onClick={() => setFeeView('list')} className="p-2 hover:bg-neutral-100 rounded-xl transition-colors text-app-text-tertiary hover:text-black -ml-1">
+                                                <ArrowLeft className="w-5 h-5" />
+                                            </button>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-app-text-tertiary mb-0.5">New</p>
+                                                <h3 className="text-xl font-black text-black tracking-tight">Add Fee Column</h3>
+                                            </div>
+                                        </div>
+                                        <form onSubmit={handleAddInstallment} className="flex flex-col flex-1 overflow-hidden">
+                                            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-black text-app-text-tertiary uppercase tracking-[0.1em]">Column Name</label>
+                                                    <input value={newInstallment.name} onChange={(e) => setNewInstallment({ ...newInstallment, name: e.target.value })} className="w-full bg-neutral-50 border border-black/[0.08] rounded-2xl px-4 py-3.5 text-black font-semibold focus:ring-2 focus:ring-black/10 focus:border-black/30 outline-none transition-all placeholder:text-app-text-tertiary/50 placeholder:font-normal" placeholder="e.g. April – June 2025" autoFocus required />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-black text-app-text-tertiary uppercase tracking-[0.1em]">Amount (₹)</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-app-text-tertiary font-bold text-sm">₹</span>
+                                                        <input type="number" inputMode="numeric" value={newInstallment.amount} onChange={(e) => setNewInstallment({ ...newInstallment, amount: e.target.value })} className="w-full bg-neutral-50 border border-black/[0.08] rounded-2xl pl-8 pr-4 py-3.5 text-black font-semibold focus:ring-2 focus:ring-black/10 focus:border-black/30 outline-none transition-all placeholder:text-app-text-tertiary/50 placeholder:font-normal" placeholder="2000" required />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-12 text-app-text-tertiary">
-                                        <p>No fee columns created yet.</p>
-                                    </div>
+                                            <div className="px-5 py-4 border-t border-black/[0.06] shrink-0 flex gap-3">
+                                                <button type="button" onClick={() => setFeeView('list')} className="flex-1 py-3.5 rounded-2xl font-bold border border-black/[0.08] text-app-text-secondary hover:bg-neutral-50 transition-all">Cancel</button>
+                                                <button type="submit" className="flex-1 bg-black hover:bg-neutral-800 text-white py-3.5 rounded-2xl font-bold transition-all active:scale-[0.98]">Create Column</button>
+                                            </div>
+                                        </form>
+                                    </motion.div>
                                 )}
-                            </div>
 
-                            <div className="flex justify-end pt-4 border-t border-black/5">
-                                <button
-                                    onClick={() => { setShowManageInstallments(false); setShowAddInstallment(true); }}
-                                    className="bg-neutral-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98]"
-                                >
-                                    <Plus className="w-4 h-4 mr-2" /> Add New Column
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                                {/* ── EDIT VIEW ── */}
+                                {feeView === 'edit' && editingInstallment && (
+                                    <motion.div key="fee-edit" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.16 }} className="flex flex-col flex-1 overflow-hidden">
+                                        <div className="flex items-center gap-3 px-6 py-5 border-b border-black/[0.06] shrink-0">
+                                            <button onClick={() => { setEditingInstallment(null); setFeeView('list'); }} className="p-2 hover:bg-neutral-100 rounded-xl transition-colors text-app-text-tertiary hover:text-black -ml-1">
+                                                <ArrowLeft className="w-5 h-5" />
+                                            </button>
+                                            <div className="min-w-0">
+                                                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-app-text-tertiary mb-0.5">Editing</p>
+                                                <h3 className="text-xl font-black text-black tracking-tight truncate">{editingInstallment.name}</h3>
+                                            </div>
+                                        </div>
+                                        <form onSubmit={async (e) => { await handleUpdateInstallment(e); setFeeView('list'); }} className="flex flex-col flex-1 overflow-hidden">
+                                            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-black text-app-text-tertiary uppercase tracking-[0.1em]">Column Name</label>
+                                                    <input value={editingInstallment.name} onChange={(e) => setEditingInstallment({ ...editingInstallment, name: e.target.value })} className="w-full bg-neutral-50 border border-black/[0.08] rounded-2xl px-4 py-3.5 text-black font-semibold focus:ring-2 focus:ring-black/10 focus:border-black/30 outline-none transition-all" autoFocus required />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-black text-app-text-tertiary uppercase tracking-[0.1em]">Amount (₹)</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-app-text-tertiary font-bold text-sm">₹</span>
+                                                        <input type="number" inputMode="numeric" value={editingInstallment.amount} onChange={(e) => setEditingInstallment({ ...editingInstallment, amount: Number(e.target.value) })} className="w-full bg-neutral-50 border border-black/[0.08] rounded-2xl pl-8 pr-4 py-3.5 text-black font-semibold focus:ring-2 focus:ring-black/10 focus:border-black/30 outline-none transition-all" required />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="px-5 py-4 border-t border-black/[0.06] shrink-0 flex gap-3">
+                                                <button type="button" onClick={() => { setEditingInstallment(null); setFeeView('list'); }} className="flex-1 py-3.5 rounded-2xl font-bold border border-black/[0.08] text-app-text-secondary hover:bg-neutral-50 transition-all">Cancel</button>
+                                                <button type="submit" className="flex-1 bg-black hover:bg-neutral-800 text-white py-3.5 rounded-2xl font-bold transition-all active:scale-[0.98]">Save Changes</button>
+                                            </div>
+                                        </form>
+                                    </motion.div>
+                                )}
 
-            {/* Add Installment Modal */}
-            <AnimatePresence>
-                {
-                    showAddInstallment && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute inset-0 bg-black/40 backdrop-blur-md"
-                                onClick={() => setShowAddInstallment(false)}
-                            />
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
-                            >
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-bold text-app-text">Add Fee Installment</h3>
-                                    <button onClick={() => setShowAddInstallment(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
-                                </div>
+                                {/* ── DELETE CONFIRM VIEW ── */}
+                                {feeView === 'delete-confirm' && installmentToDelete && (
+                                    <motion.div key="fee-delete" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.15 }} className="flex flex-col p-6 sm:p-8">
+                                        <div className="w-14 h-14 rounded-2xl bg-red-50 border border-red-100 text-red-500 flex items-center justify-center mb-5">
+                                            <Trash2 className="w-6 h-6" />
+                                        </div>
+                                        <h3 className="text-xl font-black text-black mb-2">Delete Fee Column?</h3>
+                                        <p className="text-sm text-app-text-secondary leading-relaxed mb-8">
+                                            Permanently delete <span className="font-bold text-black">"{installmentToDelete.name}"</span>. Any payments linked to this column will also be removed.
+                                        </p>
+                                        <div className="flex gap-3">
+                                            <button onClick={() => { setInstallmentToDelete(null); setFeeView('list'); }} className="flex-1 py-3.5 rounded-2xl font-bold border border-black/[0.08] text-app-text-secondary hover:bg-neutral-50 transition-all">Go Back</button>
+                                            <button onClick={async () => { await handleDeleteInstallment(); setFeeView('list'); }} className="flex-1 py-3.5 rounded-2xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 transition-all active:scale-[0.98]">Delete</button>
+                                        </div>
+                                    </motion.div>
+                                )}
 
-                                <form onSubmit={handleAddInstallment} className="space-y-4">
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Installment Name</label>
-                                        <input
-                                            value={newInstallment.name}
-                                            onChange={(e) => setNewInstallment({ ...newInstallment, name: e.target.value })}
-                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                            placeholder="e.g. Jan-Mar 2024"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Amount (₹)</label>
-                                        <input
-                                            type="number"
-                                            inputMode="numeric"
-                                            value={newInstallment.amount}
-                                            onChange={(e) => setNewInstallment({ ...newInstallment, amount: e.target.value })}
-                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="flex justify-end pt-4">
-                                        <button
-                                            type="submit"
-                                            className="bg-neutral-900 hover:bg-black  text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center"
-                                        >
-                                            Create Installment
-                                        </button>
-                                    </div>
-                                    <div className="h-4 md:hidden"></div>
-                                </form>
-                            </motion.div>
-                        </div>
-                    )
-                }
-            </AnimatePresence >
-
-            {/* Edit Installment Modal */}
-            <AnimatePresence>
-                {
-                    editingInstallment && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute inset-0 bg-black/40 backdrop-blur-md"
-                                onClick={() => setEditingInstallment(null)}
-                            />
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative z-10"
-                            >
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-bold text-app-text">Edit Fee Column</h3>
-                                    <button onClick={() => setEditingInstallment(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
-                                </div>
-
-                                <form onSubmit={handleUpdateInstallment} className="space-y-4">
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Column Name</label>
-                                        <input
-                                            value={editingInstallment.name}
-                                            onChange={(e) => setEditingInstallment({ ...editingInstallment, name: e.target.value })}
-                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Amount (₹)</label>
-                                        <input
-                                            type="number"
-                                            inputMode="numeric"
-                                            value={editingInstallment.amount}
-                                            onChange={(e) => setEditingInstallment({ ...editingInstallment, amount: Number(e.target.value) })}
-                                            className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="flex justify-end pt-4">
-                                        <button
-                                            type="submit"
-                                            className="bg-neutral-900 hover:bg-black text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center"
-                                        >
-                                            Save Changes
-                                        </button>
-                                    </div>
-                                </form>
-                            </motion.div>
-                        </div>
-                    )
-                }
-            </AnimatePresence >
-
-            {/* Delete Installment Confirmation Modal */}
-            <AnimatePresence>
-                {installmentToDelete && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-md"
-                            onClick={() => setInstallmentToDelete(null)}
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-8 max-w-md w-full shadow-2xl relative z-10"
-                        >
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center mb-4">
-                                        <Trash2 className="w-6 h-6" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-app-text">Delete Fee Column?</h3>
-                                    <p className="text-app-text-secondary mt-1 text-sm">
-                                        Are you sure you want to delete <span className="font-bold text-app-text">{installmentToDelete.name}</span>? This will permanently remove it.
-                                    </p>
-                                </div>
-                                <button onClick={() => setInstallmentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
-                            </div>
-
-                            <div className="flex gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setInstallmentToDelete(null)}
-                                    className="flex-1 py-3 rounded-xl font-bold bg-neutral-50/50 border-[1.5px] border-black/5 text-app-text hover:bg-neutral-50/50-hover transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleDeleteInstallment}
-                                    className="flex-1 py-3 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all hover:bg-red-700 active:scale-[0.98]"
-                                >
-                                    Delete
-                                </button>
-                            </div>
+                            </AnimatePresence>
                         </motion.div>
                     </div>
                 )}
@@ -2782,6 +2604,155 @@ export default function BatchDetails() {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* ═══════════════════════════════════════════
+                REGISTRATION QR MODAL
+            ═══════════════════════════════════════════ */}
+            <AnimatePresence>
+                {showRegModal && !batch.isRegistrationEnded && (
+                    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        {/* Backdrop */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/50 backdrop-blur-md"
+                            onClick={() => setShowRegModal(false)}
+                        />
+                        {/* Sheet / Card */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 40, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 40, scale: 0.97 }}
+                            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                            className="!bg-white border border-black/[0.06] rounded-t-[2rem] sm:rounded-[2rem] p-6 sm:p-8 w-full sm:max-w-sm shadow-2xl relative z-10 flex flex-col gap-5"
+                        >
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-app-text-tertiary mb-1">Registration</p>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xl font-black text-black tracking-tight">{batch.name}</h3>
+                                        <div className={cn(
+                                            "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-black border uppercase tracking-wider shrink-0",
+                                            batch.isRegistrationOpen
+                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                                : 'bg-amber-50 text-amber-600 border-amber-200'
+                                        )}>
+                                            <span className={cn(
+                                                "w-1.5 h-1.5 rounded-full",
+                                                batch.isRegistrationOpen ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                                            )} />
+                                            {batch.isRegistrationOpen ? 'Live' : 'Paused'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowRegModal(false)}
+                                    className="p-2 hover:bg-neutral-100 rounded-xl transition-colors text-app-text-tertiary hover:text-black shrink-0 ml-2"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* QR Code */}
+                            <div className="flex flex-col items-center gap-4 py-4 bg-neutral-50 rounded-2xl border border-black/[0.06]">
+                                <div className="bg-white p-4 rounded-2xl border border-black/[0.06] shadow-sm">
+                                    <QRCode value={`${window.location.origin}/register/${batch.id}`} size={140} />
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const token = localStorage.getItem('token');
+                                            const response = await fetch(`${API_URL}/batches/${batch.id}/qr-pdf`, {
+                                                headers: { Authorization: `Bearer ${token}` }
+                                            });
+                                            if (!response.ok) throw new Error('Failed to download');
+                                            const blob = await response.blob();
+                                            const url = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = `QR-${batch.name.replace(/\s+/g, '-')}.pdf`;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            window.URL.revokeObjectURL(url);
+                                            document.body.removeChild(a);
+                                        } catch {
+                                            toast.error('Failed to download QR PDF');
+                                        }
+                                    }}
+                                    className="flex items-center gap-2 text-sm font-bold text-app-text-secondary hover:text-black bg-white px-5 py-2.5 rounded-xl border border-black/[0.06] hover:border-black/20 transition-all active:scale-[0.97] shadow-sm"
+                                >
+                                    <Download className="w-4 h-4" /> Download QR PDF
+                                </button>
+                            </div>
+
+                            {/* Quick Links */}
+                            <div className="flex flex-col gap-2">
+                                <p className="text-[10px] font-black text-app-text-tertiary uppercase tracking-widest px-1">Quick Links</p>
+                                <button
+                                    onClick={() => window.open(`/kiosk/register/${batch.id}`, '_blank')}
+                                    className="flex items-center gap-3 py-3 px-4 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-black border border-black/[0.06] text-sm font-semibold transition-all w-full active:scale-[0.98] text-left"
+                                >
+                                    <Monitor className="w-4 h-4 text-app-text-tertiary shrink-0" />
+                                    <span>Fullscreen Kiosk Mode</span>
+                                </button>
+                                <button
+                                    onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`); toast.success('Invite Link Copied'); }}
+                                    className="flex items-center gap-3 py-3 px-4 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-black border border-black/[0.06] text-sm font-semibold transition-all w-full active:scale-[0.98] text-left"
+                                >
+                                    <Copy className="w-4 h-4 text-app-text-tertiary shrink-0" />
+                                    <span>Copy Registration Link</span>
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            if (navigator.share) {
+                                                await navigator.share({ title: 'Batch Registration', text: `Register for ${batch.name}`, url: `${window.location.origin}/register/${batch.id}` });
+                                            } else {
+                                                navigator.clipboard.writeText(`${window.location.origin}/register/${batch.id}`);
+                                                toast.success('Link copied!');
+                                            }
+                                        } catch (err) { console.error('Share failed', err); }
+                                    }}
+                                    className="flex items-center gap-3 py-3 px-4 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-black border border-black/[0.06] text-sm font-semibold transition-all w-full active:scale-[0.98] text-left"
+                                >
+                                    <Share2 className="w-4 h-4 text-app-text-tertiary shrink-0" />
+                                    <span>Share Link</span>
+                                </button>
+                            </div>
+
+                            {/* Admin Controls */}
+                            <div className="border-t border-black/[0.06] pt-4 flex flex-col gap-2">
+                                <p className="text-[10px] font-black text-app-text-tertiary uppercase tracking-widest px-1 mb-1">Admin Controls</p>
+                                <button
+                                    onClick={() => { handleToggleRegistration(); setShowRegModal(false); }}
+                                    className={cn(
+                                        "flex items-center gap-3 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all w-full text-left border",
+                                        batch.isRegistrationOpen
+                                            ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200"
+                                            : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200"
+                                    )}
+                                >
+                                    {batch.isRegistrationOpen ? <Pause className="w-4 h-4 shrink-0" /> : <Play className="w-4 h-4 shrink-0" />}
+                                    <span>{batch.isRegistrationOpen ? 'Pause Registration Temporarily' : 'Resume Registration'}</span>
+                                </button>
+                                <button
+                                    onClick={() => { handleEndRegistration(); setShowRegModal(false); }}
+                                    className="flex items-center gap-3 py-2.5 px-4 rounded-xl text-sm font-semibold bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-all w-full text-left"
+                                >
+                                    <Archive className="w-4 h-4 shrink-0" />
+                                    <span>Close Registration Permanently</span>
+                                </button>
+                            </div>
+
+                            {/* Safe area spacer for mobile bottom sheet */}
+                            <div className="h-safe-area-inset-bottom sm:hidden" />
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
         </Layout >
     );
 }

@@ -16,7 +16,6 @@
 - [ ] **Throughput**: Scan 100 students in < 2 minutes on a single mid-range Android phone.
 - [ ] **Security**: Capture a "Silent Audit" photo for every scan without slowing down the UI.
 - [ ] **Offline-First**: Buffer scans locally if Wi-Fi is down and auto-sync later.
-- [ ] **Engagement**: Display a personalized "Insightful Greet" for every student.
 
 ---
 
@@ -40,7 +39,6 @@
 | :--- | :--- | :--- | :--- | :--- |
 | T2.1 | **Continuous Scanner** | `mobile` | P0 | Implement a "Zero-Lag" QR scanner that resets immediately after a successful detect. |
 | T2.2 | **Silent Audit Capture** | `mobile` | P1 | Trigger a background photo capture on successful QR scan (no shutter sound). |
-| T2.3 | **Insightful Greet UI** | `mobile` | P2 | Build the "Welcome Screen" that shows student name, photo, and a "Data Insight" (e.g., "5-day streak!"). |
 | T2.4 | **Kiosk Lock Mode** | `mobile` | P2 | Add a PIN-protected view that hides navigation tabs and system bars. |
 
 ### Phase 3: Web Admin & Reporting

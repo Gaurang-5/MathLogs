@@ -6,6 +6,7 @@ import { sendEmail } from '../utils/email';
 import { addMathLogsHeader } from '../utils/pdfUtils';
 import { calculateStudentFeeSnapshot } from '../utils/feeCalculations';
 import { deletePaymentScreenshot, encodePaymentScreenshotKey, signPaymentScreenshotKey } from '../utils/paymentStorage';
+import { processReceiptScreenshot } from '../utils/ai/receipt-scanner';
 
 // Email handling moved to utils/email.ts
 
@@ -596,15 +597,21 @@ export const payInstallment = async (req: Request, res: Response) => {
             }
         });
 
-        await prisma.systemLog.create({
-            data: {
-                instituteId: student.instituteId!,
-                action: 'FEE_COLLECTED',
-                entityId: student.id,
-                entityName: student.name,
-                details: { amount: newPaymentAmount, installmentName: installment.name }
+        if (student.instituteId) {
+            try {
+                await prisma.systemLog.create({
+                    data: {
+                        instituteId: student.instituteId,
+                        action: 'FEE_COLLECTED',
+                        entityId: student.id,
+                        entityName: student.name,
+                        details: { amount: newPaymentAmount, installmentName: installment.name }
+                    }
+                });
+            } catch (logError) {
+                console.warn('[WARN] Failed to write fee collection audit log:', logError);
             }
-        });
+        }
 
         console.log('[DEBUG] Payment created successfully:', {
             paymentId: payment.id,
@@ -1370,5 +1377,27 @@ export const getCustomInvoices = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error fetching custom invoices:', error);
         res.status(500).json({ error: 'Failed to fetch custom invoices' });
+    }
+};
+
+export const scanReceipt = async (req: Request, res: Response) => {
+    try {
+        let imageBuffer: Buffer | string | undefined;
+
+        if ((req as any).file) {
+            imageBuffer = (req as any).file.buffer;
+        } else if (req.body.image) {
+            imageBuffer = req.body.image;
+        }
+
+        if (!imageBuffer) {
+            return res.status(400).json({ error: "Missing image data" });
+        }
+
+        const data = await processReceiptScreenshot(imageBuffer);
+        res.json(data);
+    } catch (error: any) {
+        console.error("❌ Receipt Scan Error:", error);
+        res.status(500).json({ error: "Receipt Scan Failed", details: error.message });
     }
 };

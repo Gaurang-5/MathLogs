@@ -238,6 +238,7 @@ test('POST /api/fees/pay-installment records a payment for an authenticated teac
         amountPaid: data.amountPaid,
         date: data.date,
     }) as never) as typeof prisma.feePayment.create);
+    replaceMethod(prisma.systemLog, 'create', (async () => ({ id: 'system-log-route-1' }) as never) as typeof prisma.systemLog.create);
 
     const response = await postJson('/api/fees/pay-installment', {
         studentId: '123e4567-e89b-12d3-a456-426614174000',
@@ -263,4 +264,79 @@ test('POST /api/fees/pay-installment records a payment for an authenticated teac
     assert.equal(json.installmentId, '123e4567-e89b-12d3-a456-426614174001');
     assert.equal(json.amountPaid, 500);
     assert.equal(json.date, new Date('2026-04-03').toISOString());
+});
+
+test('POST /api/tests/online saves generated quiz questions for a teacher batch', async () => {
+    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: (error: unknown, decoded?: unknown) => void) => {
+        callback(null, {
+            id: 'teacher-quiz-1',
+            username: 'owner',
+            passwordVersion: 1,
+            instituteId: 'inst-quiz-1',
+            role: 'ADMIN',
+        });
+    }) as unknown) as typeof jwt.verify);
+    replaceMethod(prisma.admin, 'findUnique', (async () => ({
+        id: 'teacher-quiz-1',
+        username: 'owner',
+        currentAcademicYearId: 'year-1',
+        passwordVersion: 1,
+        instituteId: 'inst-quiz-1',
+        role: 'ADMIN',
+        institute: {
+            planExpiryDate: null,
+            plan: 'ACTIVE',
+        },
+    }) as never) as typeof prisma.admin.findUnique);
+    replaceMethod(prisma.batch, 'findFirst', (async () => ({ id: 'batch-quiz-1' }) as never) as typeof prisma.batch.findFirst);
+    replaceMethod(prisma.batch, 'findMany', (async () => [{ id: 'batch-quiz-1' }] as never) as typeof prisma.batch.findMany);
+
+    let createdQuestions: Array<Record<string, unknown>> = [];
+    replaceMethod(prisma.onlineQuiz, 'create', (async ({ data }: { data: any }) => {
+        createdQuestions = data.questions.create;
+        return {
+            id: 'quiz-route-1',
+            title: data.title,
+            topic: data.topic,
+            difficulty: data.difficulty,
+            timeLimitMins: data.timeLimitMins,
+            totalMarks: data.totalMarks,
+            batchId: data.batchId,
+            instituteId: data.instituteId,
+            teacherId: data.teacherId,
+            batch: { id: data.batchId, name: 'Batch A', className: '10' },
+            questions: createdQuestions.map((question, index) => ({ id: `q-${index + 1}`, ...question })),
+            _count: { submissions: 0 },
+        } as never;
+    }) as typeof prisma.onlineQuiz.create);
+
+    const response = await postJson('/api/tests/online', {
+        title: 'Linear Equations Quiz',
+        topic: 'Linear equations',
+        difficulty: 'Medium',
+        timeLimitMins: 15,
+        totalMarks: 2,
+        availableFrom: '2026-05-21T04:00:00.000Z',
+        availableUntil: '2026-05-21T05:00:00.000Z',
+        batchId: 'batch-quiz-1',
+        questions: [
+            {
+                questionText: 'What is x if x + 2 = 5?',
+                options: ['2', '3', '4', '5'],
+                correctAnswer: '3',
+                marks: 2,
+            },
+        ],
+    }, {
+        Authorization: 'Bearer valid-token',
+    });
+
+    assert.equal(response.status, 200);
+
+    const json = await response.json() as { id: string; title: string; questions: Array<{ orderIndex: number; correctOption: string }> };
+    assert.equal(json.id, 'quiz-route-1');
+    assert.equal(json.title, 'Linear Equations Quiz');
+    assert.equal(json.questions[0].orderIndex, 0);
+    assert.equal(json.questions[0].correctOption, '3');
+    assert.equal(createdQuestions.length, 1);
 });
