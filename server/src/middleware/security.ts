@@ -284,10 +284,11 @@ export const studentLoginLimiter = rateLimit({
 });
 
 // Student Portal: Quiz Activity Rate Limiter (heartbeat, autosave, cheating events)
-// Tuned for classroom NAT: ~30 students behind one IP, each sending heartbeat + autosave every ~15s
+// Tuned for classroom NAT: up to 200 students behind one IP, each sending heartbeat + autosave every ~15s
+// Math: 200 students × 4 req/min = 800 req/min. Limit is 600 — catches abuse, allows real classroom use.
 export const quizActivityLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 120, // 120 req/min per IP (supports ~30 students on shared Wi-Fi)
+    max: 600, // 600 req/min per IP (supports ~200 students on shared school Wi-Fi)
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Please wait a moment.' },
