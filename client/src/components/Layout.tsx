@@ -90,7 +90,7 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
             {/* Sidebar (Desktop) - Premium Glass Style */}
             <aside
                 className={cn(
-                    "glass fixed inset-y-4 left-4 rounded-[24px] hidden xl:flex flex-col z-20 shadow-xl overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+                    "bg-transparent fixed inset-y-4 left-4 hidden xl:flex flex-col z-20 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
                     isSidebarCollapsed ? "w-24" : "w-72"
                 )}
             >
