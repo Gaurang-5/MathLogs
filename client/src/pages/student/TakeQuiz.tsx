@@ -154,6 +154,7 @@ export default function TakeQuiz() {
     const submittedRef = useRef(false);
     const submittingRef = useRef(false);
     const startAttemptedRef = useRef(false);
+    const lastEventTimeRef = useRef<number>(0);
 
     // Stable ref for submitQuiz — breaks dep cycle with countdown effect
     const submitQuizRef = useRef<(auto?: boolean) => Promise<void>>(() => Promise.resolve());
@@ -196,6 +197,13 @@ export default function TakeQuiz() {
 
     const triggerMask = useCallback(async (reason: string) => {
         if (submittedRef.current || phase !== 'quiz') return;
+        const now = Date.now();
+        if (now - lastEventTimeRef.current < 1000) {
+            console.log('[PROCTOR] Ignored duplicate cheating warning event:', reason);
+            return;
+        }
+        lastEventTimeRef.current = now;
+
         if (maskTimer.current) clearTimeout(maskTimer.current);
         setViolationReason(reason);
         const n = await logCheat(reason);
@@ -402,7 +410,13 @@ export default function TakeQuiz() {
     useEffect(() => {
         if (phase !== 'quiz') return;
         const onVis = () => { if (document.hidden) triggerMask('TAB_SWITCH'); };
-        const onBlur = () => triggerMask('WINDOW_BLUR');
+        const onBlur = () => {
+            // Only trigger WINDOW_BLUR if the document/tab is still visible.
+            // If the document is hidden, it's a tab switch or minimized window, which is already handled by TAB_SWITCH.
+            if (!document.hidden) {
+                triggerMask('WINDOW_BLUR');
+            }
+        };
         const noCtx = (e: Event) => e.preventDefault();
         const noCopy = (e: Event) => e.preventDefault();
         const noKey = (e: KeyboardEvent) => {
