@@ -94,9 +94,16 @@ export default function StudentPortalDashboard() {
                 navigate(`/${instituteSlug}/student`);
             } finally {
                 setLoading(false);
+                setRefreshing(false);
             }
         };
+
         fetchDashboard();
+
+        // Auto-refresh when app regains focus
+        const onFocus = () => fetchDashboard();
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
     }, [instituteSlug, navigate]);
 
     const handleLogout = () => {
@@ -121,8 +128,7 @@ export default function StudentPortalDashboard() {
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 pb-32">
-
-            {/* ── HEADER ── */}
+            {/* Pull-to-refresh spinner */}
             <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
                 <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
                     {/* Avatar circle — opens profile sheet */}

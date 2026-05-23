@@ -95,29 +95,54 @@ export async function sendQuizMarksBroadcast(quizId: string) {
         where: { id: quizId },
         include: {
             institute: { select: { id: true, name: true } },
+            batches: { select: { id: true } },
             submissions: {
                 where: { submittedAt: { not: null } },
-                include: {
-                    student: { select: { name: true, parentWhatsapp: true } }
-                }
+                select: { studentId: true, score: true }
             }
         }
     });
 
     if (!quiz) return { sent: 0, failed: 0 };
 
+    const batchIds = quiz.batches.map(b => b.id);
+    if (quiz.batchId && !batchIds.includes(quiz.batchId)) {
+        batchIds.push(quiz.batchId);
+    }
+
+    if (batchIds.length === 0) return { sent: 0, failed: 0 };
+
+    const students = await prisma.student.findMany({
+        where: {
+            batchId: { in: batchIds },
+            status: 'APPROVED'
+        },
+        select: {
+            id: true,
+            name: true,
+            parentWhatsapp: true
+        }
+    });
+
     let sent = 0;
     let failed = 0;
-    const jobs = quiz.submissions.map(async (submission) => {
-        const phone = normalizePhone(submission.student.parentWhatsapp);
+
+    const submissionMap = new Map(quiz.submissions.map(s => [s.studentId, s.score]));
+
+    const jobs = students.map(async (student) => {
+        if (!student.parentWhatsapp) return;
+        const phone = normalizePhone(student.parentWhatsapp);
         if (!phone) return;
 
-        const score = Number(submission.score || 0);
+        const score = submissionMap.has(student.id) 
+            ? String(Number(submissionMap.get(student.id) || 0)) 
+            : "ABSENT";
+
         const result = await sendTestMarksWhatsApp(phone, {
-            studentName: submission.student.name,
+            studentName: student.name,
             instituteName: quiz.institute.name,
             testName: quiz.title,
-            marksObtained: String(score),
+            marksObtained: score,
             totalMarks: String(quiz.totalMarks),
             instituteId: quiz.institute.id
         });

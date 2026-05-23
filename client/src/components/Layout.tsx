@@ -138,20 +138,19 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                                 )}
                                 <item.icon
                                     className={cn(
-                                        "w-5 h-5 z-10 relative transition-transform duration-300 group-hover:scale-110",
-                                        !isSidebarCollapsed && "mr-3",
-                                        isActive ? "text-accent" : "text-app-text-tertiary group-hover:text-app-text"
+                                        "w-[22px] h-[22px] transition-transform duration-200",
+                                        isActive ? "opacity-100" : "opacity-80 group-hover:opacity-100 group-hover:scale-110",
+                                        !isSidebarCollapsed && "mr-3.5"
                                     )}
-                                    strokeWidth={2}
+                                    strokeWidth={isActive ? 2.5 : 2}
                                 />
-                                {!isSidebarCollapsed && <span className="z-10 relative whitespace-nowrap overflow-hidden">{item.name}</span>}
+                                {!isSidebarCollapsed && <span className="tracking-wide">{item.name}</span>}
                             </Link>
                         );
                     })}
                 </nav>
 
-                {/* Quick Actions (Desktop) */}
-                <div className={cn("px-4 pb-2", isSidebarCollapsed ? "flex justify-center" : "")}>
+                <div className={cn("p-4 border-t border-app-border shrink-0", isSidebarCollapsed && "px-2")}>
                     <button
                         onClick={() => setShowQuickFeeModal(true)}
                         className={cn(
@@ -160,13 +159,12 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                         )}
                         title="Log Fee"
                     >
-                        <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                         <IndianRupee className={cn("w-5 h-5", !isSidebarCollapsed && "mr-2")} strokeWidth={2.5} />
                         {!isSidebarCollapsed && <span className="font-bold text-sm">Log Fee</span>}
                     </button>
                 </div>
 
-                <div className={cn("space-y-2", isSidebarCollapsed ? "p-2 items-center flex flex-col" : "p-4")}>
+                <div className={cn("space-y-2 p-4", isSidebarCollapsed ? "items-center flex flex-col" : "")}>
                     <button
                         onClick={handleLogout}
                         className={cn(
@@ -199,12 +197,17 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                         </Link>
                         <div className="flex items-center gap-2">
                             <Link
+                                to="/quizzes"
+                                className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:text-blue-700 hover:bg-blue-100 transition-all active:scale-90"
+                            >
+                                <Sparkles className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                            </Link>
+                            <Link
                                 to="/scan"
                                 className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90"
                             >
                                 <Scan className="w-[18px] h-[18px]" strokeWidth={2.5} />
                             </Link>
-                            <div className="w-[1px] h-4 bg-app-border/80 mx-0.5"></div>
                             <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90">
                                 {mobileMenuOpen ? <X size={20} strokeWidth={2.5} /> : <Menu size={20} strokeWidth={2.5} />}
                             </button>
@@ -224,7 +227,6 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                         style={{ paddingTop: 'calc(5.5rem + env(safe-area-inset-top))' }}
                     >
                         <nav className="space-y-2">
-                            {/* Navigation items are moved to Bottom Bar. Keeping menu for system actions only. */}
                             <div className="pt-2">
                                 <Link
                                     to="/quizzes"

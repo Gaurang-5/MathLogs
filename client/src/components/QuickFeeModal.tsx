@@ -145,19 +145,7 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
                             </div>
 
                             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                                {/* Scan Receipt Section */}
-                                <div>
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={scanningImage}
-                                        className="w-full bg-indigo-50 text-indigo-600 font-bold py-3 rounded-xl hover:bg-indigo-100/70 disabled:opacity-50 transition-all flex items-center justify-center gap-2 border border-indigo-100"
-                                    >
-                                        {scanningImage ? <Loader className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                                        {scanningImage ? 'Scanning Receipt...' : 'Scan Screenshot ✨'}
-                                    </button>
-                                    <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                                </div>
+
 
                                 {/* Student Selection */}
                                 <div className="space-y-2 relative">

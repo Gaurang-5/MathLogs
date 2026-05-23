@@ -482,7 +482,7 @@ export default function QuizList() {
     };
 
     return (
-        <Layout title={activeQuiz ? undefined : "Manage Quizzes"} hideMobileNav>
+        <Layout title={activeQuiz ? undefined : "Manage Quizzes"} hideMobileNav={!!activeQuiz || showAIModal}>
             <AnimatePresence mode="wait">
                 {!activeQuiz ? (
                     /* QUIZ GRID VIEW */
