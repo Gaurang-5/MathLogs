@@ -5,7 +5,7 @@ import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimit
 import { validateRequest } from '../middleware/validation';
 import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
 import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, updateFeeInstallment, deleteFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF, inviteStudentToBatch } from '../controllers/batchController';
-import { registerStudent, getPendingStudents, approveStudent, rejectStudent, updateStudent, addStudentManually, getStudentGrowthStats } from '../controllers/studentController';
+import { registerStudent, getPendingStudents, approveStudent, rejectStudent, updateStudent, addStudentManually, getStudentGrowthStats, getClassAverageStats } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute } from '../controllers/testController';
@@ -317,6 +317,8 @@ router.post('/fees/scan-receipt', authenticateToken as any, ocrLimiter, upload.s
 // Stats
 router.get('/stats/growth', authenticateToken as any, getStudentGrowthStats as any);
 router.get('/stats/finance-growth', authenticateToken as any, getFinancialGrowthStats as any);
+router.get('/stats/class-average', authenticateToken as any, getClassAverageStats as any);
+
 
 // Invites
 router.post('/invites', authenticateToken as any, generateInvite as any);

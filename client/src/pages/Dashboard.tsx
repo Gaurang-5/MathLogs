@@ -6,9 +6,9 @@ import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee } from 'l
 import { motion, AnimatePresence } from 'framer-motion';
 import CountUp from 'react-countup';
 
-interface GrowthPoint {
+interface ClassAveragePoint {
     name: string;
-    students: number;
+    average: number;
 }
 
 interface FinanceGrowthPoint {
@@ -40,7 +40,7 @@ const formatIndianRupee = (value: number) => new Intl.NumberFormat('en-IN').form
 
 export default function Dashboard() {
     const [stats, setStats] = useState({ batches: 0, students: 0 });
-    const [growthData, setGrowthData] = useState<GrowthPoint[]>([]);
+    const [classAverageData, setClassAverageData] = useState<ClassAveragePoint[]>([]);
     const [financeGrowthData, setFinanceGrowthData] = useState<FinanceGrowthPoint[]>([]);
     const [finances, setFinances] = useState({ collected: 0, totalCollected: 0, pending: 0 });
     const [defaulters, setDefaulters] = useState<Defaulter[]>([]);
@@ -88,11 +88,11 @@ export default function Dashboard() {
             if ('requestIdleCallback' in window) {
                 requestIdleCallback(async () => {
                     try {
-                        const [growth, financeGrowth] = await Promise.all([
-                            api.get<GrowthPoint[]>('/stats/growth'),
+                        const [classAverage, financeGrowth] = await Promise.all([
+                            api.get<ClassAveragePoint[]>('/stats/class-average'),
                             api.get<FinanceGrowthPoint[]>('/stats/finance-growth')
                         ]);
-                        setGrowthData(growth);
+                        setClassAverageData(classAverage);
                         setFinanceGrowthData(financeGrowth);
                         setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
                     } catch (error) {
@@ -104,11 +104,11 @@ export default function Dashboard() {
                 // Fallback for browsers without requestIdleCallback
                 setTimeout(async () => {
                     try {
-                        const [growth, financeGrowth] = await Promise.all([
-                            api.get<GrowthPoint[]>('/stats/growth'),
+                        const [classAverage, financeGrowth] = await Promise.all([
+                            api.get<ClassAveragePoint[]>('/stats/class-average'),
                             api.get<FinanceGrowthPoint[]>('/stats/finance-growth')
                         ]);
-                        setGrowthData(growth);
+                        setClassAverageData(classAverage);
                         setFinanceGrowthData(financeGrowth);
                         setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
                     } catch (error) {
@@ -302,7 +302,7 @@ export default function Dashboard() {
 
             {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
-                {/* Growth Trends Chart */}
+                {/* Class Performance Chart */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -313,19 +313,24 @@ export default function Dashboard() {
                         <div className="w-7 h-7 bg-black text-white rounded-lg flex items-center justify-center">
                             <TrendingUp className="w-4 h-4" />
                         </div>
-                        Growth Trends
+                        Class Performance
                     </h3>
                     {loading.growth ? (
                         <div className="h-[260px] flex items-center justify-center">
                             <div className="w-7 h-7 border-2 border-black border-t-transparent rounded-full animate-spin" />
                         </div>
-                    ) : growthData.length > 0 ? (
+                    ) : classAverageData.length > 0 ? (
                         <div style={{ width: '100%', height: 260 }}>
                             <ResponsiveContainer width="100%" height={260}>
-                                <LineChart data={growthData}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                <BarChart data={classAverageData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                                     <XAxis dataKey="name" stroke="#9ca3af" style={{ fontSize: '11px', fontWeight: 600 }} />
-                                    <YAxis stroke="#9ca3af" style={{ fontSize: '11px', fontWeight: 600 }} />
+                                    <YAxis
+                                        stroke="#9ca3af"
+                                        style={{ fontSize: '11px', fontWeight: 600 }}
+                                        domain={[0, 100]}
+                                        tickFormatter={(v) => `${v}%`}
+                                    />
                                     <Tooltip
                                         contentStyle={{
                                             backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -336,17 +341,17 @@ export default function Dashboard() {
                                             fontWeight: 600,
                                             fontSize: '13px'
                                         }}
+                                        formatter={(value: number) => [`${value}%`, 'Average Marks']}
                                     />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="students"
-                                        stroke="#000000"
-                                        strokeWidth={2.5}
-                                        dot={{ fill: '#000000', r: 4, strokeWidth: 0 }}
-                                        activeDot={{ fill: '#000000', r: 6, strokeWidth: 3, stroke: '#fff' }}
-                                        animationDuration={2000}
+                                    <Bar
+                                        dataKey="average"
+                                        name="Average Marks"
+                                        fill="#000000"
+                                        radius={[6, 6, 0, 0]}
+                                        maxBarSize={36}
+                                        animationDuration={1500}
                                     />
-                                </LineChart>
+                                </BarChart>
                             </ResponsiveContainer>
                         </div>
                     ) : (
@@ -355,11 +360,12 @@ export default function Dashboard() {
                                 <div className="w-14 h-14 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-3">
                                     <TrendingUp className="w-7 h-7 text-app-text-tertiary" />
                                 </div>
-                                <p className="text-sm text-app-text-tertiary font-medium">No growth data available</p>
+                                <p className="text-sm text-app-text-tertiary font-medium">No performance data available yet</p>
                             </div>
                         </div>
                     )}
                 </motion.div>
+
 
                 {/* Fee Collected vs Remaining - Bar Chart */}
                 <motion.div

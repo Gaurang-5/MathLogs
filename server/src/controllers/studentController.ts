@@ -598,3 +598,60 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 };
+
+export const getClassAverageStats = async (req: Request, res: Response) => {
+    try {
+        const instituteId = (req as any).user.instituteId;
+        const academicYearId = (req as any).user.currentAcademicYearId;
+
+        // Fetch all tests for this institute and academic year including their marks
+        const tests = await prisma.test.findMany({
+            where: {
+                instituteId,
+                academicYearId
+            },
+            include: {
+                marks: true
+            }
+        });
+
+        // Group scores and maxMarks by className
+        const classScores: Record<string, { totalScore: number; totalMax: number; count: number }> = {};
+
+        tests.forEach(test => {
+            const className = test.className || 'Unknown';
+            if (test.marks.length === 0) return;
+
+            if (!classScores[className]) {
+                classScores[className] = { totalScore: 0, totalMax: 0, count: 0 };
+            }
+
+            test.marks.forEach(mark => {
+                classScores[className].totalScore += mark.score;
+                classScores[className].totalMax += test.maxMarks;
+                classScores[className].count += 1;
+            });
+        });
+
+        // Compute average percentage for each class
+        const data = Object.entries(classScores).map(([className, stats]) => {
+            const avgPercentage = stats.totalMax > 0
+                ? parseFloat(((stats.totalScore / stats.totalMax) * 100).toFixed(1))
+                : 0;
+
+            return {
+                name: className.startsWith('Class ') ? className : `Class ${className}`,
+                average: avgPercentage
+            };
+        });
+
+        // Sort naturally: e.g. "Class 9" comes before "Class 10"
+        data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+        res.json(data);
+    } catch (e) {
+        console.error('Class average stats error:', e);
+        res.status(500).json({ error: 'Failed to fetch class average stats' });
+    }
+};
+
