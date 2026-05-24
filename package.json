@@ -12,7 +12,7 @@
         "heroku-postbuild": "echo 'Installing Client...' && cd client && npm install --production=false && npm run build && echo 'Installing Server...' && cd ../server && npm install --production=false && npm run build"
     },
     "engines": {
-        "node": "20.x"
+        "node": "22.x"
     },
     "dependencies": {
         "@sentry/node": "^10.38.0",
