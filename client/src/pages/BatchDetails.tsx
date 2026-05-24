@@ -537,19 +537,22 @@ export default function BatchDetails() {
             if (customInvoice.existingInstallmentId) {
                 // Link an existing global invoice to this student
                 const existingInst = batch?.feeInstallments?.find(i => i.id === customInvoice.existingInstallmentId);
-                const paymentAmount = customInvoice.markAsPaid ? Number(existingInst?.amount || 0) : 0;
 
-                await apiRequest(`/fees/pay-installment`, 'POST', {
-                    studentId: showCustomInvoice.id,
-                    installmentId: customInvoice.existingInstallmentId,
-                    amount: paymentAmount,
-                    date: new Date().toISOString().split('T')[0]
-                });
+                // Only call pay-installment if marking as paid — amount:0 fails schema validation (400)
+                if (customInvoice.markAsPaid) {
+                    const paymentAmount = Number(existingInst?.amount || 0);
+                    await apiRequest(`/fees/pay-installment`, 'POST', {
+                        studentId: showCustomInvoice.id,
+                        installmentId: customInvoice.existingInstallmentId,
+                        amount: paymentAmount,
+                        date: new Date().toISOString().split('T')[0]
+                    });
+                }
 
                 toast.success(
                     customInvoice.markAsPaid
-                        ? 'Installment linked & marked paid'
-                        : 'Installment successfully linked to student',
+                        ? 'Installment marked as paid'
+                        : 'This installment is already visible for this student',
                     { id: toastId }
                 );
             } else {
