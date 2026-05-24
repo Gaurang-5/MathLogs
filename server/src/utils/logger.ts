@@ -120,13 +120,7 @@ export const logger = {
             log('INFO', 'BATCH_REGISTRATION_CLOSED', { batchId, name, studentCount }),
     },
 
-    academicYear: {
-        switched: (teacherId: string, fromYearId: string | null, toYearId: string, yearName: string) =>
-            log('INFO', 'ACADEMIC_YEAR_SWITCHED', { teacherId, fromYearId, toYearId, yearName }),
 
-        created: (yearId: string, name: string, teacherId: string) =>
-            log('INFO', 'ACADEMIC_YEAR_CREATED', { yearId, name, teacherId }),
-    },
 
     performance: {
         slow: (operation: string, durationMs: number, threshold: number, context?: LogContext) =>

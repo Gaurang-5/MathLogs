@@ -3,7 +3,7 @@ import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../c
 import { authenticateToken } from '../middleware/auth';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createAcademicYearSchema, createInstallmentSchema } from '../schemas';
+import { loginSchema, setupSchema, changePasswordSchema, registerStudentSchema, createBatchSchema, updateBatchSchema, updateStudentSchema, paymentSchema, payInstallmentSchema, submitMarkSchema, createTestSchema, updateTestSchema, createInstallmentSchema } from '../schemas';
 import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatchRegistration, createFeeInstallment, updateFeeInstallment, deleteFeeInstallment, getBatchPublicStatus, endBatchRegistration, updateBatch, deleteBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, downloadBatchQRPDF, inviteStudentToBatch } from '../controllers/batchController';
 import { registerStudent, getPendingStudents, approveStudent, rejectStudent, updateStudent, addStudentManually, getStudentGrowthStats, getClassAverageStats } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
@@ -11,7 +11,7 @@ import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute } from '../controllers/testController';
 import { getOnlineQuizAnalytics, getLiveQuizStatus } from '../controllers/analyticsController';
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, scanReceipt } from '../controllers/feeController';
-import { listAcademicYears, createAcademicYear, switchAcademicYear, backupAcademicYear, deleteAcademicYear } from '../controllers/academicYearController';
+
 
 
 import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
@@ -224,13 +224,6 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
 
 // Dashboard (Optimized endpoint)
 router.get('/dashboard/summary', authenticateToken as any, getDashboardSummary as any);
-
-// Academic Year
-router.get('/academic-years', authenticateToken as any, listAcademicYears as any);
-router.post('/academic-years', authenticateToken as any, validateRequest(createAcademicYearSchema), createAcademicYear as any);
-router.post('/academic-years/switch', authenticateToken as any, switchAcademicYear as any);
-router.get('/academic-years/:id/backup', authenticateToken as any, backupAcademicYear as any);
-router.delete('/academic-years/:id', authenticateToken as any, deleteAcademicYear as any);
 
 // Auth
 router.post('/auth/login', authLimiter, validateRequest(loginSchema), loginAdmin as any);

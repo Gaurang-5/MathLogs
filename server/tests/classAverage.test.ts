@@ -55,7 +55,6 @@ test('GET /api/stats/class-average returns correct class average marks percentag
     replaceMethod(prisma.admin, 'findUnique', (async () => ({
         id: 'teacher-1',
         username: 'owner',
-        currentAcademicYearId: 'year-1',
         passwordVersion: 1,
         instituteId: 'inst-1',
         role: 'ADMIN',

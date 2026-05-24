@@ -212,26 +212,7 @@ export const setupAccount = async (req: Request, res: Response) => {
                 }
             });
 
-            // 3. Create Default Academic Year for them
-            const currentYear = new Date().getFullYear();
-            const yearName = `${currentYear}-${currentYear + 1}`;
 
-            const academicYear = await tx.academicYear.create({
-                data: {
-                    name: yearName,
-                    teacherId: admin.id, // Legacy field, keeping for now
-                    instituteId: invite.instituteId,
-                    isDefault: true,
-                    startDate: new Date(`${currentYear}-04-01`),
-                    endDate: new Date(`${currentYear + 1}-03-31`)
-                }
-            });
-
-            // 4. Link Admin to Year
-            await tx.admin.update({
-                where: { id: admin.id },
-                data: { currentAcademicYearId: academicYear.id }
-            });
 
             // 5. Invalidate Token
             await tx.inviteToken.update({

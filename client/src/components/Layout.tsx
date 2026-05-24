@@ -2,7 +2,7 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, FileText, Sparkles, Scan, Receipt, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Sparkles, Scan, ReceiptIndianRupee, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
 import ToastProvider from './ToastProvider';
@@ -77,7 +77,7 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
         { name: 'Tests', path: '/tests', icon: FileText },
         { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
         { name: 'Scan Marks', path: '/scan', icon: Scan },
-        { name: 'Fees', path: '/fees', icon: Receipt },
+        { name: 'Fees', path: '/fees', icon: ReceiptIndianRupee },
         { name: 'Billing', path: '/billing', icon: CreditCard },
         { name: 'Settings', path: '/settings', icon: Settings },
     ];
@@ -150,16 +150,16 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                     })}
                 </nav>
 
-                <div className={cn("p-4 border-t border-app-border shrink-0", isSidebarCollapsed && "px-2")}>
+                <div className={cn("p-4 border-t border-app-border shrink-0 flex justify-center", isSidebarCollapsed && "px-2")}>
                     <button
                         onClick={() => setShowQuickFeeModal(true)}
                         className={cn(
                             "flex items-center justify-center bg-gray-900 text-white hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95 group relative overflow-hidden",
-                            isSidebarCollapsed ? "w-10 h-10 rounded-xl" : "w-full py-3 rounded-2xl"
+                            isSidebarCollapsed ? "w-12 h-12 rounded-[18px] mx-auto" : "w-full py-3 rounded-2xl"
                         )}
                         title="Log Fee"
                     >
-                        <IndianRupee className={cn("w-5 h-5", !isSidebarCollapsed && "mr-2")} strokeWidth={2.5} />
+                        <IndianRupee className={cn("w-[22px] h-[22px]", !isSidebarCollapsed && "mr-2")} strokeWidth={2.5} />
                         {!isSidebarCollapsed && <span className="font-bold text-sm">Log Fee</span>}
                     </button>
                 </div>
@@ -340,7 +340,7 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
 
                         <Link to="/fees" className="flex flex-col items-center justify-center group h-full">
                             <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/fees') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
-                                <Receipt className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/fees') ? 2.5 : 1.5} />
+                                <ReceiptIndianRupee className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/fees') ? 2.5 : 1.5} />
                                 <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/fees') ? 'opacity-100' : 'opacity-70'}`}>Fees</span>
                                 {location.pathname.startsWith('/fees') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
                             </div>

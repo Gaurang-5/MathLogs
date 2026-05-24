@@ -102,25 +102,7 @@ export const createInitialAdmin = async (req: Request, res: Response) => {
                 data: { username, password: hashedPassword }
             });
 
-            const currentYear = new Date().getFullYear();
-            const yearName = `${currentYear}-${currentYear + 1}`;
-
-            const academicYear = await tx.academicYear.create({
-                data: {
-                    name: yearName,
-                    teacherId: admin.id,
-                    isDefault: true,
-                    startDate: new Date(`${currentYear}-04-01`),
-                    endDate: new Date(`${currentYear + 1}-03-31`)
-                }
-            });
-
-            const updatedAdmin = await tx.admin.update({
-                where: { id: admin.id },
-                data: { currentAcademicYearId: academicYear.id }
-            });
-
-            return updatedAdmin;
+            return admin;
         });
 
         res.json({ id: result.id, username: result.username });

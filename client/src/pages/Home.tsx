@@ -17,7 +17,16 @@ const ONBOARDING_STEPS = [
 
 const KIOSK_STUDENTS = ['Aryan K.', 'Sneha M.', 'Rahul D.'] as const;
 
-const QR_PATTERN = [1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 0] as const;
+// 7×7 QR-style pattern (49 cells) — corner finders + random data modules
+const QR_PATTERN = [
+    1,1,1,1,1,1,1,
+    1,0,0,0,0,0,1,
+    1,0,1,0,1,0,1,
+    1,0,0,1,0,0,1,
+    1,0,1,0,1,0,1,
+    1,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,
+] as const;
 
 /** Memoized card component — only re-renders when props change (none here) */
 const OnboardingCard = memo(function OnboardingCard() {
@@ -86,13 +95,25 @@ const OnboardingCard = memo(function OnboardingCard() {
                         {activeStep === 1 && (
                             <motion.div key="qr" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.4 }} className="w-full max-w-[260px] bg-white rounded-2xl shadow-[0_8px_40px_-8px_rgba(0,0,0,0.1)] border border-neutral-100 p-5 flex flex-col items-center">
                                 <div className="text-[11px] font-bold text-[#697386] tracking-wider uppercase mb-4">Scan to Register</div>
-                                <div className="relative w-[120px] h-[120px] bg-white border-2 border-neutral-300 rounded-xl flex items-center justify-center mb-4 overflow-hidden">
-                                    <div className="grid grid-cols-5 gap-[3px] p-2">
+                                <div className="relative w-[140px] h-[140px] bg-white border-2 border-neutral-200 rounded-xl flex items-center justify-center mb-4 overflow-hidden shadow-inner">
+                                    <div className="grid gap-[2.5px] p-2" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
                                         {QR_PATTERN.map((v, i) => (
-                                            <motion.div key={i} className="w-full aspect-square rounded-[2px]" style={{ backgroundColor: v ? '#1a1f36' : 'transparent' }} animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity, delay: i * 0.04 }} />
+                                            <motion.div
+                                                key={i}
+                                                className="rounded-[1.5px]"
+                                                style={{ width: 14, height: 14, backgroundColor: v ? '#1a1f36' : 'transparent' }}
+                                                animate={v ? { opacity: [0.7, 1, 0.7] } : {}}
+                                                transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.03, ease: 'easeInOut' }}
+                                            />
                                         ))}
                                     </div>
-                                    <motion.div className="absolute left-0 right-0 h-0.5 bg-neutral-500/60 shadow-[0_0_8px_rgba(0,0,0,0.3)]" animate={{ top: ['10%', '90%', '10%'] }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }} />
+                                    {/* Scanning laser line */}
+                                    <motion.div
+                                        className="absolute left-2 right-2 h-[2px] rounded-full"
+                                        style={{ background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.8), transparent)' }}
+                                        animate={{ top: ['8%', '88%', '8%'] }}
+                                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                                    />
                                 </div>
                                 <div className="text-[10px] text-[#697386] text-center leading-relaxed">Class 10 — JEE Batch<br /><span className="text-neutral-900 font-semibold">45 spots remaining</span></div>
                             </motion.div>
@@ -431,17 +452,19 @@ export default function Home() {
                     </div>
                 </div>
 
-                {/* ── MOBILE MOCKUP (< 768px) — Bulletproof Flex Centering ── */}
-                <div className="md:hidden mt-auto pt-6 flex justify-center overflow-hidden w-screen relative left-1/2 -translate-x-1/2">
+                {/* ── MOBILE MOCKUP (< 768px) — Clean Centering ── */}
+                <div className="md:hidden mt-16 pb-12 flex justify-center w-full px-4">
                     <motion.img
-                        src="/images/features/dashboard-mobile.webp"
+                        initial={{ opacity: 0, y: 40 }}
+                        animate={{ opacity: 1, y: [0, -10, 0] }}
+                        transition={{ 
+                            opacity: { duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] },
+                            y: { duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.8 }
+                        }}
+                        src="/images/features/dashboard-mobile.png"
                         alt="MathLogs mobile app dashboard"
                         fetchPriority="high"
-                        width={1920}
-                        height={1440}
-                        animate={{ y: [0, -10, 0] }}
-                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                        className="w-[220%] max-w-[1000px] flex-shrink-0 drop-shadow-[0_24px_48px_rgba(0,0,0,0.18)] origin-top object-contain"
+                        className="w-full max-w-[450px] drop-shadow-[0_24px_48px_rgba(0,0,0,0.12)] origin-top object-contain rounded-3xl"
                     />
                 </div>
 
@@ -516,9 +539,9 @@ export default function Home() {
                                     whileInView={{ y: 0, opacity: 1 }}
                                     transition={{ duration: 0.8, delay: 0.2, type: 'spring', bounce: 0.15 }}
                                 >
-                                    <div className="min-w-[700px]">
-                                        {/* Batch Header Card */}
-                                        <div className="bg-white border-b border-neutral-100 px-6 py-4 flex items-start justify-between">
+                                    <div className="w-full flex flex-col">
+                                        {/* Batch Header Card (Responsive) */}
+                                        <div className="bg-white border-b border-neutral-100 px-4 md:px-6 py-4 flex flex-col md:flex-row md:items-start justify-between gap-3 md:gap-0">
                                             <div>
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className="text-[15px] font-bold text-[#1a1f36]">CLASS 10</span>
@@ -530,79 +553,119 @@ export default function Home() {
                                                     <span>👥 3 Students</span>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3 mt-1">
+                                            <div className="flex overflow-x-auto custom-scrollbar items-center gap-2 mt-1 md:mt-0 pb-1 md:pb-0">
                                                 {/* Action buttons row */}
                                                 {['Download List', 'Add Student', 'Fee Columns', 'Add Group Link'].map((action) => (
-                                                    <div key={action} className="text-[9px] font-semibold text-neutral-600 border border-neutral-200 rounded-lg px-2.5 py-1.5 bg-white whitespace-nowrap">{action}</div>
+                                                    <div key={action} className="text-[9px] font-semibold text-neutral-600 border border-neutral-200 rounded-lg px-2.5 py-1.5 bg-white whitespace-nowrap shrink-0">{action}</div>
                                                 ))}
                                             </div>
                                         </div>
 
                                         {/* Search bar */}
-                                        <div className="px-6 py-2 border-b border-neutral-100 bg-neutral-50/50">
-                                            <div className="flex items-center gap-2 bg-white border border-neutral-200 rounded-xl px-3 py-1.5 max-w-xs">
+                                        <div className="px-4 md:px-6 py-2 border-b border-neutral-100 bg-neutral-50/50">
+                                            <div className="flex items-center gap-2 bg-white border border-neutral-200 rounded-xl px-3 py-1.5 w-full md:max-w-xs">
                                                 <span className="text-neutral-300 text-[12px]">🔍</span>
-                                                <span className="text-[11px] text-neutral-400">Search by name, school, ID, or phone...</span>
+                                                <span className="text-[11px] text-neutral-400 truncate">Search by name, school, ID, or phone...</span>
                                             </div>
                                         </div>
 
-                                        {/* Table header */}
-                                        <div className="grid grid-cols-[80px_1fr_1fr_1fr_80px_80px_100px_60px] px-6 py-2 bg-white border-b border-neutral-100">
-                                            {['ID', 'STUDENT NAME', 'SCHOOL', 'PARENT NAME', 'TESTS', 'AVG (10)', 'JAN ₹1000', 'ACTIONS'].map((col) => (
-                                                <span key={col} className="text-[9px] font-bold text-[#697386] tracking-wider uppercase">{col}</span>
+                                        {/* --- DESKTOP TABLE VIEW --- */}
+                                        <div className="hidden md:block min-w-[700px]">
+                                            {/* Table header */}
+                                            <div className="grid grid-cols-[80px_1fr_1fr_1fr_80px_80px_100px_60px] px-6 py-2 bg-white border-b border-neutral-100">
+                                                {['ID', 'STUDENT NAME', 'SCHOOL', 'PARENT NAME', 'TESTS', 'AVG (10)', 'JAN ₹1000', 'ACTIONS'].map((col) => (
+                                                    <span key={col} className="text-[9px] font-bold text-[#697386] tracking-wider uppercase">{col}</span>
+                                                ))}
+                                            </div>
+
+                                            {/* Student rows */}
+                                            {[
+                                                { id: 'DE-MTH26-001', name: 'student1', school: 'school1', parent: 'parent1', tests: '👁', avg: '9.5', feeIcon: '⦾', feeColor: 'text-[#1a1f36]' },
+                                                { id: 'DE-MTH26-002', name: 'student2', school: 'school2', parent: 'parent2', tests: '👁', avg: '8.6', feeIcon: '◎', feeColor: 'text-amber-500' },
+                                                { id: 'DE-MTH26-003', name: 'student3', school: 'school3', parent: 'parent3', tests: '👁', avg: '7.9', feeIcon: '○', feeColor: 'text-neutral-400' },
+                                                { id: 'DE-MTH26-004', name: 'student4', school: 'school4', parent: 'parent4', tests: '👁', avg: '8.2', feeIcon: '⦾', feeColor: 'text-[#1a1f36]' },
+                                                { id: 'DE-MTH26-005', name: 'student5', school: 'school5', parent: 'parent5', tests: '👁', avg: '7.4', feeIcon: '◎', feeColor: 'text-amber-500' },
+                                            ].map((row, i) => (
+                                                <motion.div
+                                                    key={row.id}
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    whileInView={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: 0.5 + i * 0.12 }}
+                                                    className="grid grid-cols-[80px_1fr_1fr_1fr_80px_80px_100px_60px] px-6 py-2.5 border-b border-neutral-50 hover:bg-neutral-50/70 transition-colors"
+                                                >
+                                                    <span className="text-[10px] font-mono text-neutral-400">{row.id}</span>
+                                                    <span className="text-[11px] font-bold text-[#1a1f36]">{row.name}</span>
+                                                    <span className="text-[11px] text-neutral-500">{row.school}</span>
+                                                    <span className="text-[11px] text-neutral-500">{row.parent}</span>
+                                                    <span className="text-[11px] text-neutral-500">{row.tests}</span>
+                                                    <span className="text-[12px] font-bold text-[#1a1f36]">{row.avg}</span>
+                                                    <span className={`text-[14px] font-bold ${row.feeColor} text-center`}>{row.feeIcon}</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-neutral-300 text-[11px] cursor-pointer">✏</span>
+                                                        <span className="text-neutral-300 text-[11px] cursor-pointer">🗑</span>
+                                                    </div>
+                                                </motion.div>
                                             ))}
+
+                                            {/* Summary stats footer */}
+                                            <div className="px-6 py-3 bg-neutral-50/80 border-t border-neutral-100 flex items-center justify-between">
+                                                <div className="flex items-center gap-5">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Students</span>
+                                                        <span className="text-[11px] font-bold text-[#1a1f36]">5</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Avg Score</span>
+                                                        <span className="text-[11px] font-bold text-[#1a1f36]">8.3 / 10</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Fees Paid</span>
+                                                        <span className="text-[11px] font-bold text-green-600">₹4,000</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Due</span>
+                                                        <span className="text-[11px] font-bold text-amber-500">₹2,000</span>
+                                                    </div>
+                                                </div>
+                                                <span className="text-[9px] text-neutral-300">Showing 5 of 10 students</span>
+                                            </div>
                                         </div>
 
-                                        {/* Student rows */}
-                                        {[
-                                            { id: 'DE-MTH26-001', name: 'student1', school: 'school1', parent: 'parent1', tests: '👁', avg: '9.5', feeIcon: '⦾', feeColor: 'text-[#1a1f36]' },
-                                            { id: 'DE-MTH26-002', name: 'student2', school: 'school2', parent: 'parent2', tests: '👁', avg: '8.6', feeIcon: '◎', feeColor: 'text-amber-500' },
-                                            { id: 'DE-MTH26-003', name: 'student3', school: 'school3', parent: 'parent3', tests: '👁', avg: '7.9', feeIcon: '○', feeColor: 'text-neutral-400' },
-                                            { id: 'DE-MTH26-004', name: 'student4', school: 'school4', parent: 'parent4', tests: '👁', avg: '8.2', feeIcon: '⦾', feeColor: 'text-[#1a1f36]' },
-                                            { id: 'DE-MTH26-005', name: 'student5', school: 'school5', parent: 'parent5', tests: '👁', avg: '7.4', feeIcon: '◎', feeColor: 'text-amber-500' },
-                                        ].map((row, i) => (
-                                            <motion.div
-                                                key={row.id}
-                                                initial={{ opacity: 0, x: -10 }}
-                                                whileInView={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: 0.5 + i * 0.12 }}
-                                                className="grid grid-cols-[80px_1fr_1fr_1fr_80px_80px_100px_60px] px-6 py-2.5 border-b border-neutral-50 hover:bg-neutral-50/70 transition-colors"
-                                            >
-                                                <span className="text-[10px] font-mono text-neutral-400">{row.id}</span>
-                                                <span className="text-[11px] font-bold text-[#1a1f36]">{row.name}</span>
-                                                <span className="text-[11px] text-neutral-500">{row.school}</span>
-                                                <span className="text-[11px] text-neutral-500">{row.parent}</span>
-                                                <span className="text-[11px] text-neutral-500">{row.tests}</span>
-                                                <span className="text-[12px] font-bold text-[#1a1f36]">{row.avg}</span>
-                                                <span className={`text-[14px] font-bold ${row.feeColor} text-center`}>{row.feeIcon}</span>
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-neutral-300 text-[11px] cursor-pointer">✏</span>
-                                                    <span className="text-neutral-300 text-[11px] cursor-pointer">🗑</span>
-                                                </div>
-                                            </motion.div>
-                                        ))}
-
-                                        {/* Summary stats footer */}
-                                        <div className="px-6 py-3 bg-neutral-50/80 border-t border-neutral-100 flex items-center justify-between">
-                                            <div className="flex items-center gap-5">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Students</span>
-                                                    <span className="text-[11px] font-bold text-[#1a1f36]">5</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Avg Score</span>
-                                                    <span className="text-[11px] font-bold text-[#1a1f36]">8.3 / 10</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Fees Paid</span>
-                                                    <span className="text-[11px] font-bold text-green-600">₹4,000</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Due</span>
-                                                    <span className="text-[11px] font-bold text-amber-500">₹2,000</span>
-                                                </div>
-                                            </div>
-                                            <span className="text-[9px] text-neutral-300">Showing 5 of 10 students</span>
+                                        {/* --- MOBILE LIST VIEW --- */}
+                                        <div className="block md:hidden px-4 py-3 bg-neutral-50/30 overflow-y-auto custom-scrollbar flex-1 pb-16">
+                                            {[
+                                                { id: 'DE-MTH26-001', name: 'student1', school: 'school1', avg: '9.5', feeStatus: 'Paid', feeColor: 'text-green-700 bg-green-50 border-green-100' },
+                                                { id: 'DE-MTH26-002', name: 'student2', school: 'school2', avg: '8.6', feeStatus: 'Pending', feeColor: 'text-amber-700 bg-amber-50 border-amber-100' },
+                                                { id: 'DE-MTH26-003', name: 'student3', school: 'school3', avg: '7.9', feeStatus: 'Unpaid', feeColor: 'text-red-700 bg-red-50 border-red-100' },
+                                            ].map((row, i) => (
+                                                <motion.div
+                                                    key={row.id}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    whileInView={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: 0.1 + i * 0.1 }}
+                                                    className="bg-white border border-neutral-200 rounded-xl p-3.5 mb-3 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]"
+                                                >
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <div className="text-[13px] font-bold text-[#1a1f36] leading-tight">{row.name}</div>
+                                                            <div className="text-[10px] text-neutral-400 mt-1 font-mono tracking-tight">{row.id} • {row.school}</div>
+                                                        </div>
+                                                        <div className={`text-[9px] font-bold px-2 py-1 rounded-md border ${row.feeColor}`}>
+                                                            {row.feeStatus}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-neutral-100">
+                                                        <div className="flex-1">
+                                                            <div className="text-[9px] text-neutral-400 uppercase tracking-wide font-semibold mb-0.5">Avg Score</div>
+                                                            <div className="text-[13px] font-bold text-[#1a1f36]">{row.avg} <span className="text-[10px] font-normal text-neutral-400">/ 10</span></div>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <div className="w-8 h-8 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center text-[10px] text-neutral-600">👁</div>
+                                                            <div className="w-8 h-8 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center text-[10px] text-neutral-600">✏</div>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
                                         </div>
                                     </div>
                                 </motion.div>
@@ -1211,16 +1274,18 @@ export default function Home() {
                                         </div>
 
                                         {/* Card 3: WhatsApp Automation */}
-                                        <div className="bg-[#fcfdfd] rounded-[2.5rem] pt-6 lg:pt-8 px-6 lg:px-8 pb-0 shadow-sm border border-neutral-100 flex flex-col group hover:shadow-md transition-all relative overflow-hidden">
-                                            <div className="w-[48px] h-[48px] rounded-2xl bg-[#effdf4] border border-[#dcfce7] flex items-center justify-center text-[#22c55e] mb-5 relative z-10 shadow-sm">
-                                                <MessageSquare className="w-5 h-5" strokeWidth={1.5} />
+                                        <div className="bg-[#fcfdfd] rounded-[2.5rem] pt-6 lg:pt-8 px-6 lg:px-8 pb-0 shadow-sm border border-neutral-100 flex flex-col md:flex-row md:items-center justify-between group hover:shadow-md transition-all relative overflow-hidden md:col-span-2 lg:col-span-3">
+                                            <div className="md:w-1/2 md:pr-8 mb-8 md:mb-0 pb-6 md:pb-8 flex flex-col justify-center">
+                                                <div className="w-[48px] h-[48px] rounded-2xl bg-[#effdf4] border border-[#dcfce7] flex items-center justify-center text-[#22c55e] mb-5 relative z-10 shadow-sm">
+                                                    <MessageSquare className="w-5 h-5" strokeWidth={1.5} />
+                                                </div>
+                                                <h4 className="text-[24px] font-bold text-[#1a1f36] tracking-[-0.03em] mb-3 relative z-10 leading-[1.1]">Zero-Touch WhatsApp</h4>
+                                                <p className="text-[#697386] text-[15px] leading-relaxed relative z-10 max-w-sm">
+                                                    Link your WhatsApp group once — approved students join automatically without you having to add contacts one by one.
+                                                </p>
                                             </div>
-                                            <h4 className="text-[24px] font-bold text-[#1a1f36] tracking-[-0.03em] mb-3 relative z-10 leading-[1.1]">Zero-Touch WhatsApp</h4>
-                                            <p className="text-[#697386] text-[15px] leading-relaxed mb-6 relative z-10 max-w-[95%]">
-                                                Link your WhatsApp group once — approved students join automatically.
-                                            </p>
-                                            <div className="mt-auto pointer-events-none relative flex justify-center px-4">
-                                                <img src="/images/features/registration-success.png" alt="WhatsApp Alert" width={961} height={1622} loading="lazy" className="w-[220px] rounded-t-[1.5rem] shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.15)] border border-neutral-200/60 object-cover object-top opacity-95 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0 duration-500 ease-out" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                            <div className="mt-auto md:w-1/2 pointer-events-none relative flex justify-center px-4 md:pt-12">
+                                                <img src="/images/features/registration-success.png" alt="WhatsApp Alert" width={961} height={1622} loading="lazy" className="w-[220px] lg:w-[280px] rounded-t-[1.5rem] shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.15)] border border-neutral-200/60 object-cover object-top opacity-95 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0 duration-500 ease-out" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                             </div>
                                         </div>
 
