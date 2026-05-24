@@ -277,7 +277,12 @@ export default function Dashboard() {
                                 <div className="flex items-center gap-1 min-[375px]:gap-1.5 mb-0.5 -ml-0.5 sm:ml-0">
                                     <p className="text-[10px] sm:text-xs text-app-text-tertiary font-bold uppercase tracking-widest">This Month</p>
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); toggleFeeVisibility(); }}
+                                        onClick={(e) => { 
+                                            e.stopPropagation(); 
+                                            const newValue = !showFeeData;
+                                            setShowFeeData(newValue);
+                                            localStorage.setItem('dashboard_show_fees', String(newValue));
+                                        }}
                                         className="p-1 hover:bg-neutral-200 rounded-md transition-colors z-20 active:scale-90"
                                     >
                                         {showFeeData ? (

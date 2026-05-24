@@ -258,7 +258,7 @@ export default function TestDetails() {
 
     if (loading) {
         return (
-            <Layout title="Loading...">
+            <Layout title="Loading..." hideMobileNav>
                 <div className="flex items-center justify-center min-h-[50vh]">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-app-text"></div>
                 </div>
@@ -266,7 +266,7 @@ export default function TestDetails() {
         );
     }
 
-    if (!test) return <Layout title="Error">Test not found</Layout>;
+    if (!test) return <Layout title="Error" hideMobileNav>Test not found</Layout>;
 
     const filteredEligibleStudents = studentSearch.trim()
         ? eligibleStudents.filter(s =>
@@ -285,7 +285,7 @@ export default function TestDetails() {
         : '-';
 
     return (
-        <Layout title="Test Dashboard">
+        <Layout title="Test Dashboard" hideMobileNav>
             <div className="space-y-8 max-w-5xl mx-auto">
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                     <div className="flex items-start gap-4">

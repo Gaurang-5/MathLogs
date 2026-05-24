@@ -205,7 +205,6 @@ test('POST /api/fees/pay-installment records a payment for an authenticated teac
     replaceMethod(prisma.admin, 'findUnique', (async () => ({
         id: 'teacher-1',
         username: 'owner',
-        currentAcademicYearId: 'year-1',
         passwordVersion: 1,
         instituteId: 'inst-1',
         role: 'ADMIN',
@@ -279,7 +278,6 @@ test('POST /api/tests/online saves generated quiz questions for a teacher batch'
     replaceMethod(prisma.admin, 'findUnique', (async () => ({
         id: 'teacher-quiz-1',
         username: 'owner',
-        currentAcademicYearId: 'year-1',
         passwordVersion: 1,
         instituteId: 'inst-quiz-1',
         role: 'ADMIN',

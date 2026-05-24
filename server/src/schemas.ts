@@ -119,13 +119,7 @@ export const updateTestSchema = z.object({
     })
 });
 
-export const createAcademicYearSchema = z.object({
-    body: z.object({
-        name: z.string().min(1, "Year name is required").max(50),
-        startDate: z.string().datetime().optional(),
-        endDate: z.string().datetime().optional()
-    })
-});
+
 
 export const createInstallmentSchema = z.object({
     body: z.object({

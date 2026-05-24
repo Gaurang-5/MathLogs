@@ -9,15 +9,14 @@ import { prisma } from '../prisma';
 export const getDashboardSummary = async (req: Request, res: Response) => {
     try {
         const teacherId = (req as any).user?.id;
-        const academicYearId = (req as any).user?.currentAcademicYearId;
         const user = (req as any).user;
 
-        if (!teacherId || !academicYearId) {
-            console.warn(`[DASHBOARD_DEBUG] Missing context — Teacher: ${teacherId}, Year: ${academicYearId}, Institute: ${user.instituteId}`);
-            return res.status(400).json({ error: 'Missing teacher or academic year context' });
+        if (!teacherId) {
+            console.warn(`[DASHBOARD_DEBUG] Missing context — Teacher: ${teacherId}, Institute: ${user.instituteId}`);
+            return res.status(400).json({ error: 'Missing teacher context' });
         }
 
-        console.log(`[DASHBOARD_DEBUG] Fetching for Teacher: ${teacherId}, Year: ${academicYearId}, Inst: ${user.instituteId}`);
+        console.log(`[DASHBOARD_DEBUG] Fetching for Teacher: ${teacherId}, Inst: ${user.instituteId}`);
 
         // Get current month start and end dates (IST adjusted)
         const now = new Date();
@@ -46,7 +45,6 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                         SELECT COUNT(*)
                         FROM "Batch"
                         WHERE "teacherId" = ${teacherId}
-                            AND "academicYearId" = ${academicYearId}
                             AND "instituteId" = ${user.instituteId}
                     ) as batches_count,
                     
@@ -56,7 +54,6 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                         JOIN "Batch" b ON b.id = s."batchId"
                         WHERE s.status = 'APPROVED'
                             AND b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
                     ) as students_count,
                     
                     (
@@ -68,7 +65,6 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                             AND fr.date <= ${monthEnd}::timestamp
                             AND fr.status = 'PAID'
                             AND b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
                             AND s.status = 'APPROVED'
                     ) + (
                         SELECT COALESCE(SUM(fp."amountPaid"), 0)
@@ -78,7 +74,6 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                         WHERE fp.date >= ${monthStart}::timestamp
                             AND fp.date <= ${monthEnd}::timestamp
                             AND b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
                             AND s.status = 'APPROVED'
                     ) as monthly_collected,
                     
@@ -89,7 +84,6 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                         JOIN "Batch" b ON b.id = s."batchId"
                         WHERE fr.status = 'PAID'
                             AND b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
                             AND s.status = 'APPROVED'
                     ) + (
                         SELECT COALESCE(SUM(fp."amountPaid"), 0)
@@ -97,7 +91,6 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                         JOIN "Student" s ON s.id = fp."studentId"
                         JOIN "Batch" b ON b.id = s."batchId"
                         WHERE b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
                             AND s.status = 'APPROVED'
                     ) as total_collected,
                     
@@ -108,7 +101,6 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                         JOIN "Batch" b ON b.id = s."batchId"
                         WHERE s.status = 'APPROVED'
                             AND b."teacherId" = ${teacherId}
-                            AND s."academicYearId" = ${academicYearId}
                     ) as total_pending
             `,
 
@@ -120,7 +112,6 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
                 JOIN "Batch" b ON b.id = s."batchId"
                 WHERE s.status = 'APPROVED'
                     AND b."teacherId" = ${teacherId}
-                    AND s."academicYearId" = ${academicYearId}
                     AND sb.balance > 0
                 GROUP BY b.id, b.name
                 ORDER BY amount DESC
@@ -168,18 +159,10 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
 
 export const getFinancialGrowthStats = async (req: Request, res: Response) => {
     try {
-        const academicYearId = (req as any).user?.currentAcademicYearId;
         const instituteId = (req as any).user?.instituteId;
 
-        // Get academic year details to determine start month
-        const academicYear = await prisma.academicYear.findUnique({
-            where: { id: academicYearId }
-        });
-
         const currentSysDate = new Date();
-        let startRawDate = academicYear?.startDate
-            ? new Date(academicYear.startDate)
-            : new Date(currentSysDate.getFullYear(), 0, 1);
+        let startRawDate = new Date(currentSysDate.getFullYear(), 0, 1);
 
         const IST_OFFSET = 5.5 * 60 * 60 * 1000;
         const endDate = new Date(Date.now() + IST_OFFSET);
@@ -215,9 +198,7 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
         // New code: 2 SQL queries returning ~12 rows each (one per month)
 
         const { Prisma } = await import('@prisma/client');
-        const ayFilter = academicYearId 
-            ? Prisma.sql`AND s."academicYearId" = ${academicYearId}` 
-            : Prisma.empty;
+        const ayFilter = Prisma.empty;
 
         // 1. GENERATED FEE: Aggregate by month
         const generatedByMonth = await prisma.$queryRaw<Array<{ yr: number; mo: number; total: number }>>(Prisma.sql`

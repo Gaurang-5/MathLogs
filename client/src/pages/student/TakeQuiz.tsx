@@ -79,7 +79,7 @@ const MAX_WARNS = 5;
 const ConfettiBurst = () => {
     // Generate 35 particles with random angles, distances, sizes, and colors
     const particles = useMemo(() => {
-        const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#ec4899', '#a855f7'];
+        const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6'];
         return Array.from({ length: 35 }).map((_, i) => {
             const angle = (i * 360) / 35 + Math.random() * 15;
             const distance = 80 + Math.random() * 140;

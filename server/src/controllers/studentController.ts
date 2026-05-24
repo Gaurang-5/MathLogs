@@ -79,11 +79,8 @@ const autoSendWelcomeInvite = async (student: AutoInviteStudent, batch: AutoInvi
 const generateHumanId = async (batch: any) => {
     const courseCode = getCourseCode(batch.subject || '');
 
-    // Use Academic Year Start Date if available, else fallback to current year
-    let year = new Date().getFullYear();
-    if (batch.academicYearRef?.startDate) {
-        year = new Date(batch.academicYearRef.startDate).getFullYear();
-    }
+    // Use Batch Creation Date if available, else fallback to current year
+    const year = batch.createdAt ? new Date(batch.createdAt).getFullYear() : new Date().getFullYear();
     const yy = year.toString().slice(-2);
 
     // MULTI-TENANT FIX: Include institute code in prefix to prevent collisions
@@ -155,7 +152,6 @@ export const registerStudent = async (req: Request, res: Response) => {
         const batch = await prisma.batch.findUnique({
             where: { id: batchId },
             include: {
-                academicYearRef: true,
                 institute: { select: { ...AUTO_INVITE_INSTITUTE_SELECT, areRegistrationsPaused: true, plan: true, planExpiryDate: true } }
             }
         });
@@ -181,8 +177,7 @@ export const registerStudent = async (req: Request, res: Response) => {
         if (institute && institute.config && typeof institute.config === 'object' && (institute.config as any).maxStudents) {
             const currentStudentCount = await prisma.student.count({
                 where: {
-                    instituteId: batch.instituteId,
-                    academicYearId: batch.academicYearId
+                    instituteId: batch.instituteId
                 }
             });
             if (currentStudentCount >= (institute.config as any).maxStudents) {
@@ -221,7 +216,6 @@ export const registerStudent = async (req: Request, res: Response) => {
                         schoolName,
                         status: 'APPROVED', // Auto-approve
                         humanId,
-                        academicYearId: batch.academicYearId,
                         instituteId: batch.instituteId
                     }
                 });
@@ -245,7 +239,7 @@ export const registerStudent = async (req: Request, res: Response) => {
                     } else {
                         retries++;
                         const seq = error.meta?.target?.match(/\d+/)?.[0];
-                        const prefix = getCourseCode(batch.subject || '') + new Date(batch.academicYearRef?.startDate || new Date()).getFullYear().toString().slice(-2); logger.registration.idCollision(prefix, parseInt(seq) || 0, retries, MAX_RETRIES);
+                        const prefix = getCourseCode(batch.subject || '') + new Date(batch.createdAt || new Date()).getFullYear().toString().slice(-2); logger.registration.idCollision(prefix, parseInt(seq) || 0, retries, MAX_RETRIES);
                     }
                 } else {
                     throw error;
@@ -289,7 +283,6 @@ export const addStudentManually = async (req: Request, res: Response) => {
         const batch = await prisma.batch.findUnique({
             where: { id: batchId },
             include: {
-                academicYearRef: true,
                 institute: { select: { ...AUTO_INVITE_INSTITUTE_SELECT } }
             }
         });
@@ -303,8 +296,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
         if (institute && institute.config && typeof institute.config === 'object' && (institute.config as any).maxStudents) {
             const currentStudentCount = await prisma.student.count({
                 where: {
-                    instituteId: batch.instituteId,
-                    academicYearId: batch.academicYearId
+                    instituteId: batch.instituteId
                 }
             });
             if (currentStudentCount >= (institute.config as any).maxStudents) {
@@ -336,7 +328,6 @@ export const addStudentManually = async (req: Request, res: Response) => {
                         schoolName,
                         status: 'APPROVED',
                         humanId,
-                        academicYearId: batch.academicYearId,
                         instituteId: batch.instituteId
                     }
                 });
@@ -405,8 +396,7 @@ export const getPendingStudents = async (req: Request, res: Response) => {
         const students = await prisma.student.findMany({
             where: {
                 status: 'PENDING',
-                instituteId: user.instituteId,
-                academicYearId: user.currentAcademicYearId
+                instituteId: user.instituteId
             },
             include: { batch: true },
             orderBy: { createdAt: 'desc' }
@@ -427,7 +417,6 @@ export const approveStudent = async (req: Request, res: Response) => {
             include: {
                 batch: {
                     include: {
-                        academicYearRef: true,
                         institute: { select: { name: true } }
                     }
                 }
@@ -488,7 +477,6 @@ export const approveStudent = async (req: Request, res: Response) => {
 export const rejectStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
     const teacherId = (req as any).user?.id;
-    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
     try {
         const user = (req as any).user;
@@ -496,11 +484,6 @@ export const rejectStudent = async (req: Request, res: Response) => {
         const student = await prisma.student.findUnique({ where: { id: String(id) }, include: { batch: true } });
         if (!student) return res.status(404).json({ error: 'Student not found' });
         if (student.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
-
-        // Academic year boundary check
-        if (student.academicYearId && student.academicYearId !== currentAcademicYearId) {
-            return res.status(400).json({ error: 'Cannot reject student from non-active academic year' });
-        }
 
         await prisma.student.delete({ where: { id: String(id) } });
         res.json({ success: true });
@@ -511,17 +494,9 @@ export const rejectStudent = async (req: Request, res: Response) => {
 
 export const getStudentGrowthStats = async (req: Request, res: Response) => {
     try {
-        const academicYearId = (req as any).user?.currentAcademicYearId;
-
-        // Get academic year details to determine start month
-        const academicYear = await prisma.academicYear.findUnique({
-            where: { id: academicYearId }
-        });
-
         const students = await prisma.student.findMany({
             where: {
-                instituteId: (req as any).user.instituteId,
-                ...(academicYearId && { academicYearId })
+                instituteId: (req as any).user.instituteId
             },
             select: { createdAt: true },
             orderBy: { createdAt: 'asc' }
@@ -531,11 +506,9 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
             return res.json([{ name: 'Jan', students: 0 }]);
         }
 
-        // Get the start date - use academic year start or default to start of current year
+        // Get the start date - default to start of current year
         const currentSysDate = new Date();
-        let startRawDate = (academicYear?.startDate)
-            ? new Date(academicYear.startDate)
-            : new Date(currentSysDate.getFullYear(), 0, 1);
+        let startRawDate = new Date(currentSysDate.getFullYear(), 0, 1);
 
         // Calculate end date (Today + IST Buffer)
         const IST_OFFSET = 5.5 * 60 * 60 * 1000;
@@ -602,13 +575,11 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
 export const getClassAverageStats = async (req: Request, res: Response) => {
     try {
         const instituteId = (req as any).user.instituteId;
-        const academicYearId = (req as any).user.currentAcademicYearId;
 
-        // Fetch all tests for this institute and academic year including their marks
+        // Fetch all tests for this institute including their marks
         const tests = await prisma.test.findMany({
             where: {
-                instituteId,
-                academicYearId
+                instituteId
             },
             include: {
                 marks: true

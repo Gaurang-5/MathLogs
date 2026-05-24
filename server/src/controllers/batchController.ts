@@ -13,10 +13,8 @@ export const createBatch = async (req: Request, res: Response) => {
     const { timeSlot, feeAmount, className, batchNumber, subject, customName } = req.body;
     const teacherId = (req as any).user?.id;
     const user = (req as any).user;
-    const academicYearId = (req as any).user?.currentAcademicYearId;
 
     if (!user.instituteId) return res.status(401).json({ error: 'Unauthorized: No institute assigned' });
-    if (!academicYearId) return res.status(400).json({ error: 'No academic year selected' });
 
     // Fetch Institute Config
     const institute = await prisma.institute.findUnique({
@@ -60,7 +58,6 @@ export const createBatch = async (req: Request, res: Response) => {
         const existingBatchesCount = await prisma.batch.count({
             where: {
                 instituteId: user.instituteId,
-                academicYearId: academicYearId,
                 className: null,
                 subject: currentSubject
             }
@@ -69,11 +66,10 @@ export const createBatch = async (req: Request, res: Response) => {
     // Only enforce subject limit if Global Limit is NOT active - REMOVED
 
         try {
-            // Check for duplicate batch number in the current academic year
+            // Check for duplicate batch number in the current institute
             const existing = await prisma.batch.findFirst({
                 where: {
                     batchNumber: num,
-                    academicYearId: academicYearId,
                     className: null, // For non-grade institutes, className is null
                     instituteId: user.instituteId // Scoped to tenant!
                 }
@@ -91,7 +87,6 @@ export const createBatch = async (req: Request, res: Response) => {
                     batchNumber: num,
                     feeAmount: feeAmount ? parseFloat(feeAmount) : 0,
                     teacherId,
-                    academicYearId,
                     instituteId: user.instituteId
                 }
             });
@@ -143,12 +138,11 @@ export const createBatch = async (req: Request, res: Response) => {
 
     try {
         // Check for duplicate
-        // Check for duplicate in the current academic year
+        // Check for duplicate in the current institute
         const existing = await prisma.batch.findFirst({
             where: {
                 className,
                 batchNumber: num,
-                academicYearId: academicYearId,
                 instituteId: user.instituteId // Scoped to tenant!
             }
         });
@@ -166,7 +160,6 @@ export const createBatch = async (req: Request, res: Response) => {
                 feeAmount: feeAmount ? parseFloat(feeAmount) : 0,
 
                 teacherId,
-                academicYearId,
                 instituteId: user.instituteId
             }
         });
@@ -183,8 +176,7 @@ export const getBatches = async (req: Request, res: Response) => {
 
         const batches = await prisma.batch.findMany({
             where: {
-                instituteId: user.instituteId,
-                academicYearId: user.currentAcademicYearId // Filter by active year
+                instituteId: user.instituteId
             },
             orderBy: [
                 { className: 'desc' },
@@ -700,7 +692,6 @@ export const updateBatch = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, subject, timeSlot, feeAmount, className, whatsappGroupLink, autoSendWelcome } = req.body;
     const teacherId = (req as any).user?.id;
-    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
     try {
         const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
@@ -708,11 +699,6 @@ export const updateBatch = async (req: Request, res: Response) => {
 
         const user = (req as any).user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
-
-        // Academic year boundary check
-        if (batch.academicYearId && batch.academicYearId !== currentAcademicYearId) {
-            return res.status(400).json({ error: 'Cannot modify batch from non-active academic year. Switch to the correct year first.' });
-        }
 
         const updated = await prisma.batch.update({
             where: { id: String(id) },
@@ -735,7 +721,6 @@ export const updateBatch = async (req: Request, res: Response) => {
 
 export const deleteBatch = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
     try {
         const batch = await prisma.batch.findUnique({
@@ -750,11 +735,6 @@ export const deleteBatch = async (req: Request, res: Response) => {
 
         const user = (req as any).user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
-
-        // Academic year boundary check
-        if (batch.academicYearId && batch.academicYearId !== currentAcademicYearId) {
-            return res.status(400).json({ error: 'Cannot delete batch from non-active academic year. Switch to the correct year first.' });
-        }
 
         // FINANCIAL SAFETY GUARD (P1-A): Prevent destruction of payment history.
         // Hard-deleting a batch with payments cascades and wipes the entire financial ledger.

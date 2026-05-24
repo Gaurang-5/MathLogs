@@ -368,7 +368,7 @@ export const getStudentQuizzes = async (req: Request, res: Response): Promise<vo
             },
             select: { id: true }
         });
-        await Promise.all(candidateQuizzes.map(q => autoFinalizeExpiredSubmissions(q.id)));
+        await Promise.all(candidateQuizzes.map((q: { id: string }) => autoFinalizeExpiredSubmissions(q.id)));
 
         const quizzes = await prisma.onlineQuiz.findMany({
             where: {

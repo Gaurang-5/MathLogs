@@ -15,13 +15,11 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
         const batchFilter = req.query.batch as string;
         const sortBy = req.query.sortBy as string;
         const teacherId = (req as any).user?.id;
-        const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
         const students = await prisma.student.findMany({
             where: {
                 status: 'APPROVED',
-                batch: { teacherId },
-                academicYearId: currentAcademicYearId
+                batch: { teacherId }
             },
             include: {
                 batch: { include: { feeInstallments: true } },
@@ -199,13 +197,11 @@ export const getPaymentHistory = async (req: Request, res: Response) => {
 export const getFeeSummary = async (req: Request, res: Response) => {
     try {
         const teacherId = (req as any).user?.id;
-        const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
         const students = await prisma.student.findMany({
             where: {
                 status: 'APPROVED',
-                batch: { teacherId },
-                academicYearId: currentAcademicYearId
+                batch: { teacherId }
             },
             select: {
                 id: true,
@@ -850,14 +846,12 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
 
         // Fetch Installment Payments
         const instituteId = (req as any).user?.instituteId;
-        const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
         const teacherId = (req as any).user?.id;
 
         const payments = await prisma.feePayment.findMany({
             where: {
                 student: {
                     instituteId: instituteId,
-                    academicYearId: currentAcademicYearId,
                     status: 'APPROVED',
                     batch: { teacherId }
                 },
@@ -879,7 +873,6 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
                 status: 'PAID',
                 student: {
                     instituteId: instituteId,
-                    academicYearId: currentAcademicYearId,
                     status: 'APPROVED',
                     batch: { teacherId }
                 },
@@ -1316,14 +1309,12 @@ export const getCustomInvoices = async (req: Request, res: Response) => {
     try {
         const teacherId = (req as any).user?.id;
         const instituteId = (req as any).user?.instituteId;
-        const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
         const invoices = await prisma.feeInstallment.findMany({
             where: {
                 studentId: { not: null },
                 student: {
                     instituteId: instituteId,
-                    academicYearId: currentAcademicYearId,
                     status: 'APPROVED'
                 }
             },

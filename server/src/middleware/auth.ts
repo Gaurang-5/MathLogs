@@ -81,7 +81,6 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
                     select: {
                         id: true,
                         username: true,
-                        currentAcademicYearId: true,
                         passwordVersion: true,
                         instituteId: true,
                         role: true,

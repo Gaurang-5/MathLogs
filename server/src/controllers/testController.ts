@@ -10,11 +10,9 @@ export const createTest = async (req: Request, res: Response) => {
     const { name, subject, date, maxMarks, className, batchId, batchIds } = req.body;
     const teacherId = (req as any).user?.id;
     const user = (req as any).user;
-    const academicYearId = (req as any).user?.currentAcademicYearId;
 
     if (!teacherId) return res.status(401).json({ error: 'Unauthorized' });
     if (!user.instituteId) return res.status(401).json({ error: 'No institute assigned' });
-    if (!academicYearId) return res.status(400).json({ error: 'No academic year selected' });
 
     try {
         const test = await prisma.test.create({
@@ -25,7 +23,6 @@ export const createTest = async (req: Request, res: Response) => {
                 date: new Date(date),
                 maxMarks: parseFloat(maxMarks),
                 teacherId,
-                academicYearId,
                 instituteId: user.instituteId, // ✅ SECURITY: Multi-tenant isolation
                 batchId: batchId || (batchIds && batchIds.length > 0 ? batchIds[0] : null),
                 ...(batchIds && batchIds.length > 0 ? {
@@ -44,12 +41,10 @@ export const createTest = async (req: Request, res: Response) => {
 export const getTests = async (req: Request, res: Response) => {
     try {
         const teacherId = (req as any).user?.id;
-        const academicYearId = (req as any).user?.currentAcademicYearId;
 
         const tests = await prisma.test.findMany({
             where: {
-                teacherId,
-                academicYearId
+                teacherId
             },
             orderBy: { date: 'desc' },
             include: {
@@ -94,15 +89,10 @@ export const submitMark = async (req: Request, res: Response) => {
         // Verify Student Eligibility (Security Check)
         const student = await prisma.student.findUnique({
             where: { id: studentId },
-            select: { academicYearId: true, instituteId: true }
+            select: { instituteId: true }
         });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
-
-        // Ensure student belongs to same academic year as test
-        if (student.academicYearId && test.academicYearId && student.academicYearId !== test.academicYearId) {
-            return res.status(400).json({ error: 'Student belongs to a different academic year' });
-        }
 
         // Ensure student belongs to same institute (redundant but safe)
         if (student.instituteId && test.instituteId && student.instituteId !== test.instituteId) {
@@ -136,15 +126,14 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
     const { humanId } = req.params;
     const { testId } = req.query;
     const teacherId = (req as any).user?.id;
-    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
+    const user = (req as any).user;
 
     try {
-        // FIX: Use findFirst with academicYearId filter due to composite unique constraint
-        // @@unique([humanId, academicYearId]) means humanId alone is not unique
+        // FIX: Use findFirst scoped to instituteId since composite constraint is now humanId_instituteId
         const student = await prisma.student.findFirst({
             where: {
                 humanId: String(humanId),
-                academicYearId: currentAcademicYearId
+                instituteId: user.instituteId
             },
             include: {
                 batch: true,
@@ -197,17 +186,11 @@ export const updateTest = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, date, maxMarks } = req.body;
     const teacherId = (req as any).user?.id;
-    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
     try {
         const test = await prisma.test.findUnique({ where: { id: String(id) } });
         if (!test) return res.status(404).json({ error: 'Test not found' });
         if (test.teacherId && test.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
-
-        // Academic year boundary check
-        if (test.academicYearId && test.academicYearId !== currentAcademicYearId) {
-            return res.status(400).json({ error: 'Cannot modify test from non-active academic year' });
-        }
 
         const updated = await prisma.test.update({
             where: { id: String(id) },
@@ -226,17 +209,11 @@ export const updateTest = async (req: Request, res: Response) => {
 export const deleteTest = async (req: Request, res: Response) => {
     const { id } = req.params;
     const teacherId = (req as any).user?.id;
-    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
     try {
         const test = await prisma.test.findUnique({ where: { id: String(id) } });
         if (!test) return res.status(404).json({ error: 'Test not found' });
         if (test.teacherId && test.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
-
-        // Academic year boundary check
-        if (test.academicYearId && test.academicYearId !== currentAcademicYearId) {
-            return res.status(400).json({ error: 'Cannot delete test from non-active academic year' });
-        }
 
         await prisma.test.delete({
             where: { id: String(id) }
@@ -330,7 +307,6 @@ export const downloadTestReport = async (req: Request, res: Response) => {
 export const getTestEligibleStudents = async (req: Request, res: Response) => {
     const { id } = req.params;
     const teacherId = (req as any).user?.id;
-    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
     try {
         // Fetch test details (lightweight query)
@@ -357,7 +333,6 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
             if (linkedBatchIds.length > 0) {
                 return prisma.student.findMany({
                     where: {
-                        academicYearId: currentAcademicYearId,
                         batchId: { in: linkedBatchIds },
                         status: 'APPROVED',
                         marks: {
@@ -377,7 +352,6 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
                 // Fallback for older tests that only had className
                 return prisma.student.findMany({
                     where: {
-                        academicYearId: currentAcademicYearId,
                         batch: {
                             className: testData.className || undefined
                         },
@@ -416,7 +390,6 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
 export const sendTestResultsEmail = async (req: Request, res: Response) => {
     const { id } = req.params;
     const teacherId = (req as any).user?.id;
-    const currentAcademicYearId = (req as any).user?.currentAcademicYearId;
 
     try {
         // 1. Fetch Test Details
@@ -453,7 +426,6 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
             // Precise batch scoped tests don't need marks to know who should get messages!
             students = await prisma.student.findMany({
                 where: {
-                    academicYearId: currentAcademicYearId,
                     batchId: { in: testBatchIds },
                     status: 'APPROVED'
                 },
@@ -476,15 +448,14 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                 testMarks.map(m => m.student?.batchId).filter(Boolean)
             )) as string[];
 
-            if (testBatchIds.length === 0) {
+            if (fallbackBatchIds.length === 0) {
                 return res.status(400).json({ error: 'No marks found for this legacy test. Cannot determine batches to message.' });
             }
 
             students = await prisma.student.findMany({
                 where: {
-                    academicYearId: currentAcademicYearId,
                     batchId: {
-                        in: testBatchIds
+                        in: fallbackBatchIds
                     },
                     status: 'APPROVED'
                 },
@@ -1114,8 +1085,7 @@ export const finalizeOnlineQuiz = async (req: Request, res: Response) => {
                     batch: {
                         select: {
                             id: true,
-                            className: true,
-                            academicYearId: true
+                            className: true
                         }
                     },
                     batches: {
@@ -1161,7 +1131,6 @@ export const finalizeOnlineQuiz = async (req: Request, res: Response) => {
                     date: quiz.availableFrom || quiz.createdAt,
                     maxMarks: quiz.totalMarks,
                     teacherId,
-                    academicYearId: quiz.batch?.academicYearId || null,
                     instituteId,
                     batchId: quiz.batchId,
                     isQuiz: true,

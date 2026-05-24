@@ -683,7 +683,7 @@ export default function BatchDetails() {
 
     if (loading) {
         return (
-            <Layout>
+            <Layout hideMobileNav>
                 <div className="flex flex-col items-center justify-center h-96 gap-4">
                     <div className="flex gap-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-neutral-300 animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -699,7 +699,7 @@ export default function BatchDetails() {
     if (!batch) return null;
 
     return (
-        <Layout>
+        <Layout hideMobileNav>
             <div className="mb-6 sm:mb-8">
                 {/* ── Back navigation ── */}
                 <button
@@ -1537,7 +1537,7 @@ export default function BatchDetails() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-5 md:p-8 max-w-2xl w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-5 md:p-8 max-w-4xl w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
                         >
                             <div className="flex justify-between items-center mb-6">
                                 <div>

@@ -272,8 +272,6 @@ export const deleteInstitute = async (req: Request, res: Response) => {
             prisma.batch.deleteMany({ where: { instituteId: id } }),
             // Delete tests
             prisma.test.deleteMany({ where: { instituteId: id } }),
-            // Delete academic years
-            prisma.academicYear.deleteMany({ where: { instituteId: id } }),
             // Delete admins
             prisma.admin.deleteMany({ where: { instituteId: id } }),
             // Delete invite tokens
