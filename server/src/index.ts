@@ -190,6 +190,22 @@ export function createApp() {
         res.status(statusCode).json({ error: message });
     });
 
+    app.get('/s/:code', async (req, res) => {
+        try {
+            const { code } = req.params;
+            const record = await prisma.shortUrl.findUnique({
+                where: { id: code }
+            });
+            if (!record) {
+                return res.status(404).send('Invitation link not found or expired.');
+            }
+            res.redirect(record.longUrl);
+        } catch (err) {
+            console.error('Error redirecting short URL:', err);
+            res.status(500).send('Internal server error');
+        }
+    });
+
     app.get(/.*/, (req, res) => {
         res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
     });

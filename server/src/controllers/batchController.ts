@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import { prisma } from '../prisma';
 import { runPdfInWorker } from '../utils/pdfWorker';
 import bwipjs from 'bwip-js';
@@ -622,12 +623,14 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
         let registeredStudentData = null;
 
         let isTokenValid = false;
+        let invitePhone: string | null = null;
 
         if (token) {
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-123') as any;
                 if (decoded.batchId === id && decoded.whatsapp) {
                     isTokenValid = true;
+                    invitePhone = decoded.whatsapp;
                     const existingStudent = await prisma.student.findFirst({
                         where: { batchId: id, parentWhatsapp: decoded.whatsapp }
                     });
@@ -1023,14 +1026,22 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
         const user = (req as any).user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
-        // Generate 24hr JWT invite token
-        const token = jwt.sign(
-            { batchId: String(id), whatsapp: whatsappNumber },
-            process.env.JWT_SECRET || 'fallback-secret-123',
-            { expiresIn: '24h' }
-        );
+        const payload = {
+            batchId: String(id),
+            whatsapp: whatsappNumber,
+            exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days expiration
+        };
+        const token = jwt.sign(payload, process.env.JWT_SECRET || 'fallback-secret-123');
+        const fullUrl = `${getClientUrl(req)}/register/${batch.id}?token=${token}`;
 
-        const registrationLink = `${getClientUrl(req)}/register/${batch.id}?token=${token}`;
+        const shortCode = crypto.randomBytes(4).toString('hex');
+        await prisma.shortUrl.create({
+            data: {
+                id: shortCode,
+                longUrl: fullUrl
+            }
+        });
+        const registrationLink = `${getClientUrl(req)}/s/${shortCode}`;
 
         // Send via WhatsApp
         await sendStudentInviteWhatsApp(whatsappNumber, {

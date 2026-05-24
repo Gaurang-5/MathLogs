@@ -57,6 +57,7 @@ interface BatchDetails {
     name: string;
     amount: number;
     createdAt: string;
+    studentId?: string | null;
   }>;
 }
 
@@ -240,6 +241,15 @@ export default function BatchDetailScreen() {
   };
 
   const students = useMemo(() => batch?.students || [], [batch]);
+  const invoiceTemplates = useMemo(() => {
+    const seen = new Set<string>();
+    return (batch?.feeInstallments || []).filter(inst => {
+      const key = `${inst.name}::${inst.amount}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [batch?.feeInstallments]);
 
   const getStudentAverage = (student: any) => {
     if (!student.marks || student.marks.length === 0) return '-';
@@ -387,7 +397,9 @@ export default function BatchDetailScreen() {
                   students.map((student, i) => {
                     const genericPaid = student.fees?.filter((f: any) => f.status === 'PAID').reduce((sum: number, f: any) => sum + f.amount, 0) || 0;
                     let currentBuffer = genericPaid;
-                    const sortedInsts = [...(batch.feeInstallments || [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                    const sortedInsts = [...(batch.feeInstallments || [])]
+                      .filter(inst => !inst.studentId || inst.studentId === student.id)
+                      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
                     const instPaidMap: Record<string, number> = {};
                     
                     sortedInsts.forEach(inst => {
@@ -631,9 +643,9 @@ export default function BatchDetailScreen() {
                  </TouchableOpacity>
                  <TouchableOpacity 
                    style={[s.tabBtn, !!customInvoice.existingInstallmentId && s.tabBtnActive]} 
-                   onPress={() => setCustomInvoice({ ...customInvoice, existingInstallmentId: batch?.feeInstallments?.[0]?.id || '' })}
+                   onPress={() => setCustomInvoice({ ...customInvoice, existingInstallmentId: invoiceTemplates[0]?.id || '' })}
                  >
-                    <Text style={[s.tabBtnText, !!customInvoice.existingInstallmentId && s.tabBtnTextActive]}>Link Global</Text>
+                    <Text style={[s.tabBtnText, !!customInvoice.existingInstallmentId && s.tabBtnTextActive]}>Existing</Text>
                  </TouchableOpacity>
               </View>
 
@@ -641,7 +653,7 @@ export default function BatchDetailScreen() {
                 <View>
                    <Text style={s.inputLabel}>Select Installment</Text>
                    {/* In a real app we'd use a picker, but we can list them as buttons for now */}
-                   {batch?.feeInstallments?.map(inst => (
+                   {invoiceTemplates.map(inst => (
                      <TouchableOpacity 
                        key={inst.id} 
                        style={[s.instSelectBtn, customInvoice.existingInstallmentId === inst.id && s.instSelectBtnActive]}
@@ -730,10 +742,10 @@ export default function BatchDetailScreen() {
             <ScrollView style={{ padding: 20 }}>
               <View style={{ marginBottom: 24 }}>
                 <Text style={[s.sectionTitle, { marginLeft: 0 }]}>Existing Installments</Text>
-                {batch?.feeInstallments?.length === 0 ? (
+                {batch?.feeInstallments?.filter(inst => !inst.studentId).length === 0 ? (
                   <Text style={{ color: T.textMuted }}>No installments configured.</Text>
                 ) : (
-                  batch?.feeInstallments?.map(inst => (
+                  batch?.feeInstallments?.filter(inst => !inst.studentId).map(inst => (
                     <View key={inst.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: T.white, borderRadius: 12, borderWidth: 1, borderColor: T.border, marginBottom: 8 }}>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontWeight: '700', color: T.text }}>{inst.name}</Text>

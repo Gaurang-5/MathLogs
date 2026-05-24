@@ -1371,6 +1371,157 @@ export const getCustomInvoices = async (req: Request, res: Response) => {
     }
 };
 
+export const createCustomInvoice = async (req: Request, res: Response) => {
+    try {
+        const { studentId, installmentId, name, amount, markAsPaid } = req.body;
+        const user = (req as any).user;
+        const teacherId = user?.id;
+        const instituteId = user?.instituteId;
+
+        const student = await prisma.student.findUnique({
+            where: { id: String(studentId) },
+            include: {
+                batch: {
+                    select: {
+                        id: true,
+                        teacherId: true,
+                        instituteId: true,
+                        name: true,
+                        institute: {
+                            select: {
+                                name: true,
+                                slug: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!student) return res.status(404).json({ error: 'Student not found' });
+        if (!student.batch) return res.status(400).json({ error: 'Student has no batch assigned' });
+        if (student.instituteId && student.instituteId !== instituteId) {
+            return res.status(403).json({ error: 'Unauthorized: Cross-institute access denied' });
+        }
+        if (student.batch.instituteId !== instituteId || student.batch.teacherId !== teacherId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        let invoiceName = String(name || '').trim();
+        let invoiceAmount = amount !== undefined ? parseFloat(String(amount)) : NaN;
+
+        if (installmentId) {
+            const sourceInstallment = await prisma.feeInstallment.findFirst({
+                where: {
+                    id: String(installmentId),
+                    batchId: student.batch.id
+                }
+            });
+
+            if (!sourceInstallment) {
+                return res.status(404).json({ error: 'Global installment not found for this student batch' });
+            }
+
+            invoiceName = sourceInstallment.name;
+            invoiceAmount = sourceInstallment.amount;
+        }
+
+        if (!invoiceName || isNaN(invoiceAmount) || invoiceAmount <= 0) {
+            return res.status(400).json({ error: 'Invoice name and a positive amount are required' });
+        }
+
+        const existingAssignment = await prisma.feeInstallment.findFirst({
+            where: {
+                batchId: student.batch.id,
+                studentId: student.id,
+                name: invoiceName,
+                amount: invoiceAmount
+            }
+        });
+
+        if (existingAssignment) {
+            return res.status(409).json({ error: 'This invoice is already assigned to the student' });
+        }
+
+        const installment = await prisma.feeInstallment.create({
+            data: {
+                batchId: student.batch.id,
+                name: invoiceName,
+                amount: invoiceAmount,
+                studentId: student.id
+            }
+        });
+
+        let payment = null;
+        if (markAsPaid) {
+            payment = await prisma.feePayment.create({
+                data: {
+                    studentId: student.id,
+                    installmentId: installment.id,
+                    amountPaid: invoiceAmount,
+                    date: new Date()
+                }
+            });
+
+            if (student.instituteId) {
+                try {
+                    await prisma.systemLog.create({
+                        data: {
+                            instituteId: student.instituteId,
+                            action: 'FEE_COLLECTED',
+                            entityId: student.id,
+                            entityName: student.name,
+                            details: { amount: invoiceAmount, installmentName: invoiceName }
+                        }
+                    });
+                } catch (logError) {
+                    console.warn('[WARN] Failed to write custom invoice audit log:', logError);
+                }
+            }
+        }
+
+        if (student.parentWhatsapp) {
+            const instituteName = student.batch.institute?.name || 'our institute';
+            try {
+                const whatsapp = await import('../utils/whatsapp');
+                if (markAsPaid) {
+                    await whatsapp.sendPaymentReceiptWhatsApp(student.parentWhatsapp, {
+                        studentName: student.name,
+                        amountPaid: `Rs. ${invoiceAmount.toLocaleString()}`,
+                        installmentName: invoiceName,
+                        instituteName,
+                        instituteId: student.instituteId || undefined
+                    });
+                } else {
+                    const phoneDigits = student.parentWhatsapp.replace(/\D/g, '').slice(-10);
+                    const baseUrl = process.env.FRONTEND_URL || 'https://mathlogs.com';
+                    const instituteSlug = student.batch.institute?.slug;
+                    const upiPaymentLink = instituteSlug
+                        ? `${baseUrl}/pay/${instituteSlug}?phone=${phoneDigits}`
+                        : 'Please contact admin for payment details.';
+
+                    await whatsapp.sendFeeReminderUpiWhatsApp(student.parentWhatsapp, {
+                        studentName: student.name,
+                        batchName: student.batch.name || 'the batch',
+                        feeBreakup: `- ${invoiceName}: Rs. ${invoiceAmount.toLocaleString()} (Due)`,
+                        totalAmount: invoiceAmount.toLocaleString(),
+                        instituteName,
+                        upiPaymentLink,
+                        instituteId: student.instituteId || undefined
+                    });
+                }
+            } catch (waError) {
+                console.error('WhatsApp Custom Invoice Notification Error:', waError);
+            }
+        }
+
+        res.status(201).json({ installment, payment });
+    } catch (error) {
+        console.error('Error creating custom invoice:', error);
+        res.status(500).json({ error: 'Failed to create custom invoice' });
+    }
+};
+
 export const scanReceipt = async (req: Request, res: Response) => {
     try {
         let imageBuffer: Buffer | string | undefined;

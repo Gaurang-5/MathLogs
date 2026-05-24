@@ -569,3 +569,9 @@ model QuizAnswer {
   @@unique([submissionId, questionId])
   @@index([submissionId])
 }
+
+model ShortUrl {
+  id        String   @id // unique random code
+  longUrl   String   @db.Text
+  createdAt DateTime @default(now())
+}

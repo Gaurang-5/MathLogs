@@ -127,3 +127,18 @@ export const createInstallmentSchema = z.object({
         amount: z.number().positive("Amount must be positive")
     })
 });
+
+export const createCustomInvoiceSchema = z.object({
+    body: z.object({
+        studentId: z.string().uuid("Invalid Student ID"),
+        installmentId: z.string().uuid("Invalid Installment ID").optional(),
+        name: z.string().min(1, "Invoice name required").max(200).optional(),
+        amount: z.number().positive("Amount must be positive")
+            .or(z.string().regex(/^\d+(\.\d+)?$/).transform(Number))
+            .optional(),
+        markAsPaid: z.boolean().optional()
+    }).refine(
+        data => !!data.installmentId || (!!data.name && data.amount !== undefined),
+        { message: "Either installmentId or name and amount are required" }
+    )
+});

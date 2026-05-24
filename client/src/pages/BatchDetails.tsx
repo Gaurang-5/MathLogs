@@ -158,6 +158,27 @@ export default function BatchDetails() {
     // View Payment Details State
     const [viewPayment, setViewPayment] = useState<{ student: Student, installment: FeeInstallment, payments: FeePayment[] } | null>(null);
 
+    const invoiceTemplates = useMemo(() => {
+        const seen = new Set<string>();
+        return (batch?.feeInstallments || []).filter(inst => {
+            const key = `${inst.name}::${inst.amount}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }, [batch?.feeInstallments]);
+
+    const customInvoiceColumns = useMemo(() => {
+        const seen = new Set<string>();
+        return (batch?.feeInstallments || []).filter(inst => {
+            if (!inst.studentId) return false;
+            const key = `${inst.name}::${inst.amount}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }, [batch?.feeInstallments]);
+
     // ... existing search logic ...
     const filteredStudents = useMemo(() => {
         const students = (batch?.students || []).filter(student =>
@@ -532,46 +553,32 @@ export default function BatchDetails() {
     const handleCreateCustomInvoice = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!showCustomInvoice) return;
+        if (customInvoice.existingInstallmentId === 'error') {
+            toast.error('No invoice template selected');
+            return;
+        }
         const toastId = toast.loading('Creating custom invoice...');
         try {
             if (customInvoice.existingInstallmentId) {
-                // Link an existing global invoice to this student
-                const existingInst = batch?.feeInstallments?.find(i => i.id === customInvoice.existingInstallmentId);
-
-                // Only call pay-installment if marking as paid — amount:0 fails schema validation (400)
-                if (customInvoice.markAsPaid) {
-                    const paymentAmount = Number(existingInst?.amount || 0);
-                    await apiRequest(`/fees/pay-installment`, 'POST', {
-                        studentId: showCustomInvoice.id,
-                        installmentId: customInvoice.existingInstallmentId,
-                        amount: paymentAmount,
-                        date: new Date().toISOString().split('T')[0]
-                    });
-                }
+                await apiRequest(`/fees/custom-invoices`, 'POST', {
+                    studentId: showCustomInvoice.id,
+                    installmentId: customInvoice.existingInstallmentId,
+                    markAsPaid: customInvoice.markAsPaid
+                });
 
                 toast.success(
                     customInvoice.markAsPaid
-                        ? 'Installment marked as paid'
-                        : 'This installment is already visible for this student',
+                        ? 'Installment linked and marked as paid'
+                        : 'Installment successfully linked to student',
                     { id: toastId }
                 );
             } else {
-                // Create brand new student-specific invoice
-                const installment = await apiRequest(`/batches/${id}/installments`, 'POST', {
+                await apiRequest(`/fees/custom-invoices`, 'POST', {
                     name: customInvoice.name,
                     amount: Number(customInvoice.amount),
-                    studentId: showCustomInvoice.id
+                    studentId: showCustomInvoice.id,
+                    markAsPaid: customInvoice.markAsPaid
                 });
-
-                // If "Mark as Paid" is checked, immediately log a payment
-                if (customInvoice.markAsPaid && installment?.id) {
-                    await apiRequest(`/fees/pay-installment`, 'POST', {
-                        studentId: showCustomInvoice.id,
-                        installmentId: installment.id,
-                        amount: Number(customInvoice.amount),
-                        date: new Date().toISOString().split('T')[0]
-                    });
-                }
 
                 toast.success(
                     customInvoice.markAsPaid
@@ -717,181 +724,181 @@ export default function BatchDetails() {
                 ══════════════════════════════════════════════ */}
                 <div>
 
-                        {/* Title section — compact */}
-                        <div className="bg-white border border-black/[0.06] rounded-2xl px-5 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] mb-4">
-                            <div className="flex items-center justify-between gap-4">
-                                <div className="flex-1 min-w-0">
-                                    {/* Batch name headline */}
-                                    <h1 className="text-xl md:text-2xl font-black text-black tracking-tight leading-tight break-words mb-2">
-                                        {batch.name}
-                                    </h1>
+                    {/* Title section — compact */}
+                    <div className="bg-white border border-black/[0.06] rounded-2xl px-5 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] mb-4">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                                {/* Batch name headline */}
+                                <h1 className="text-xl md:text-2xl font-black text-black tracking-tight leading-tight break-words mb-2">
+                                    {batch.name}
+                                </h1>
 
-                                    {/* Single meta line: MATH · CLASS 10 · 4–6pm · 53 Students */}
-                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                        <span className="text-[11px] font-black uppercase tracking-[0.1em] text-app-text-tertiary">{batch.subject}</span>
-                                        {batch.className && (
-                                            <>
-                                                <span className="text-app-text-tertiary/40 text-[11px]">·</span>
-                                                <span className="text-[11px] font-black uppercase tracking-[0.1em] text-app-text-tertiary">{batch.className}</span>
-                                            </>
-                                        )}
-                                        {batch.timeSlot && (
-                                            <>
-                                                <span className="text-app-text-tertiary/40 text-[11px]">·</span>
-                                                <span className="flex items-center gap-1 text-[11px] font-semibold text-app-text-tertiary">
-                                                    <Clock className="w-3 h-3" />{batch.timeSlot}
-                                                </span>
-                                            </>
-                                        )}
-                                        <span className="text-app-text-tertiary/40 text-[11px]">·</span>
-                                        <span className="flex items-center gap-1 text-[11px] font-semibold text-app-text-tertiary">
-                                            <Users className="w-3 h-3" />
-                                            <span className="font-black text-black">{batch.students.length}</span> Students
-                                        </span>
-                                    </div>
+                                {/* Single meta line: MATH · CLASS 10 · 4–6pm · 53 Students */}
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <span className="text-[11px] font-black uppercase tracking-[0.1em] text-app-text-tertiary">{batch.subject}</span>
+                                    {batch.className && (
+                                        <>
+                                            <span className="text-app-text-tertiary/40 text-[11px]">·</span>
+                                            <span className="text-[11px] font-black uppercase tracking-[0.1em] text-app-text-tertiary">{batch.className}</span>
+                                        </>
+                                    )}
+                                    {batch.timeSlot && (
+                                        <>
+                                            <span className="text-app-text-tertiary/40 text-[11px]">·</span>
+                                            <span className="flex items-center gap-1 text-[11px] font-semibold text-app-text-tertiary">
+                                                <Clock className="w-3 h-3" />{batch.timeSlot}
+                                            </span>
+                                        </>
+                                    )}
+                                    <span className="text-app-text-tertiary/40 text-[11px]">·</span>
+                                    <span className="flex items-center gap-1 text-[11px] font-semibold text-app-text-tertiary">
+                                        <Users className="w-3 h-3" />
+                                        <span className="font-black text-black">{batch.students.length}</span> Students
+                                    </span>
                                 </div>
+                            </div>
 
-                                {/* Edit / Delete controls */}
-                                <div className="flex gap-1.5 shrink-0">
-                                    <button onClick={openEditBatch} className="p-2 text-app-text-tertiary hover:text-black hover:bg-neutral-100 rounded-xl transition-all border border-black/[0.06]" title="Edit Batch Details">
-                                        <Settings className="w-4 h-4" />
-                                    </button>
-                                    <button onClick={handleDeleteBatch} className="p-2 text-app-text-tertiary hover:text-danger hover:bg-red-50 rounded-xl transition-all border border-black/[0.06]" title="Delete Batch">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
+                            {/* Edit / Delete controls */}
+                            <div className="flex gap-1.5 shrink-0">
+                                <button onClick={openEditBatch} className="p-2 text-app-text-tertiary hover:text-black hover:bg-neutral-100 rounded-xl transition-all border border-black/[0.06]" title="Edit Batch Details">
+                                    <Settings className="w-4 h-4" />
+                                </button>
+                                <button onClick={handleDeleteBatch} className="p-2 text-app-text-tertiary hover:text-danger hover:bg-red-50 rounded-xl transition-all border border-black/[0.06]" title="Delete Batch">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
+                    </div>
 
 
-                        {/* ── Action strip ── */}
-                        {/* Desktop: flex-wrap pill row | Mobile: horizontal scroll icon tabs */}
-                        <div className="bg-white border border-black/[0.06] rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] overflow-hidden">
-                            {/* Mobile: icon tab strip — scrollable, no wrapping */}
-                            <div className="flex md:hidden overflow-x-auto scrollbar-hide">
-                                {/* Primary CTA — fills to left */}
-                                <button
-                                    onClick={() => setShowAddStudent(true)}
-                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 bg-black text-white active:bg-neutral-800 transition-colors"
-                                >
-                                    <Plus className="w-5 h-5" />
-                                    <span className="text-[10px] font-black uppercase tracking-wide whitespace-nowrap">Add Student</span>
-                                </button>
+                    {/* ── Action strip ── */}
+                    {/* Desktop: flex-wrap pill row | Mobile: horizontal scroll icon tabs */}
+                    <div className="bg-white border border-black/[0.06] rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.04)] overflow-hidden">
+                        {/* Mobile: icon tab strip — scrollable, no wrapping */}
+                        <div className="flex md:hidden overflow-x-auto scrollbar-hide">
+                            {/* Primary CTA — fills to left */}
+                            <button
+                                onClick={() => setShowAddStudent(true)}
+                                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 bg-black text-white active:bg-neutral-800 transition-colors"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span className="text-[10px] font-black uppercase tracking-wide whitespace-nowrap">Add Student</span>
+                            </button>
 
-                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+                            <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
 
-                                <button
-                                    onClick={handleDownloadPDF}
-                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
-                                >
-                                    <Download className="w-5 h-5" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Download</span>
-                                </button>
+                            <button
+                                onClick={handleDownloadPDF}
+                                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                            >
+                                <Download className="w-5 h-5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Download</span>
+                            </button>
 
-                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+                            <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
 
-                                <button
-                                    onClick={handlePrintStickers}
-                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
-                                >
-                                    <Printer className="w-5 h-5" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Stickers</span>
-                                </button>
+                            <button
+                                onClick={handlePrintStickers}
+                                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                            >
+                                <Printer className="w-5 h-5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Stickers</span>
+                            </button>
 
-                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+                            <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
 
-                                <button
-                                    onClick={openFeeModal}
-                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
-                                >
-                                    <Settings className="w-5 h-5" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Fee Cols</span>
-                                </button>
+                            <button
+                                onClick={openFeeModal}
+                                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                            >
+                                <Settings className="w-5 h-5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Fee Cols</span>
+                            </button>
 
-                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+                            <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
 
 
-                                <button
-                                    onClick={openWhatsappModal}
-                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
-                                >
-                                    <Phone className="w-5 h-5" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-                                        {batch.whatsappGroupLink ? 'WA Link' : 'Add WA'}
-                                    </span>
-                                </button>
+                            <button
+                                onClick={openWhatsappModal}
+                                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                            >
+                                <Phone className="w-5 h-5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                    {batch.whatsappGroupLink ? 'WA Link' : 'Add WA'}
+                                </span>
+                            </button>
 
-                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+                            <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
 
-                                <button
-                                    onClick={handleSendWhatsappInvite}
-                                    disabled={!batch.whatsappGroupLink}
-                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition-colors disabled:opacity-40 disabled:pointer-events-none"
-                                >
-                                    <Mail className="w-5 h-5" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Invites</span>
-                                </button>
+                            <button
+                                onClick={handleSendWhatsappInvite}
+                                disabled={!batch.whatsappGroupLink}
+                                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                            >
+                                <Mail className="w-5 h-5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Invites</span>
+                            </button>
 
-                                {!batch.isRegistrationEnded && (
-                                    <>
-                                        <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
-                                        <button
-                                            onClick={() => setShowRegModal(true)}
-                                            className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
-                                        >
-                                            <Share2 className="w-5 h-5" />
-                                            <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Reg. QR</span>
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-
-                            {/* Desktop: wrapped pill row */}
-                            <div className="hidden md:flex flex-wrap gap-2 p-3">
-                                <button
-                                    onClick={() => setShowAddStudent(true)}
-                                    className="flex items-center gap-2 bg-black hover:bg-neutral-800 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all active:scale-[0.97] shadow-sm shadow-black/20"
-                                >
-                                    <Plus className="w-4 h-4" /> Add Student
-                                </button>
-                                <div className="w-px bg-black/[0.06] self-stretch mx-1" />
-                                <button onClick={handleDownloadPDF} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
-                                    <Download className="w-4 h-4 text-app-text-tertiary" /> Download
-                                </button>
-                                <button onClick={handlePrintStickers} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
-                                    <Printer className="w-4 h-4 text-app-text-tertiary" /> Stickers
-                                </button>
-                                <button onClick={openFeeModal} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
-                                    <Settings className="w-4 h-4 text-app-text-tertiary" /> Fee Cols
-                                </button>
-                                <div className="w-px bg-black/[0.06] self-stretch mx-1" />
-                                <button
-                                    onClick={openWhatsappModal}
-                                    className={cn(
-                                        "flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border transition-all active:scale-[0.97]",
-                                        batch.whatsappGroupLink ? "bg-neutral-50 hover:bg-neutral-100 text-black border-black/[0.06]" : "bg-neutral-50 border-dashed border-neutral-300 text-app-text-secondary hover:border-black/30"
-                                    )}
-                                >
-                                    <Phone className="w-4 h-4 text-app-text-tertiary" />
-                                    {batch.whatsappGroupLink ? 'WA Link' : 'Add WA Link'}
-                                </button>
-                                <button
-                                    onClick={handleSendWhatsappInvite}
-                                    disabled={!batch.whatsappGroupLink}
-                                    className="flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold px-4 py-2.5 rounded-xl border border-emerald-200 transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <Mail className="w-4 h-4" /> Send Invites
-                                </button>
-                                {!batch.isRegistrationEnded && (
+                            {!batch.isRegistrationEnded && (
+                                <>
+                                    <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
                                     <button
                                         onClick={() => setShowRegModal(true)}
-                                        className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]"
+                                        className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
                                     >
-                                        <Share2 className="w-4 h-4 text-app-text-tertiary" /> Registration QR
+                                        <Share2 className="w-5 h-5" />
+                                        <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Reg. QR</span>
                                     </button>
-                                )}
-                            </div>
+                                </>
+                            )}
                         </div>
+
+                        {/* Desktop: wrapped pill row */}
+                        <div className="hidden md:flex flex-wrap gap-2 p-3">
+                            <button
+                                onClick={() => setShowAddStudent(true)}
+                                className="flex items-center gap-2 bg-black hover:bg-neutral-800 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all active:scale-[0.97] shadow-sm shadow-black/20"
+                            >
+                                <Plus className="w-4 h-4" /> Add Student
+                            </button>
+                            <div className="w-px bg-black/[0.06] self-stretch mx-1" />
+                            <button onClick={handleDownloadPDF} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
+                                <Download className="w-4 h-4 text-app-text-tertiary" /> Download
+                            </button>
+                            <button onClick={handlePrintStickers} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
+                                <Printer className="w-4 h-4 text-app-text-tertiary" /> Stickers
+                            </button>
+                            <button onClick={openFeeModal} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
+                                <Settings className="w-4 h-4 text-app-text-tertiary" /> Fee Cols
+                            </button>
+                            <div className="w-px bg-black/[0.06] self-stretch mx-1" />
+                            <button
+                                onClick={openWhatsappModal}
+                                className={cn(
+                                    "flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border transition-all active:scale-[0.97]",
+                                    batch.whatsappGroupLink ? "bg-neutral-50 hover:bg-neutral-100 text-black border-black/[0.06]" : "bg-neutral-50 border-dashed border-neutral-300 text-app-text-secondary hover:border-black/30"
+                                )}
+                            >
+                                <Phone className="w-4 h-4 text-app-text-tertiary" />
+                                {batch.whatsappGroupLink ? 'WA Link' : 'Add WA Link'}
+                            </button>
+                            <button
+                                onClick={handleSendWhatsappInvite}
+                                disabled={!batch.whatsappGroupLink}
+                                className="flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold px-4 py-2.5 rounded-xl border border-emerald-200 transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                <Mail className="w-4 h-4" /> Send Invites
+                            </button>
+                            {!batch.isRegistrationEnded && (
+                                <button
+                                    onClick={() => setShowRegModal(true)}
+                                    className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]"
+                                >
+                                    <Share2 className="w-4 h-4 text-app-text-tertiary" /> Registration QR
+                                </button>
+                            )}
+                        </div>
+                    </div>
 
                 </div>
             </div>
@@ -973,18 +980,14 @@ export default function BatchDetails() {
                                     </th>
                                 ))}
                                 {/* Dynamic headers for custom (student-specific) invoices */}
-                                {(() => {
-                                    const allCustom = batch.feeInstallments?.filter(i => i.studentId) || [];
-                                    const seen = new Set<string>();
-                                    return allCustom.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; }).map(inst => (
-                                        <th key={inst.id} className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>
-                                            <div className="flex flex-col items-center">
-                                                <span>{inst.name}</span>
-                                                <span className={cn("text-app-text-tertiary", getTextSizeClass('sub'))}>₹{inst.amount}</span>
-                                            </div>
-                                        </th>
-                                    ));
-                                })()}
+                                {customInvoiceColumns.map(inst => (
+                                    <th key={`${inst.name}-${inst.amount}`} className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>
+                                        <div className="flex flex-col items-center">
+                                            <span>{inst.name}</span>
+                                            <span className={cn("text-app-text-tertiary", getTextSizeClass('sub'))}>₹{inst.amount}</span>
+                                        </div>
+                                    </th>
+                                ))}
                                 <th className={cn("border-b border-black/5 text-center", getCellPadding())} style={{ minWidth: '120px', whiteSpace: 'nowrap' }}>Actions</th>
                             </tr>
                         </thead>
@@ -1078,64 +1081,65 @@ export default function BatchDetails() {
                                             );
                                         })}
                                         {/* Custom student-specific invoices — rendered as regular fee circles */}
-                                        {(() => {
-                                            const allCustom = batch.feeInstallments?.filter(i => i.studentId) || [];
-                                            const seen = new Set<string>();
-                                            const uniqueCustom = allCustom.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
-                                            return uniqueCustom.map(inst => {
-                                                // Only render circle if this invoice belongs to this student
-                                                if (inst.studentId !== student.id) {
-                                                    return <td key={inst.id} className={cn("text-center text-app-text-tertiary", getCellPadding())} title="Not applicable">-</td>;
-                                                }
-                                                const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
-                                                const paidAmount = payments.reduce((sum, p) => sum + p.amountPaid, 0);
-                                                const isFullyPaid = paidAmount >= inst.amount;
-                                                const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
-                                                return (
-                                                    <td key={inst.id} className={cn("text-center", getCellPadding())}>
-                                                        <button
-                                                            onClick={() => {
-                                                                if (isFullyPaid) {
-                                                                    if (payments.length > 0) {
-                                                                        setViewPayment({ student, installment: inst, payments });
-                                                                    } else {
-                                                                        toast.success('Paid via Account Balance');
-                                                                    }
+                                        {customInvoiceColumns.map(template => {
+                                            const inst = batch.feeInstallments?.find(invoice =>
+                                                invoice.studentId === student.id &&
+                                                invoice.name === template.name &&
+                                                invoice.amount === template.amount
+                                            );
+
+                                            if (!inst) {
+                                                return <td key={`${student.id}-${template.name}-${template.amount}`} className={cn("text-center text-app-text-tertiary", getCellPadding())} title="Not applicable">-</td>;
+                                            }
+
+                                            const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
+                                            const paidAmount = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+                                            const isFullyPaid = paidAmount >= inst.amount;
+                                            const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
+                                            return (
+                                                <td key={inst.id} className={cn("text-center", getCellPadding())}>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (isFullyPaid) {
+                                                                if (payments.length > 0) {
+                                                                    setViewPayment({ student, installment: inst, payments });
                                                                 } else {
-                                                                    const remaining = inst.amount - paidAmount;
-                                                                    setPaymentModal({
-                                                                        student,
-                                                                        installment: { ...inst, amount: remaining },
-                                                                        date: new Date().toISOString().split('T')[0]
-                                                                    });
+                                                                    toast.success('Paid via Account Balance');
                                                                 }
-                                                            }}
-                                                            className={cn(
-                                                                "rounded-full flex items-center justify-center border-2 transition-all mx-auto relative group/btn",
-                                                                getPaymentButtonSize(),
-                                                                isFullyPaid
-                                                                    ? "border-app-text bg-transparent cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-                                                                    : isPartiallyPaid
-                                                                        ? "border-orange-400 text-orange-500 cursor-pointer bg-orange-50 hover:bg-orange-100"
-                                                                        : "border-app-text-tertiary bg-transparent hover:border-app-text cursor-pointer text-app-text"
-                                                            )}
-                                                            title={
-                                                                isFullyPaid
-                                                                    ? (payments.length > 0 ? `Paid on ${new Date(payments[0].date).toLocaleDateString()}` : 'Paid via Balance')
-                                                                    : isPartiallyPaid
-                                                                        ? `Partial: ₹${paidAmount}/${inst.amount}`
-                                                                        : `${inst.name} — ₹${inst.amount}`
+                                                            } else {
+                                                                const remaining = inst.amount - paidAmount;
+                                                                setPaymentModal({
+                                                                    student,
+                                                                    installment: { ...inst, amount: remaining },
+                                                                    date: new Date().toISOString().split('T')[0]
+                                                                });
                                                             }
-                                                        >
-                                                            {isFullyPaid && <div className={cn("bg-current rounded-full", getPaymentInnerSize())} />}
-                                                            {isPartiallyPaid && (
-                                                                <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold">P</div>
-                                                            )}
-                                                        </button>
-                                                    </td>
-                                                );
-                                            });
-                                        })()}
+                                                        }}
+                                                        className={cn(
+                                                            "rounded-full flex items-center justify-center border-2 transition-all mx-auto relative group/btn",
+                                                            getPaymentButtonSize(),
+                                                            isFullyPaid
+                                                                ? "border-app-text bg-transparent cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                                                                : isPartiallyPaid
+                                                                    ? "border-orange-400 text-orange-500 cursor-pointer bg-orange-50 hover:bg-orange-100"
+                                                                    : "border-app-text-tertiary bg-transparent hover:border-app-text cursor-pointer text-app-text"
+                                                        )}
+                                                        title={
+                                                            isFullyPaid
+                                                                ? (payments.length > 0 ? `Paid on ${new Date(payments[0].date).toLocaleDateString()}` : 'Paid via Balance')
+                                                                : isPartiallyPaid
+                                                                    ? `Partial: ₹${paidAmount}/${inst.amount}`
+                                                                    : `${inst.name} — ₹${inst.amount}`
+                                                        }
+                                                    >
+                                                        {isFullyPaid && <div className={cn("bg-current rounded-full", getPaymentInnerSize())} />}
+                                                        {isPartiallyPaid && (
+                                                            <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold">P</div>
+                                                        )}
+                                                    </button>
+                                                </td>
+                                            );
+                                        })}
                                         <td className={cn("text-center border-b border-black/5", getCellPadding())} >
                                             <div className="flex items-center justify-center gap-1.5">
                                                 <button
@@ -1166,7 +1170,7 @@ export default function BatchDetails() {
                             })}
                             {filteredStudents.length === 0 && (
                                 <tr>
-                                    <td colSpan={6 + (batch.feeInstallments?.filter(i => !i.studentId).length || 0) + (batch.feeInstallments?.filter(i => i.studentId).length || 0)} className="p-20 text-center text-app-text-tertiary flex flex-col items-center justify-center">
+                                    <td colSpan={6 + (batch.feeInstallments?.filter(i => !i.studentId).length || 0) + customInvoiceColumns.length} className="p-20 text-center text-app-text-tertiary flex flex-col items-center justify-center">
                                         <Users className="w-12 h-12 mb-4 opacity-20" />
                                         <p>{searchQuery ? 'No students match your search.' : 'No students in this batch yet.'}</p>
                                     </td>
@@ -2512,11 +2516,15 @@ export default function BatchDetails() {
                                         </button>
                                         <button
                                             type="button"
+                                            disabled={invoiceTemplates.length === 0}
                                             onClick={() => {
-                                                const globalInsts = batch?.feeInstallments?.filter(i => !i.studentId);
-                                                setCustomInvoice({ ...customInvoice, existingInstallmentId: globalInsts?.[0]?.id || 'error' });
+                                                setCustomInvoice({ ...customInvoice, existingInstallmentId: invoiceTemplates[0]?.id || 'error' });
                                             }}
-                                            className={cn("flex-1 py-2 rounded-xl text-sm font-bold border transition-colors", customInvoice.existingInstallmentId ? "bg-black text-white border-black" : "bg-neutral-50 text-app-text-tertiary border-black/5 hover:border-black/20")}
+                                            className={cn(
+                                                "flex-1 py-2 rounded-xl text-sm font-bold border transition-colors",
+                                                customInvoice.existingInstallmentId ? "bg-black text-white border-black" : "bg-neutral-50 text-app-text-tertiary border-black/5 hover:border-black/20",
+                                                invoiceTemplates.length === 0 && "opacity-50 cursor-not-allowed hover:border-black/5"
+                                            )}
                                         >
                                             Existing
                                         </button>
@@ -2530,12 +2538,12 @@ export default function BatchDetails() {
                                             value={customInvoice.existingInstallmentId}
                                             onChange={(val) => setCustomInvoice({ ...customInvoice, existingInstallmentId: val })}
                                             options={[
-                                                ...(batch?.feeInstallments?.filter(i => !i.studentId).map(inst => ({
+                                                ...invoiceTemplates.map(inst => ({
                                                     value: inst.id,
                                                     label: `${inst.name} — ₹${inst.amount}`
-                                                })) || []),
-                                                ...(batch?.feeInstallments?.filter(i => !i.studentId).length === 0 ? [
-                                                    { value: 'error', label: 'No global fees available' }
+                                                })),
+                                                ...(invoiceTemplates.length === 0 ? [
+                                                    { value: 'error', label: 'No invoice templates available' }
                                                 ] : [])
                                             ]}
                                         />
@@ -2598,7 +2606,9 @@ export default function BatchDetails() {
                                         className="bg-neutral-900 hover:bg-black text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center gap-2"
                                     >
                                         <Receipt className="w-4 h-4" />
-                                        {customInvoice.markAsPaid ? 'Create & Mark Paid' : 'Create Invoice'}
+                                        {customInvoice.existingInstallmentId
+                                            ? (customInvoice.markAsPaid ? 'Link & Mark Paid' : 'Link Invoice')
+                                            : (customInvoice.markAsPaid ? 'Create & Mark Paid' : 'Create Invoice')}
                                     </button>
                                 </div>
                                 <div className="h-4 md:hidden"></div>
