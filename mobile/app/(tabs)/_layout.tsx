@@ -73,7 +73,7 @@ export default function TabLayout() {
         })}
         options={{ tabBarIcon: () => <CenterButton /> }} 
       />
-      <Tabs.Screen name="tests" options={{ tabBarIcon: ({ focused }) => <TabIcon Icon={FileText} focused={focused} label="Tests" /> }} />
+      <Tabs.Screen name="tests" options={{ href: null }} />
       <Tabs.Screen name="fees" options={{ tabBarIcon: ({ focused }) => <TabIcon Icon={Receipt} focused={focused} label="Fees" /> }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>

@@ -276,7 +276,8 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
             }
 
             const res = await api.post('/tests/generate', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+                headers: { 'Content-Type': 'multipart/form-data' },
+                timeoutMs: 120000
             });
 
             // Attach `kept: false` to all generated questions
@@ -326,7 +327,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                 difficulty,
                 excludeQuestions,
                 comments: comments.trim() || undefined
-            });
+            }, { timeoutMs: 60000 });
 
             const newQuestions: any[] = [];
             
@@ -340,7 +341,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                     difficulty,
                     originalQuestion: res.questionText,
                     comments: comments.trim() || undefined
-                });
+                }, { timeoutMs: 60000 });
                 newQuestions.push({ ...variantRes, variantGroup: newVariantGroup });
             } else {
                 newQuestions.push(res);
@@ -383,7 +384,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                 difficulty,
                 originalQuestion: originalQuestion.questionText,
                 comments: comments.trim() || undefined
-            });
+            }, { timeoutMs: 60000 });
 
             // Assign a common variantGroup
             const variantGroupId = `vgroup-${Date.now()}`;
@@ -430,7 +431,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                     difficulty,
                     excludeQuestions: [...excludeSoFar],
                     comments: comments.trim() || undefined
-                });
+                }, { timeoutMs: 60000 });
 
                 updatedQuestions[i] = { ...res, kept: false };
                 excludeSoFar.push(res.questionText);

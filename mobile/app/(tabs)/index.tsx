@@ -8,7 +8,7 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useRouter, useFocusEffect } from 'expo-router';
 import {
   Users, BookOpen, AlertCircle, TrendingUp, IndianRupee,
-  X, LogOut, Mail, Phone, ChevronRight, Eye, EyeOff, Bell, Scan,
+  X, LogOut, Mail, Phone, ChevronRight, Eye, EyeOff, Bell, Scan, Sparkles
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { OfflineBanner, SkeletonLoader } from '../../components/ui';
@@ -88,6 +88,13 @@ export default function DashboardScreen() {
           <Text style={s.navName} numberOfLines={1}>{data?.userName || user?.name || 'Admin'}</Text>
         </View>
         <View style={s.navRight}>
+          <TouchableOpacity
+            style={s.navIconBtn}
+            onPress={() => router.push('/(tabs)/tests' as any)}
+            activeOpacity={0.75}
+          >
+            <Sparkles size={18} color={T.text} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={s.navIconBtn}
             onPress={() => router.push('/scan' as any)}
