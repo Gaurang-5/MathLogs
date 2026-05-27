@@ -90,6 +90,7 @@ export default function RootLayout() {
               <Stack.Screen name="login" options={{ animation: 'fade' }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="quick-fee-modal" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="quiz-generator" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
               <Stack.Screen
                 name="modal"
                 options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

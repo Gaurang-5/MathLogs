@@ -206,11 +206,17 @@ export default function BatchDetailScreen() {
     if (!showCustomInvoice) return;
     try {
       if (customInvoice.existingInstallmentId) {
-        await api.post('/fees/custom-invoices', {
-          studentId: showCustomInvoice.id,
-          installmentId: customInvoice.existingInstallmentId,
-          markAsPaid: customInvoice.markAsPaid
-        });
+        if (customInvoice.markAsPaid) {
+          const existingInst = batch?.feeInstallments?.find(i => i.id === customInvoice.existingInstallmentId);
+          const paymentAmount = Number(existingInst?.amount || 0);
+          await api.post('/fees/pay-installment', {
+            studentId: showCustomInvoice.id,
+            installmentId: customInvoice.existingInstallmentId,
+            amount: paymentAmount,
+            date: new Date().toISOString().split('T')[0]
+          });
+        }
+        Alert.alert("Success", customInvoice.markAsPaid ? "Installment marked as paid" : "This installment is already visible for this student");
       } else {
         if (!customInvoice.name || !customInvoice.amount) return Alert.alert("Required", "Invoice Name and Amount are mandatory");
         await api.post('/fees/custom-invoices', {
@@ -219,13 +225,13 @@ export default function BatchDetailScreen() {
           studentId: showCustomInvoice.id,
           markAsPaid: customInvoice.markAsPaid
         });
+        Alert.alert("Success", "Invoice created successfully");
       }
       setShowCustomInvoice(null);
       setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
       refetch();
-      Alert.alert("Success", "Invoice created successfully");
     } catch(e: any) {
-      Alert.alert("Error", e.response?.data?.error || "Failed to create invoice");
+      Alert.alert("Error", e.response?.data?.error || "Failed to process invoice");
     }
   };
 
