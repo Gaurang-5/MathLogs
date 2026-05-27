@@ -583,6 +583,11 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
     }
 };
 
+import crypto from 'crypto';
+
+// In-memory job store for long-running AI tasks
+const aiJobs = new Map<string, { status: 'pending' | 'completed' | 'error'; result?: any; error?: string }>();
+
 export const generateAITest = async (req: Request, res: Response) => {
     const { topic, grade, difficulty, questionCount, comments, withVariants } = req.body;
     const parsedQuestionCount = Number.parseInt(String(questionCount), 10);
@@ -619,21 +624,49 @@ export const generateAITest = async (req: Request, res: Response) => {
 
         const filesArg = validFiles.length > 0 ? validFiles : undefined;
 
-        let testData;
-        if (withVariants === true || withVariants === 'true') {
-            // Generate 2N questions in N paired variant groups
-            testData = await generateTestWithVariants(topic, grade, difficulty, parsedQuestionCount, filesArg, comments);
-        } else {
-            // Legacy: generate 2x question pool for randomized sampling
-            const targetAICount = parsedQuestionCount * 2;
-            testData = await generateTest(topic, grade, difficulty, targetAICount, filesArg, comments);
-        }
+        const jobId = crypto.randomUUID();
+        aiJobs.set(jobId, { status: 'pending' });
 
-        res.json({ ...testData, warnings });
+        // Return immediately to avoid Heroku 30s timeout
+        res.json({ jobId });
+
+        // Run background task
+        (async () => {
+            try {
+                let testData;
+                if (withVariants === true || withVariants === 'true') {
+                    testData = await generateTestWithVariants(topic, grade, difficulty, parsedQuestionCount, filesArg, comments);
+                } else {
+                    const targetAICount = parsedQuestionCount * 2;
+                    testData = await generateTest(topic, grade, difficulty, targetAICount, filesArg, comments);
+                }
+                aiJobs.set(jobId, { status: 'completed', result: { ...testData, warnings } });
+            } catch (e: any) {
+                console.error("AI Background Gen Error:", e);
+                aiJobs.set(jobId, { status: 'error', error: e.message || 'Unknown generation error' });
+            }
+        })();
+
     } catch (e: any) {
-        console.error("AI Test Gen Error:", e);
-        res.status(500).json({ error: "Failed to generate test", details: e.message });
+        console.error("AI Test Gen Init Error:", e);
+        res.status(500).json({ error: "Failed to initialize test generation", details: e.message });
     }
+};
+
+export const getAITestJobStatus = async (req: Request, res: Response) => {
+    const { jobId } = req.params;
+    const job = aiJobs.get(jobId);
+    
+    if (!job) {
+        return res.status(404).json({ error: 'Job not found or expired' });
+    }
+    
+    // Automatically clean up memory after job completes/fails
+    if (job.status === 'completed' || job.status === 'error') {
+        setTimeout(() => aiJobs.delete(jobId), 300000); // 5 mins cleanup buffer
+    }
+    
+    res.json(job);
 };
 
 export const generateSingleQuestionRoute = async (req: Request, res: Response) => {

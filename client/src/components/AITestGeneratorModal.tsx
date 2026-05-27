@@ -275,22 +275,46 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                 formData.append('comments', comments.trim());
             }
 
-            const res = await api.post('/tests/generate', formData, {
+            const initialRes = await api.post('/tests/generate', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
-                timeoutMs: 120000
+                timeoutMs: 60000 // 1 min timeout for initial trigger
             });
 
-            // Attach `kept: false` to all generated questions
-            const questions: GeneratedQuestion[] = (res.questions || []).map((q: any) => ({ ...q, kept: false }));
-            setGeneratedTest({ ...res, questions });
-
-            if (res.warnings?.length > 0) {
-                toast.error(res.warnings.join('\n'), { duration: 6000 });
+            if (!initialRes.jobId) {
+                throw new Error('Failed to start test generation job.');
             }
-            toast.success('Test generated successfully!');
+
+            const jobId = initialRes.jobId;
+
+            const pollJobStatus = async () => {
+                try {
+                    const statusRes = await api.get(`/tests/generate/status/${jobId}`);
+                    if (statusRes.status === 'completed') {
+                        const res = statusRes.result;
+                        // Attach `kept: false` to all generated questions
+                        const questions: GeneratedQuestion[] = (res.questions || []).map((q: any) => ({ ...q, kept: false }));
+                        setGeneratedTest({ ...res, questions });
+
+                        if (res.warnings?.length > 0) {
+                            toast.error(res.warnings.join('\n'), { duration: 6000 });
+                        }
+                        toast.success('Test generated successfully!');
+                        setGenerating(false);
+                    } else if (statusRes.status === 'failed') {
+                        throw new Error(statusRes.error || 'Failed to generate test.');
+                    } else {
+                        // Pending or processing, poll again in 5 seconds
+                        setTimeout(pollJobStatus, 5000);
+                    }
+                } catch (error) {
+                    toast.error(getErrorMessage(error, 'Failed to check test generation status.'));
+                    setGenerating(false);
+                }
+            };
+
+            pollJobStatus();
         } catch (error) {
             toast.error(getErrorMessage(error, 'Failed to generate test. Please try again.'));
-        } finally {
             setGenerating(false);
         }
     };
