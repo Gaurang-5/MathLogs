@@ -248,7 +248,7 @@ export const bulkNotifyLimiter = rateLimit({
 // Student Portal: General Limiter for Dashboard and Read Routes
 export const studentPortalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 300, // Limit each IP to 300 requests per 15 minutes
+    max: 1000, // Bumped to 1000 to handle 200 students on single Wi-Fi
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Please try again later.' },
@@ -266,7 +266,7 @@ export const studentPortalLimiter = rateLimit({
 // Student Portal: Login Rate Limiter
 export const studentLoginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20, // 20 login attempts per IP per window
+    max: 500, // 500 login attempts per IP per window (allows 200 students to login from same Wi-Fi)
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many login attempts. Please try again later.' },
@@ -284,11 +284,11 @@ export const studentLoginLimiter = rateLimit({
 });
 
 // Student Portal: Quiz Activity Rate Limiter (heartbeat, autosave, cheating events)
-// Tuned for classroom NAT: up to 200 students behind one IP, each sending heartbeat + autosave every ~15s
-// Math: 200 students × 4 req/min = 800 req/min. Limit is 600 — catches abuse, allows real classroom use.
+// Tuned for classroom NAT: up to 200+ students behind one IP, each sending heartbeat + autosave every ~15s
+// Math: 200 students × 4 req/min = 800 req/min. Limit is 1500 to be perfectly safe for 300+ students.
 export const quizActivityLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 600, // 600 req/min per IP (supports ~200 students on shared school Wi-Fi)
+    max: 1500, // 1500 req/min per IP
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Please wait a moment.' },
