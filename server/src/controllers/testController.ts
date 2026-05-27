@@ -654,7 +654,7 @@ export const generateAITest = async (req: Request, res: Response) => {
 };
 
 export const getAITestJobStatus = async (req: Request, res: Response) => {
-    const { jobId } = req.params;
+    const jobId = req.params.jobId as string;
     const job = aiJobs.get(jobId);
     
     if (!job) {
