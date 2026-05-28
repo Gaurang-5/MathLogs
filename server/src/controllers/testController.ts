@@ -637,7 +637,8 @@ export const generateAITest = async (req: Request, res: Response) => {
                 if (withVariants === true || withVariants === 'true') {
                     testData = await generateTestWithVariants(topic, grade, difficulty, parsedQuestionCount, filesArg, comments);
                 } else {
-                    const targetAICount = parsedQuestionCount * 2;
+                    // If a PDF/file is provided, do not force the AI to hallucinate double the questions.
+                    const targetAICount = filesArg ? parsedQuestionCount : parsedQuestionCount * 2;
                     testData = await generateTest(topic, grade, difficulty, targetAICount, filesArg, comments);
                 }
                 aiJobs.set(jobId, { status: 'completed', result: { ...testData, warnings } });
