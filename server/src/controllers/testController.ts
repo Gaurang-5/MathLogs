@@ -879,6 +879,7 @@ export const getOnlineQuizzes = async (req: Request, res: Response) => {
                         startedAt: true,
                         submittedAt: true,
                         score: true,
+                        shuffledQuestions: true,
                         answers: {
                             select: {
                                 questionId: true,

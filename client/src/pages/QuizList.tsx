@@ -18,8 +18,7 @@ import {
     Trash2,
     Edit3,
     CalendarDays,
-    X,
-    ShieldAlert
+    X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AITestGeneratorModal from '../components/AITestGeneratorModal';
@@ -41,6 +40,7 @@ interface QuizSubmission {
     submittedAt: string | null;
     score: number | null;
     answers?: QuizAnswer[];
+    shuffledQuestions?: any;
 }
 
 interface QuizQuestion {
@@ -399,11 +399,10 @@ export default function QuizList() {
                         <div className="p-3 bg-neutral-50 border border-neutral-250 rounded-xl group-hover:bg-emerald-50/50 group-hover:border-emerald-100 transition-colors">
                             <Sparkles className="w-5 h-5 text-emerald-600 animate-pulse-subtle" />
                         </div>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                            quiz.isFinalized
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${quiz.isFinalized
                                 ? 'bg-slate-50 text-slate-700 border-slate-200'
                                 : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        }`}>
+                            }`}>
                             {quiz.isFinalized ? 'Finalized' : 'Published'}
                         </span>
                     </div>
@@ -668,8 +667,8 @@ export default function QuizList() {
                                         {finalizingQuizId === activeQuiz.id
                                             ? 'Finalizing...'
                                             : activeQuiz.isFinalized
-                                            ? 'Marks Finalized'
-                                            : 'Finalize Quiz Marks'}
+                                                ? 'Marks Finalized'
+                                                : 'Finalize Quiz Marks'}
                                     </button>
                                 </div>
                             </div>
@@ -716,11 +715,10 @@ export default function QuizList() {
                         <div className="flex border-b border-black/5 overflow-x-auto w-full pt-1 sm:pt-2">
                             <button
                                 onClick={() => setActiveTab('monitor')}
-                                className={`px-3.5 sm:px-6 py-3 border-b-2 font-bold text-xs sm:text-sm transition-all shrink-0 flex items-center gap-2 ${
-                                    activeTab === 'monitor'
+                                className={`px-3.5 sm:px-6 py-3 border-b-2 font-bold text-xs sm:text-sm transition-all shrink-0 flex items-center gap-2 ${activeTab === 'monitor'
                                         ? 'border-emerald-600 text-emerald-600 bg-emerald-50/10'
                                         : 'border-transparent text-neutral-500 hover:text-neutral-800'
-                                }`}
+                                    }`}
                             >
                                 <Monitor className="w-4.5 h-4.5" />
                                 Live Proctoring
@@ -734,11 +732,10 @@ export default function QuizList() {
 
                             <button
                                 onClick={() => setActiveTab('analytics')}
-                                className={`px-3.5 sm:px-6 py-3 border-b-2 font-bold text-xs sm:text-sm transition-all shrink-0 flex items-center gap-2 ${
-                                    activeTab === 'analytics'
+                                className={`px-3.5 sm:px-6 py-3 border-b-2 font-bold text-xs sm:text-sm transition-all shrink-0 flex items-center gap-2 ${activeTab === 'analytics'
                                         ? 'border-emerald-600 text-emerald-600 bg-emerald-50/10'
                                         : 'border-transparent text-neutral-500 hover:text-neutral-800'
-                                }`}
+                                    }`}
                             >
                                 <BarChart3 className="w-4.5 h-4.5" />
                                 Quiz Analytics
@@ -746,11 +743,10 @@ export default function QuizList() {
 
                             <button
                                 onClick={() => setActiveTab('submissions')}
-                                className={`px-3.5 sm:px-6 py-3 border-b-2 font-bold text-xs sm:text-sm transition-all shrink-0 flex items-center gap-2 ${
-                                    activeTab === 'submissions'
+                                className={`px-3.5 sm:px-6 py-3 border-b-2 font-bold text-xs sm:text-sm transition-all shrink-0 flex items-center gap-2 ${activeTab === 'submissions'
                                         ? 'border-emerald-600 text-emerald-600 bg-emerald-50/10'
                                         : 'border-transparent text-neutral-500 hover:text-neutral-800'
-                                }`}
+                                    }`}
                             >
                                 <Users className="w-4.5 h-4.5" />
                                 Student Submissions
@@ -1216,8 +1212,8 @@ export default function QuizList() {
                                             {selectedStudentSub.submission?.submittedAt
                                                 ? `${selectedStudentSub.submission.score?.toFixed(1)} / ${activeQuiz?.totalMarks} marks`
                                                 : selectedStudentSub.submission?.startedAt && activeQuiz?.isFinalized
-                                                ? `0.0 / ${activeQuiz?.totalMarks} (Locked)`
-                                                : 'Unsubmitted / Active'}
+                                                    ? `0.0 / ${activeQuiz?.totalMarks} (Locked)`
+                                                    : 'Unsubmitted / Active'}
                                         </span>
                                     </div>
                                     <div>
@@ -1226,8 +1222,8 @@ export default function QuizList() {
                                             {selectedStudentSub.submission?.submittedAt
                                                 ? `Submitted: ${new Date(selectedStudentSub.submission.submittedAt).toLocaleTimeString()}`
                                                 : selectedStudentSub.submission?.startedAt
-                                                ? `Started: ${new Date(selectedStudentSub.submission.startedAt).toLocaleTimeString()}`
-                                                : 'No timeline'}
+                                                    ? `Started: ${new Date(selectedStudentSub.submission.startedAt).toLocaleTimeString()}`
+                                                    : 'No timeline'}
                                         </span>
                                     </div>
                                 </div>
@@ -1238,73 +1234,76 @@ export default function QuizList() {
                                         Detailed Answer Sheet
                                     </h4>
 
-                                    {activeQuiz?.questions?.map((q, idx) => {
-                                        const ans = selectedStudentSub.submission?.answers?.find(a => a.questionId === q.id);
-                                        let parsedOptions: string[] = [];
-                                        try {
-                                            parsedOptions = typeof q.options === 'string' ? JSON.parse(q.options) : Array.isArray(q.options) ? q.options : [];
-                                        } catch { parsedOptions = []; }
+                                    {(() => {
+                                        const displayQuestions = Array.isArray(selectedStudentSub.submission?.shuffledQuestions) && selectedStudentSub.submission.shuffledQuestions.length > 0
+                                            ? selectedStudentSub.submission.shuffledQuestions
+                                            : activeQuiz?.questions || [];
 
-                                        return (
-                                            <div key={q.id} className="border border-black/5 rounded-xl overflow-hidden">
-                                                <div className={`px-4 py-3 flex items-center justify-between gap-3 border-b border-black/5 ${
-                                                    ans
-                                                        ? ans.isCorrect
-                                                            ? 'bg-emerald-50'
-                                                            : 'bg-rose-50'
-                                                        : 'bg-neutral-50'
-                                                }`}>
-                                                    <span className="text-xs font-black text-app-text-tertiary">Q{idx + 1}</span>
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                                                        ans
+                                        return displayQuestions.map((q: any, idx: number) => {
+                                            const ans = selectedStudentSub.submission?.answers?.find(a => a.questionId === q.id);
+                                            let parsedOptions: string[] = [];
+                                            try {
+                                                parsedOptions = typeof q.options === 'string' ? JSON.parse(q.options) : Array.isArray(q.options) ? q.options : [];
+                                            } catch { parsedOptions = []; }
+
+                                            return (
+                                                <div key={q.id} className="border border-black/5 rounded-xl overflow-hidden">
+                                                    <div className={`px-4 py-3 flex items-center justify-between gap-3 border-b border-black/5 ${ans
                                                             ? ans.isCorrect
-                                                                ? 'bg-emerald-100 text-emerald-800'
-                                                                : 'bg-rose-100 text-rose-800'
-                                                            : 'bg-neutral-200 text-neutral-600'
-                                                    }`}>
-                                                        {ans ? (ans.isCorrect ? `+${ans.marksObtained}` : '0') : 'Not answered'}
-                                                    </span>
-                                                </div>
-                                                <div className="p-4 space-y-3">
-                                                    <p className="text-sm font-semibold text-app-text">{q.questionText}</p>
-                                                    <div className="space-y-2">
-                                                        {parsedOptions.map((option) => {
-                                                            const isCorrectOpt = option === q.correctOption;
-                                                            const isSelectedOpt = option === ans?.selectedOption;
-                                                            let optionStyle = 'border-neutral-200 hover:bg-neutral-50/50';
-                                                            if (isCorrectOpt) {
-                                                                optionStyle = 'bg-emerald-50 border-emerald-500 text-emerald-800 font-bold';
-                                                            } else if (isSelectedOpt && !ans?.isCorrect) {
-                                                                optionStyle = 'bg-rose-50 border-rose-400 text-rose-800 font-bold';
-                                                            }
-                                                            return (
-                                                                <div
-                                                                    key={option}
-                                                                    className={`px-3 py-2 rounded-lg border text-xs flex items-center justify-between gap-3 transition-colors ${optionStyle}`}
-                                                                >
-                                                                    <span>{option}</span>
-                                                                    <div className="flex items-center gap-1.5 shrink-0">
-                                                                        {isCorrectOpt && (
-                                                                            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700">Correct</span>
-                                                                        )}
-                                                                        {isSelectedOpt && (
-                                                                            <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 rounded border ${
-                                                                                ans?.isCorrect
-                                                                                    ? 'bg-emerald-600 text-white border-emerald-700'
-                                                                                    : 'bg-rose-600 text-white border-rose-700'
-                                                                            }`}>
-                                                                                Student
-                                                                            </span>
-                                                                        )}
+                                                                ? 'bg-emerald-50'
+                                                                : 'bg-rose-50'
+                                                            : 'bg-neutral-50'
+                                                        }`}>
+                                                        <span className="text-xs font-black text-app-text-tertiary">Q{idx + 1}</span>
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ans
+                                                                ? ans.isCorrect
+                                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                                    : 'bg-rose-100 text-rose-800'
+                                                                : 'bg-neutral-200 text-neutral-600'
+                                                            }`}>
+                                                            {ans ? (ans.isCorrect ? `+${ans.marksObtained}` : '0') : 'Not answered'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="p-4 space-y-3">
+                                                        <p className="text-sm font-semibold text-app-text">{q.questionText}</p>
+                                                        <div className="space-y-2">
+                                                            {parsedOptions.map((option) => {
+                                                                const isCorrectOpt = option === q.correctOption;
+                                                                const isSelectedOpt = option === ans?.selectedOption;
+                                                                let optionStyle = 'border-neutral-200 hover:bg-neutral-50/50';
+                                                                if (isCorrectOpt) {
+                                                                    optionStyle = 'bg-emerald-50 border-emerald-500 text-emerald-800 font-bold';
+                                                                } else if (isSelectedOpt && !ans?.isCorrect) {
+                                                                    optionStyle = 'bg-rose-50 border-rose-400 text-rose-800 font-bold';
+                                                                }
+                                                                return (
+                                                                    <div
+                                                                        key={option}
+                                                                        className={`px-3 py-2 rounded-lg border text-xs flex items-center justify-between gap-3 transition-colors ${optionStyle}`}
+                                                                    >
+                                                                        <span>{option}</span>
+                                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                                            {isCorrectOpt && (
+                                                                                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700">Correct</span>
+                                                                            )}
+                                                                            {isSelectedOpt && (
+                                                                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 rounded border ${ans?.isCorrect
+                                                                                        ? 'bg-emerald-600 text-white border-emerald-700'
+                                                                                        : 'bg-rose-600 text-white border-rose-700'
+                                                                                    }`}>
+                                                                                    Student
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            );
-                                                        })}
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        });
+                                    })()}
                                 </div>
                             </div>
                         </motion.div>

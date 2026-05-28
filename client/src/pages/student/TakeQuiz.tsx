@@ -333,8 +333,7 @@ export default function TakeQuiz() {
                             setPhase('quiz');
                             setTimeExpired(true);
                         } else {
-                            // Recovered session reload event (Option A)
-                            logCheat('PAGE_RELOAD').then(n => setWarnCount(n));
+                            // Recovered session reload event
                             setPhase('instructions');
                         }
                     }
