@@ -146,7 +146,7 @@ export async function generateTestWithVariants(
             // pairs: N groups, each with 2 sibling questions
             pairs: {
                 type: SchemaType.ARRAY,
-                description: `Exactly ${questionCount} concept groups. Each group has 2 variant questions testing the same concept differently.`,
+                description: `Up to ${questionCount} concept groups. Each group has 2 variant questions testing the same concept differently.`,
                 items: {
                     type: SchemaType.OBJECT,
                     properties: {
@@ -182,14 +182,19 @@ export async function generateTestWithVariants(
         required: ["title", "description", "totalMarks", "pairs"]
     };
 
+    const isFromFiles = files && files.length > 0;
+    const countInstruction = isFromFiles 
+        ? `Generate UP TO ${questionCount} CONCEPT GROUPS based on the provided reference material.`
+        : `Generate exactly ${questionCount} CONCEPT GROUPS.`;
+
     let prompt = `You are an expert teacher creating an anti-cheating quiz.
 
 Topic: "${topic}"
 Grade: ${grade}
 Difficulty: ${difficulty}
-Concept Groups Required: ${questionCount}
+Concept Groups Required: ${questionCount} (or as many as possible up to this limit based on the reference material)
 
-TASK: Generate exactly ${questionCount} CONCEPT GROUPS. Each group contains exactly 2 VARIANT questions that:
+TASK: ${countInstruction} Each group contains exactly 2 VARIANT questions that:
 1. Test the SAME concept/skill
 2. Are DIFFERENT in wording, scenario, or numbers (not just surface rewording)
 3. Have the SAME marks value and difficulty level
