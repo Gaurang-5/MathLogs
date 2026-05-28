@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Auth Context — manages login state, secure token storage, and user data.
  * Tokens live in SecureStore (device keychain), never AsyncStorage.

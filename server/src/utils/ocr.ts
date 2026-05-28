@@ -15,7 +15,7 @@ function cleanExtractedScore(text: string): string {
     if (!text) return "";
 
     // Normalize text
-    let clean = text.replace(/```(?:json|text)?/g, '').replace(/```/g, '').trim();
+    const clean = text.replace(/```(?:json|text)?/g, '').replace(/```/g, '').trim();
 
     // Aggressive merge of spaced digits: "7 0" -> "70", "0 5" -> "05"
     const fractionMatch = clean.match(/(\d+)\s*\/\s*(\d+)/);

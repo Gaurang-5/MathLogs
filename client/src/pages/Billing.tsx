@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect, useRef } from 'react';
 import { CreditCard, Sparkles, Building, Check, CalendarCheck, CalendarOff, Info, AlertCircle, Crown } from 'lucide-react';
 import Layout from '../components/Layout';

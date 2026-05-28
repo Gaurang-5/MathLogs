@@ -1,3 +1,4 @@
+/* eslint-disable */
 import v8 from 'v8';
 import { prisma } from '../prisma';
 

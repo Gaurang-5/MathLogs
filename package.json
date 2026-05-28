@@ -18,5 +18,14 @@
         "@sentry/node": "^10.38.0",
         "@sentry/react": "^10.53.1",
         "lucide-react-native": "^0.577.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "eslint": "^10.4.0",
+        "eslint-plugin-react": "^7.37.5",
+        "globals": "^17.6.0",
+        "jiti": "^2.7.0",
+        "typescript": "^6.0.3",
+        "typescript-eslint": "^8.60.0"
     }
 }

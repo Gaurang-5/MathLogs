@@ -62,8 +62,8 @@ async function generate(data: BatchPdfData): Promise<Buffer> {
         // Define column widths explicitly
         let nameWidth = 140;
         let schoolWidth = 120;
-        let phoneWidth = 90;
-        let avgWidth = 50;
+        const phoneWidth = 90;
+        const avgWidth = 50;
         let feeDueWidth = 70;
         
         let fixedColsWidth = nameWidth + schoolWidth + phoneWidth + avgWidth + feeDueWidth + (5 * 5);

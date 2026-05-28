@@ -13,7 +13,7 @@ async function main() {
 
     let fixedCount = 0;
     for (const job of jobs) {
-        let data = job.data as string[];
+        const data = job.data as string[];
         if (data.length === 5) {
             // Reconstruct array to have 6 elements
             const newData = [

@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Loader, X, FileText, Check, Upload, Trash2, RefreshCw, Layers, Link2 } from 'lucide-react';

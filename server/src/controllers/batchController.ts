@@ -652,7 +652,7 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
             }
         }
 
-        let responseData = {
+        const responseData = {
             ...safeBatchData,
             alreadyRegistered: isAlreadyRegistered,
             registeredStudent: registeredStudentData

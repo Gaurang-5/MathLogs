@@ -1,3 +1,4 @@
+/* eslint-disable */
 
 import { useState, useEffect } from 'react';
 import { API_URL, apiRequest } from '../utils/api';

@@ -77,7 +77,7 @@ export default function StudentPaymentPortal() {
             };
             autoFetch();
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     }, [slug, phoneFromUrl]);
 
     const lookupStudent = useCallback(async () => {
