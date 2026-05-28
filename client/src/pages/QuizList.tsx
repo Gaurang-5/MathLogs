@@ -1237,7 +1237,7 @@ export default function QuizList() {
                                     {(() => {
                                         let sq = selectedStudentSub.submission?.shuffledQuestions;
                                         if (typeof sq === 'string') {
-                                            try { sq = JSON.parse(sq); } catch (e) {}
+                                            try { sq = JSON.parse(sq); } catch { /* ignore parse error */ }
                                         }
                                         const displayQuestions = Array.isArray(sq) && sq.length > 0
                                             ? sq
