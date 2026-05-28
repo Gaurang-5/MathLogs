@@ -1235,8 +1235,12 @@ export default function QuizList() {
                                     </h4>
 
                                     {(() => {
-                                        const displayQuestions = Array.isArray(selectedStudentSub.submission?.shuffledQuestions) && selectedStudentSub.submission.shuffledQuestions.length > 0
-                                            ? selectedStudentSub.submission.shuffledQuestions
+                                        let sq = selectedStudentSub.submission?.shuffledQuestions;
+                                        if (typeof sq === 'string') {
+                                            try { sq = JSON.parse(sq); } catch (e) {}
+                                        }
+                                        const displayQuestions = Array.isArray(sq) && sq.length > 0
+                                            ? sq
                                             : activeQuiz?.questions || [];
 
                                         return displayQuestions.map((q: any, idx: number) => {
