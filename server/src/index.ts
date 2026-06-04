@@ -227,7 +227,7 @@ function startServer() {
                     secureLogger.info('✅ PostgreSQL LISTEN connected for WhatsApp worker');
                     pgClient.query('LISTEN whatsapp_job_insert');
                     
-                    pgClient.on('notification', (msg) => {
+                    pgClient.on('notification', (msg: any) => {
                         if (msg.channel === 'whatsapp_job_insert') {
                             triggerProcess();
                         }
@@ -235,14 +235,14 @@ function startServer() {
                     
                     // Initial run to clear any pending jobs
                     triggerProcess();
-                }).catch(err => {
+                }).catch((err: unknown) => {
                     console.error('❌ Failed to connect PG LISTEN:', err);
                     // Fallback to polling
                     const pollQueue = async () => {
                         try {
                             const processedCount = await processWhatsappQueue();
                             setTimeout(pollQueue, processedCount && processedCount > 0 ? 100 : 5000);
-                        } catch (err) {
+                        } catch (err: unknown) {
                             setTimeout(pollQueue, 5000);
                         }
                     };

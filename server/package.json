@@ -46,7 +46,7 @@
     "multer": "^2.1.1",
     "nodemailer": "^7.0.12",
     "pdfkit": "^0.17.2",
-    "pg": "^8.17.2",
+    "pg": "^8.21.0",
     "prisma": "5.22.0",
     "rate-limit-redis": "^5.0.0",
     "razorpay": "^2.9.6",
@@ -57,6 +57,7 @@
   "devDependencies": {
     "@types/ioredis": "^4.28.10",
     "@types/multer": "^2.0.0",
+    "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
     "nodemon": "^3.1.11",
     "supertest": "^7.2.2"
