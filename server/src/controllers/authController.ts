@@ -6,6 +6,8 @@ import crypto from 'crypto';
 import { sendOtpEmail } from '../utils/email';
 import { sendOtpWhatsApp } from '../utils/whatsapp';
 import { invalidateAuthCache } from '../middleware/auth';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -64,14 +66,14 @@ export const loginAdmin = async (req: Request, res: Response) => {
         }
 
         if (!admin) {
-            console.warn(`[Auth] Failed login attempt for identifier: ${username} (User not found)`);
+            secureLogger.warn(`[Auth] Failed login attempt for identifier: ${username} (User not found)`);
             res.status(404).json({ error: 'User not found' });
             return;
         }
 
         const isMatch = await bcrypt.compare(password, admin.password);
         if (!isMatch) {
-            console.warn(`[Auth] Failed login attempt for identifier: ${username} (Invalid password)`);
+            secureLogger.warn(`[Auth] Failed login attempt for identifier: ${username} (Invalid password)`);
             res.status(401).json({ error: 'Incorrect password' });
             return;
         }
@@ -113,7 +115,7 @@ export const createInitialAdmin = async (req: Request, res: Response) => {
 
 export const changePassword = async (req: Request, res: Response) => {
     const { currentPassword, newPassword } = req.body;
-    const adminId = (req as any).user?.id;
+    const adminId = req.user?.id;
 
     if (!currentPassword || !newPassword) {
         return res.status(400).json({ error: 'Current and new password are required' });
@@ -167,7 +169,7 @@ export const changePassword = async (req: Request, res: Response) => {
 };
 
 export const getProfile = async (req: Request, res: Response) => {
-    const adminId = (req as any).user?.id;
+    const adminId = req.user?.id;
     try {
         const admin = await prisma.admin.findUnique({
             where: { id: adminId },
@@ -208,7 +210,7 @@ if (process.env.NODE_ENV !== 'test') {
                 where: { expiresAt: { lt: new Date() } }
             });
             if (result.count > 0) {
-                console.log(`[OTP] Cleaned ${result.count} expired tokens from DB`);
+                secureLogger.info(`[OTP] Cleaned ${result.count} expired tokens from DB`);
             }
         } catch (e) {
             console.error('[OTP] Cleanup error:', e);
@@ -292,14 +294,14 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
         await Promise.allSettled(dispatchPromises);
 
         if (process.env.NODE_ENV !== 'production') {
-            console.log(`\n========================================`);
-            console.log(`🔑 OTP DISPATCH FIRED:`);
-            console.log(`🆔 FOR: ${cleanIdentifier}`);
-            console.log(`💬 WA?: ${!!waPhone} | 📧 EMAIL?: ${!!email}`);
-            console.log(`🔒 YOUR CODE IS: ${otpCode}`);
-            console.log(`========================================\n`);
+            secureLogger.info(`\n========================================`);
+            secureLogger.info(`🔑 OTP DISPATCH FIRED:`);
+            secureLogger.info(`🆔 FOR: ${cleanIdentifier}`);
+            secureLogger.info(`💬 WA?: ${!!waPhone} | 📧 EMAIL?: ${!!email}`);
+            secureLogger.info(`🔒 YOUR CODE IS: ${otpCode}`);
+            secureLogger.info(`========================================\n`);
         } else {
-            console.log(`[OTP] Dispatched to ${cleanIdentifier} via WA:${!!waPhone} Email:${!!email}`);
+            secureLogger.info(`[OTP] Dispatched to ${cleanIdentifier} via WA:${!!waPhone} Email:${!!email}`);
         }
 
         res.json({ success: true, message: `OTP sent successfully to your ${dispatchMethods.join(' and ')}.` });
@@ -331,7 +333,7 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
         });
         
         if (!storedOtp) {
-            console.log(`[AUTH] OTP lookup failed for: ${cleanIdentifier} (raw: ${phone})`);
+            secureLogger.info(`[AUTH] OTP lookup failed for: ${cleanIdentifier} (raw: ${phone})`);
             return res.status(400).json({ error: 'OTP expired or not requested' });
         }
         

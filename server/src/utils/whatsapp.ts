@@ -1,4 +1,6 @@
 import { prisma } from '../prisma';
+import { secureLogger } from './secureLogger';
+
 
 /**
  * ============================================================================
@@ -116,7 +118,7 @@ export interface AttendanceAbsentWAData {
  */
 export const enqueueWhatsApp = async (mobileNumber: string, templateName: string, componentValues: string[], instituteId?: string) => {
     if (!templateName) {
-        console.warn('[WhatsApp] Dropped: No template configured.');
+        secureLogger.warn('[WhatsApp] Dropped: No template configured.');
         return false;
     }
 
@@ -136,7 +138,7 @@ export const enqueueWhatsApp = async (mobileNumber: string, templateName: string
             }
         });
 
-        console.log(`[WhatsApp Queue] Enqueued template '${templateName}' for ${formattedMobile}`);
+        secureLogger.info(`[WhatsApp Queue] Enqueued template '${templateName}' for ${formattedMobile}`);
         return true;
     } catch (error: any) {
         console.error("[WhatsApp Queue] DB Enqueue Failed:", error.message);

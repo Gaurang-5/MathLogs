@@ -109,6 +109,7 @@ model Student {
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   schoolName              String?
+  additionalData          Json?
   instituteId             String?
   feePayments             FeePayment[]
   feeInstallments         FeeInstallment[]
@@ -146,23 +147,23 @@ model FeeRecord {
 }
 
 model Test {
-  id              String        @id @default(uuid())
-  name            String
-  subject         String
-  className       String?
-  date            DateTime
-  maxMarks        Float
-  teacherId       String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  instituteId     String?
-  batchId         String?
-  isQuiz          Boolean       @default(false)
-  marks           Mark[]
-  institute       Institute?    @relation(fields: [instituteId], references: [id])
-  teacher         Admin?        @relation(fields: [teacherId], references: [id])
-  batch           Batch?        @relation(fields: [batchId], references: [id])
-  batches         Batch[]       @relation("TestBatches")
+  id          String     @id @default(uuid())
+  name        String
+  subject     String
+  className   String?
+  date        DateTime
+  maxMarks    Float
+  teacherId   String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  instituteId String?
+  batchId     String?
+  isQuiz      Boolean    @default(false)
+  marks       Mark[]
+  institute   Institute? @relation(fields: [instituteId], references: [id])
+  teacher     Admin?     @relation(fields: [teacherId], references: [id])
+  batch       Batch?     @relation(fields: [batchId], references: [id])
+  batches     Batch[]    @relation("TestBatches")
 
   @@index([teacherId])
   @@index([date])
@@ -213,6 +214,7 @@ model FeePayment {
   @@index([installmentId])
   @@index([studentId, installmentId])
   @@index([date])
+  @@index([date, installmentId])
 }
 
 model StudentBalance {
@@ -255,16 +257,16 @@ model AttendanceRecord {
 }
 
 model AttendanceSweepRun {
-  id              String        @id @default(uuid())
-  batchId         String
-  instituteId     String
-  attendanceDate  DateTime
-  scheduledFor    DateTime
-  status          String        @default("COMPLETED")
-  createdAt       DateTime      @default(now())
-  completedAt     DateTime?
-  batch           Batch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  institute       Institute     @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  id             String    @id @default(uuid())
+  batchId        String
+  instituteId    String
+  attendanceDate DateTime
+  scheduledFor   DateTime
+  status         String    @default("COMPLETED")
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+  batch          Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  institute      Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
 
   @@unique([batchId, attendanceDate])
   @@index([scheduledFor])
@@ -449,6 +451,7 @@ model SystemLog {
 
   @@index([instituteId, action])
   @@index([createdAt])
+  @@index([instituteId, action, createdAt])
 }
 
 model UpiPaymentVerification {
@@ -493,13 +496,14 @@ model OnlineQuiz {
   batch     Batch?    @relation(fields: [batchId], references: [id], onDelete: Cascade)
   teacher   Admin?    @relation(fields: [teacherId], references: [id], onDelete: SetNull)
 
-  batches              Batch[]         @relation("OnlineQuizBatches")
+  batches              Batch[]          @relation("OnlineQuizBatches")
   studentQuestionCount Int?
   questions            QuizQuestion[]
   submissions          QuizSubmission[]
 
   @@index([instituteId])
   @@index([batchId])
+  @@index([batchId, isFinalized])
   @@index([batchId, createdAt])
   @@index([batchId, availableFrom, availableUntil])
   @@index([teacherId, instituteId, createdAt])
@@ -523,13 +527,13 @@ model QuizQuestion {
 }
 
 model QuizSubmission {
-  id               String    @id @default(uuid())
-  quizId           String
-  studentId        String
-  score            Float? // Null if not yet graded/submitted
-  autoSavedAnswers Json      @default("{}")
-  startedAt        DateTime  @default(now())
-  submittedAt      DateTime?
+  id                String    @id @default(uuid())
+  quizId            String
+  studentId         String
+  score             Float? // Null if not yet graded/submitted
+  autoSavedAnswers  Json      @default("{}")
+  startedAt         DateTime  @default(now())
+  submittedAt       DateTime?
   shuffledQuestions Json?
 
   quiz           OnlineQuiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
@@ -540,6 +544,7 @@ model QuizSubmission {
   @@unique([quizId, studentId])
   @@index([studentId])
   @@index([quizId])
+  @@index([quizId, submittedAt])
 }
 
 model CheatingEvent {

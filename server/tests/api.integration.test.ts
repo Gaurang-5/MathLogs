@@ -238,6 +238,7 @@ test('POST /api/fees/pay-installment records a payment for an authenticated teac
         date: data.date,
     }) as never) as typeof prisma.feePayment.create);
     replaceMethod(prisma.systemLog, 'create', (async () => ({ id: 'system-log-route-1' }) as never) as typeof prisma.systemLog.create);
+    replaceMethod(prisma, '$transaction', (async (cb: any) => cb(prisma)) as typeof prisma.$transaction);
 
     const response = await postJson('/api/fees/pay-installment', {
         studentId: '123e4567-e89b-12d3-a456-426614174000',
@@ -337,4 +338,104 @@ test('POST /api/tests/online saves generated quiz questions for a teacher batch'
     assert.equal(json.questions[0].orderIndex, 0);
     assert.equal(json.questions[0].correctOption, '3');
     assert.equal(createdQuestions.length, 1);
+});
+
+test('POST /api/fees/pay is idempotent and prevents double-payment', async () => {
+    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: any) => {
+        callback(null, { id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN' });
+    }) as unknown) as typeof jwt.verify);
+    replaceMethod(prisma.admin, 'findUnique', (async () => ({
+        id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN', institute: { plan: 'ACTIVE' },
+    }) as never) as typeof prisma.admin.findUnique);
+
+    let txLock = Promise.resolve();
+    replaceMethod(prisma, '$transaction', (async (cb: any) => {
+        const previous = txLock;
+        let release!: () => void;
+        txLock = new Promise(r => { release = r; });
+        await previous;
+        try {
+            return await cb(prisma);
+        } finally {
+            release();
+        }
+    }) as typeof prisma.$transaction);
+
+    let createdRecords: any[] = [];
+    replaceMethod(prisma.student, 'findUnique', (async () => ({
+        id: '123e4567-e89b-12d3-a456-426614174002',
+        name: 'Idempotency Test',
+        instituteId: 'inst-1',
+        createdAt: new Date(),
+        batch: { teacherId: 'teacher-1', feeAmount: 1000, feeInstallments: [] },
+        fees: [...createdRecords],
+        feePayments: []
+    }) as never) as typeof prisma.student.findUnique);
+
+    replaceMethod(prisma.feeRecord, 'create', (async ({ data }: any) => {
+        createdRecords.push(data);
+        return { id: 'fr-1', ...data };
+    }) as typeof prisma.feeRecord.create);
+    replaceMethod(prisma.systemLog, 'create', (async () => ({})) as typeof prisma.systemLog.create);
+
+    const [res1, res2] = await Promise.all([
+        postJson('/api/fees/pay', { studentId: '123e4567-e89b-12d3-a456-426614174002', amount: 1000 }, { Authorization: 'Bearer token' }),
+        postJson('/api/fees/pay', { studentId: '123e4567-e89b-12d3-a456-426614174002', amount: 1000 }, { Authorization: 'Bearer token' })
+    ]);
+
+    assert.ok(res1.status === 200 || res2.status === 200, 'At least one request should succeed');
+    assert.ok(res1.status === 400 || res2.status === 400, 'One request should fail due to overpayment');
+    assert.equal(createdRecords.length, 1, 'Only one fee record should be created');
+});
+
+test('POST /api/fees/pay-installment is idempotent and prevents double-payment', async () => {
+    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: any) => {
+        callback(null, { id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN' });
+    }) as unknown) as typeof jwt.verify);
+    replaceMethod(prisma.admin, 'findUnique', (async () => ({
+        id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN', institute: { plan: 'ACTIVE' },
+    }) as never) as typeof prisma.admin.findUnique);
+
+    let txLock = Promise.resolve();
+    replaceMethod(prisma, '$transaction', (async (cb: any) => {
+        const previous = txLock;
+        let release!: () => void;
+        txLock = new Promise(r => { release = r; });
+        await previous;
+        try {
+            return await cb(prisma);
+        } finally {
+            release();
+        }
+    }) as typeof prisma.$transaction);
+
+    replaceMethod(prisma.student, 'findUnique', (async () => ({
+        id: '123e4567-e89b-12d3-a456-426614174003',
+        name: 'Installment Test',
+        instituteId: 'inst-1',
+        batch: { teacherId: 'teacher-1', institute: { name: 'Inst' } }
+    }) as never) as typeof prisma.student.findUnique);
+
+    replaceMethod(prisma.feeInstallment, 'findUnique', (async () => ({
+        id: '123e4567-e89b-12d3-a456-426614174004',
+        name: 'May Fee',
+        amount: 500
+    }) as never) as typeof prisma.feeInstallment.findUnique);
+
+    let createdInstallmentPayments: any[] = [];
+    replaceMethod(prisma.feePayment, 'findMany', (async () => [...createdInstallmentPayments]) as typeof prisma.feePayment.findMany);
+    replaceMethod(prisma.feePayment, 'create', (async ({ data }: any) => {
+        createdInstallmentPayments.push(data);
+        return { id: 'fp-1', ...data };
+    }) as typeof prisma.feePayment.create);
+    replaceMethod(prisma.systemLog, 'create', (async () => ({})) as typeof prisma.systemLog.create);
+
+    const [res1, res2] = await Promise.all([
+        postJson('/api/fees/pay-installment', { studentId: '123e4567-e89b-12d3-a456-426614174003', installmentId: '123e4567-e89b-12d3-a456-426614174004', amount: 500 }, { Authorization: 'Bearer token' }),
+        postJson('/api/fees/pay-installment', { studentId: '123e4567-e89b-12d3-a456-426614174003', installmentId: '123e4567-e89b-12d3-a456-426614174004', amount: 500 }, { Authorization: 'Bearer token' })
+    ]);
+
+    assert.ok(res1.status === 200 || res2.status === 200, 'At least one request should succeed');
+    assert.ok(res1.status === 400 || res2.status === 400, 'One request should fail due to overpayment');
+    assert.equal(createdInstallmentPayments.length, 1, 'Only one fee payment should be created');
 });

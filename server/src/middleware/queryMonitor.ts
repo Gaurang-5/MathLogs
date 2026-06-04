@@ -7,6 +7,8 @@
 import { Prisma } from '@prisma/client';
 import * as Sentry from '@sentry/node';
 import { performance } from 'perf_hooks';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const SLOW_QUERY_THRESHOLD_MS = 1000; // 1 second
@@ -94,7 +96,7 @@ function handleSlowQuery(params: Prisma.MiddlewareParams, duration: number) {
     const model = params.model || 'unknown';
     const action = params.action;
 
-    console.warn(
+    secureLogger.warn(
         `[SLOW_QUERY] ${logLevel} ${model}.${action} took ${duration.toFixed(2)}ms (threshold: ${SLOW_QUERY_THRESHOLD_MS}ms)`
     );
 

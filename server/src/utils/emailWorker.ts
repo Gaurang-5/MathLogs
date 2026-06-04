@@ -12,7 +12,7 @@ export class EmailWorker {
     private isProcessing = false;
 
     start() {
-        console.log('[EmailWorker] Starting robust background worker...');
+        secureLogger.info('[EmailWorker] Starting robust background worker...');
         setInterval(() => this.processQueue(), POLLING_INTERVAL);
     }
 
@@ -57,7 +57,7 @@ export class EmailWorker {
                 return;
             }
 
-            console.log(`[EmailWorker] Claimed ${claimedJobs.length} jobs.`);
+            secureLogger.info(`[EmailWorker] Claimed ${claimedJobs.length} jobs.`);
 
             // 2. Process concurrently (outside transaction)
             // We use Promise.allSettled to ensure all get a chance to complete

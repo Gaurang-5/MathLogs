@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
+import { Prisma } from '@prisma/client';
+import { secureLogger } from '../utils/secureLogger';
+
 
 /**
  * Optimized dashboard summary endpoint
@@ -8,15 +11,15 @@ import { prisma } from '../prisma';
  */
 export const getDashboardSummary = async (req: Request, res: Response) => {
     try {
-        const teacherId = (req as any).user?.id;
-        const user = (req as any).user;
+        const teacherId = req.user?.id;
+        const user = req.user;
 
         if (!teacherId) {
-            console.warn(`[DASHBOARD_DEBUG] Missing context — Teacher: ${teacherId}, Institute: ${user.instituteId}`);
+            secureLogger.warn(`[DASHBOARD_DEBUG] Missing context — Teacher: ${teacherId}, Institute: ${user.instituteId}`);
             return res.status(400).json({ error: 'Missing teacher context' });
         }
 
-        console.log(`[DASHBOARD_DEBUG] Fetching for Teacher: ${teacherId}, Inst: ${user.instituteId}`);
+        secureLogger.info(`[DASHBOARD_DEBUG] Fetching for Teacher: ${teacherId}, Inst: ${user.instituteId}`);
 
         // Get current month start and end dates (IST adjusted)
         const now = new Date();
@@ -159,7 +162,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
 
 export const getFinancialGrowthStats = async (req: Request, res: Response) => {
     try {
-        const instituteId = (req as any).user?.instituteId;
+        const instituteId = req.user?.instituteId;
 
         const currentSysDate = new Date();
         let startRawDate = new Date(currentSysDate.getFullYear(), 0, 1);
@@ -197,7 +200,6 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
         // Previous code: loaded ALL students + nested installments + ALL payments into JS memory
         // New code: 2 SQL queries returning ~12 rows each (one per month)
 
-        const { Prisma } = await import('@prisma/client');
         const ayFilter = Prisma.empty;
 
         // 1. GENERATED FEE: Aggregate by month

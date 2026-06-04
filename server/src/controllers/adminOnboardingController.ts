@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import { getClientUrl } from '../utils/urlConfig';
 import { sendSetupLinkWhatsApp } from '../utils/whatsapp';
 import { sendSetupLinkEmail } from '../utils/email';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key',
@@ -34,7 +36,7 @@ function getPriceInPaise(link: any, billingCycle: 'monthly' | 'yearly'): number 
 
 // SUPER ADMIN: Create a custom onboarding link
 export const createAdminOnboardingLink = async (req: Request, res: Response) => {
-    const user = (req as any).user;
+    const user = req.user;
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -490,7 +492,7 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
 
 // SUPER ADMIN: List all admin onboarding links
 export const listAdminOnboardingLinks = async (req: Request, res: Response) => {
-    const user = (req as any).user;
+    const user = req.user;
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
     }

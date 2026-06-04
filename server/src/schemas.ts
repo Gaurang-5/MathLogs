@@ -36,6 +36,7 @@ export const registerStudentSchema = z.object({
             return emailRegex.test(val.trim()) ? val.trim() : undefined;
         }),
         schoolName: z.string().max(300).nullish(),
+        additionalData: z.record(z.string(), z.any()).optional(),
         token: z.string().nullish()
     })
 });

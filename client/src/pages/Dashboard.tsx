@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart, BarChart, Bar } from 'recharts';
 import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import CountUp from 'react-countup';
 
 interface ClassAveragePoint {
@@ -39,22 +39,43 @@ interface DashboardSummaryResponse {
 const formatIndianRupee = (value: number) => new Intl.NumberFormat('en-IN').format(value);
 
 export default function Dashboard() {
-    const [stats, setStats] = useState({ batches: 0, students: 0 });
-    const [classAverageData, setClassAverageData] = useState<ClassAveragePoint[]>([]);
-    const [financeGrowthData, setFinanceGrowthData] = useState<FinanceGrowthPoint[]>([]);
-    const [finances, setFinances] = useState({ collected: 0, totalCollected: 0, pending: 0 });
-    const [defaulters, setDefaulters] = useState<Defaulter[]>([]);
-    const [userName, setUserName] = useState('');
-
-    // Separate loading states for progressive rendering
-    const [loading, setLoading] = useState({ summary: true, growth: true, financeGrowth: true });
-
     // Privacy toggle for fee data — persisted across sessions
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+
     const [showFeeData, setShowFeeData] = useState(() => {
         const saved = localStorage.getItem('mathlogs_hide_fees');
         if (saved !== null) return saved === 'false';
         return true;
     });
+
+    const { data: summary, isLoading: summaryLoading } = useQuery({
+        queryKey: ['dashboardSummary'],
+        queryFn: () => api.get<DashboardSummaryResponse>('/dashboard/summary'),
+        staleTime: 30000,
+    });
+
+    const { data: classAverageData = [], isLoading: growthLoading } = useQuery({
+        queryKey: ['classAverage'],
+        queryFn: () => api.get<ClassAveragePoint[]>('/stats/class-average'),
+        staleTime: 30000,
+    });
+
+    const { data: financeGrowthData = [], isLoading: financeGrowthLoading } = useQuery({
+        queryKey: ['financeGrowth'],
+        queryFn: () => api.get<FinanceGrowthPoint[]>('/stats/finance-growth'),
+        staleTime: 30000,
+    });
+
+    const stats = summary?.stats || { batches: 0, students: 0 };
+    const finances = summary?.finances || { collected: 0, totalCollected: 0, pending: 0 };
+    const defaulters = summary?.defaulters || [];
+    const userName = summary?.userName || 'Teacher';
+    const loading = {
+        summary: summaryLoading,
+        growth: growthLoading,
+        financeGrowth: financeGrowthLoading
+    };
 
     const toggleFeePrivacy = () => {
         setShowFeeData((prev) => {
@@ -63,65 +84,6 @@ export default function Dashboard() {
             return next;
         });
     };
-
-    useEffect(() => {
-        // OPTIMIZATION 1: Load critical summary data FIRST (non-blocking)
-        const loadSummary = async () => {
-            try {
-                const data = await api.get<DashboardSummaryResponse>('/dashboard/summary');
-
-                setStats(data.stats);
-                setFinances(data.finances);
-                setDefaulters(data.defaulters);
-                setUserName(data.userName || 'Teacher');
-
-                setLoading(prev => ({ ...prev, summary: false }));
-            } catch (error) {
-                console.error('Failed to load dashboard summary:', error);
-                setLoading(prev => ({ ...prev, summary: false }));
-            }
-        };
-
-        // OPTIMIZATION 2: Load chart data in BACKGROUND (defer to idle time)
-        const loadCharts = () => {
-            // Use requestIdleCallback to defer chart loading until main thread is idle
-            if ('requestIdleCallback' in window) {
-                requestIdleCallback(async () => {
-                    try {
-                        const [classAverage, financeGrowth] = await Promise.all([
-                            api.get<ClassAveragePoint[]>('/stats/class-average'),
-                            api.get<FinanceGrowthPoint[]>('/stats/finance-growth')
-                        ]);
-                        setClassAverageData(classAverage);
-                        setFinanceGrowthData(financeGrowth);
-                        setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
-                    } catch (error) {
-                        console.error('Failed to load chart data:', error);
-                        setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
-                    }
-                });
-            } else {
-                // Fallback for browsers without requestIdleCallback
-                setTimeout(async () => {
-                    try {
-                        const [classAverage, financeGrowth] = await Promise.all([
-                            api.get<ClassAveragePoint[]>('/stats/class-average'),
-                            api.get<FinanceGrowthPoint[]>('/stats/finance-growth')
-                        ]);
-                        setClassAverageData(classAverage);
-                        setFinanceGrowthData(financeGrowth);
-                        setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
-                    } catch (error) {
-                        console.error('Failed to load chart data:', error);
-                        setLoading(prev => ({ ...prev, growth: false, financeGrowth: false }));
-                    }
-                }, 100);
-            }
-        };
-
-        loadSummary();
-        loadCharts();
-    }, []);
 
 
     // Collection rate based on total collected (all-time), not monthly
@@ -152,16 +114,12 @@ export default function Dashboard() {
     return (
         <Layout>
             {/* Personalized Greeting */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 sm:mb-8"
-            >
+            <div className="mb-6 sm:mb-8 animate-fade-in-up">
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-black tracking-tighter mb-1.5">
                     {getGreeting()}, <span className="text-app-text-tertiary">{userName}</span>
                 </h1>
                 <p className="text-app-text-secondary font-medium text-sm sm:text-base">Here's what's happening with your institute today.</p>
-            </motion.div>
+            </div>
 
 
             {/* Stats Overview - Premium Cards */}
@@ -170,11 +128,9 @@ export default function Dashboard() {
                 {loading.summary ? (
                     <div className="h-[100px] sm:h-[110px] rounded-2xl sm:rounded-[24px] bg-neutral-50/80 border border-black/5 animate-pulse" />
                 ) : (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 }}
-                        className="group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
+                    <div
+                        style={{ animationDelay: '150ms' }}
+                        className="animate-fade-in-up group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
                     >
                         <div className="absolute top-0 right-0 w-20 h-20 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
                         <div className="flex items-center gap-2 min-[375px]:gap-3 sm:gap-4 relative z-10">
@@ -188,18 +144,16 @@ export default function Dashboard() {
                                 </p>
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Active Batches */}
                 {loading.summary ? (
                     <div className="h-[100px] sm:h-[110px] rounded-2xl sm:rounded-[24px] bg-neutral-50/80 border border-black/5 animate-pulse" />
                 ) : (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
+                    <div
+                        style={{ animationDelay: '200ms' }}
+                        className="animate-fade-in-up group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
                     >
                         <div className="absolute top-0 right-0 w-20 h-20 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
                         <div className="flex items-center gap-2 min-[375px]:gap-3 sm:gap-4 relative z-10">
@@ -213,25 +167,23 @@ export default function Dashboard() {
                                 </p>
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Fee Collection Rate - Circular Progress */}
                 {loading.summary ? (
                     <div className="h-[100px] sm:h-[110px] rounded-2xl sm:rounded-[24px] bg-neutral-50/80 border border-black/5 animate-pulse" />
                 ) : (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.25 }}
-                        className="group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
+                    <div
+                        style={{ animationDelay: '250ms' }}
+                        className="animate-fade-in-up group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
                     >
                         <div className="absolute top-0 right-0 w-20 h-20 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
                         <div className="flex items-center gap-2 min-[375px]:gap-3 sm:gap-4 relative z-10">
                             <div className="relative w-8 h-8 min-[375px]:w-10 min-[375px]:h-10 sm:w-11 sm:h-11 shrink-0">
                                 <svg className="w-full h-full transform -rotate-90">
                                     <circle cx="50%" cy="50%" r="42%" stroke="#f0f0f0" strokeWidth="3.5" fill="none" />
-                                    <motion.circle
+                                    <circle
                                         cx="50%"
                                         cy="50%"
                                         r="42%"
@@ -239,9 +191,10 @@ export default function Dashboard() {
                                         strokeWidth="3.5"
                                         fill="none"
                                         strokeLinecap="round"
-                                        initial={{ strokeDasharray: '0 125.6' }}
-                                        animate={{ strokeDasharray: `${(collectionRate / 100) * 125.6} 125.6` }}
-                                        transition={{ duration: 2 }}
+                                        style={{ 
+                                            strokeDasharray: mounted ? `${(collectionRate / 100) * 125.6} 125.6` : '0 125.6',
+                                            transition: 'stroke-dasharray 2s ease-out'
+                                        }}
                                     />
                                 </svg>
                                 <div className="absolute inset-0 flex items-center justify-center">
@@ -255,18 +208,16 @@ export default function Dashboard() {
                                 </p>
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Monthly Revenue - with Privacy Toggle */}
                 {loading.summary ? (
                     <div className="h-[100px] sm:h-[110px] rounded-2xl sm:rounded-[24px] bg-neutral-50/80 border border-black/5 animate-pulse" />
                 ) : (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
+                    <div
+                        style={{ animationDelay: '300ms' }}
+                        className="animate-fade-in-up group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
                     >
                         <div className="absolute top-0 right-0 w-20 h-20 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
                         <div className="flex items-center gap-2 min-[375px]:gap-3 sm:gap-4 relative z-10">
@@ -301,18 +252,16 @@ export default function Dashboard() {
                                 </p>
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
                 )}
             </div>
 
             {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
                 {/* Class Performance Chart */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="bg-app-surface-opaque border-[1.5px] border-black/5 p-5 sm:p-6 rounded-2xl sm:rounded-[28px] shadow-sm"
+                <div
+                    style={{ animationDelay: '400ms' }}
+                    className="animate-fade-in-up bg-app-surface-opaque border-[1.5px] border-black/5 p-5 sm:p-6 rounded-2xl sm:rounded-[28px] shadow-sm"
                 >
                     <h3 className="text-sm font-bold text-app-text mb-5 flex items-center gap-2.5 uppercase tracking-widest">
                         <div className="w-7 h-7 bg-black text-white rounded-lg flex items-center justify-center">
@@ -369,15 +318,13 @@ export default function Dashboard() {
                             </div>
                         </div>
                     )}
-                </motion.div>
+                </div>
 
 
                 {/* Fee Collected vs Remaining - Bar Chart */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                    className="bg-app-surface-opaque border-[1.5px] border-black/5 p-5 sm:p-6 rounded-2xl sm:rounded-[28px] shadow-sm flex flex-col justify-between"
+                <div
+                    style={{ animationDelay: '500ms' }}
+                    className="animate-fade-in-up bg-app-surface-opaque border-[1.5px] border-black/5 p-5 sm:p-6 rounded-2xl sm:rounded-[28px] shadow-sm flex flex-col justify-between"
                 >
                     <h3 className="text-sm font-bold text-app-text mb-5 flex items-center gap-2.5 uppercase tracking-widest">
                         <div className="w-7 h-7 bg-black text-white rounded-lg flex items-center justify-center">
@@ -451,16 +398,14 @@ export default function Dashboard() {
                             </div>
                         </div>
                     )}
-                </motion.div>
+                </div>
             </div>
 
             {/* Pending Dues List */}
             {defaulters.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 }}
-                    className="bg-app-surface-opaque border-[1.5px] border-black/5 p-5 sm:p-6 rounded-2xl sm:rounded-[28px] shadow-sm"
+                <div
+                    style={{ animationDelay: '600ms' }}
+                    className="animate-fade-in-up bg-app-surface-opaque border-[1.5px] border-black/5 p-5 sm:p-6 rounded-2xl sm:rounded-[28px] shadow-sm"
                 >
                     <h3 className="text-sm font-bold text-app-text mb-5 flex items-center gap-2.5 uppercase tracking-widest">
                         <div className="w-7 h-7 bg-black text-white rounded-lg flex items-center justify-center">
@@ -477,12 +422,10 @@ export default function Dashboard() {
                     ) : (
                         <div className="space-y-2">
                             {defaulters.map((batch, index) => (
-                                <motion.div
+                                <div
                                     key={batch.name}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.08 * index }}
-                                    className="flex items-center justify-between p-3.5 sm:p-4 bg-neutral-50/80 hover:bg-neutral-100/80 rounded-2xl transition-all group border border-black/[0.03]"
+                                    style={{ animationDelay: `${80 * index}ms` }}
+                                    className="animate-fade-in-left flex items-center justify-between p-3.5 sm:p-4 bg-neutral-50/80 hover:bg-neutral-100/80 rounded-2xl transition-all group border border-black/[0.03]"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 bg-black text-white rounded-xl flex items-center justify-center text-xs font-bold">
@@ -493,11 +436,11 @@ export default function Dashboard() {
                                     <span className="text-black font-extrabold text-base sm:text-lg tracking-tight">
                                         {showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(batch.amount)}` : '₹••••••'}
                                     </span>
-                                </motion.div>
+                                </div>
                             ))}
                         </div>
                     )}
-                </motion.div>
+                </div>
             )}
         </Layout>
     );

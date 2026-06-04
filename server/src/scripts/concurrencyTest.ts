@@ -14,12 +14,14 @@ let ADMIN_ID = '';
 
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const prisma = new PrismaClient();
 
 async function loginAndSetup() {
     if (!TOKEN) {
-        console.log('Generating test-token from DB directly...');
+        secureLogger.info('Generating test-token from DB directly...');
         try {
             const admin = await prisma.admin.findFirst();
             if (!admin) throw new Error("No admins found in DB to test with.");
@@ -33,7 +35,7 @@ async function loginAndSetup() {
             }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1h' });
             
             ADMIN_ID = admin.id;
-            console.log(`✅ Successfully authenticated as ${admin.username}!`);
+            secureLogger.info(`✅ Successfully authenticated as ${admin.username}!`);
         } catch (e: any) {
             console.error('Test Token Gen Failed:', e.message);
             process.exit(1);
@@ -42,14 +44,14 @@ async function loginAndSetup() {
 }
 
 async function runPaymentRaceConditionTest(studentId: string, feeRecordId: string) {
-    console.log(`\n===========================================`);
-    console.log(`🧪 TESTING DOUBLE-SPEND / PAYMENT RACE CONDITIONS`);
-    console.log(`===========================================`);
+    secureLogger.info(`\n===========================================`);
+    secureLogger.info(`🧪 TESTING DOUBLE-SPEND / PAYMENT RACE CONDITIONS`);
+    secureLogger.info(`===========================================`);
     
     const headers = { Authorization: `Bearer ${TOKEN}` };
     const NUM_CONCURRENT = 10;
     
-    console.log(`Sending ${NUM_CONCURRENT} identical payment requests at the exact same millisecond...`);
+    secureLogger.info(`Sending ${NUM_CONCURRENT} identical payment requests at the exact same millisecond...`);
     
     // API endpoint based on current router validation: /api/fees/pay requires { studentId, amount }
     const requests = Array.from({ length: NUM_CONCURRENT }).map((_, i) => {
@@ -65,26 +67,26 @@ async function runPaymentRaceConditionTest(studentId: string, feeRecordId: strin
     const successes = results.filter(r => r.status === 200);
     const failures = results.filter(r => r.status !== 200);
     
-    console.log(`\nResults:`);
-    console.log(`✅ Successes: ${successes.length}`);
-    console.log(`❌ Failures (Double-Spend Prevented): ${failures.length}`);
+    secureLogger.info(`\nResults:`);
+    secureLogger.info(`✅ Successes: ${successes.length}`);
+    secureLogger.info(`❌ Failures (Double-Spend Prevented): ${failures.length}`);
     
     if (successes.length === 1 && failures.length === NUM_CONCURRENT - 1) {
-        console.log(`\n🎉 PASS: Serializable Transactions successfully blocked the race condition!`);
+        secureLogger.info(`\n🎉 PASS: Serializable Transactions successfully blocked the race condition!`);
     } else {
-        console.log(`\n💥 FAIL: Multiple payments merged! (Success: ${successes.length})`);
+        secureLogger.info(`\n💥 FAIL: Multiple payments merged! (Success: ${successes.length})`);
     }
     
     return failures;
 }
 
 async function runOTPRaceConditionTest() {
-    console.log(`\n===========================================`);
-    console.log(`🧪 TESTING OTP UPSERT CONCURRENCY & LIMITS`);
-    console.log(`===========================================`);
+    secureLogger.info(`\n===========================================`);
+    secureLogger.info(`🧪 TESTING OTP UPSERT CONCURRENCY & LIMITS`);
+    secureLogger.info(`===========================================`);
     
     const NUM_CONCURRENT = 5;
-    console.log(`Sending ${NUM_CONCURRENT} identical OTP requests at the exact same millisecond...`);
+    secureLogger.info(`Sending ${NUM_CONCURRENT} identical OTP requests at the exact same millisecond...`);
     
     const phone = '9999999999'; // Some dummy phone
     const requests = Array.from({ length: NUM_CONCURRENT }).map((_, i) => {
@@ -93,13 +95,13 @@ async function runOTPRaceConditionTest() {
     });
     
     const results = await Promise.all(requests);
-    console.log(`✅ Completed ${results.length} requests without Postgres Deadlock.`);
+    secureLogger.info(`✅ Completed ${results.length} requests without Postgres Deadlock.`);
     // As long as no 500 errors or Prisma crash happens, upserts are serialized correctly!
     const serverErrors = results.filter(r => r.status >= 500);
     if (serverErrors.length === 0) {
-        console.log(`\n🎉 PASS: OTP DB Upsert handled concurrency gracefully.`);
+        secureLogger.info(`\n🎉 PASS: OTP DB Upsert handled concurrency gracefully.`);
     } else {
-        console.log(`\n💥 FAIL: Database deadlock or server crash detected.`);
+        secureLogger.info(`\n💥 FAIL: Database deadlock or server crash detected.`);
     }
 }
 
@@ -117,7 +119,7 @@ async function run() {
     
     // If no existing fee system data is around, let's inject a mock one to test the serialization fully
     if (!feeRecord) {
-        console.log(`\n⚠️ No PENDING FeeRecord found! Injecting a temporary mock record to test the payment race-condition...`);
+        secureLogger.info(`\n⚠️ No PENDING FeeRecord found! Injecting a temporary mock record to test the payment race-condition...`);
         const admin = await prisma.admin.findFirst({ where: { instituteId: { not: null } } });
         if (admin && admin.instituteId) {
             const fakeBatch = await prisma.batch.create({
@@ -158,15 +160,15 @@ async function run() {
     }
 
     if (feeRecord) {
-        console.log(`\n🎯 Testing against: Student ${feeRecord.student.name} (Amount: ${feeRecord.amount})`);
+        secureLogger.info(`\n🎯 Testing against: Student ${feeRecord.student.name} (Amount: ${feeRecord.amount})`);
         const failures = await runPaymentRaceConditionTest(feeRecord.studentId, feeRecord.id);
         
         if (failures?.length === 10) {
-            console.log(`\n🔍 First failure response body:`, failures[0].data);
+            secureLogger.info(`\n🔍 First failure response body:`, failures[0].data);
         }
         
         if (isMockData) {
-            console.log(`🧹 Cleaning up mock fee data...`);
+            secureLogger.info(`🧹 Cleaning up mock fee data...`);
             await prisma.feeInstallment.deleteMany({ where: { batchId: fakeBatchId } }).catch(()=>{});
             await prisma.feePayment.deleteMany({ where: { studentId: feeRecord.studentId } });
             await prisma.feeRecord.deleteMany({ where: { studentId: feeRecord.studentId } });
@@ -175,11 +177,11 @@ async function run() {
             await prisma.batch.delete({ where: { id: fakeBatchId } }).catch(()=>{});
         }
     } else {
-        console.log(`\n⚠️ Skipping Payment Stress Test: Impossible to construct mock data without an admin institute.`);
+        secureLogger.info(`\n⚠️ Skipping Payment Stress Test: Impossible to construct mock data without an admin institute.`);
     }
 
     await runOTPRaceConditionTest();
-    console.log('\n✅ All automated concurrency tests completed.');
+    secureLogger.info('\n✅ All automated concurrency tests completed.');
     process.exit(0);
 }
 

@@ -1,3 +1,5 @@
+import { secureLogger } from './secureLogger';
+
 /**
  * Structured Logging Utility for Production Debugging
  * 
@@ -31,15 +33,15 @@ function log(level: LogLevel, event: string, context?: LogContext) {
             console.error(formattedMessage, context || '');
             break;
         case 'WARN':
-            console.warn(formattedMessage, context || '');
+            secureLogger.warn(formattedMessage, context || '');
             break;
         case 'DEBUG':
             if (process.env.NODE_ENV !== 'production') {
-                console.log(formattedMessage, context || '');
+                secureLogger.info(formattedMessage, context || '');
             }
             break;
         default:
-            console.log(formattedMessage, context || '');
+            secureLogger.info(formattedMessage, context || '');
     }
 
     return logEntry;

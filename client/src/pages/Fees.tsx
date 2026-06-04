@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,9 +53,7 @@ interface CustomInvoice {
 }
 
 const Fees: React.FC = () => {
-    const [students, setStudents] = useState<FeeSummary[]>([]);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
@@ -96,42 +95,22 @@ const Fees: React.FC = () => {
     const [showMonthMenu, setShowMonthMenu] = useState(false);
     const [showYearMenu, setShowYearMenu] = useState(false);
 
-    useEffect(() => {
-        fetchFees();
-        fetchTransactions();
-        fetchCustomInvoices();
-    }, []);
+    const { data: students = [], isLoading: feesLoading } = useQuery({
+        queryKey: ['fees'],
+        queryFn: () => api.get<FeeSummary[]>('/fees')
+    });
 
-    const [customInvoices, setCustomInvoices] = useState<CustomInvoice[]>([]);
+    const { data: transactions = [], isLoading: transactionsLoading } = useQuery({
+        queryKey: ['transactions'],
+        queryFn: () => api.get<Transaction[]>('/fees/recent')
+    });
 
-    const fetchCustomInvoices = async () => {
-        try {
-            const data = await api.get<CustomInvoice[]>(`/fees/custom-invoices?t=${Date.now()}`);
-            setCustomInvoices(data);
-        } catch {
-            // Silently fail — tab will show empty state
-        }
-    };
+    const { data: customInvoices = [], isLoading: customInvoicesLoading } = useQuery({
+        queryKey: ['customInvoices'],
+        queryFn: () => api.get<CustomInvoice[]>('/fees/custom-invoices')
+    });
 
-    const fetchFees = async () => {
-        try {
-            const data = await api.get<FeeSummary[]>(`/fees?t=${Date.now()}`);
-            setStudents(data);
-        } catch {
-            toast.error("Failed to load fee records");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchTransactions = async () => {
-        try {
-            const data = await api.get<Transaction[]>(`/fees/recent?t=${Date.now()}`);
-            setTransactions(data);
-        } catch (error) {
-            console.error(error);
-        }
-    };
+    const loading = feesLoading || transactionsLoading || customInvoicesLoading;
 
     const handlePayment = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -145,8 +124,8 @@ const Fees: React.FC = () => {
                 studentId: selectedStudent.id,
                 amount: paymentAmount
             });
-            await fetchFees();
-            await fetchTransactions(); // Refresh feed
+            await queryClient.invalidateQueries({ queryKey: ['fees'] });
+            await queryClient.invalidateQueries({ queryKey: ['transactions'] });
             toast.success(`Payment of ₹${paymentAmount} recorded!`, { id: toastId });
             setSelectedStudent(null);
             setPaymentAmount('');

@@ -1,4 +1,6 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { secureLogger } from '../secureLogger';
+
 
 const geminiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(geminiKey || "");
@@ -44,7 +46,7 @@ async function runWithFallback<T>(
         return await operation(model);
     } catch (e: any) {
         // If Primary fails with Overloaded/High Demand (503) or generic failure, try Fallback
-        console.warn(`[AI_FALLBACK] Primary model (${primaryModel}) failed. Retrying with ${secondaryModel}...`, e.message);
+        secureLogger.warn(`[AI_FALLBACK] Primary model (${primaryModel}) failed. Retrying with ${secondaryModel}...`, e.message);
         
         try {
             const fallbackModel = genAI.getGenerativeModel(getConfig(secondaryModel));

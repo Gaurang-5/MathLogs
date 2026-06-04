@@ -22,8 +22,10 @@ interface AuthContextData {
   token: string | null;
   isLoading: boolean;
   isLoggedIn: boolean;
+  hasSeenOnboarding: boolean;
   loginWithPassword: (identifier: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
   const router = useRouter();
 
   // Check for existing session on app launch
@@ -43,6 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const storedToken = await getItemAsync('auth_token');
       const storedUser = await getItemAsync('user_data');
+      const onboardingStatus = await getItemAsync('has_seen_onboarding');
+
+      if (onboardingStatus === 'true') {
+        setHasSeenOnboarding(true);
+      }
 
       if (storedToken && storedUser) {
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
@@ -140,9 +148,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await deleteItemAsync('auth_token');
     await deleteItemAsync('user_data');
+    await deleteItemAsync('has_seen_onboarding'); // Temporary for testing
     delete api.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
+    setHasSeenOnboarding(false);
+    router.replace('/welcome');
+  }, [router]);
+
+  const completeOnboarding = useCallback(async () => {
+    await setItemAsync('has_seen_onboarding', 'true');
+    setHasSeenOnboarding(true);
     router.replace('/login');
   }, [router]);
 
@@ -151,9 +167,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     token,
     isLoading,
     isLoggedIn: !!token,
+    hasSeenOnboarding,
     loginWithPassword,
     logout,
-  }), [user, token, isLoading, loginWithPassword, logout]);
+    completeOnboarding,
+  }), [user, token, isLoading, hasSeenOnboarding, loginWithPassword, logout, completeOnboarding]);
 
   return (
     <AuthContext.Provider value={value}>

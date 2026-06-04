@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Platform } from 'react-native';
-import { BarChart3, TrendingUp, ShieldAlert, BookOpen, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react-native';
+import { BarChart3, TrendingUp, ShieldAlert, BookOpen, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2 } from 'lucide-react-native';
 import api from '../../services/api';
 
 const T = {

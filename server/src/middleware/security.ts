@@ -1,6 +1,10 @@
 import { Express, Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
+import { redis } from '../utils/redis';
+import { secureLogger } from '../utils/secureLogger';
+
 
 export const configureSecurityHeaders = (app: Express) => {
     // Hardened Helmet configuration with strict CSP
@@ -67,13 +71,17 @@ export const configureSecurityHeaders = (app: Express) => {
 
 // General API Rate Limiter
 export const apiLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:api:',
+    }),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 1000, // Limit each IP to 1000 requests per windowMs
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
     handler: (req: Request, res: Response) => {
-        console.warn('[RATE_LIMIT_EXCEEDED]', {
+        secureLogger.warn('[RATE_LIMIT_EXCEEDED]', {
             type: 'api',
             ip: req.ip,
             path: req.path,
@@ -86,13 +94,17 @@ export const apiLimiter = rateLimit({
 
 // Stricter Limiter for Auth Routes
 export const authLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:auth:',
+    }),
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20, // Limit each IP to 20 login attempts per windowMs
+    max: process.env.NODE_ENV === 'production' ? 20 : 500, // 500 in dev to prevent lockouts during hot reloads
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many login attempts, please try again later.' },
     handler: (req: Request, res: Response) => {
-        console.warn('[RATE_LIMIT_EXCEEDED]', {
+        secureLogger.warn('[RATE_LIMIT_EXCEEDED]', {
             type: 'auth',
             ip: req.ip,
             path: req.path,
@@ -106,6 +118,10 @@ export const authLimiter = rateLimit({
 // Public Registration Rate Limiter (QR codes)
 // Increased to 500/hour to handle classroom Wi-Fi (NAT) scenarios where many students share one IP.
 export const publicLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:public:',
+    }),
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 500,
     standardHeaders: true,
@@ -139,14 +155,18 @@ export const publicLimiter = rateLimit({
 // ✅ HIGH-2 FIX: Payment Endpoint Rate Limiter
 // Prevents spam attacks on financial transactions
 export const paymentLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:payment:',
+    }),
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 10, // Limit each user to 10 payment submissions per minute
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many payment submissions. Please wait a moment before trying again.' },
     handler: (req: Request, res: Response) => {
-        const user = (req as any).user;
-        console.warn('[RATE_LIMIT_EXCEEDED]', {
+        const user = req.user;
+        secureLogger.warn('[RATE_LIMIT_EXCEEDED]', {
             type: 'payment',
             userId: user?.id || 'unknown',
             username: user?.username || 'unknown',
@@ -165,13 +185,17 @@ export const paymentLimiter = rateLimit({
 
 // ✅ HIGH-1: Dedicated Limiter for UPI Payment Flows
 export const upiPaymentLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:upi:',
+    }),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 30, // Limit each IP to 30 requests per windowMs (allows retries)
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many payment requests. Please wait a moment.' },
     handler: (req: Request, res: Response) => {
-        console.warn('[RATE_LIMIT_EXCEEDED]', {
+        secureLogger.warn('[RATE_LIMIT_EXCEEDED]', {
             type: 'upi_payment_flow',
             ip: req.ip,
             path: req.path,
@@ -185,6 +209,10 @@ export const upiPaymentLimiter = rateLimit({
 // ✅ HIGH-1: Per-User OCR Rate Limiter
 // Protects against Gemini quota drain and cost spikes
 export const ocrLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:ocr:',
+    }),
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 15, // Limit each user to 15 scans per minute
     standardHeaders: true,
@@ -193,12 +221,12 @@ export const ocrLimiter = rateLimit({
     validate: { ip: false },
     keyGenerator: (req) => {
         // Use User ID if available (authenticated), otherwise fallback to IP
-        const user = (req as any).user;
+        const user = req.user;
         return user?.id || ipKeyGenerator(req.ip || '127.0.0.1');
     },
     handler: (req: Request, res: Response) => {
-        const user = (req as any).user;
-        console.warn('[RATE_LIMIT_EXCEEDED]', {
+        const user = req.user;
+        secureLogger.warn('[RATE_LIMIT_EXCEEDED]', {
             type: 'ocr',
             userId: user?.id || 'unknown',
             username: user?.username || 'unknown',
@@ -218,19 +246,23 @@ export const ocrLimiter = rateLimit({
 // Prevents teachers from accidentally sending duplicate bulk messages
 // by spamming "Send Invite" or "Send Results" buttons
 export const bulkNotifyLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:bulk_notify:',
+    }),
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 5, // Max 5 bulk sends per minute per user
     standardHeaders: true,
     legacyHeaders: false,
     validate: { ip: false },
     keyGenerator: (req) => {
-        const user = (req as any).user;
+        const user = req.user;
         return user?.id || ipKeyGenerator(req.ip || '127.0.0.1');
     },
     message: { error: 'Too many notifications sent. Please wait a minute before sending again.' },
     handler: (req: Request, res: Response) => {
-        const user = (req as any).user;
-        console.warn('[RATE_LIMIT_EXCEEDED]', {
+        const user = req.user;
+        secureLogger.warn('[RATE_LIMIT_EXCEEDED]', {
             type: 'bulk_notify',
             userId: user?.id || 'unknown',
             ip: req.ip,
@@ -247,13 +279,17 @@ export const bulkNotifyLimiter = rateLimit({
 
 // Student Portal: General Limiter for Dashboard and Read Routes
 export const studentPortalLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:student_portal:',
+    }),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 300, // Limit each IP to 300 requests per 15 minutes
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Please try again later.' },
     handler: (req: Request, res: Response) => {
-        console.warn('[RATE_LIMIT_EXCEEDED]', {
+        secureLogger.warn('[RATE_LIMIT_EXCEEDED]', {
             type: 'student_portal',
             ip: req.ip,
             path: req.path,
@@ -265,13 +301,17 @@ export const studentPortalLimiter = rateLimit({
 
 // Student Portal: Login Rate Limiter
 export const studentLoginLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:student_login:',
+    }),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 20, // 20 login attempts per IP per window
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many login attempts. Please try again later.' },
     handler: (req: Request, res: Response) => {
-        console.warn('[RATE_LIMIT_EXCEEDED]', {
+        secureLogger.warn('[RATE_LIMIT_EXCEEDED]', {
             type: 'student_login',
             ip: req.ip,
             path: req.path,
@@ -287,13 +327,17 @@ export const studentLoginLimiter = rateLimit({
 // Tuned for classroom NAT: up to 200 students behind one IP, each sending heartbeat + autosave every ~15s
 // Math: 200 students × 4 req/min = 800 req/min. Limit is 600 — catches abuse, allows real classroom use.
 export const quizActivityLimiter = rateLimit({
+    store: new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix: 'rl:quiz_activity:',
+    }),
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 600, // 600 req/min per IP (supports ~200 students on shared school Wi-Fi)
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Please wait a moment.' },
     handler: (req: Request, res: Response) => {
-        console.warn('[RATE_LIMIT_EXCEEDED]', {
+        secureLogger.warn('[RATE_LIMIT_EXCEEDED]', {
             type: 'quiz_activity',
             ip: req.ip,
             path: req.path,

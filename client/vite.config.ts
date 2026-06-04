@@ -92,18 +92,6 @@ export default defineConfig({
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
               }
             }
-          },
-          {
-            // Network-first for API calls (never cache authenticated data)
-            urlPattern: /\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 10,
-              expiration: {
-                maxEntries: 0 // Don't cache API responses
-              }
-            }
           }
         ],
         cleanupOutdatedCaches: true,
@@ -118,7 +106,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['framer-motion', 'lucide-react'],
+          ui: ['lucide-react'],
           charts: ['recharts'],
           utils: ['html5-qrcode', 'react-qr-code']
         }

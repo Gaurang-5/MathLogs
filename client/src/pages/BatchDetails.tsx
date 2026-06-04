@@ -24,6 +24,7 @@ interface Student {
     fees: LegacyFee[];
     marks?: StudentMark[];
     createdAt?: string;
+    additionalData?: any;
 }
 
 interface FeeInstallment {
@@ -103,6 +104,20 @@ export default function BatchDetails() {
         if (!viewMarksId || !batch) return null;
         return batch.students.find(s => s.id === viewMarksId) || null;
     }, [viewMarksId, batch]);
+
+    const formFields = useMemo(() => {
+        const config = (batch as any)?.institute?.config;
+        if (config?.registrationForm?.fields && Array.isArray(config.registrationForm.fields)) {
+            return config.registrationForm.fields;
+        }
+        return [
+            { id: 'studentName', label: 'Student Name', type: 'text', required: true, system: true },
+            { id: 'parentName', label: 'Parent / Guardian Name', type: 'text', required: true, system: true },
+            { id: 'parentWhatsapp', label: 'WhatsApp Number', type: 'tel', required: true, system: true },
+            { id: 'schoolName', label: 'School Name', type: 'text', required: false, system: true },
+            { id: 'parentEmail', label: 'Parent Email (Optional)', type: 'email', required: false, system: true }
+        ];
+    }, [batch]);
 
     const getStudentAverage = (student: Pick<Student, 'marks'>) => {
         if (!student.marks || student.marks.length === 0) return '-';
@@ -965,10 +980,11 @@ export default function BatchDetails() {
                                         )}
                                     </div>
                                 </th>
-                                <th className={cn("bg-transparent", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Student Name</th>
-                                <th className={cn("bg-transparent", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>School</th>
-                                <th className={cn("bg-transparent", getCellPadding())} style={{ minWidth: '180px', whiteSpace: 'nowrap' }}>Parent Name</th>
-                                <th className={cn("bg-transparent", getCellPadding())} style={{ minWidth: '200px', whiteSpace: 'nowrap' }}>Contact</th>
+                                {formFields.map((field: any) => (
+                                    <th key={field.id} className={cn("bg-transparent", getCellPadding())} style={{ minWidth: field.id === 'parentEmail' ? '200px' : '180px', whiteSpace: 'nowrap' }}>
+                                        {field.label}
+                                    </th>
+                                ))}
                                 <th className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Tests</th>
                                 <th className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Avg (10)</th>
                                 {batch.feeInstallments?.filter(inst => !inst.studentId).map(inst => (
@@ -999,15 +1015,36 @@ export default function BatchDetails() {
                                 return (
                                     <tr key={student.id} className="hover:bg-neutral-50/70 transition-colors group">
                                         <td className={cn("font-mono text-app-text-tertiary", getCellPadding(), getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }}>{student.humanId || '-'}</td>
-                                        <td className={cn("font-semibold text-app-text", getCellPadding(), getTextSizeClass('body'))} style={{ whiteSpace: 'nowrap' }} title={student.name}>{student.name}</td>
-                                        <td className={cn("text-app-text-secondary", getCellPadding(), getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }} title={student.schoolName || ''}>{student.schoolName || '-'}</td>
-                                        <td className={cn("text-app-text-secondary", getCellPadding(), getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }} title={student.parentName}>{student.parentName}</td>
-                                        <td className={getCellPadding()}>
-                                            <div className={cn("flex flex-col gap-1.5", getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }}>
-                                                <span className="flex items-center gap-1 text-app-text-secondary"><Phone className={cn("text-success", getIconSizeClass())} /> {student.parentWhatsapp}</span>
-                                                {student.parentEmail && <span className="flex items-center gap-1 text-app-text-secondary"><Mail className={cn("text-accent", getIconSizeClass())} /> {student.parentEmail}</span>}
-                                            </div>
-                                        </td>
+                                        {formFields.map((field: any) => {
+                                            let content: React.ReactNode = '-';
+                                            let rawText = '';
+                                            
+                                            if (field.system) {
+                                                if (field.id === 'studentName') { content = student.name; rawText = student.name; }
+                                                else if (field.id === 'schoolName') { content = student.schoolName || '-'; rawText = student.schoolName || ''; }
+                                                else if (field.id === 'parentName') { content = student.parentName || '-'; rawText = student.parentName || ''; }
+                                                else if (field.id === 'parentWhatsapp') {
+                                                    content = <span className="flex items-center gap-1 text-app-text-secondary"><Phone className={cn("text-success", getIconSizeClass())} /> {student.parentWhatsapp}</span>;
+                                                    rawText = student.parentWhatsapp;
+                                                }
+                                                else if (field.id === 'parentEmail') {
+                                                    content = student.parentEmail ? <span className="flex items-center gap-1 text-app-text-secondary"><Mail className={cn("text-accent", getIconSizeClass())} /> {student.parentEmail}</span> : '-';
+                                                    rawText = student.parentEmail || '';
+                                                }
+                                            } else {
+                                                const val = student.additionalData?.[field.id];
+                                                content = val ? String(val) : '-';
+                                                rawText = val ? String(val) : '';
+                                            }
+
+                                            const isStudentName = field.id === 'studentName';
+
+                                            return (
+                                                <td key={field.id} className={cn(isStudentName ? "font-semibold text-app-text" : "text-app-text-secondary", getCellPadding(), isStudentName ? getTextSizeClass('body') : getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }} title={rawText}>
+                                                    {content}
+                                                </td>
+                                            );
+                                        })}
                                         <td className={cn("text-center", getCellPadding())}>
                                             <button onClick={() => setViewMarksId(student.id)} className="p-2 hover:bg-black/5 rounded-lg transition-colors inline-flex items-center justify-center text-app-text-secondary hover:text-app-text" title="View Marks">
                                                 <Eye className={getIconSizeClass()} />
@@ -1170,7 +1207,7 @@ export default function BatchDetails() {
                             })}
                             {filteredStudents.length === 0 && (
                                 <tr>
-                                    <td colSpan={6 + (batch.feeInstallments?.filter(i => !i.studentId).length || 0) + customInvoiceColumns.length} className="p-20 text-center text-app-text-tertiary flex flex-col items-center justify-center">
+                                    <td colSpan={4 + formFields.length + (batch.feeInstallments?.filter(i => !i.studentId).length || 0) + customInvoiceColumns.length} className="p-20 text-center text-app-text-tertiary flex flex-col items-center justify-center">
                                         <Users className="w-12 h-12 mb-4 opacity-20" />
                                         <p>{searchQuery ? 'No students match your search.' : 'No students in this batch yet.'}</p>
                                     </td>
@@ -1213,14 +1250,26 @@ export default function BatchDetails() {
 
                                         {/* Row 2: School & Parent meta */}
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-app-text-secondary mb-3">
-                                            <span className="flex items-center gap-1.5">
-                                                <Book className="w-3.5 h-3.5 text-app-text-tertiary shrink-0" />
-                                                <span className="truncate max-w-[130px]">{student.schoolName || <span className="italic text-app-text-tertiary">No school</span>}</span>
-                                            </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <User className="w-3.5 h-3.5 text-app-text-tertiary shrink-0" />
-                                                <span className="truncate max-w-[130px]">{student.parentName}</span>
-                                            </span>
+                                            {formFields.map((field: any) => {
+                                                if (field.id === 'studentName' || field.id === 'parentWhatsapp' || field.id === 'parentEmail') return null;
+                                                let val = '';
+                                                if (field.id === 'schoolName') val = student.schoolName || '';
+                                                else if (field.id === 'parentName') val = student.parentName || '';
+                                                else if (field.system) return null; // Fallback
+                                                else val = student.additionalData?.[field.id] ? String(student.additionalData[field.id]) : '';
+                                                
+                                                if (!val) return null;
+
+                                                return (
+                                                    <span key={field.id} className="flex items-center gap-1.5" title={field.label}>
+                                                        {field.id === 'schoolName' ? <Book className="w-3.5 h-3.5 text-app-text-tertiary shrink-0" /> : <User className="w-3.5 h-3.5 text-app-text-tertiary shrink-0" />}
+                                                        <span className="truncate max-w-[130px] text-xs font-medium text-app-text-secondary">
+                                                            <span className="text-[10px] text-app-text-tertiary uppercase mr-1 hidden">{field.label}:</span>
+                                                            {val}
+                                                        </span>
+                                                    </span>
+                                                );
+                                            })}
                                         </div>
 
                                         {/* Fee pills — horizontal scroll */}
@@ -1512,6 +1561,34 @@ export default function BatchDetails() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Additional Data Section */}
+                                    {editingStudent.additionalData && Object.keys(editingStudent.additionalData).length > 0 && (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="p-1.5 bg-blue-500/10 rounded-lg text-blue-500"><Book className="w-4 h-4" /></div>
+                                                <h4 className="text-sm font-bold text-app-text tracking-tight">Additional Information</h4>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {Object.entries(editingStudent.additionalData).map(([key, value]) => {
+                                                    const formattedLabel = key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                                                    return (
+                                                        <div key={key} className="space-y-1.5 md:col-span-2">
+                                                            <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider ml-1">{formattedLabel}</label>
+                                                            <div className="relative">
+                                                                <input
+                                                                    value={String(value)}
+                                                                    readOnly
+                                                                    className="w-full bg-neutral-50 border-[1.5px] border-black/5 rounded-xl px-4 py-2.5 text-app-text outline-none opacity-80 cursor-default"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="flex justify-end pt-4 border-t border-black/5">
                                         <button

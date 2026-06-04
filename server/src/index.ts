@@ -11,6 +11,9 @@ import { initializeSentry } from './monitoring/sentry';
 import * as Sentry from '@sentry/node';
 import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
 import { emailWorker } from './utils/emailWorker';
+import { Client } from 'pg';
+import { secureLogger } from './utils/secureLogger';
+
 
 
 
@@ -25,40 +28,6 @@ const PRODUCTION_ORIGINS = new Set([
     'https://www.mathlogs.in',
 ]);
 
-const DEVELOPMENT_ORIGINS = new Set([
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:3000',
-    'http://localhost:5174',
-    'http://127.0.0.1:5174',
-    'http://localhost:5175',
-    'http://127.0.0.1:5175',
-    'http://localhost:5176',
-    'http://127.0.0.1:5176',
-    'http://localhost:5177',
-    'http://127.0.0.1:5177',
-    'http://localhost:5178',
-    'http://127.0.0.1:5178',
-    'http://localhost:5179',
-    'http://127.0.0.1:5179',
-    'http://localhost:5180',
-    'http://127.0.0.1:5180',
-    'http://localhost:5181',
-    'http://127.0.0.1:5181',
-    'http://localhost:5182',
-    'http://127.0.0.1:5182',
-    'http://localhost:5183',
-    'http://127.0.0.1:5183',
-    'http://localhost:5184',
-    'http://127.0.0.1:5184',
-    'http://localhost:5185',
-    'http://127.0.0.1:5185',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001',
-    'http://localhost:8081',
-    'http://10.100.3.216:8081',
-]);
-
 export function createApp() {
     const app = express();
 
@@ -71,7 +40,7 @@ export function createApp() {
     app.set('trust proxy', 1);
 
     app.use(compression({
-        level: 9,
+        level: 6,
         threshold: 1024,
         filter: (req, res) => {
             if (res.getHeader('Content-Type')?.toString().includes('json')) {
@@ -86,7 +55,7 @@ export function createApp() {
         res.on('finish', () => {
             const duration = Date.now() - start;
             if (duration > 1000) {
-                console.warn(`[SLOW_REQUEST] ${req.method} ${req.path} took ${duration}ms`);
+                secureLogger.warn(`[SLOW_REQUEST] ${req.method} ${req.path} took ${duration}ms`);
             }
         });
         next();
@@ -100,12 +69,13 @@ export function createApp() {
 
             const isDev = process.env.NODE_ENV !== 'production';
             const isCloudflareTunnel = origin.endsWith('.trycloudflare.com');
-            const isAllowed = PRODUCTION_ORIGINS.has(origin) || (isDev && (DEVELOPMENT_ORIGINS.has(origin) || isCloudflareTunnel));
+            const isLocalDev = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin);
+            const isAllowed = PRODUCTION_ORIGINS.has(origin) || (isDev && (isLocalDev || isCloudflareTunnel));
 
             if (isAllowed) {
                 callback(null, true);
             } else {
-                console.warn(`[SECURITY] Blocked CORS request from unauthorized origin: ${origin}`);
+                secureLogger.warn(`[SECURITY] Blocked CORS request from unauthorized origin: ${origin}`);
                 callback(new Error('Not allowed by CORS'));
             }
         },
@@ -233,28 +203,61 @@ function startServer() {
 
         if (process.env.NODE_ENV === 'production') {
             import('./utils/whatsappWorker').then(({ processWhatsappQueue }) => {
-                console.log('✅ WhatsApp Worker Initialized');
+                secureLogger.info('✅ WhatsApp Worker Initialized');
 
-                const pollQueue = async () => {
+                const pgClient = new Client({ connectionString: process.env.DATABASE_URL });
+                let isProcessing = false;
+
+                const triggerProcess = async () => {
+                    if (isProcessing) return;
+                    isProcessing = true;
                     try {
-                        const processedCount = await processWhatsappQueue();
-                        setTimeout(pollQueue, processedCount && processedCount > 0 ? 100 : 2000);
+                        let processedCount = 0;
+                        do {
+                            processedCount = await processWhatsappQueue() || 0;
+                        } while (processedCount > 0);
                     } catch (err) {
-                        setTimeout(pollQueue, 5000);
+                        console.error('[WhatsApp Worker] Error:', err);
+                    } finally {
+                        isProcessing = false;
                     }
                 };
 
-                pollQueue();
+                pgClient.connect().then(() => {
+                    secureLogger.info('✅ PostgreSQL LISTEN connected for WhatsApp worker');
+                    pgClient.query('LISTEN whatsapp_job_insert');
+                    
+                    pgClient.on('notification', (msg) => {
+                        if (msg.channel === 'whatsapp_job_insert') {
+                            triggerProcess();
+                        }
+                    });
+                    
+                    // Initial run to clear any pending jobs
+                    triggerProcess();
+                }).catch(err => {
+                    console.error('❌ Failed to connect PG LISTEN:', err);
+                    // Fallback to polling
+                    const pollQueue = async () => {
+                        try {
+                            const processedCount = await processWhatsappQueue();
+                            setTimeout(pollQueue, processedCount && processedCount > 0 ? 100 : 5000);
+                        } catch (err) {
+                            setTimeout(pollQueue, 5000);
+                        }
+                    };
+                    pollQueue();
+                });
             });
         } else {
-            console.log('⏭️  WhatsApp Worker skipped (development mode)');
+            secureLogger.info('⏭️  WhatsApp Worker skipped (development mode)');
         }
 
-        console.log(`Server running on http://localhost:${PORT}`);
-        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-        console.log(`Health check: http://localhost:${PORT}/health`);
-        console.log(`Detailed health: http://localhost:${PORT}/health/detailed`);
-        console.log(`Metrics: http://localhost:${PORT}/metrics`);
+        secureLogger.info(`Server running on http://localhost:${PORT}`);
+        secureLogger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        secureLogger.info(`Health check: http://localhost:${PORT}/health`);
+        secureLogger.info(`Detailed health: http://localhost:${PORT}/health/detailed`);
+        secureLogger.info(`Metrics: http://localhost:${PORT}/metrics`);
     });
 }
 

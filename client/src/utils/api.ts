@@ -206,7 +206,17 @@ async function request<T = unknown>(
 
         // --- MOBILE DIAGNOSTICS ---
         if (isCapacitor) {
-            alert(`NATIVE FETCH ERROR:\nURL: ${API_URL}${endpoint}\nMSG: ${requestError.message}\nNAME: ${requestError.name}`);
+            console.error('Capacitor fetch error', { 
+                extra: { 
+                    url: `${API_URL}${endpoint}`, 
+                    error: requestError.message,
+                    name: requestError.name
+                }
+            });
+            
+            if (import.meta.env.DEV) {
+                alert(`NATIVE FETCH ERROR:\nURL: ${API_URL}${endpoint}\nMSG: ${requestError.message}\nNAME: ${requestError.name}`);
+            }
         }
         // --------------------------
 

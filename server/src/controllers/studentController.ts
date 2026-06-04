@@ -4,6 +4,8 @@ import logger from '../utils/logger';
 import { sendWelcomeWhatsApp } from '../utils/whatsapp';
 import { getCourseCode, getInstituteCode } from '../utils/studentIds';
 import jwt from 'jsonwebtoken';
+import { secureLogger } from '../utils/secureLogger';
+
 
 // H5 fix: Shared constant so both registerStudent and addStudentManually
 // always include the fields that autoSendWelcomeInvite depends on.
@@ -121,7 +123,7 @@ const generateHumanId = async (batch: any) => {
 const MAX_RETRIES = 15;
 
 export const registerStudent = async (req: Request, res: Response) => {
-    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, token } = req.body;
+    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, token, additionalData } = req.body;
 
     // Data Normalization (Fix for typical duplications)
     if (typeof name === 'string') name = name.trim();
@@ -214,6 +216,7 @@ export const registerStudent = async (req: Request, res: Response) => {
                         parentWhatsapp,
                         parentEmail,
                         schoolName,
+                        additionalData,
                         status: 'APPROVED', // Auto-approve
                         humanId,
                         instituteId: batch.instituteId
@@ -279,7 +282,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
     }
 
     try {
-        const teacherId = (req as any).user?.id;
+        const teacherId = req.user?.id;
         const batch = await prisma.batch.findUnique({
             where: { id: batchId },
             include: {
@@ -288,7 +291,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         // Enforce Plan Limits
@@ -371,7 +374,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
 export const updateStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, parentName, parentWhatsapp, parentEmail, schoolName, humanId } = req.body;
-    const user = (req as any).user;
+    const user = req.user;
 
     try {
         const student = await prisma.student.findUnique({ where: { id: String(id) }, include: { batch: true } });
@@ -392,7 +395,7 @@ export const updateStudent = async (req: Request, res: Response) => {
 
 export const getPendingStudents = async (req: Request, res: Response) => {
     try {
-        const user = (req as any).user;
+        const user = req.user;
         const students = await prisma.student.findMany({
             where: {
                 status: 'PENDING',
@@ -410,7 +413,7 @@ export const getPendingStudents = async (req: Request, res: Response) => {
 export const approveStudent = async (req: Request, res: Response) => {
     // Kept for backward compatibility if any legacy pending students exist
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
     try {
         const studentToApprove = await prisma.student.findUnique({
             where: { id: String(id) },
@@ -423,7 +426,7 @@ export const approveStudent = async (req: Request, res: Response) => {
             }
         });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (studentToApprove?.instituteId && studentToApprove.instituteId !== user.instituteId) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
@@ -476,10 +479,10 @@ export const approveStudent = async (req: Request, res: Response) => {
 
 export const rejectStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
-        const user = (req as any).user;
+        const user = req.user;
 
         const student = await prisma.student.findUnique({ where: { id: String(id) }, include: { batch: true } });
         if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -496,7 +499,7 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
     try {
         const students = await prisma.student.findMany({
             where: {
-                instituteId: (req as any).user.instituteId
+                instituteId: req.user.instituteId
             },
             select: { createdAt: true },
             orderBy: { createdAt: 'asc' }
@@ -574,7 +577,7 @@ export const getStudentGrowthStats = async (req: Request, res: Response) => {
 
 export const getClassAverageStats = async (req: Request, res: Response) => {
     try {
-        const instituteId = (req as any).user.instituteId;
+        const instituteId = req.user.instituteId;
 
         // Fetch all tests for this institute including their marks
         const tests = await prisma.test.findMany({

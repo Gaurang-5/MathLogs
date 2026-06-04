@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { z } from 'zod';
 import { storePaymentScreenshotAsync, readPaymentScreenshot, verifyPaymentScreenshotSignature } from '../utils/paymentStorage';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const leadSchema = z.object({
     studentName: z.string().min(2, "Student name is required"),

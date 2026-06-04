@@ -9,6 +9,7 @@ import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Sparkles, ArrowLeft, Loader2, Layers, AlertCircle, Save } from 'lucide-react-native';
 import api from '../services/api';
+import { getItemAsync } from '../services/storage';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
@@ -35,6 +36,39 @@ interface GeneratedQuestion {
   kept?: boolean;
   variantGroup?: string;
 }
+
+const ProgressSteps = [
+  "Analyzing topic & constraints...",
+  "Searching for reference materials...",
+  "Drafting questions...",
+  "Building anti-cheat variants...",
+  "Finalizing test..."
+];
+
+const ProgressLoader = () => {
+  const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStepIndex(prev => Math.min(prev + 1, ProgressSteps.length - 1));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const progress = Math.min(((stepIndex + 1) / ProgressSteps.length) * 100, 95);
+
+  return (
+    <View style={{ width: '100%', backgroundColor: T.white, borderRadius: 16, borderWidth: 1, borderColor: T.border, padding: 32, alignItems: 'center', justifyContent: 'center' }}>
+      <ActivityIndicator size="large" color={T.emerald} style={{ marginBottom: 24 }} />
+      <View style={{ width: '100%', maxWidth: 280, alignItems: 'center' }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: T.accent, marginBottom: 12 }}>{ProgressSteps[stepIndex]}</Text>
+        <View style={{ height: 6, width: '100%', backgroundColor: '#F3F4F6', borderRadius: 99, overflow: 'hidden' }}>
+          <View style={{ height: '100%', backgroundColor: T.emerald, width: `${progress}%` }} />
+        </View>
+      </View>
+    </View>
+  );
+};
 
 export default function QuizGeneratorScreen() {
   const router = useRouter();
@@ -76,26 +110,54 @@ export default function QuizGeneratorScreen() {
     setGeneratedTest(null);
 
     try {
-      // In React Native, FormData works slightly differently but simple strings work the same
-      const formData = new FormData();
-      formData.append('topic', topic);
-      formData.append('grade', grade);
-      formData.append('difficulty', difficulty === 'Olympiad' ? 'Olympiad / Competitive' : difficulty);
-      formData.append('questionCount', questionCount);
-      formData.append('withVariants', String(withVariants));
-      if (comments.trim()) {
-        formData.append('comments', comments.trim());
+      const payload = {
+        topic,
+        grade,
+        difficulty: difficulty === 'Olympiad' ? 'Olympiad / Competitive' : difficulty,
+        questionCount: parseInt(questionCount, 10) || 10,
+        withVariants,
+        comments: comments.trim() || undefined
+      };
+
+      const response = await api.post('/tests/generate', payload, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      let data = response.data;
+
+      // Check if we received an async jobId instead of direct questions
+      if (data && data.jobId) {
+         let jobStatus = 'pending';
+         while (jobStatus === 'pending' || jobStatus === 'processing') {
+            await new Promise(res => setTimeout(res, 2500));
+            try {
+              const statusRes = await api.get(`/tests/generate/status/${data.jobId}`);
+              const statusData = statusRes.data;
+              if (statusData.status === 'completed') {
+                  data = statusData.result;
+                  break;
+              } else if (statusData.status === 'error') {
+                  throw new Error(statusData.error || 'AI generation failed remotely');
+              }
+              jobStatus = statusData.status;
+            } catch (err) {
+              console.warn('Polling error:', err);
+              // Retry on transient network errors while polling
+            }
+         }
       }
 
-      const res = await api.post('/tests/generate', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      // Final validation
+      if (!data || !Array.isArray(data.questions)) {
+         alert('Unexpected server response: ' + (typeof data === 'string' ? data.substring(0, 100) : JSON.stringify(data)));
+         return;
+      }
 
-      const questions: GeneratedQuestion[] = (res.data.questions || []).map((q: any) => ({ ...q, kept: false }));
-      setGeneratedTest({ ...res.data, questions });
+      const questions: GeneratedQuestion[] = (data.questions || []).map((q: any) => ({ ...q, kept: false }));
+      setGeneratedTest({ ...data, questions });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
-      alert(error?.response?.data?.error || 'Failed to generate test');
+      const msg = error?.response?.data?.error || error?.message || 'Failed to generate test';
+      alert('Error: ' + msg);
     } finally {
       setGenerating(false);
     }
@@ -234,23 +296,20 @@ export default function QuizGeneratorScreen() {
                 />
               </View>
 
-              <TouchableOpacity 
-                style={[s.generateBtn, (!topic || !grade) && s.generateBtnDisabled]} 
-                onPress={handleGenerate}
-                disabled={generating || !topic || !grade}
-              >
-                {generating ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <ActivityIndicator color={T.white} />
-                    <Text style={s.generateBtnText}>Generating with AI...</Text>
-                  </View>
-                ) : (
-                  <>
-                    <Sparkles size={20} color={T.white} />
-                    <Text style={s.generateBtnText}>Generate with AI</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              {generating ? (
+                <View style={{ marginTop: 16 }}>
+                  <ProgressLoader />
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={[s.generateBtn, (!topic || !grade) && s.generateBtnDisabled]} 
+                  onPress={handleGenerate}
+                  disabled={!topic || !grade}
+                >
+                  <Sparkles size={20} color={T.white} />
+                  <Text style={s.generateBtnText}>Generate with AI</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View style={s.reviewArea}>
@@ -295,15 +354,81 @@ export default function QuizGeneratorScreen() {
               
               <View style={{ paddingVertical: 12 }}>
                 <Text style={s.label}>Generated Questions Preview</Text>
-                {generatedTest.questions.slice(0, 3).map((q, i) => (
-                  <View key={i} style={s.questionCard}>
-                    <Text style={s.qLabel}>Q{i + 1} ({q.marks} Marks)</Text>
-                    <Text style={s.qText}>{q.questionText}</Text>
-                  </View>
-                ))}
-                {generatedTest.questions.length > 3 && (
-                  <Text style={s.moreQuestionsText}>+ {generatedTest.questions.length - 3} more questions</Text>
-                )}
+                {(() => {
+                  let currentNumber = 1;
+                  let lastVariantGroup: string | null = null;
+                  let variantSubIndex = 0;
+
+                  return generatedTest.questions.map((q, i) => {
+                    let displayLabel = '';
+                    if (!q.variantGroup) {
+                        displayLabel = `Q${currentNumber}`;
+                        currentNumber++;
+                        lastVariantGroup = null;
+                    } else {
+                        if (q.variantGroup !== lastVariantGroup) {
+                            lastVariantGroup = q.variantGroup;
+                            variantSubIndex = 0;
+                        } else {
+                            variantSubIndex++;
+                        }
+                        displayLabel = `Q${currentNumber}${String.fromCharCode(65 + variantSubIndex)}`;
+                        
+                        // If next question isn't in this variant group, increment currentNumber
+                        const nextQ = generatedTest.questions[i + 1];
+                        if (!nextQ || nextQ.variantGroup !== q.variantGroup) {
+                            currentNumber++;
+                        }
+                    }
+
+                    return (
+                      <View key={i} style={[s.questionCard, !q.kept && s.questionCardUnkept]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <Text style={s.qLabel}>{displayLabel} ({q.marks} Marks)</Text>
+                          <TouchableOpacity 
+                            style={[s.keepBtn, q.kept ? s.keepBtnActive : s.keepBtnInactive]}
+                            onPress={() => {
+                              const updated = [...generatedTest.questions];
+                              updated[i].kept = !updated[i].kept;
+                              
+                              // Recalculate total marks
+                              const newTotal = updated.reduce((sum, item) => sum + (item.kept ? item.marks : 0), 0);
+                              setGeneratedTest({ ...generatedTest, questions: updated, totalMarks: newTotal });
+                            }}
+                          >
+                            <Text style={[s.keepBtnText, q.kept ? s.keepBtnTextActive : s.keepBtnTextInactive]}>
+                              {q.kept ? 'Selected' : 'Discarded'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={s.qText}>{q.questionText}</Text>
+                        
+                        {q.options && q.options.length > 0 && (
+                          <View style={{ marginTop: 8, gap: 4 }}>
+                            {q.options.map((opt, optIdx) => {
+                               const isCorrect = q.correctAnswer === opt || q.correctAnswer === String.fromCharCode(65 + optIdx);
+                               return (
+                                 <View key={optIdx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                                   <Text style={{ fontWeight: isCorrect ? '700' : '500', color: isCorrect ? T.emerald : T.textSec, fontSize: 13 }}>
+                                     {String.fromCharCode(65 + optIdx)}.
+                                   </Text>
+                                   <Text style={{ flex: 1, color: isCorrect ? T.text : T.textSec, fontWeight: isCorrect ? '600' : '400', fontSize: 13 }}>
+                                     {opt}
+                                   </Text>
+                                 </View>
+                               );
+                            })}
+                          </View>
+                        )}
+                        {(!q.options || q.options.length === 0) && (
+                           <Text style={{ marginTop: 8, fontSize: 13, color: T.emerald, fontWeight: '600' }}>
+                             Ans: {q.correctAnswer}
+                           </Text>
+                        )}
+                      </View>
+                    );
+                  });
+                })()}
               </View>
 
               <TouchableOpacity 
@@ -385,9 +510,16 @@ const s = StyleSheet.create({
   batchChipTextActive: { color: T.white },
   
   questionCard: { backgroundColor: T.white, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: T.border, marginBottom: 10 },
+  questionCardUnkept: { opacity: 0.6, backgroundColor: T.bg },
   qLabel: { fontSize: 11, fontWeight: '700', color: T.textMuted, marginBottom: 6 },
   qText: { fontSize: 15, color: T.text, fontWeight: '500', lineHeight: 22 },
-  moreQuestionsText: { textAlign: 'center', color: T.textSec, fontWeight: '600', fontSize: 13, marginTop: 8 },
+  
+  keepBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
+  keepBtnActive: { backgroundColor: `${T.emerald}10`, borderColor: T.emerald },
+  keepBtnInactive: { backgroundColor: T.bg, borderColor: T.border },
+  keepBtnText: { fontSize: 11, fontWeight: '700' },
+  keepBtnTextActive: { color: T.emerald },
+  keepBtnTextInactive: { color: T.textSec },
   
   saveBtn: {
     backgroundColor: T.emerald, height: 60, borderRadius: 16,

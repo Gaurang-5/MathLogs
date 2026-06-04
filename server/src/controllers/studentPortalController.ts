@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import jwt from 'jsonwebtoken';
 import { quizCache, heartbeatManager, brandingCache } from '../utils/redis';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 const AUTOSAVE_MIN_INTERVAL_MS = 10_000;
@@ -139,7 +141,7 @@ export const loginStudent = async (req: Request, res: Response): Promise<void> =
         });
 
         if (students.length === 0) {
-            console.warn(`[STUDENT_LOGIN_FAILED] No match for ${cleanMobile} in institute ${instituteSlug}`);
+            secureLogger.warn(`[STUDENT_LOGIN_FAILED] No match for ${cleanMobile} in institute ${instituteSlug}`);
             res.status(404).json({ error: 'This mobile number is not registered. Please contact your teacher.' });
             return;
         }
