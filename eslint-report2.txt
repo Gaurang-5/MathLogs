@@ -1,0 +1,1134 @@
+
+/Users/gaurangbhatia/Desktop/new_project/.venv/lib/python3.14/site-packages/pip/_vendor/urllib3/contrib/emscripten/emscripten_fetch_worker.js
+  19:29  warning  'reader' is never reassigned. Use 'const' instead      prefer-const
+  19:37  warning  'intBuffer' is never reassigned. Use 'const' instead   prefer-const
+  19:48  warning  'byteBuffer' is never reassigned. Use 'const' instead  prefer-const
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/AITestGeneratorModal.tsx
+   51:18  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  106:66  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  107:58  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  129:66  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  131:34  error  '_' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+  154:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/AITestGeneratorModal.tsx:154:13
+  152 |     useEffect(() => {
+  153 |         if (isOpen && quizToEdit) {
+> 154 |             setTopic(quizToEdit.topic || '');
+      |             ^^^^^^^^ Avoid calling setState() directly within an effect
+  155 |             const targetGrade = quizToEdit.batch?.className || quizToEdit.batch?.name || '10th Grade';
+  156 |             setGrade(targetGrade);
+  157 |             setDifficulty(quizToEdit.difficulty || 'Medium');                                                        react-hooks/set-state-in-effect
+  165:95  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  197:35  error  Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `generatedTest.questions`, but the source dependencies were [generatedTest?.questions]. Inferred different dependency than source.
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/AITestGeneratorModal.tsx:197:35
+  195 |     }, []);
+  196 |
+> 197 |     const displayLabels = useMemo(() => {
+      |                                   ^^^^^^^
+> 198 |         if (!generatedTest?.questions) return [];
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 199 |         const labels: string[] = [];
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 226 |         return labels;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 227 |     }, [generatedTest?.questions]);
+      | ^^^^^^ Could not preserve existing manual memoization
+  228 |
+  229 |     const validateAndAddFiles = (selectedFiles: FileList | null) => {
+  230 |         if (!selectedFiles) return;  react-hooks/preserve-manual-memoization
+  295:94  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  323:11  error  'toggleKept' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  356:33  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  776:51  error  'isVariantB' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/Layout.tsx
+  6:28  error  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/QuickFeeModal.tsx
+   3:56  error  'Sparkles' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  31:12  error  'scanningImage' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+  36:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/QuickFeeModal.tsx:36:13
+  34 |         if (isOpen) {
+  35 |             // Reset state
+> 36 |             setSearch('');
+     |             ^^^^^^^^^ Avoid calling setState() directly within an effect
+  37 |             setSelectedStudent(null);
+  38 |             setAmount('');
+  39 |  react-hooks/set-state-in-effect
+  65:11  error  'handleFileUpload' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  74:25  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+  88:18  error  'error' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/QuizLiveMonitor.tsx
+   25:19  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+   45:34  error    'timeLimitMins' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   49:9   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/QuizLiveMonitor.tsx:49:9
+  47 |
+  48 |     useEffect(() => {
+> 49 |         setSecondsLeft(student.remainingSeconds);
+     |         ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  50 |     }, [student.remainingSeconds]);
+  51 |
+  52 |     useEffect(() => {                                                                         react-hooks/set-state-in-effect
+  127:9   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/QuizLiveMonitor.tsx:127:9
+  125 |     // Auto-refresh every 5 seconds for absolute live accuracy
+  126 |     useEffect(() => {
+> 127 |         loadMonitorData();
+      |         ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  128 |
+  129 |         const interval = setInterval(() => {
+  130 |             loadMonitorData(true);  react-hooks/set-state-in-effect
+  134:8   warning  React Hook useEffect has a missing dependency: 'loadMonitorData'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-hooks/exhaustive-deps
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/UpiVerificationList.tsx
+  46:23  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-explicit-any
+  54:9   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/components/UpiVerificationList.tsx:54:9
+  52 |
+  53 |     useEffect(() => {
+> 54 |         fetchVerifications();
+     |         ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  55 |         // Setup polling every 30 seconds
+  56 |         const handle = setInterval(fetchVerifications, 30000);
+  57 |         return () => clearInterval(handle);  react-hooks/set-state-in-effect
+  81:23  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-explicit-any
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/AdminLogin.tsx
+  5:33  error  'Loader2' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Approvals.tsx
+  34:23  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Approvals.tsx:34:23
+  32 |     };
+  33 |
+> 34 |     useEffect(() => { fetchPending(); }, []);
+     |                       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  35 |
+  36 |     const handleApprove = async (id: string, name: string) => {
+  37 |         const promise = apiRequest(`/students/${id}/approve`, 'POST', {});  react-hooks/set-state-in-effect
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/BatchDetails.tsx
+     8:131  error  'MoreVertical' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+     8:172  error  'FileText' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+     8:256  error  'Sparkles' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+    95:12   error  'showRegMenu' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+    95:25   error  'setShowRegMenu' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   296:9    error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/BatchDetails.tsx:296:9
+  294 |     useEffect(() => {
+  295 |         // Initial load
+> 296 |         fetchDetails();
+      |         ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  297 |
+  298 |         // Silent auto-refresh every 15 seconds for incoming live registrations
+  299 |         const interval = setInterval(() => {  react-hooks/set-state-in-effect
+  1605:69   error  'i' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Billing.tsx
+  149:9  error  Error: Cannot access variable before it is declared
+
+`fetchInstituteDetails` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Billing.tsx:149:9
+  147 |
+  148 |     useEffect(() => {
+> 149 |         fetchInstituteDetails();
+      |         ^^^^^^^^^^^^^^^^^^^^^ `fetchInstituteDetails` accessed before it is declared
+  150 |     }, []);
+  151 |
+  152 |     const fetchInstituteDetails = async () => {
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Billing.tsx:152:5
+  150 |     }, []);
+  151 |
+> 152 |     const fetchInstituteDetails = async () => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 153 |         try {
+      | ^^^^^^^^^^^^^
+> 154 |             const res = await api.get<InstituteBilling>('/institute/me');
+      …
+      | ^^^^^^^^^^^^^
+> 164 |         }
+      | ^^^^^^^^^^^^^
+> 165 |     };
+      | ^^^^^^^ `fetchInstituteDetails` is declared here
+  166 |
+  167 |     // Detect custom plan from config
+  168 |     const config = institute?.config || {};  react-hooks/immutability
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Dashboard.tsx
+   4:69  error  'Line' is defined but never used                       @typescript-eslint/no-unused-vars
+   4:75  error  'LineChart' is defined but never used                  @typescript-eslint/no-unused-vars
+   6:18  error  'AnimatePresence' is defined but never used            @typescript-eslint/no-unused-vars
+  59:11  error  'toggleFeePrivacy' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Fees.tsx
+    6:29   error  'TrendingUp' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+    6:106  error  'ArrowUpRight' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+    6:172  error  'MessageSquare' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+    6:207  error  'AlertCircle' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+    6:220  error  'Phone' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+    6:227  error  'Calendar' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+   89:9    error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Fees.tsx:89:9
+  87 |     // Reset selection and expansion on view/filter changes
+  88 |     useEffect(() => {
+> 89 |         setSelectedStudentIds([]);
+     |         ^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  90 |         setExpandedStudentId(null);
+  91 |     }, [viewMode, selectedBatch, debouncedSearchTerm]);
+  92 |                                                                                                                                                                                                                                                                                                                       react-hooks/set-state-in-effect
+  100:9    error  Error: Cannot access variable before it is declared
+
+`fetchFees` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Fees.tsx:100:9
+   98 |
+   99 |     useEffect(() => {
+> 100 |         fetchFees();
+      |         ^^^^^^^^^ `fetchFees` accessed before it is declared
+  101 |         fetchTransactions();
+  102 |         fetchCustomInvoices();
+  103 |     }, []);
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Fees.tsx:116:5
+  114 |     };
+  115 |
+> 116 |     const fetchFees = async () => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 117 |         try {
+      | ^^^^^^^^^^^^^
+> 118 |             const data = await api.get<FeeSummary[]>(`/fees?t=${Date.now()}`);
+      | ^^^^^^^^^^^^^
+> 119 |             setStudents(data);
+      | ^^^^^^^^^^^^^
+> 120 |         } catch {
+      | ^^^^^^^^^^^^^
+> 121 |             toast.error("Failed to load fee records");
+      | ^^^^^^^^^^^^^
+> 122 |         } finally {
+      | ^^^^^^^^^^^^^
+> 123 |             setLoading(false);
+      | ^^^^^^^^^^^^^
+> 124 |         }
+      | ^^^^^^^^^^^^^
+> 125 |     };
+      | ^^^^^^^ `fetchFees` is declared here
+  126 |
+  127 |     const fetchTransactions = async () => {
+  128 |         try {                                                                                                   react-hooks/immutability
+  101:9    error  Error: Cannot access variable before it is declared
+
+`fetchTransactions` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Fees.tsx:101:9
+   99 |     useEffect(() => {
+  100 |         fetchFees();
+> 101 |         fetchTransactions();
+      |         ^^^^^^^^^^^^^^^^^ `fetchTransactions` accessed before it is declared
+  102 |         fetchCustomInvoices();
+  103 |     }, []);
+  104 |
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Fees.tsx:127:5
+  125 |     };
+  126 |
+> 127 |     const fetchTransactions = async () => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 128 |         try {
+      | ^^^^^^^^^^^^^
+> 129 |             const data = await api.get<Transaction[]>(`/fees/recent?t=${Date.now()}`);
+      | ^^^^^^^^^^^^^
+> 130 |             setTransactions(data);
+      | ^^^^^^^^^^^^^
+> 131 |         } catch (error) {
+      | ^^^^^^^^^^^^^
+> 132 |             console.error(error);
+      | ^^^^^^^^^^^^^
+> 133 |         }
+      | ^^^^^^^^^^^^^
+> 134 |     };
+      | ^^^^^^^ `fetchTransactions` is declared here
+  135 |
+  136 |     const handlePayment = async (e: React.FormEvent) => {
+  137 |         e.preventDefault();                                                                                                                                       react-hooks/immutability
+  102:9    error  Error: Cannot access variable before it is declared
+
+`fetchCustomInvoices` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Fees.tsx:102:9
+  100 |         fetchFees();
+  101 |         fetchTransactions();
+> 102 |         fetchCustomInvoices();
+      |         ^^^^^^^^^^^^^^^^^^^ `fetchCustomInvoices` accessed before it is declared
+  103 |     }, []);
+  104 |
+  105 |     const [customInvoices, setCustomInvoices] = useState<CustomInvoice[]>([]);
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Fees.tsx:107:5
+  105 |     const [customInvoices, setCustomInvoices] = useState<CustomInvoice[]>([]);
+  106 |
+> 107 |     const fetchCustomInvoices = async () => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 108 |         try {
+      | ^^^^^^^^^^^^^
+> 109 |             const data = await api.get<CustomInvoice[]>(`/fees/custom-invoices?t=${Date.now()}`);
+      | ^^^^^^^^^^^^^
+> 110 |             setCustomInvoices(data);
+      | ^^^^^^^^^^^^^
+> 111 |         } catch {
+      | ^^^^^^^^^^^^^
+> 112 |             // Silently fail — tab will show empty state
+      | ^^^^^^^^^^^^^
+> 113 |         }
+      | ^^^^^^^^^^^^^
+> 114 |     };
+      | ^^^^^^^ `fetchCustomInvoices` is declared here
+  115 |
+  116 |     const fetchFees = async () => {
+  117 |         try {  react-hooks/immutability
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Home.tsx
+  6:40  error  'LineChart' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/JoinOnboarding.tsx
+  107:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/JoinOnboarding.tsx:107:13
+  105 |     useEffect(() => {
+  106 |         if (!token) {
+> 107 |             setError('Invalid link.');
+      |             ^^^^^^^^ Avoid calling setState() directly within an effect
+  108 |             setLoading(false);
+  109 |             return;
+  110 |         }  react-hooks/set-state-in-effect
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/QuizList.tsx
+    43:25  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+    50:14  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+   173:9   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/QuizList.tsx:173:9
+  171 |
+  172 |     useEffect(() => {
+> 173 |         fetchData();
+      |         ^^^^^^^^^ Avoid calling setState() directly within an effect
+  174 |     }, []);
+  175 |
+  176 |     const refreshOnlineQuizzes = async () => {  react-hooks/set-state-in-effect
+   174:8   warning  React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        react-hooks/exhaustive-deps
+   346:45  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+   348:45  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+   351:38  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+   353:44  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+   899:61  error    'isMissed' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  1242:73  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Register.tsx
+   24:25  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+   62:21  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/Register.tsx:62:21
+  60 |                     toast.error("Invite link has expired!");
+  61 |                 } else if (payload.whatsapp) {
+> 62 |                     setWhatsapp(payload.whatsapp);
+     |                     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  63 |                     setIsPhoneLocked(true);
+  64 |                 }
+  65 |             } catch (e) {  react-hooks/set-state-in-effect
+   65:22  error    'e' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+   76:89  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+  100:8   warning  React Hook useEffect has missing dependencies: 'cachedRegistration' and 'submitted'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     react-hooks/exhaustive-deps
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/SetupAccount.tsx
+  69:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/SetupAccount.tsx:69:13
+  67 |     useEffect(() => {
+  68 |         if (!token) {
+> 69 |             setStep('invalid');
+     |             ^^^^^^^ Avoid calling setState() directly within an effect
+  70 |             setError('Missing invite token.');
+  71 |             return;
+  72 |         }  react-hooks/set-state-in-effect
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/StudentPaymentPortal.tsx
+    5:119  error  'PartyPopper' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+   45:9    error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/StudentPaymentPortal.tsx:45:9
+  43 |         if (!slug) return;
+  44 |
+> 45 |         setLoadingInstitute(true);
+     |         ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  46 |         axios.get(`${API_URL}/public/i/${slug}`)
+  47 |             .then(res => {
+  48 |                 setInstitute(prev => prev || {                                                    react-hooks/set-state-in-effect
+   97:23   error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-explicit-any
+  108:85   error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-explicit-any
+  110:25   error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-explicit-any
+  120:17   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/StudentPaymentPortal.tsx:120:17
+  118 |         if (step === 'upload' && selectedStudent) {
+  119 |             if (paymentType === 'full') {
+> 120 |                 setAmount(String(getBalance(selectedStudent)));
+      |                 ^^^^^^^^^ Avoid calling setState() directly within an effect
+  121 |             }
+  122 |         }
+  123 |     }, [step, selectedStudent, paymentType]);  react-hooks/set-state-in-effect
+  188:23   error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-explicit-any
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/StudentPortalDashboard.tsx
+   52:38   error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  125:11   error  'scheduledQuizzes' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  172:76   error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  173:76   error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  175:68   error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  186:58   error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  191:90   error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  222:70   error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  380:74   error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  407:100  error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  411:84   error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/StudentPortalLogin.tsx
+  33:22  error    'err' is defined but never used                                                                              @typescript-eslint/no-unused-vars
+  40:8   warning  React Hook useEffect has a missing dependency: 'branding'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  53:69  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+  62:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/SuperAdminDashboard.tsx
+  146:9  error  Error: Cannot access variable before it is declared
+
+`fetchData` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/SuperAdminDashboard.tsx:146:9
+  144 |
+  145 |     useEffect(() => {
+> 146 |         fetchData();
+      |         ^^^^^^^^^ `fetchData` accessed before it is declared
+  147 |     }, []);
+  148 |
+  149 |     const fetchData = async () => {
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/SuperAdminDashboard.tsx:149:5
+  147 |     }, []);
+  148 |
+> 149 |     const fetchData = async () => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 150 |         try {
+      | ^^^^^^^^^^^^^
+> 151 |             const token = localStorage.getItem('token');
+      …
+      | ^^^^^^^^^^^^^
+> 168 |         }
+      | ^^^^^^^^^^^^^
+> 169 |     };
+      | ^^^^^^^ `fetchData` is declared here
+  170 |
+  171 |     const handleViewProfile = async (id: string) => {
+  172 |         try {  react-hooks/immutability
+
+/Users/gaurangbhatia/Desktop/new_project/client/src/pages/student/TakeQuiz.tsx
+  353:13  warning  Unused eslint-disable directive (no problems were reported)
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/(tabs)/_layout.tsx
+  5:10  warning  'BlurView' is defined but never used  @typescript-eslint/no-unused-vars
+  6:34  warning  'FileText' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/(tabs)/batches.tsx
+    9:45  warning  'FadeIn' is defined but never used                    @typescript-eslint/no-unused-vars
+    9:53  warning  'FadeOut' is defined but never used                   @typescript-eslint/no-unused-vars
+   12:75  warning  'ExternalLink' is defined but never used              @typescript-eslint/no-unused-vars
+   42:11  warning  'InstituteResponse' is defined but never used         @typescript-eslint/no-unused-vars
+   97:10  warning  'allowedSubjects' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  103:10  warning  'allowedClasses' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/(tabs)/fees.tsx
+    7:32  warning  'FadeIn' is defined but never used                      @typescript-eslint/no-unused-vars
+    9:19  warning  'TrendingUp' is defined but never used                  @typescript-eslint/no-unused-vars
+    9:31  warning  'TrendingDown' is defined but never used                @typescript-eslint/no-unused-vars
+    9:45  warning  'IndianRupee' is defined but never used                 @typescript-eslint/no-unused-vars
+    9:58  warning  'History' is defined but never used                     @typescript-eslint/no-unused-vars
+    9:67  warning  'Mail' is defined but never used                        @typescript-eslint/no-unused-vars
+    9:73  warning  'CheckCircle2' is defined but never used                @typescript-eslint/no-unused-vars
+    9:90  warning  'ChevronRight' is defined but never used                @typescript-eslint/no-unused-vars
+   76:22  warning  'setReportSort' is assigned a value but never used      @typescript-eslint/no-unused-vars
+  104:49  warning  'isLoadingInvoices' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  159:15  warning  'base64data' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  166:14  warning  'e' is defined but never used                           @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/(tabs)/index.tsx
+   1:17  warning  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+  11:54  warning  'Bell' is defined but never used       @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/(tabs)/settings.tsx
+  12:49  warning  'BorderRadius' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/(tabs)/tests.tsx
+  1:36  warning  'useEffect' is defined but never used             @typescript-eslint/no-unused-vars
+  9:10  warning  'useLocalSearchParams' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/+not-found.tsx
+  11:53  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/batch/[id].tsx
+   11:3   warning  'BookOpen' is defined but never used                             @typescript-eslint/no-unused-vars
+   11:60  warning  'Mail' is defined but never used                                 @typescript-eslint/no-unused-vars
+   12:51  warning  'Plus' is defined but never used                                 @typescript-eslint/no-unused-vars
+   12:74  warning  'Trash2' is defined but never used                               @typescript-eslint/no-unused-vars
+  114:14  warning  'e' is defined but never used                                    @typescript-eslint/no-unused-vars
+  137:13  warning  'e' is defined but never used                                    @typescript-eslint/no-unused-vars
+  238:13  warning  'e' is defined but never used                                    @typescript-eslint/no-unused-vars
+  272:9   warning  'totalCollected' is assigned a value but never used              @typescript-eslint/no-unused-vars
+  280:9   warning  'totalPending' is assigned a value but never used                @typescript-eslint/no-unused-vars
+  397:42  warning  'i' is defined but never used                                    @typescript-eslint/no-unused-vars
+  527:49  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/login.tsx
+  5:13  warning  'Alert' is defined but never used  @typescript-eslint/no-unused-vars
+  5:20  warning  'Image' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/quick-fee-modal.tsx
+  15:9  warning  'width' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/scan.tsx
+  7:20  warning  'FadeIn' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/test/[id].tsx
+  349:28  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/app/test/scan.tsx
+  7:20  warning  'FadeIn' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/components/EditScreenInfo.tsx
+  41:39  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/components/ui/index.tsx
+   14:3   warning  'TextStyle' is defined but never used                            @typescript-eslint/no-unused-vars
+   21:3   warning  'interpolateColor' is defined but never used                     @typescript-eslint/no-unused-vars
+   26:63  warning  'Shadows' is defined but never used                              @typescript-eslint/no-unused-vars
+  251:15  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/contexts/AuthContext.tsx
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/metro.config.js
+  1:30  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/services/api.ts
+  7:10  warning  'Platform' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/services/offlineSync.ts
+  115:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/mobile/tailwind.config.js
+  4:13  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/check-db.js
+  1:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/academicYearController.js
+   7:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   8:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   9:24  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  25:12  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+  51:12  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+  73:12  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/adminOnboardingController.js
+   7:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   8:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   9:34  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  10:21  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  11:20  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:17  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/alertController.js
+  4:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/analyticsController.js
+  4:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  5:17  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  6:35  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/attendanceController.js
+   8:34  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   9:35  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  10:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  11:27  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:29  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:20  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/authController.js
+    7:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    8:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    9:40  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   10:34  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   11:17  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   12:20  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   13:16  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   84:12  warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+  101:12  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/batchController.js
+   40:32  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+   41:34  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+   42:18  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+   43:21  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+   44:35  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+   45:24  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+   46:21  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+   47:40  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+   48:20  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+   84:15  warning  'maxBatchesPerSubject' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   86:15  warning  'existingBatchesCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  214:12  warning  'error' is defined but never used                          @typescript-eslint/no-unused-vars
+  221:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  380:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  394:12  warning  'e' is defined but never used                              @typescript-eslint/no-unused-vars
+  402:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  452:96  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+  454:15  warning  'upiPaymentLink' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  631:21  warning  'invitePhone' is assigned a value but never used           @typescript-eslint/no-unused-vars
+  648:20  warning  'err' is defined but never used                            @typescript-eslint/no-unused-vars
+  664:12  warning  'e' is defined but never used                              @typescript-eslint/no-unused-vars
+  671:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  685:12  warning  'e' is defined but never used                              @typescript-eslint/no-unused-vars
+  693:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  801:89  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+  849:15  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  900:93  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+  932:78  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+  933:87  warning  A `require()` style import is forbidden                    @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/billingController.js
+   7:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   8:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   9:34  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  10:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/dashboardController.js
+   37:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  208:76  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/feeController.js
+    40:18  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+    41:34  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+    42:24  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+    43:20  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+    44:27  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+    45:26  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+    46:27  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+   202:12  warning  'e' is defined but never used                          @typescript-eslint/no-unused-vars
+   284:17  warning  'installmentTotal' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   469:55  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+   579:55  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+   678:55  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+   887:28  warning  'i' is defined but never used                          @typescript-eslint/no-unused-vars
+   963:21  warning  'storageKey' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  1112:59  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+  1175:55  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+  1195:15  warning  'teacherId' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  1359:82  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/instituteController.js
+    4:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   50:12  warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+   74:12  warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+  210:12  warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/inviteController.js
+    7:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    8:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    9:40  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   10:24  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   11:21  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  127:12  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+  238:12  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/leadController.js
+  4:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/logController.js
+  4:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/onboardingController.js
+    7:18  warning  A `require()` style import is forbidden            @typescript-eslint/no-require-imports
+    8:36  warning  A `require()` style import is forbidden            @typescript-eslint/no-require-imports
+    9:34  warning  A `require()` style import is forbidden            @typescript-eslint/no-require-imports
+   10:20  warning  A `require()` style import is forbidden            @typescript-eslint/no-require-imports
+   11:17  warning  A `require()` style import is forbidden            @typescript-eslint/no-require-imports
+   12:21  warning  A `require()` style import is forbidden            @typescript-eslint/no-require-imports
+  230:63  warning  'billingCycle' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/publicController.js
+   4:18  warning  A `require()` style import is forbidden    @typescript-eslint/no-require-imports
+   5:15  warning  A `require()` style import is forbidden    @typescript-eslint/no-require-imports
+   6:26  warning  A `require()` style import is forbidden    @typescript-eslint/no-require-imports
+  76:15  warning  'lead' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/statusController.js
+  4:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  5:24  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/stickerController.js
+   7:18  warning  A `require()` style import is forbidden         @typescript-eslint/no-require-imports
+   8:34  warning  A `require()` style import is forbidden         @typescript-eslint/no-require-imports
+   9:35  warning  A `require()` style import is forbidden         @typescript-eslint/no-require-imports
+  52:15  warning  'pageWidth' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/studentController.js
+    7:18  warning  A `require()` style import is forbidden                 @typescript-eslint/no-require-imports
+    8:34  warning  A `require()` style import is forbidden                 @typescript-eslint/no-require-imports
+    9:20  warning  A `require()` style import is forbidden                 @typescript-eslint/no-require-imports
+   10:22  warning  A `require()` style import is forbidden                 @typescript-eslint/no-require-imports
+   11:40  warning  A `require()` style import is forbidden                 @typescript-eslint/no-require-imports
+   97:11  warning  'batchId' is never reassigned. Use 'const' instead      prefer-const
+   97:26  warning  'parentName' is never reassigned. Use 'const' instead   prefer-const
+   97:54  warning  'parentEmail' is never reassigned. Use 'const' instead  prefer-const
+   97:67  warning  'schoolName' is never reassigned. Use 'const' instead   prefer-const
+   97:79  warning  'token' is never reassigned. Use 'const' instead        prefer-const
+  115:16  warning  'err' is defined but never used                         @typescript-eslint/no-unused-vars
+  231:15  warning  'latencyMs' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  238:11  warning  'batchId' is never reassigned. Use 'const' instead      prefer-const
+  238:26  warning  'parentName' is never reassigned. Use 'const' instead   prefer-const
+  238:54  warning  'parentEmail' is never reassigned. Use 'const' instead  prefer-const
+  238:67  warning  'schoolName' is never reassigned. Use 'const' instead   prefer-const
+  248:15  warning  'teacherId' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  353:12  warning  'e' is defined but never used                           @typescript-eslint/no-unused-vars
+  371:12  warning  'e' is defined but never used                           @typescript-eslint/no-unused-vars
+  379:11  warning  'teacherId' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  437:12  warning  'e' is defined but never used                           @typescript-eslint/no-unused-vars
+  444:11  warning  'teacherId' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  455:12  warning  'e' is defined but never used                           @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/studentPortalController.js
+    7:18  warning  A `require()` style import is forbidden                  @typescript-eslint/no-require-imports
+    8:40  warning  A `require()` style import is forbidden                  @typescript-eslint/no-require-imports
+    9:17  warning  A `require()` style import is forbidden                  @typescript-eslint/no-require-imports
+  166:16  warning  'e' is defined but never used                            @typescript-eslint/no-unused-vars
+  464:15  warning  'isNotNewerThanQuiz' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  587:77  warning  '_co' is defined but never used                          @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/controllers/testController.js
+    40:18  warning  A `require()` style import is forbidden           @typescript-eslint/no-require-imports
+    41:17  warning  A `require()` style import is forbidden           @typescript-eslint/no-require-imports
+    42:34  warning  A `require()` style import is forbidden           @typescript-eslint/no-require-imports
+    43:20  warning  A `require()` style import is forbidden           @typescript-eslint/no-require-imports
+    44:26  warning  A `require()` style import is forbidden           @typescript-eslint/no-require-imports
+    45:26  warning  A `require()` style import is forbidden           @typescript-eslint/no-require-imports
+    74:12  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   101:12  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   218:12  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   243:12  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   262:12  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   535:91  warning  A `require()` style import is forbidden           @typescript-eslint/no-require-imports
+   586:34  warning  A `require()` style import is forbidden           @typescript-eslint/no-require-imports
+  1334:11  warning  'instituteId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/index.js
+   41:1    warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   42:32   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   43:35   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   44:32   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   45:39   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   46:31   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   47:18   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   48:20   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   49:16   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   50:18   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   51:29   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   52:18   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   53:23   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  152:16   warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+  162:16   warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+  178:16   warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+  183:102  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  191:35   warning  'req' is defined but never used          @typescript-eslint/no-unused-vars
+  191:40   warning  'res' is defined but never used          @typescript-eslint/no-unused-vars
+  197:36   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  202:29   warning  'next' is defined but never used         @typescript-eslint/no-unused-vars
+  248:55   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  255:28   warning  'err' is defined but never used          @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/middleware/auth.js
+  7:40  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  8:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/middleware/queryMonitor.js
+  44:29  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  45:22  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/middleware/security.js
+   40:34  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   41:43  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  167:12  warning  'req' is defined but never used          @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/middleware/validation.js
+  4:15  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/monitoring/health.js
+    7:30  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    8:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  131:12  warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/monitoring/sentry.js
+  41:29  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  42:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/prisma.js
+  4:1   warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  5:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  6:24  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/routes/api.js
+    6:19  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    7:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    8:16  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    9:20  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   10:22  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   11:19  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   12:27  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   13:29  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   14:28  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   15:29  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   16:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   17:31  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   18:25  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   19:31  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   20:28  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   21:32  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   22:34  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   23:15  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   24:23  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   25:28  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   31:28  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   75:34  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   76:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  214:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  294:29  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  298:31  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  308:31  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  319:37  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/routes/insights.js
+  3:19  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  4:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  5:21  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/routes/studentPortalRoutes.js
+  6:35  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  7:35  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  8:20  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/schemas.js
+  4:15  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/scripts/concurrencyTest.js
+   6:33  warning  A `require()` style import is forbidden        @typescript-eslint/no-require-imports
+   7:1   warning  A `require()` style import is forbidden        @typescript-eslint/no-require-imports
+  16:5   warning  'ADMIN_ID' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  17:18  warning  A `require()` style import is forbidden        @typescript-eslint/no-require-imports
+  18:40  warning  A `require()` style import is forbidden        @typescript-eslint/no-require-imports
+  43:55  warning  'feeRecordId' is defined but never used        @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/ai/predictor.js
+  4:25  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/ai/receipt-scanner.js
+  4:25  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/ai/test-generator.js
+  7:25  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/attendanceLinks.js
+  41:37  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/attendanceStorage.js
+   8:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   9:32  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  10:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  11:21  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/email.js
+  7:38  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  8:24  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/emailWorker.js
+  7:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  8:17  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  9:24  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/ocr.js
+    4:25  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  108:20  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/ocrTextract.js
+    4:27  warning  A `require()` style import is forbidden        @typescript-eslint/no-require-imports
+  103:11  warning  'numBoxes' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/paymentStorage.js
+    7:21  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    8:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   44:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+   45:32  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  133:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  185:16  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/pdfUtils.js
+  7:32  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  8:30  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/pdfWorker.js
+  19:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/quizBroadcasts.js
+  5:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  6:20  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/redis.js
+  4:19  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/whatsapp.js
+  4:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/utils/whatsappWorker.js
+    7:33  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+    8:18  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  125:24  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/dist/workers/batchPdfWorker.js
+  6:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  7:34  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/gaurangbhatia/Desktop/new_project/server/prisma/seed.ts
+  10:11  warning  'admin' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/authController.ts
+   90:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  109:14  warning  'e' is defined but never used      @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/batchController.ts
+    8:10  warning  'sendEmail' is defined but never used                      @typescript-eslint/no-unused-vars
+   55:15  warning  'maxBatchesPerSubject' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   59:15  warning  'existingBatchesCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  193:14  warning  'error' is defined but never used                          @typescript-eslint/no-unused-vars
+  200:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  363:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  377:14  warning  'e' is defined but never used                              @typescript-eslint/no-unused-vars
+  385:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  441:15  warning  'upiPaymentLink' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  633:21  warning  'invitePhone' is assigned a value but never used           @typescript-eslint/no-unused-vars
+  650:22  warning  'err' is defined but never used                            @typescript-eslint/no-unused-vars
+  668:14  warning  'e' is defined but never used                              @typescript-eslint/no-unused-vars
+  675:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  689:14  warning  'e' is defined but never used                              @typescript-eslint/no-unused-vars
+  697:11  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  867:15  warning  'teacherId' is assigned a value but never used             @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/feeController.ts
+     5:10  warning  'sendEmail' is defined but never used                  @typescript-eslint/no-unused-vars
+   192:14  warning  'e' is defined but never used                          @typescript-eslint/no-unused-vars
+   283:17  warning  'installmentTotal' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   973:28  warning  'i' is defined but never used                          @typescript-eslint/no-unused-vars
+  1059:21  warning  'storageKey' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  1310:15  warning  'teacherId' is assigned a value but never used         @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/instituteController.ts
+   52:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+   77:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  225:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/inviteController.ts
+  141:14  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+  264:14  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/onboardingController.ts
+  258:63  warning  'billingCycle' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/publicController.ts
+  84:15  warning  'lead' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/stickerController.ts
+  55:15  warning  'pageWidth' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/studentController.ts
+  124:11  warning  'batchId' is never reassigned. Use 'const' instead      prefer-const
+  124:26  warning  'parentName' is never reassigned. Use 'const' instead   prefer-const
+  124:54  warning  'parentEmail' is never reassigned. Use 'const' instead  prefer-const
+  124:67  warning  'schoolName' is never reassigned. Use 'const' instead   prefer-const
+  124:79  warning  'token' is never reassigned. Use 'const' instead        prefer-const
+  141:18  warning  'err' is defined but never used                         @typescript-eslint/no-unused-vars
+  265:15  warning  'latencyMs' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  272:11  warning  'batchId' is never reassigned. Use 'const' instead      prefer-const
+  272:26  warning  'parentName' is never reassigned. Use 'const' instead   prefer-const
+  272:54  warning  'parentEmail' is never reassigned. Use 'const' instead  prefer-const
+  272:67  warning  'schoolName' is never reassigned. Use 'const' instead   prefer-const
+  282:15  warning  'teacherId' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  388:14  warning  'e' is defined but never used                           @typescript-eslint/no-unused-vars
+  405:14  warning  'e' is defined but never used                           @typescript-eslint/no-unused-vars
+  413:11  warning  'teacherId' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  472:14  warning  'e' is defined but never used                           @typescript-eslint/no-unused-vars
+  479:11  warning  'teacherId' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  490:14  warning  'e' is defined but never used                           @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/studentPortalController.ts
+  188:18  warning  'e' is defined but never used                            @typescript-eslint/no-unused-vars
+  503:15  warning  'isNotNewerThanQuiz' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  641:77  warning  '_co' is defined but never used                          @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/controllers/testController.ts
+    36:14  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+    63:14  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   180:14  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   204:14  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+   222:14  warning  'e' is defined but never used                     @typescript-eslint/no-unused-vars
+  1426:11  warning  'instituteId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/index.ts
+  126:18  warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+  136:18  warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+  152:18  warning  'error' is defined but never used        @typescript-eslint/no-unused-vars
+  168:35  warning  'req' is defined but never used          @typescript-eslint/no-unused-vars
+  168:40  warning  'res' is defined but never used          @typescript-eslint/no-unused-vars
+  175:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  182:69  warning  'next' is defined but never used         @typescript-eslint/no-unused-vars
+  242:30  warning  'err' is defined but never used          @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/middleware/security.ts
+    1:38  warning  'NextFunction' is defined but never used  @typescript-eslint/no-unused-vars
+  132:12  warning  'req' is defined but never used           @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/routes/api.ts
+  20:10  warning  'getPaymentHistory' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/scripts/concurrencyTest.ts
+  13:5   warning  'ADMIN_ID' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  44:63  warning  'feeRecordId' is defined but never used        @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/utils/ocr.ts
+  122:22  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/utils/ocrTextract.ts
+  128:11  warning  'numBoxes' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/utils/paymentStorage.ts
+  130:36  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  182:18  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/utils/pdfWorker.ts
+  17:18  warning  'isMainThread' is defined but never used  @typescript-eslint/no-unused-vars
+  17:32  warning  'parentPort' is defined but never used    @typescript-eslint/no-unused-vars
+  17:44  warning  'workerData' is defined but never used    @typescript-eslint/no-unused-vars
+  18:8   warning  'path' is defined but never used          @typescript-eslint/no-unused-vars
+
+/Users/gaurangbhatia/Desktop/new_project/server/src/utils/whatsappWorker.ts
+  134:26  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 506 problems (88 errors, 418 warnings)
+  0 errors and 2 warnings potentially fixable with the `--fix` option.
+

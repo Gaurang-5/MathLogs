@@ -110,7 +110,7 @@ export const sendEmail = async (to: string, subject: string, body: string, optio
     const config = getEmailConfig(senderType);
 
     if (!config) {
-        console.warn('[EMAIL WARNING] No email credentials configured for ' + senderType + '. Falling back to mock.');
+        secureLogger.warn('[EMAIL WARNING] No email credentials configured for ' + senderType + '. Falling back to mock.');
         secureLogger.debug('Email mock mode', { to, subject, senderType });
         return { success: true };
     }
@@ -147,7 +147,7 @@ export const sendSetupLinkEmail = async (
     data: { ownerName: string; setupLink: string; tuitionName: string }
 ): Promise<{ success: boolean; error?: string }> => {
     if (!to || !to.includes('@')) {
-        console.warn('[EMAIL] Skipping setup link email — invalid email:', to);
+        secureLogger.warn('[EMAIL] Skipping setup link email — invalid email:', to);
         return { success: true };
     }
 
@@ -194,7 +194,7 @@ export const sendOtpEmail = async (
     otp: string
 ): Promise<{ success: boolean; error?: string }> => {
     if (!to || !to.includes('@')) {
-        console.warn('[EMAIL] Skipping OTP email — invalid email:', to);
+        secureLogger.warn('[EMAIL] Skipping OTP email — invalid email:', to);
         return { success: true };
     }
 

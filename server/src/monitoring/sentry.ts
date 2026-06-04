@@ -5,6 +5,8 @@
 
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const SENTRY_DSN = process.env.SENTRY_DSN;
@@ -18,7 +20,7 @@ export const initializeSentry = () => {
         if (IS_PRODUCTION) {
             console.error('[SENTRY] ⚠️ SENTRY_DSN not set in production!');
         } else {
-            console.log('[SENTRY] Skipping Sentry in development (no DSN)');
+            secureLogger.info('[SENTRY] Skipping Sentry in development (no DSN)');
         }
         return;
     }
@@ -65,9 +67,9 @@ export const initializeSentry = () => {
         ]
     });
 
-    console.log('[SENTRY] ✅ Initialized successfully');
-    console.log(`[SENTRY] Environment: ${process.env.NODE_ENV}`);
-    console.log(`[SENTRY] Sample Rate: ${IS_PRODUCTION ? '10%' : '100%'}`);
+    secureLogger.info('[SENTRY] ✅ Initialized successfully');
+    secureLogger.info(`[SENTRY] Environment: ${process.env.NODE_ENV}`);
+    secureLogger.info(`[SENTRY] Sample Rate: ${IS_PRODUCTION ? '10%' : '100%'}`);
 };
 
 /**

@@ -1,9 +1,11 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { secureLogger } from './secureLogger';
+
 
 const geminiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
 if (!geminiKey) {
-    console.warn("⚠️ GEMINI_API_KEY is not set in environment variables.");
+    secureLogger.warn("⚠️ GEMINI_API_KEY is not set in environment variables.");
 }
 
 const genAI = new GoogleGenerativeAI(geminiKey || "");
@@ -102,14 +104,14 @@ If the image is completely unreadable or has no numbers, return "ERROR_UNCERTAIN
             const response = result.response;
 
             if (response.promptFeedback && response.promptFeedback.blockReason) {
-                console.warn(`⚠️ Gemini prompt blocked: ${response.promptFeedback.blockReason}`);
+                secureLogger.warn(`⚠️ Gemini prompt blocked: ${response.promptFeedback.blockReason}`);
                 continue;
             }
 
             try {
                 responseText = response.text();
             } catch (e: any) {
-                console.warn(`⚠️ Gemini could not read text from ${modelName}:`, e.message);
+                secureLogger.warn(`⚠️ Gemini could not read text from ${modelName}:`, e.message);
                 continue;
             }
 

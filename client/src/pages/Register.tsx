@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { motion } from 'framer-motion';
-import { User, Users, Smartphone, Mail, ArrowRight, CheckCircle, School, GraduationCap, BookOpen, AlertCircle } from 'lucide-react';
+import { User, Users, Smartphone, Mail, ArrowRight, CheckCircle, School, GraduationCap, BookOpen, AlertCircle, Hash, Type } from 'lucide-react';
 import ToastProvider from '../components/ToastProvider';
 import toast from 'react-hot-toast';
 import { getCachedRegistration, type RegisteredStudent } from '../utils/registration';
@@ -11,6 +11,14 @@ import { getCachedRegistration, type RegisteredStudent } from '../utils/registra
 interface RegisterProps {
     mode?: 'kiosk' | 'standard';
 }
+
+const DEFAULT_FORM_FIELDS = [
+    { id: 'studentName', label: 'Student Name', type: 'text', required: true, system: true },
+    { id: 'parentName', label: 'Parent / Guardian Name', type: 'text', required: true, system: true },
+    { id: 'parentWhatsapp', label: 'WhatsApp Number', type: 'tel', required: true, system: true },
+    { id: 'schoolName', label: 'School Name', type: 'text', required: false, system: true },
+    { id: 'parentEmail', label: 'Parent Email (Optional)', type: 'email', required: false, system: true }
+];
 
 interface BatchStatus {
     error?: boolean;
@@ -25,6 +33,11 @@ interface BatchStatus {
     institute?: {
         name: string;
         logoUrl?: string | null;
+        config?: {
+            registrationForm?: {
+                fields: any[];
+            }
+        }
     };
 }
 
@@ -33,11 +46,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     const cachedRegistration = getCachedRegistration(batchId, mode);
     const [submitted, setSubmitted] = useState(() => cachedRegistration !== null);
 
-    const [parentName, setParentName] = useState('');
-    const [studentName, setStudentName] = useState('');
-    const [whatsapp, setWhatsapp] = useState('');
-    const [email, setEmail] = useState('');
-    const [schoolName, setSchoolName] = useState('');
+    const [formData, setFormData] = useState<Record<string, string>>({});
 
     const [submittedData, setSubmittedData] = useState<RegisteredStudent | null>(() => cachedRegistration);
 
@@ -59,7 +68,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                 if (payload.exp && payload.exp * 1000 < Date.now()) {
                     toast.error("Invite link has expired!");
                 } else if (payload.whatsapp) {
-                    setWhatsapp(payload.whatsapp);
+                    setFormData(prev => ({ ...prev, parentWhatsapp: payload.whatsapp }));
                     setIsPhoneLocked(true);
                 }
             } catch (e) {
@@ -124,14 +133,26 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
             clearTimeout(feedback30s);
         };
 
+        const studentName = formData['studentName'] || '';
+        
         try {
+            const additionalData: Record<string, string> = {};
+            const formFields = batchStatus?.institute?.config?.registrationForm?.fields || DEFAULT_FORM_FIELDS;
+            
+            formFields.forEach(f => {
+                if (!f.system) {
+                    additionalData[f.id] = formData[f.id] || '';
+                }
+            });
+
             const student = await apiRequest<RegisteredStudent>('/public/register', 'POST', {
                 batchId,
-                name: studentName,
-                parentName,
-                parentWhatsapp: whatsapp,
-                parentEmail: email || undefined,
-                schoolName: schoolName || undefined,
+                name: formData['studentName'] || '',
+                parentName: formData['parentName'] || '',
+                parentWhatsapp: formData['parentWhatsapp'] || '',
+                parentEmail: formData['parentEmail'] || undefined,
+                schoolName: formData['schoolName'] || undefined,
+                additionalData,
                 ...(token && { token })
             });
 
@@ -459,93 +480,50 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                     <p className="text-sm text-app-text-tertiary mb-6">Fill in the details below to enroll.</p>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Student Name */}
-                        <div>
-                            <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Student Name</label>
-                            <div className="relative group">
-                                <User className={iconClass} />
-                                <input
-                                    className={inputClass}
-                                    placeholder="Enter full name"
-                                    value={studentName}
-                                    onChange={e => setStudentName(e.target.value)}
-                                    autoComplete="name"
-                                    required
-                                />
+                        {(batchStatus?.institute?.config?.registrationForm?.fields || DEFAULT_FORM_FIELDS).map((field) => (
+                            <div key={field.id}>
+                                <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">
+                                    {field.label} {!field.required && <span className="text-app-text-tertiary font-normal">(Optional)</span>}
+                                </label>
+                                <div className="relative group">
+                                    {field.type === 'tel' || field.id === 'parentWhatsapp' ? (
+                                        <Smartphone className={iconClass} />
+                                    ) : field.type === 'email' ? (
+                                        <Mail className={iconClass} />
+                                    ) : field.type === 'number' ? (
+                                        <Hash className={iconClass} />
+                                    ) : field.id === 'studentName' ? (
+                                        <User className={iconClass} />
+                                    ) : field.id === 'parentName' ? (
+                                        <Users className={iconClass} />
+                                    ) : field.id === 'schoolName' ? (
+                                        <School className={iconClass} />
+                                    ) : (
+                                        <Type className={iconClass} />
+                                    )}
+                                    <input
+                                        type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'}
+                                        inputMode={field.type === 'tel' || field.type === 'number' ? 'numeric' : undefined}
+                                        maxLength={field.type === 'tel' ? 10 : undefined}
+                                        readOnly={field.id === 'parentWhatsapp' && isPhoneLocked}
+                                        className={`${inputClass} ${field.id === 'parentWhatsapp' && isPhoneLocked ? 'opacity-70 bg-neutral-100 cursor-not-allowed' : ''}`}
+                                        placeholder={`Enter ${field.label.toLowerCase()}`}
+                                        value={formData[field.id] || ''}
+                                        onChange={e => {
+                                            if (field.id === 'parentWhatsapp' && isPhoneLocked) return;
+                                            
+                                            let val = e.target.value;
+                                            if (field.type === 'tel') {
+                                                val = val.replace(/\D/g, '');
+                                                if (val.length > 10) return;
+                                            }
+                                            setFormData(prev => ({ ...prev, [field.id]: val }));
+                                        }}
+                                        required={field.required}
+                                    />
+                                </div>
                             </div>
-                        </div>
-
-                        {/* Parent Name */}
-                        <div>
-                            <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Parent / Guardian Name</label>
-                            <div className="relative group">
-                                <Users className={iconClass} />
-                                <input
-                                    className={inputClass}
-                                    placeholder="Enter parent name"
-                                    value={parentName}
-                                    onChange={e => setParentName(e.target.value)}
-                                    autoComplete="off"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        {/* WhatsApp Number */}
-                        <div>
-                            <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">WhatsApp Number</label>
-                            <div className="relative group">
-                                <Smartphone className={iconClass} />
-                                <input
-                                    type="tel"
-                                    inputMode="numeric"
-                                    maxLength={10}
-                                    readOnly={isPhoneLocked}
-                                    className={`${inputClass} ${isPhoneLocked ? 'opacity-70 bg-neutral-100 cursor-not-allowed' : ''}`}
-                                    placeholder="10-digit mobile number"
-                                    value={whatsapp}
-                                    onChange={e => {
-                                        if (isPhoneLocked) return;
-                                        const val = e.target.value.replace(/\D/g, '');
-                                        if (val.length <= 10) setWhatsapp(val);
-                                    }}
-                                    autoComplete="tel"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        {/* School Name */}
-                        <div>
-                            <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">School Name</label>
-                            <div className="relative group">
-                                <School className={iconClass} />
-                                <input
-                                    className={inputClass}
-                                    placeholder="Enter school name"
-                                    value={schoolName}
-                                    onChange={e => setSchoolName(e.target.value)}
-                                    autoComplete="organization"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        {/* Parent Email (Optional) */}
-                        <div>
-                            <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Parent Email <span className="text-app-text-tertiary font-normal">(Optional)</span></label>
-                            <div className="relative group">
-                                <Mail className={iconClass} />
-                                <input
-                                    type="email"
-                                    className={inputClass}
-                                    placeholder="email@example.com (optional)"
-                                    value={email}
-                                    onChange={e => setEmail(e.target.value)}
-                                    autoComplete="email"
-                                />
-                            </div>
-                        </div>
+                        ))}
 
                         {/* Warning */}
                         <div className="pt-2">

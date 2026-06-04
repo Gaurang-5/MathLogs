@@ -43,6 +43,10 @@ export default function ScanScreen() {
     setScanned(true);
     setProcessing(true);
 
+    // Wait for the state to propagate and disable barcode scanner on the native side
+    // to prevent camera freeze on Android when taking a picture
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     let capturedBase64 = '';
     if (cameraRef.current) {
       try {

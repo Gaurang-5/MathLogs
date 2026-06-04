@@ -21,7 +21,7 @@ export const generateInvite = async (req: Request, res: Response) => {
         allowedClasses,
         requiresGrades = true // Default to true if not provided
     } = req.body;
-    const user = (req as any).user;
+    const user = req.user;
 
     // Strict Role Check
     if (user.role !== 'SUPER_ADMIN') {
@@ -115,7 +115,7 @@ export const generateInvite = async (req: Request, res: Response) => {
             instituteId: institute.id
         });
     } catch (e: any) {
-        secureLogger.error('Failed to generate invite', { error: e.message, stack: e.stack });
+        console.error('Failed to generate invite', { error: e.message, stack: e.stack });
         res.status(500).json({ error: 'Failed to generate invite: ' + e.message });
     }
 };
@@ -243,7 +243,7 @@ export const setupAccount = async (req: Request, res: Response) => {
 
 // SUPER ADMIN ONLY
 export const getInstitutes = async (req: Request, res: Response) => {
-    const user = (req as any).user;
+    const user = req.user;
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
     }

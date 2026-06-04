@@ -62,7 +62,7 @@ export const checkRegistrationStatus = async (req: Request, res: Response) => {
             });
         }
     } catch (error: any) {
-        secureLogger.error('Registration status check failed', error);
+        console.error('Registration status check failed', error);
         res.status(500).json({ error: 'Failed to check registration status' });
     }
 };

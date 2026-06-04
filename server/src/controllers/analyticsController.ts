@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { heartbeatManager } from '../utils/redis';
 import { autoFinalizeExpiredSubmissions } from './studentPortalController';
+import { secureLogger } from '../utils/secureLogger';
+
 
 
 const SCORE_BINS = [
@@ -15,8 +17,8 @@ const SCORE_BINS = [
 export const getOnlineQuizAnalytics = async (req: Request, res: Response) => {
     try {
         const quizId = String(req.params.id);
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
+        const teacherId = req.user?.id;
+        const instituteId = req.user?.instituteId;
 
         // Auto-finalize any expired submissions to update database state before aggregates
         await autoFinalizeExpiredSubmissions(quizId);
@@ -150,8 +152,8 @@ export const getOnlineQuizAnalytics = async (req: Request, res: Response) => {
 export const getLiveQuizStatus = async (req: Request, res: Response) => {
     try {
         const quizId = String(req.params.id);
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
+        const teacherId = req.user?.id;
+        const instituteId = req.user?.instituteId;
 
         // Auto-finalize any expired submissions to clean up database state before fetching
         await autoFinalizeExpiredSubmissions(quizId);

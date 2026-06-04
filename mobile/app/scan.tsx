@@ -65,6 +65,10 @@ export default function GlobalScanScreen() {
     setScanned(true);
     setProcessing(true);
 
+    // Wait for the state to propagate and disable barcode scanner on the native side
+    // to prevent camera freeze on Android when taking a picture
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     let capturedBase64 = '';
     if (cameraRef.current) {
       try {
@@ -156,7 +160,7 @@ export default function GlobalScanScreen() {
         ref={cameraRef}
         style={StyleSheet.absoluteFillObject}
         facing="back"
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        onBarcodeScanned={(scanned || !selectedTestId) ? undefined : handleBarCodeScanned}
         barcodeScannerSettings={{
           barcodeTypes: ["qr"]
         }}

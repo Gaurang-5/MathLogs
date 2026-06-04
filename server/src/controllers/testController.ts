@@ -5,11 +5,13 @@ import PDFDocument from 'pdfkit';
 import { addMathLogsHeader } from '../utils/pdfUtils';
 import { generateTest, generateSingleQuestion, generateTestWithVariants, generateVariantQuestion } from '../utils/ai/test-generator';
 import { sendQuizMarksBroadcast, sendQuizScheduleBroadcast } from '../utils/quizBroadcasts';
+import { secureLogger } from '../utils/secureLogger';
+
 
 export const createTest = async (req: Request, res: Response) => {
     const { name, subject, date, maxMarks, className, batchId, batchIds } = req.body;
-    const teacherId = (req as any).user?.id;
-    const user = (req as any).user;
+    const teacherId = req.user?.id;
+    const user = req.user;
 
     if (!teacherId) return res.status(401).json({ error: 'Unauthorized' });
     if (!user.instituteId) return res.status(401).json({ error: 'No institute assigned' });
@@ -40,7 +42,7 @@ export const createTest = async (req: Request, res: Response) => {
 
 export const getTests = async (req: Request, res: Response) => {
     try {
-        const teacherId = (req as any).user?.id;
+        const teacherId = req.user?.id;
 
         const tests = await prisma.test.findMany({
             where: {
@@ -67,7 +69,7 @@ export const getTests = async (req: Request, res: Response) => {
 
 export const submitMark = async (req: Request, res: Response) => {
     const { testId, studentId, score } = req.body;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
         // Verify test ownership
@@ -125,8 +127,8 @@ export const submitMark = async (req: Request, res: Response) => {
 export const getStudentByHumanId = async (req: Request, res: Response) => {
     const { humanId } = req.params;
     const { testId } = req.query;
-    const teacherId = (req as any).user?.id;
-    const user = (req as any).user;
+    const teacherId = req.user?.id;
+    const user = req.user;
 
     try {
         // FIX: Use findFirst scoped to instituteId since composite constraint is now humanId_instituteId
@@ -158,7 +160,7 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
 
 export const getTestDetails = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
     try {
         const test = await prisma.test.findUnique({
             where: { id: String(id) },
@@ -185,7 +187,7 @@ export const getTestDetails = async (req: Request, res: Response) => {
 export const updateTest = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, date, maxMarks } = req.body;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
         const test = await prisma.test.findUnique({ where: { id: String(id) } });
@@ -208,7 +210,7 @@ export const updateTest = async (req: Request, res: Response) => {
 
 export const deleteTest = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
         const test = await prisma.test.findUnique({ where: { id: String(id) } });
@@ -226,7 +228,7 @@ export const deleteTest = async (req: Request, res: Response) => {
 
 export const downloadTestReport = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
     try {
         const test = await prisma.test.findUnique({
             where: { id: String(id) },
@@ -306,7 +308,7 @@ export const downloadTestReport = async (req: Request, res: Response) => {
 
 export const getTestEligibleStudents = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
         // Fetch test details (lightweight query)
@@ -389,7 +391,7 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
 
 export const sendTestResultsEmail = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
         // 1. Fetch Test Details
@@ -562,7 +564,7 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
         }
 
         if (whatsappFailed > 0) {
-            console.warn(`[Test Results WA] ${whatsappSent} sent, ${whatsappFailed} failed for test ${test.id}`);
+            secureLogger.warn(`[Test Results WA] ${whatsappSent} sent, ${whatsappFailed} failed for test ${test.id}`);
         }
 
         await prisma.emailJob.createMany({
@@ -718,8 +720,8 @@ export const generateVariantQuestionRoute = async (req: Request, res: Response) 
 export const saveOnlineQuiz = async (req: Request, res: Response) => {
     try {
         const { title, topic, difficulty, timeLimitMins, totalMarks, batchId, batchIds, studentQuestionCount, questions, availableFrom, availableUntil } = req.body;
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
+        const teacherId = req.user?.id;
+        const instituteId = req.user?.instituteId;
 
         // Support either batchId or batchIds
         const finalBatchIds: string[] = Array.isArray(batchIds) ? batchIds : (batchId ? [batchId] : []);
@@ -826,8 +828,8 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
 
 export const getOnlineQuizzes = async (req: Request, res: Response) => {
     try {
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
+        const teacherId = req.user?.id;
+        const instituteId = req.user?.instituteId;
         const quizzes = await prisma.onlineQuiz.findMany({
             where: { teacherId, instituteId },
             orderBy: { createdAt: 'desc' },
@@ -904,8 +906,8 @@ export const getOnlineQuizzes = async (req: Request, res: Response) => {
 export const updateOnlineQuiz = async (req: Request, res: Response) => {
     try {
         const quizId = String(req.params.id);
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
+        const teacherId = req.user?.id;
+        const instituteId = req.user?.instituteId;
         const { title, topic, difficulty, timeLimitMins, totalMarks, batchIds, studentQuestionCount, questions, availableFrom, availableUntil } = req.body;
         let normalizedQuestions: any[] | undefined = undefined;
 
@@ -1073,8 +1075,8 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
 export const deleteOnlineQuiz = async (req: Request, res: Response) => {
     try {
         const quizId = String(req.params.id);
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
+        const teacherId = req.user?.id;
+        const instituteId = req.user?.instituteId;
 
         const quiz = await prisma.onlineQuiz.findFirst({
             where: { id: quizId, teacherId, instituteId },
@@ -1110,8 +1112,8 @@ export const deleteOnlineQuiz = async (req: Request, res: Response) => {
 export const finalizeOnlineQuiz = async (req: Request, res: Response) => {
     try {
         const quizId = String(req.params.id);
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
+        const teacherId = req.user?.id;
+        const instituteId = req.user?.instituteId;
 
         const result = await prisma.$transaction(async (tx) => {
             const quiz = await tx.onlineQuiz.findFirst({
@@ -1230,8 +1232,8 @@ function formatCsvDate(value?: Date | null) {
 export const downloadOnlineQuizReport = async (req: Request, res: Response) => {
     try {
         const quizId = String(req.params.id);
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
+        const teacherId = req.user?.id;
+        const instituteId = req.user?.instituteId;
 
         const quiz = await prisma.onlineQuiz.findFirst({
             where: { id: quizId, teacherId, instituteId },
@@ -1311,8 +1313,8 @@ export const downloadOnlineQuizReport = async (req: Request, res: Response) => {
 
 export const downloadOnlineQuizQuestionsPdf = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
-    const instituteId = (req as any).user?.instituteId;
+    const teacherId = req.user?.id;
+    const instituteId = req.user?.instituteId;
 
     try {
         const quiz = await prisma.onlineQuiz.findFirst({
@@ -1423,8 +1425,8 @@ export const downloadOnlineQuizQuestionsPdf = async (req: Request, res: Response
 
 export const downloadOnlineQuizReportPdf = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const teacherId = (req as any).user?.id;
-    const instituteId = (req as any).user?.instituteId;
+    const teacherId = req.user?.id;
+    const instituteId = req.user?.instituteId;
 
     try {
         const quiz = await prisma.onlineQuiz.findUnique({

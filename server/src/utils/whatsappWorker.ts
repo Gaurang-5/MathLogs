@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { prisma } from '../prisma';
+import { secureLogger } from './secureLogger';
+
 
 /**
  * ============================================================================
@@ -22,7 +24,7 @@ const META_API_VERSION = 'v22.0';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 
-console.log(`[Worker Boot] Loaded Access Token starting with: ${WHATSAPP_ACCESS_TOKEN ? WHATSAPP_ACCESS_TOKEN.substring(0, 15) : 'UNDEFINED'}`);
+secureLogger.info(`[Worker Boot] Loaded Access Token starting with: ${WHATSAPP_ACCESS_TOKEN ? WHATSAPP_ACCESS_TOKEN.substring(0, 15) : 'UNDEFINED'}`);
 
 const BATCH_SIZE = 25; // Safely increased to 25 for higher throughput without hitting rate limits
 
@@ -37,7 +39,7 @@ const BATCH_SIZE = 25; // Safely increased to 25 for higher throughput without h
  */
 export const processWhatsappQueue = async () => {
     if (!WHATSAPP_PHONE_NUMBER_ID || !WHATSAPP_ACCESS_TOKEN) {
-        console.warn('[WhatsApp Worker] API credentials missing. Skipping...');
+        secureLogger.warn('[WhatsApp Worker] API credentials missing. Skipping...');
         return 0;
     }
 
@@ -76,7 +78,7 @@ export const processWhatsappQueue = async () => {
 
         if (claimedJobs.length === 0) return 0;
 
-        console.log(`[WhatsApp Worker] Claimed ${claimedJobs.length} jobs (lock-safe).`);
+        secureLogger.info(`[WhatsApp Worker] Claimed ${claimedJobs.length} jobs (lock-safe).`);
 
         // Process all claimed jobs concurrently (outside transaction to avoid long lock times)
         await Promise.allSettled(claimedJobs.map(job => processJob(job)));
@@ -180,7 +182,7 @@ const processJob = async (job: any) => {
         );
 
         const messageId = response.data.messages?.[0]?.id;
-        console.log(`[WhatsApp Worker] Job ${job.id} Sent. MsgId: ${messageId}`);
+        secureLogger.info(`[WhatsApp Worker] Job ${job.id} Sent. MsgId: ${messageId}`);
 
         await prisma.whatsappJob.update({
             where: { id: job.id },

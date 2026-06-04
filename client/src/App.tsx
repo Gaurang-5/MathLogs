@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy, type ReactNode } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
-import Onboarding from './pages/Onboarding';
 import { readTokenPayload } from './utils/auth';
 
 // Lazy Load Pages
@@ -24,11 +23,11 @@ const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
 const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
 const StudentPortalLogin = lazy(() => import('./pages/StudentPortalLogin'));
 const StudentPortalDashboard = lazy(() => import('./pages/StudentPortalDashboard'));
 const TakeQuiz = lazy(() => import('./pages/student/TakeQuiz'));
-// Onboarding is eagerly imported above (only 15KB) for instant navigation from Sign Up/Get Started
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));

@@ -2,6 +2,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../prisma';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -37,7 +39,7 @@ if (process.env.NODE_ENV !== 'test') {
                 cleaned++;
             }
         }
-        if (cleaned > 0) console.log(`[AUTH_CACHE] Cleaned ${cleaned} stale entries. Size: ${authCache.size}`);
+        if (cleaned > 0) secureLogger.info(`[AUTH_CACHE] Cleaned ${cleaned} stale entries. Size: ${authCache.size}`);
     }, 5 * 60_000);
     cacheCleanupInterval.unref();
 }
@@ -47,11 +49,7 @@ export const invalidateAuthCache = (userId: string) => {
     authCache.delete(userId);
 };
 
-export interface AuthRequest extends Request {
-    user?: any;
-}
-
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -112,7 +110,7 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
             // Invalidate token if password was changed (version mismatch)
             // This also invalidates the cache since we re-check on every request
             if (user.passwordVersion !== undefined && dbUser.passwordVersion !== user.passwordVersion) {
-                console.warn(`[SECURITY] Token invalidated due to password change for user: ${user.username}`);
+                secureLogger.warn(`[SECURITY] Token invalidated due to password change for user: ${user.username}`);
                 authCache.delete(user.id); // Force re-fetch next time
                 res.sendStatus(403);
                 return;

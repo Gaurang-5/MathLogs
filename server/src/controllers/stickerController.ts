@@ -2,10 +2,12 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import PDFDocument from 'pdfkit';
 import bwipjs from 'bwip-js';
+import { secureLogger } from '../utils/secureLogger';
+
 
 export const generateStickerSheet = async (req: Request, res: Response) => {
     const { batchId } = req.query;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
     const whereClause: any = {
         status: 'APPROVED',
         batch: { teacherId }

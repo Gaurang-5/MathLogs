@@ -51,12 +51,6 @@
           "cameraPermission": "MathLogs needs camera to scan student stickers."
         }
       ],
-      [
-        "expo-barcode-scanner",
-        {
-          "cameraPermission": "MathLogs needs camera to scan QR codes."
-        }
-      ],
       "expo-font",
       "expo-web-browser"
     ],

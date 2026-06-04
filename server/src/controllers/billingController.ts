@@ -3,6 +3,8 @@ import { prisma } from '../prisma';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { Tier } from '@prisma/client';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key',
@@ -11,7 +13,7 @@ const razorpay = new Razorpay({
 
 export const createBillingSession = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as any).user?.id;
+        const adminId = req.user?.id;
         const { planId, billingCycle } = req.body;
 
         if (!adminId) return res.status(401).json({ error: 'Unauthorized' });
@@ -114,7 +116,7 @@ export const createBillingSession = async (req: Request, res: Response) => {
 
 export const verifyBillingPayment = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as any).user?.id;
+        const adminId = req.user?.id;
         const {
             razorpay_order_id,
             razorpay_payment_id,
@@ -203,7 +205,7 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
 
 export const cancelSubscription = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as any).user?.id;
+        const adminId = req.user?.id;
         if (!adminId) return res.status(401).json({ error: 'Unauthorized' });
 
         const admin = await prisma.admin.findUnique({
@@ -221,7 +223,7 @@ export const cancelSubscription = async (req: Request, res: Response) => {
             try {
                 // Cancel at the end of the current billing cycle
                 await razorpay.subscriptions.cancel(admin.institute.razorpaySubscriptionId, true);
-                console.log(`Cancelled Razorpay auto-renewal at cycle end: ${admin.institute.razorpaySubscriptionId}`);
+                secureLogger.info(`Cancelled Razorpay auto-renewal at cycle end: ${admin.institute.razorpaySubscriptionId}`);
             } catch (rzpErr: any) {
                 console.error('Razorpay Sub Cancel Error:', rzpErr);
                 // We proceed even if RZP fails (e.g., already cancelled)

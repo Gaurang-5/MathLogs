@@ -12,8 +12,8 @@ import { sendStudentInviteWhatsApp } from '../utils/whatsapp';
 
 export const createBatch = async (req: Request, res: Response) => {
     const { timeSlot, feeAmount, className, batchNumber, subject, customName } = req.body;
-    const teacherId = (req as any).user?.id;
-    const user = (req as any).user;
+    const teacherId = req.user?.id;
+    const user = req.user;
 
     if (!user.instituteId) return res.status(401).json({ error: 'Unauthorized: No institute assigned' });
 
@@ -173,7 +173,7 @@ export const createBatch = async (req: Request, res: Response) => {
 
 export const getBatches = async (req: Request, res: Response) => {
     try {
-        const user = (req as any).user;
+        const user = req.user;
 
         const batches = await prisma.batch.findMany({
             where: {
@@ -197,7 +197,7 @@ export const getBatches = async (req: Request, res: Response) => {
 
 export const getBatchDetails = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
         // PERF: Use 'select' instead of 'include' to reduce payload by 80%
@@ -217,6 +217,7 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                 isRegistrationEnded: true,
                 teacherId: true,
                 instituteId: true,
+                institute: { select: { config: true } },
                 feeInstallments: {
                     select: {
                         id: true,
@@ -238,6 +239,7 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                         schoolName: true,
                         status: true,
                         createdAt: true,
+                        additionalData: true,
                         feePayments: {
                             select: {
                                 id: true,
@@ -299,7 +301,7 @@ export const getBatchDetails = async (req: Request, res: Response) => {
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) {
             return res.status(403).json({ error: 'Unauthorized access to batch' });
         }
@@ -339,7 +341,7 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         // PERF FIX (P0-C): Run synchronous PDFKit in a worker thread.
@@ -360,13 +362,13 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
 export const toggleBatchRegistration = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { isOpen } = req.body;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
         const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         const updated = await prisma.batch.update({
@@ -382,7 +384,7 @@ export const toggleBatchRegistration = async (req: Request, res: Response) => {
 export const createFeeInstallment = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
     const { name, amount, studentId } = req.body;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     if (!name || amount === undefined) {
         return res.status(400).json({ error: 'Name and amount are required' });
@@ -417,7 +419,7 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         if (studentId) {
@@ -489,7 +491,7 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
 
                 }
             }
-            console.log(`[Fee Reminder] batch ${id}: ${sent} sent, ${failed} failed out of ${studentsToNotify.length}`);
+            secureLogger.info(`[Fee Reminder] batch ${id}: ${sent} sent, ${failed} failed out of ${studentsToNotify.length}`);
         });
 
         res.json(installment);
@@ -510,7 +512,7 @@ export const updateFeeInstallment = async (req: Request, res: Response) => {
         });
         if (!installment) return res.status(404).json({ error: 'Installment not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (installment.batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         const updated = await prisma.feeInstallment.update({
@@ -537,7 +539,7 @@ export const deleteFeeInstallment = async (req: Request, res: Response) => {
         });
         if (!installment) return res.status(404).json({ error: 'Installment not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (installment.batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         if (installment._count.payments > 0) {
@@ -584,10 +586,12 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
 
             if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-            // Extract logo safely without sending whole config
+            // Extract logo and registrationForm safely without sending whole config
             let logoUrl = null;
-            if (batch.institute && (batch.institute.config as any)?.logo) {
-                logoUrl = (batch.institute.config as any).logo;
+            let registrationForm = null;
+            if (batch.institute && (batch.institute.config as any)) {
+                logoUrl = (batch.institute.config as any).logo || null;
+                registrationForm = (batch.institute.config as any).registrationForm || null;
             }
 
             safeBatchData = {
@@ -595,7 +599,7 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
                 institute: {
                     ...batch.institute,
                     logoUrl,
-                    config: undefined // Remove sensitive config
+                    config: { registrationForm } // Only expose safe config pieces
                 }
             };
 
@@ -672,13 +676,13 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
 
 export const endBatchRegistration = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
         const batch = await prisma.batch.findUnique({ where: { id } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         const updated = await prisma.batch.update({
@@ -694,13 +698,13 @@ export const endBatchRegistration = async (req: Request, res: Response) => {
 export const updateBatch = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, subject, timeSlot, feeAmount, className, whatsappGroupLink, autoSendWelcome } = req.body;
-    const teacherId = (req as any).user?.id;
+    const teacherId = req.user?.id;
 
     try {
         const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         const updated = await prisma.batch.update({
@@ -736,7 +740,7 @@ export const deleteBatch = async (req: Request, res: Response) => {
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         // FINANCIAL SAFETY GUARD (P1-A): Prevent destruction of payment history.
@@ -777,7 +781,7 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
             }
         });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch?.instituteId && batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
@@ -839,7 +843,7 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
         }
 
         if (whatsappFailed > 0) {
-            console.warn(`[Batch Invite WA] ${whatsappCount} sent, ${whatsappFailed} failed for batch ${id}`);
+            secureLogger.warn(`[Batch Invite WA] ${whatsappCount} sent, ${whatsappFailed} failed for batch ${id}`);
         }
 
         res.json({
@@ -864,7 +868,7 @@ export const sendStudentWhatsappInvite = async (req: Request, res: Response) => 
     const { id } = req.params; // Student ID
 
     try {
-        const teacherId = (req as any).user?.id;
+        const teacherId = req.user?.id;
         const student = await prisma.student.findUnique({
             where: { id: String(id) },
 
@@ -875,7 +879,7 @@ export const sendStudentWhatsappInvite = async (req: Request, res: Response) => 
             }
         });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (student?.batch?.instituteId && student.batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -946,7 +950,7 @@ export const downloadBatchQRPDF = async (req: Request, res: Response) => {
         const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         // Dynamically import pdfkit and pdfUtils to avoid top-level import of removed unused vars
@@ -1023,7 +1027,7 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        const user = (req as any).user;
+        const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         const payload = {

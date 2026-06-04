@@ -3,7 +3,7 @@ import { Platform, View, Text, StyleSheet } from 'react-native';
 import { Tabs } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
-import { LayoutDashboard, Users, FileText, Receipt, IndianRupee } from 'lucide-react-native';
+import { LayoutDashboard, Users, FileText, Receipt, IndianRupee, Brain } from 'lucide-react-native';
 
 const T = { accent: '#111827', text: '#1D1D1F', muted: '#AEAEB2' };
 
@@ -73,7 +73,8 @@ export default function TabLayout() {
         })}
         options={{ tabBarIcon: () => <CenterButton /> }} 
       />
-      <Tabs.Screen name="tests" options={{ href: null }} />
+      <Tabs.Screen name="tests" options={{ tabBarIcon: ({ focused }) => <TabIcon Icon={FileText} focused={focused} label="Tests" /> }} />
+      <Tabs.Screen name="quizzes" options={{ href: null }} />
       <Tabs.Screen name="fees" options={{ tabBarIcon: ({ focused }) => <TabIcon Icon={Receipt} focused={focused} label="Fees" /> }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>

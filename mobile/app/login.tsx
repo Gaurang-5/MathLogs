@@ -1,20 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet,
   KeyboardAvoidingView, Platform, TouchableWithoutFeedback,
-  Keyboard, Alert, Image,
+  Keyboard, TouchableOpacity, Dimensions, ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { User, Lock, ArrowRight, ShieldCheck, AlertOctagon } from 'lucide-react-native';
+import Animated, { FadeInDown, FadeInUp, withRepeat, withTiming, useSharedValue, useAnimatedStyle, Easing } from 'react-native-reanimated';
+import { ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import * as Haptics from 'expo-haptics';
 
+const { width, height } = Dimensions.get('window');
+
 const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  border: 'rgba(0,0,0,0.08)', danger: '#ef4444',
+  bg: '#FDFDFD',
+  black: '#000000',
+  white: '#FFFFFF',
+  text: '#171717',
+  textMuted: '#9CA3AF',
+  border: '#E5E7EB',
+  danger: '#EF4444'
+};
+
+const AnimatedBackground = () => {
+  const rotation1 = useSharedValue(0);
+  const rotation2 = useSharedValue(0);
+  const translateY = useSharedValue(-height * 0.1);
+  const translateX = useSharedValue(-width * 0.1);
+
+  useEffect(() => {
+    rotation1.value = withRepeat(withTiming(360, { duration: 60000, easing: Easing.linear }), -1);
+    rotation2.value = withRepeat(withTiming(-360, { duration: 80000, easing: Easing.linear }), -1);
+    translateY.value = withRepeat(withTiming(height * 1.1, { duration: 8000, easing: Easing.linear }), -1);
+    translateX.value = withRepeat(withTiming(width * 1.1, { duration: 12000, easing: Easing.linear }), -1);
+  }, []);
+
+  const shape1Style = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotation1.value}deg` }] }));
+  const shape2Style = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotation2.value}deg` }] }));
+  const scanHStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+  const scanVStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Horizontal Scanning Line */}
+      <Animated.View style={[{ position: 'absolute', left: 0, width: '100%', height: 1, backgroundColor: 'rgba(0,0,0,0.1)' }, scanHStyle]} />
+      
+      {/* Vertical Scanning Line */}
+      <Animated.View style={[{ position: 'absolute', top: 0, height: '100%', width: 1, backgroundColor: 'rgba(0,0,0,0.05)' }, scanVStyle]} />
+
+      {/* Accent Shapes */}
+      <Animated.View style={[s.bgShape1, shape1Style]} />
+      <Animated.View style={[s.bgShape2, shape2Style]} />
+    </View>
+  );
 };
 
 export default function LoginScreen() {
@@ -23,16 +62,12 @@ export default function LoginScreen() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('');
   const [error, setError] = useState('');
 
   const handleLogin = async () => {
-    if (identifier.trim().length < 3) {
-      setError('Please enter a valid email or mobile number.');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      return;
-    }
-    if (password.length < 4) {
-      setError('Please enter your password.');
+    if (identifier.trim().length < 3 || password.length < 4) {
+      setError('Please enter valid credentials.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
@@ -40,134 +75,170 @@ export default function LoginScreen() {
     Keyboard.dismiss();
     setIsLoading(true);
     setError('');
+    setLoadingText('Authenticating...');
 
     try {
       await loginWithPassword(identifier.trim(), password);
+      setLoadingText('Verifying Security...');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace('/(tabs)');
+      setTimeout(() => {
+        setLoadingText('Loading Dashboard...');
+        setTimeout(() => {
+          router.replace('/(tabs)');
+        }, 600);
+      }, 600);
     } catch (err: any) {
       console.error('Login Error:', err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
+      setError(err.message || 'Login failed.');
       setIsLoading(false);
     }
   };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={s.container}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.kbView}>
-          <View style={s.headerArea}>
-            <Animated.View entering={FadeInDown.duration(600).delay(100)}>
-              <View style={s.shieldIconWrap}>
-                <ShieldCheck size={32} color={T.text} strokeWidth={1.5} />
-              </View>
-            </Animated.View>
-            <Animated.View entering={FadeInDown.duration(600).delay(200)}>
-              <Text style={s.title}>MathLogs</Text>
-            </Animated.View>
-            <Animated.View entering={FadeInDown.duration(600).delay(300)}>
-              <Text style={s.subtitle}>Secure Authentication Gateway</Text>
-            </Animated.View>
+      <View style={s.container}>
+        <AnimatedBackground />
+
+        <SafeAreaView style={s.safeArea}>
+          <View style={s.topBar}>
+            {router.canGoBack() && (
+              <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+                <ArrowLeft size={16} color={T.textMuted} strokeWidth={3} />
+                <Text style={s.backText}>RETURN</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          <Animated.View entering={FadeInUp.duration(500).delay(400)} style={s.formArea}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.kbView}>
+            <Animated.View entering={FadeInDown.duration(1000).springify()}>
+              <Text style={s.title}>MathLogs.</Text>
+              <Text style={s.subtitle}>
+                Enter your credentials to access the secure administration gateway.
+              </Text>
+            </Animated.View>
+
             {error ? (
-              <View style={s.errorBox}>
-                <AlertOctagon size={20} color={T.danger} style={{ marginRight: 8, marginTop: 2 }} />
+              <Animated.View entering={FadeInDown.duration(400)} style={s.errorBox}>
+                <View style={s.errorLine} />
+                <AlertCircle size={20} color={T.danger} style={s.errorIcon} />
                 <Text style={s.errorText}>{error}</Text>
-              </View>
+              </Animated.View>
             ) : null}
 
-            <View style={s.inputGroup}>
-              <Text style={s.inputLabel}>EMAIL OR MOBILE</Text>
+            <Animated.View entering={FadeInUp.duration(800).delay(100)} style={s.formArea}>
               <View style={s.inputWrap}>
-                <User size={20} color={T.textMuted} style={s.inputIcon} />
+                <Text style={[s.inputLabel, identifier ? s.inputLabelActive : null]}>Email or Mobile</Text>
                 <TextInput
                   style={s.input}
-                  placeholder="Enter your email or phone number"
-                  placeholderTextColor={T.textMuted}
+                  value={identifier}
+                  onChangeText={(t) => { setIdentifier(t); setError(''); }}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  value={identifier}
-                  onChangeText={(t) => { setIdentifier(t); setError(''); }}
                 />
               </View>
-            </View>
 
-            <View style={s.inputGroup}>
-              <Text style={s.inputLabel}>PASSWORD</Text>
               <View style={s.inputWrap}>
-                <Lock size={20} color={T.textMuted} style={s.inputIcon} />
+                <Text style={[s.inputLabel, password ? s.inputLabelActive : null]}>Password</Text>
                 <TextInput
                   style={s.input}
-                  placeholder="••••••••"
-                  placeholderTextColor={T.textMuted}
-                  secureTextEntry
                   value={password}
                   onChangeText={(t) => { setPassword(t); setError(''); }}
+                  secureTextEntry
                 />
               </View>
-            </View>
 
-            <TouchableWithoutFeedback onPress={isLoading ? undefined : handleLogin}>
-              <View style={[s.loginBtn, isLoading && s.loginBtnDisabled]}>
-                <Text style={s.loginBtnText}>
-                  {isLoading ? 'Authenticating...' : 'Access Dashboard'}
-                </Text>
-                {!isLoading && <ArrowRight size={20} color={T.white} style={{ marginLeft: 8 }} />}
-              </View>
-            </TouchableWithoutFeedback>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+              <TouchableOpacity
+                style={[s.loginBtn, (!identifier || !password) && s.loginBtnDisabled]}
+                onPress={handleLogin}
+                disabled={isLoading || !identifier || !password}
+                activeOpacity={0.8}
+              >
+                {isLoading ? (
+                  <View style={s.loadingWrap}>
+                    <ActivityIndicator color={T.white} size="small" />
+                    <Text style={s.loadingText}>{loadingText}</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={s.loginBtnText}>ACCESS GATEWAY</Text>
+                    <ArrowRight size={20} color={T.white} style={s.loginBtnIcon} />
+                  </>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+          </KeyboardAvoidingView>
+
+          {/* Brutalist Corner Decorations */}
+          <View style={s.cornerLeft}>
+            <Text style={s.cornerLeftText}>v2.0 • System Active</Text>
+          </View>
+          <View style={s.cornerRight}>
+            <View style={s.cornerLine1} />
+            <View style={s.cornerLine2} />
+            <Text style={s.cornerRightText}>AES-256</Text>
+          </View>
+
+        </SafeAreaView>
+      </View>
     </TouchableWithoutFeedback>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.bg },
-  kbView: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
-  headerArea: { alignItems: 'center', marginBottom: 40 },
-  shieldIconWrap: {
-    width: 64, height: 64, borderRadius: 24,
-    borderWidth: 1.5, borderColor: T.text,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 24,
+  safeArea: { flex: 1 },
+  bgShape1: {
+    position: 'absolute', top: -160, right: -160, width: 384, height: 384,
+    borderRadius: 192, borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)'
   },
-  title: { color: T.text, fontSize: 32, fontWeight: '700', letterSpacing: -0.5, marginBottom: 8 },
-  subtitle: { color: T.textSec, fontSize: 14, textAlign: 'center' },
-  
-  formArea: { gap: 20 },
-  
-  errorBox: {
-    flexDirection: 'row', backgroundColor: `${T.danger}15`,
-    borderColor: `${T.danger}30`, borderWidth: 1, padding: 16,
-    borderRadius: 16, marginBottom: 8, alignItems: 'flex-start'
+  bgShape2: {
+    position: 'absolute', bottom: -240, left: -80, width: 600, height: 600,
+    borderRadius: 300, borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)'
   },
-  errorText: { color: T.danger, fontSize: 13, flex: 1, lineHeight: 18 },
+  topBar: { paddingHorizontal: 32, paddingTop: 16, zIndex: 10 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backText: { fontSize: 12, fontWeight: '700', letterSpacing: 2, color: T.textMuted },
+  
+  kbView: { flex: 1, justifyContent: 'center', paddingHorizontal: 32, zIndex: 10 },
+  title: { fontSize: 56, fontWeight: '900', letterSpacing: -2, color: T.black, marginBottom: 24 },
+  subtitle: { fontSize: 18, fontWeight: '500', color: T.textMuted, marginBottom: 40, lineHeight: 26 },
 
-  inputGroup: { gap: 8 },
-  inputLabel: { fontSize: 11, fontWeight: '700', color: T.textSec, letterSpacing: 1, marginLeft: 4 },
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center', height: 56,
-    borderWidth: 1.5, borderColor: T.border, borderRadius: 16,
-    paddingHorizontal: 16, backgroundColor: T.white,
+  errorBox: {
+    backgroundColor: T.black, padding: 20, marginBottom: 32, flexDirection: 'row', alignItems: 'flex-start', overflow: 'hidden'
   },
-  inputIcon: { marginRight: 12 },
-  input: { flex: 1, color: T.text, fontSize: 16, fontWeight: '500', height: '100%' },
-  
+  errorLine: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, backgroundColor: T.danger },
+  errorIcon: { marginRight: 12, marginTop: 2 },
+  errorText: { color: T.white, fontSize: 14, fontWeight: '500', lineHeight: 20, flex: 1 },
+
+  formArea: { gap: 32 },
+  inputWrap: { borderBottomWidth: 2, borderBottomColor: T.border, paddingTop: 16, position: 'relative' },
+  inputLabel: {
+    position: 'absolute', top: 24, left: 0, fontSize: 24, fontWeight: '500', color: '#D1D5DB'
+  },
+  inputLabelActive: {
+    top: -4, fontSize: 12, fontWeight: '700', letterSpacing: 2, color: T.black, textTransform: 'uppercase'
+  },
+  input: {
+    height: 48, fontSize: 24, fontWeight: '500', color: T.black, paddingBottom: 8, paddingHorizontal: 0
+  },
+
   loginBtn: {
-    backgroundColor: T.text, height: 56, borderRadius: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    marginTop: 8,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 },
-      android: { elevation: 4 },
-    }),
+    backgroundColor: T.black, height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    marginTop: 16
   },
-  loginBtnDisabled: { opacity: 0.7 },
-  loginBtnText: { color: T.white, fontSize: 16, fontWeight: '700' },
+  loginBtnDisabled: { backgroundColor: '#171717' },
+  loginBtnText: { color: T.white, fontSize: 16, fontWeight: '900', letterSpacing: 2 },
+  loginBtnIcon: { position: 'absolute', right: 24 },
+  loadingWrap: { alignItems: 'center', justifyContent: 'center', gap: 6 },
+  loadingText: { color: 'rgba(255,255,255,0.9)', fontSize: 10, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase' },
+
+  cornerLeft: { position: 'absolute', bottom: 48, left: -32, transform: [{ rotate: '-90deg' }] },
+  cornerLeftText: { fontSize: 10, fontWeight: '700', letterSpacing: 2, color: T.textMuted, textTransform: 'uppercase' },
+  
+  cornerRight: { position: 'absolute', bottom: 48, right: 32, alignItems: 'flex-end', gap: 8 },
+  cornerLine1: { height: 6, width: 48, backgroundColor: T.black },
+  cornerLine2: { height: 6, width: 32, backgroundColor: '#D1D5DB' },
+  cornerRightText: { fontSize: 10, fontWeight: '700', letterSpacing: 2, color: T.textMuted, marginTop: 8 }
 });

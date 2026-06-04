@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
+import { secureLogger } from '../utils/secureLogger';
+
 
 export const getGlobalAnalytics = async (req: Request, res: Response) => {
     // Only Super Admin should see global stats
-    const user = (req as any).user;
+    const user = req.user;
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -37,7 +39,7 @@ export const getGlobalAnalytics = async (req: Request, res: Response) => {
 export const updateInstituteConfig = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const { config } = req.body;
-    const user = (req as any).user;
+    const user = req.user;
 
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
@@ -57,7 +59,7 @@ export const updateInstituteConfig = async (req: Request, res: Response) => {
 export const updateInstituteDetails = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const { name, teacherName, phoneNumber, email } = req.body;
-    const user = (req as any).user;
+    const user = req.user;
 
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
@@ -82,7 +84,7 @@ export const updateInstituteDetails = async (req: Request, res: Response) => {
 export const updateInstitutePlan = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const { plan, planExpiryDate, action } = req.body;
-    const user = (req as any).user;
+    const user = req.user;
 
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
@@ -146,7 +148,7 @@ export const updateInstitutePlan = async (req: Request, res: Response) => {
 
 export const getInstituteDetails = async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const user = (req as any).user;
+    const user = req.user;
 
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
@@ -206,7 +208,7 @@ export const getInstituteDetails = async (req: Request, res: Response) => {
 export const suspendInstitute = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const { action, reason } = req.body; // action: 'SUSPEND' | 'ACTIVATE'
-    const user = (req as any).user;
+    const user = req.user;
 
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
@@ -229,7 +231,7 @@ export const suspendInstitute = async (req: Request, res: Response) => {
 
 export const deleteInstitute = async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const user = (req as any).user;
+    const user = req.user;
 
     if (user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Unauthorized' });
@@ -237,7 +239,7 @@ export const deleteInstitute = async (req: Request, res: Response) => {
 
     try {
         // ✅ AUDIT LOG: Record deletion attempt BEFORE action
-        console.log(`[AUDIT] Institute Deletion Initiated`, {
+        secureLogger.info(`[AUDIT] Institute Deletion Initiated`, {
             instituteId: id,
             superAdminId: user.id,
             superAdminUsername: user.username,
@@ -281,7 +283,7 @@ export const deleteInstitute = async (req: Request, res: Response) => {
         ]);
 
         // ✅ AUDIT LOG: Successful deletion
-        console.log(`[AUDIT] Institute Deletion Completed`, {
+        secureLogger.info(`[AUDIT] Institute Deletion Completed`, {
             instituteId: id,
             instituteName: institute.name,
             superAdminId: user.id,
@@ -305,7 +307,7 @@ export const deleteInstitute = async (req: Request, res: Response) => {
 
 export const getMyInstitute = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as any).user.id;
+        const adminId = req.user.id;
         const admin = await prisma.admin.findUnique({
             where: { id: adminId },
             include: { institute: true }
@@ -322,7 +324,7 @@ export const getMyInstitute = async (req: Request, res: Response) => {
 
 export const getOnboardingLeads = async (req: Request, res: Response) => {
     try {
-        if ((req as any).user.role !== 'SUPER_ADMIN') {
+        if (req.user.role !== 'SUPER_ADMIN') {
             return res.status(403).json({ error: 'Only SuperAdmin can view leads' });
         }
 
@@ -340,7 +342,7 @@ export const getOnboardingLeads = async (req: Request, res: Response) => {
 
 export const uploadLogo = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as any).user?.id;
+        const adminId = req.user?.id;
         const admin = await prisma.admin.findUnique({
             where: { id: adminId },
             include: { institute: true }
@@ -356,7 +358,7 @@ export const uploadLogo = async (req: Request, res: Response) => {
         }
 
         // --- SECURITY VALIDATION: Prevent XSS, DOS, and File Spoofing ---
-        
+
         // 1. Strict MIME type enforcement (PNG strictly required)
         if (!logo.startsWith('data:image/png;base64,')) {
             return res.status(400).json({ error: "Security Error: Invalid file format. Only true PNG is accepted." });
@@ -389,4 +391,38 @@ export const uploadLogo = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Failed to upload logo" });
     }
 };
+
+export const updateMyInstituteConfig = async (req: Request, res: Response) => {
+    try {
+        const adminId = req.user?.id;
+        const admin = await prisma.admin.findUnique({
+            where: { id: adminId },
+            include: { institute: true }
+        });
+
+        if (!admin || !admin.institute) {
+            return res.status(404).json({ error: "Institute not found" });
+        }
+
+        const { subjects, allowedClasses, registrationForm } = req.body;
+
+        // Use existing config and override the specific keys
+        let config = (admin.institute.config as any) || {};
+
+        if (subjects !== undefined) config.subjects = subjects;
+        if (allowedClasses !== undefined) config.allowedClasses = allowedClasses;
+        if (registrationForm !== undefined) config.registrationForm = registrationForm;
+
+        await prisma.institute.update({
+            where: { id: admin.institute.id },
+            data: { config }
+        });
+
+        res.json({ success: true, message: "Coaching configuration updated successfully", config });
+    } catch (error) {
+        console.error("Error updating institute config:", error);
+        res.status(500).json({ error: "Failed to update configuration" });
+    }
+};
+
 

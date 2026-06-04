@@ -1,4 +1,6 @@
 import { Redis } from 'ioredis';
+import { secureLogger } from './secureLogger';
+
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -21,7 +23,7 @@ redis.on('error', (err) => {
 });
 
 redis.on('connect', () => {
-    console.log('[REDIS] Connected successfully');
+    secureLogger.info('[REDIS] Connected successfully');
 });
 
 /**

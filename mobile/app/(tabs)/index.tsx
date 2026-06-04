@@ -8,7 +8,7 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useRouter, useFocusEffect } from 'expo-router';
 import {
   Users, BookOpen, AlertCircle, TrendingUp, IndianRupee,
-  X, LogOut, Mail, Phone, ChevronRight, Eye, EyeOff, Bell, Scan, Sparkles
+  X, LogOut, Mail, Phone, ChevronRight, Eye, EyeOff, Bell, Scan, Sparkles,
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { OfflineBanner, SkeletonLoader } from '../../components/ui';
@@ -89,11 +89,11 @@ export default function DashboardScreen() {
         </View>
         <View style={s.navRight}>
           <TouchableOpacity
-            style={s.navIconBtn}
-            onPress={() => router.push('/(tabs)/tests' as any)}
+            style={[s.navIconBtn, { backgroundColor: '#F3E8FF', borderColor: '#D8B4FE' }]}
+            onPress={() => router.push('/(tabs)/quizzes' as any)}
             activeOpacity={0.75}
           >
-            <Sparkles size={18} color={T.text} />
+            <Sparkles size={18} color="#9333EA" />
           </TouchableOpacity>
           <TouchableOpacity
             style={s.navIconBtn}

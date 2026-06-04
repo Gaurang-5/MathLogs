@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { queryPerformanceMiddleware } from './middleware/queryMonitor';
+import { secureLogger } from './utils/secureLogger';
+
 
 // Production-grade Prisma configuration with connection pooling and query logging
 // HEROKU TIP: Basic/Mini Postgres has a 20 connection limit. 
@@ -30,13 +32,13 @@ prisma.$use(queryPerformanceMiddleware);
 
 // PERF: Graceful shutdown to prevent connection leaks
 process.on('SIGTERM', async () => {
-    console.log('[PRISMA] Disconnecting...');
+    secureLogger.info('[PRISMA] Disconnecting...');
     await prisma.$disconnect();
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-    console.log('[PRISMA] Disconnecting...');
+    secureLogger.info('[PRISMA] Disconnecting...');
     await prisma.$disconnect();
     process.exit(0);
 });

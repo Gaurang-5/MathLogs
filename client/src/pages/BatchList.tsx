@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
@@ -41,66 +42,38 @@ interface ApiErrorLike {
 }
 
 export default function BatchList() {
-    const [batches, setBatches] = useState<Batch[]>([]);
+    const queryClient = useQueryClient();
     const [showForm, setShowForm] = useState(false);
-    const [loading, setLoading] = useState(true);
 
     // Form State
     const [batchNumber, setBatchNumber] = useState('');
     const [customName, setCustomName] = useState('');
     const [subject, setSubject] = useState('Mathematics');
-    const [allowedSubjects, setAllowedSubjects] = useState<string[]>([]);
     const [timeSlot, setTimeSlot] = useState('');
-    // Fee is removed from creation
     const [className, setClassName] = useState('');
 
-    // Institute Config
-    const [requiresGrades, setRequiresGrades] = useState(true);
-    const [allowedClasses, setAllowedClasses] = useState<string[]>([]);
+    const { data: batches = [], isLoading: batchesLoading } = useQuery({
+        queryKey: ['batches'],
+        queryFn: () => apiRequest<Batch[]>('/batches')
+    });
 
-    const fetchBatches = async () => {
-        try {
-            const data = await apiRequest<Batch[]>('/batches');
-            setBatches(data);
-        } catch {
-            toast.error('Failed to load batches');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { data: institute, isLoading: instituteLoading } = useQuery({
+        queryKey: ['institute'],
+        queryFn: () => apiRequest<InstituteResponse>('/institute/me')
+    });
+
+    const loading = batchesLoading || instituteLoading;
+
+    const config = institute?.config || {};
+    const requiresGrades = config.requiresGrades !== false;
+    const allowedClasses = Array.isArray(config.allowedClasses) ? config.allowedClasses : [];
+    const allowedSubjects = Array.isArray(config.subjects) ? config.subjects : [];
 
     useEffect(() => {
-        const loadData = async () => {
-            // Fetch Batches
-            fetchBatches();
-
-            // Fetch Institute Config for Subjects and Grades
-            try {
-                const institute = await apiRequest<InstituteResponse>('/institute/me');
-                const config = institute?.config || {};
-
-                // Set requiresGrades (default to true if not specified)
-                setRequiresGrades(config.requiresGrades !== false);
-
-                // Set allowed classes
-                if (Array.isArray(config.allowedClasses)) {
-                    setAllowedClasses(config.allowedClasses);
-                }
-
-                // Set allowed subjects
-                if (config.subjects && Array.isArray(config.subjects)) {
-                    setAllowedSubjects(config.subjects);
-                    // Default to first subject if available
-                    if (config.subjects.length > 0) {
-                        setSubject(config.subjects[0]);
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to load institute config", e);
-            }
-        };
-        loadData();
-    }, []);
+        if (allowedSubjects.length > 0 && !allowedSubjects.includes(subject)) {
+            setSubject(allowedSubjects[0]);
+        }
+    }, [allowedSubjects, subject]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -124,7 +97,7 @@ export default function BatchList() {
             setShowForm(false);
             // Reset
             setBatchNumber(''); setCustomName(''); setTimeSlot(''); setClassName('');
-            fetchBatches();
+            queryClient.invalidateQueries({ queryKey: ['batches'] });
             toast.success('Batch created successfully!', { id: toastId });
         } catch (error: unknown) {
             const apiError = error as ApiErrorLike;

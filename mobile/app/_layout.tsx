@@ -29,7 +29,7 @@ const queryClient = new QueryClient({
  * Redirects to /login when not authenticated; redirects away from /login when authenticated.
  */
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn, isLoading } = useAuth();
+  const { isLoggedIn, isLoading, hasSeenOnboarding } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -38,15 +38,20 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const inAuthGroup = segments[0] === '(tabs)';
     const inLoginPage = segments[0] === 'login';
+    const inWelcomePage = segments[0] === 'welcome';
 
     if (!isLoggedIn && inAuthGroup) {
-      // Not logged in but trying to access protected tab — redirect to login
-      router.replace('/login');
-    } else if (isLoggedIn && inLoginPage) {
-      // Already logged in but on login page — redirect to dashboard
+      // Not logged in but trying to access protected tab
+      if (!hasSeenOnboarding) {
+        router.replace('/welcome');
+      } else {
+        router.replace('/login');
+      }
+    } else if (isLoggedIn && (inLoginPage || inWelcomePage)) {
+      // Already logged in but on login/welcome page — redirect to dashboard
       router.replace('/(tabs)');
     }
-  }, [isLoggedIn, isLoading, segments]);
+  }, [isLoggedIn, isLoading, hasSeenOnboarding, segments]);
 
   if (isLoading) {
     return (
@@ -87,9 +92,11 @@ export default function RootLayout() {
                 animation: 'ios_from_right',
               }}
             >
+              <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
               <Stack.Screen name="login" options={{ animation: 'fade' }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="quick-fee-modal" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="quiz-generator" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
               <Stack.Screen
                 name="modal"
                 options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

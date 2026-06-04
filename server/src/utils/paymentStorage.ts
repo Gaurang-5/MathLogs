@@ -42,6 +42,8 @@ class ConcurrencyQueue {
 
 import fs from 'fs/promises';
 import path from 'path';
+import { secureLogger } from './secureLogger';
+
 
 const LOCAL_UPLOAD_DIR = path.join(__dirname, '../../public/uploads');
 // Fire-and-forget: Ensure the local fallback directory exists
@@ -102,7 +104,7 @@ export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buff
         } catch (e: any) {
             let s3Success = false;
             if (e.name === 'NoSuchBucket' || e.Code === 'NoSuchBucket') {
-                console.log(`[Storage] Bucket ${BUCKET} not found. Attempting to create it...`);
+                secureLogger.info(`[Storage] Bucket ${BUCKET} not found. Attempting to create it...`);
                 try {
                     const region = process.env.AWS_REGION || 'ap-south-1';
                     await s3.send(new CreateBucketCommand({
@@ -120,7 +122,7 @@ export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buff
 
             // --- LOCAL FALLBACK ---
             if (!s3Success) {
-                console.log("[Storage] Falling back to LOCAL disk storage...");
+                secureLogger.info("[Storage] Falling back to LOCAL disk storage...");
                 const localFileName = key.replace(/\//g, '_');
                 await fs.mkdir(LOCAL_UPLOAD_DIR, { recursive: true }).catch(() => {});
                 await fs.writeFile(path.join(LOCAL_UPLOAD_DIR, localFileName), buffer);

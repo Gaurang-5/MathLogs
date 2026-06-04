@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import { sendSetupLinkWhatsApp } from '../utils/whatsapp';
 import { sendSetupLinkEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
+import { secureLogger } from '../utils/secureLogger';
+
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key',
@@ -239,7 +241,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
             sendSetupLinkEmail(email, notificationData)
         ]);
 
-        console.log(`[ONBOARDING] Generated link for ${tuitionName}: ${setupLink}`);
+        secureLogger.info(`[ONBOARDING] Generated link for ${tuitionName}: ${setupLink}`);
 
         res.json({
             success: true,
@@ -394,7 +396,7 @@ export const resendSetupLink = async (req: Request, res: Response) => {
                     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
                 }
             });
-            console.log(`[RESEND] Generated new invite token for ${institute.name}`);
+            secureLogger.info(`[RESEND] Generated new invite token for ${institute.name}`);
         }
 
         const clientUrl = getClientUrl(req);
@@ -412,7 +414,7 @@ export const resendSetupLink = async (req: Request, res: Response) => {
             institute.email ? sendSetupLinkEmail(institute.email, notificationData) : Promise.resolve()
         ]);
 
-        console.log(`[RESEND] Setup link resent for ${institute.name} to ${phone}`);
+        secureLogger.info(`[RESEND] Setup link resent for ${institute.name} to ${phone}`);
 
         res.json({
             success: true,
