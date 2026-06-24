@@ -1,6 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /super-admin/
-Disallow: /api/
-
-Sitemap: https://mathlogs.app/sitemap.xml

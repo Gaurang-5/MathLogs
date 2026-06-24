@@ -50,6 +50,9 @@ export class EmailWorker {
                 return await tx.emailJob.findMany({
                     where: { id: { in: ids } }
                 });
+            }, {
+                maxWait: 5000, // wait up to 5 seconds to acquire a connection
+                timeout: 10000 // transaction max duration 10 seconds
             });
 
             if (claimedJobs.length === 0) {

@@ -1,1 +1,0 @@
-import { PrismaClient } from '@prisma/client'; const prisma = new PrismaClient(); async function main() { const inst = await prisma.institute.findFirst(); console.log(JSON.stringify(inst?.config, null, 2)); } main();

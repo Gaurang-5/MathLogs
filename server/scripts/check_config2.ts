@@ -1,1 +1,0 @@
-import { PrismaClient } from '@prisma/client'; const prisma = new PrismaClient(); async function main() { const insts = await prisma.institute.findMany(); console.log(JSON.stringify(insts.map(i => i.config), null, 2)); } main();
