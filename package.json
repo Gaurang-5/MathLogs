@@ -1,0 +1,31 @@
+{
+    "name": "mathlogs-app",
+    "version": "1.0.0",
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "scripts": {
+        "setup": "npm install && cd server && npm install && cd ../client && npm install && cd ../mobile && npm install",
+        "dev": "./dev.sh",
+        "build": "cd client && npm run build && cd ../server && npm run build",
+        "start": "cd server && npm start",
+        "heroku-postbuild": "echo 'Installing Client...' && cd client && npm install --production=false && npm run build && echo 'Installing Server...' && cd ../server && npm install --production=false && npm run build"
+    },
+    "engines": {
+        "node": "22.x"
+    },
+    "dependencies": {
+        "@sentry/node": "^10.38.0",
+        "@sentry/react": "^10.53.1",
+        "lucide-react-native": "^0.577.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "eslint": "^10.4.0",
+        "eslint-plugin-react": "^7.37.5",
+        "globals": "^17.6.0",
+        "jiti": "^2.7.0",
+        "typescript": "^6.0.3",
+        "typescript-eslint": "^8.60.0"
+    }
+}

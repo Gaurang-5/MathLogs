@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/icon-192x192.png" />
+
+  <!-- PWA Meta Tags -->
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+
+  <!-- Primary Meta Tags -->
+  <title>MathLogs | Modern Coaching Management & AI Grading Software</title>
+  <meta name="title" content="MathLogs | Modern Coaching Management & AI Grading Software" />
+  <meta name="description"
+    content="Manage your coaching center efficiently with MathLogs. Automate WhatsApp alerts, use instant AI test scanning, track fees, and handle student onboarding seamlessly." />
+  <meta name="keywords"
+    content="coaching management software, attendance tracking, test grading, OCR grading, WhatsApp alerts for parents, fee collection, tuition center software" />
+  <meta name="author" content="MathLogs" />
+
+  <link rel="canonical" href="https://mathlogs.app/" />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://mathlogs.app/" />
+  <meta property="og:title" content="MathLogs | Modern Coaching Management & AI Grading Software" />
+  <meta property="og:description"
+    content="Management on auto-pilot. Automated student registration, instant WhatsApp test alerts, and automatic fee reminders. Make your tuition center stand out." />
+  <meta property="og:image" content="https://mathlogs.app/dashboard.webp" />
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://mathlogs.app/" />
+  <meta property="twitter:title" content="MathLogs | Modern Coaching Management & AI Grading Software" />
+  <meta property="twitter:description"
+    content="Management on auto-pilot. Automated student registration, instant WhatsApp test alerts, and automatic fee reminders. Make your tuition center stand out." />
+  <meta property="twitter:image" content="https://mathlogs.app/dashboard.webp" />
+
+  <meta name="theme-color" content="#ffffff" />
+
+  <!-- iOS PWA Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MathLogs" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+  <!-- Android PWA Support -->
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    media="print" onload="this.media='all'" />
+  <noscript>
+    <link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+  </noscript>
+
+  <!-- Preload hero images for faster LCP -->
+  <link rel="preload" as="image" href="/images/features/dashboard-mobile.webp" media="(max-width: 767px)"
+    fetchpriority="high">
+  <link rel="preload" as="image" href="/dashboard.webp" media="(min-width: 768px)" fetchpriority="high">
+  <!-- Critical inline CSS to eliminate render-blocking stylesheet penalty -->
+  <style>
+    body {
+      margin: 0;
+      background: #f5f5f7;
+      color: #1d1d1f;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box
+    }
+
+    #root {
+      min-height: 100vh
+    }
+
+    /* Mobile styles default */
+    .shell-container {
+      display: flex;
+      flex-direction: column;
+      padding: 3.5rem 1.5rem 0;
+      max-width: 80rem;
+      margin: 0 auto;
+    }
+    .shell-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .shell-mobile-mockup {
+      display: flex;
+      justify-content: center;
+      overflow: hidden;
+      width: 100vw;
+      margin-top: 1.5rem;
+      position: relative;
+      left: 50%;
+      right: 50%;
+      margin-left: -50vw;
+      margin-right: -50vw;
+    }
+    .shell-tablet-mockup {
+      display: none;
+    }
+    .shell-desktop-mockup {
+      display: none;
+    }
+
+    /* Tablet and up styles (md, >= 768px) */
+    @media (min-width: 768px) {
+      .shell-buttons {
+        flex-direction: row;
+      }
+      .shell-mobile-mockup {
+        display: none;
+      }
+      .shell-tablet-mockup {
+        display: flex;
+        justify-content: center;
+        overflow: hidden;
+        width: 100vw;
+        margin-top: 1.5rem;
+        position: relative;
+        left: 50%;
+        right: 50%;
+        margin-left: -50vw;
+        margin-right: -50vw;
+        margin-bottom: -15%;
+      }
+    }
+
+    /* Desktop styles (lg, >= 1024px) */
+    @media (min-width: 1024px) {
+      .shell-container {
+        display: grid;
+        grid-template-cols: 1fr 1fr;
+        gap: 2rem;
+        align-items: center;
+        padding-top: 6rem;
+      }
+      .shell-tablet-mockup {
+        display: none;
+      }
+      .shell-desktop-mockup {
+        display: flex;
+        justify-content: center;
+        position: relative;
+        width: 100%;
+        height: 600px;
+      }
+    }
+  </style>
+
+  <!-- Prevent static shell from flashing during auth/routing -->
+  <script>
+    if (localStorage.getItem('token') || window.location.pathname !== '/') {
+      document.documentElement.classList.add('hide-static-shell');
+    }
+  </script>
+  <style>
+    .hide-static-shell #static-shell { display: none !important; }
+  </style>
+
+</head>
+
+<body>
+  <!-- Static HTML shell for instant first paint (React replaces on mount) -->
+  <div id="root">
+    <div id="static-shell">
+    <!-- Nav -->
+    <nav
+      style="display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;max-width:80rem;margin:0 auto">
+      <div style="display:flex;align-items:center;gap:0.625rem">
+        <img src="/logo-64.webp" alt="MathLogs Logo" width="36" height="36"
+          style="border-radius:0.75rem;object-fit:cover" fetchpriority="high">
+        <span style="font-size:22px;font-weight:800;letter-spacing:-0.025em;color:#171717">MathLogs</span>
+      </div>
+    </nav>
+    <!-- Hero -->
+    <div class="shell-container">
+      <!-- HERO TEXT -->
+      <div style="position:relative;z-index:20;max-width:32rem">
+        <h1 style="font-size:2.75rem;font-weight:800;letter-spacing:-0.05em;line-height:1.05;margin-bottom:1.25rem;color:#1A1F36">
+          Everything you need for<br>
+          <span>modern coaching.</span>
+        </h1>
+        <p style="font-size:1.125rem;color:#737373;font-weight:500;line-height:1.625;margin-bottom:2rem">
+          Spend less time on paperwork.
+          <span style="display:block;color:#404040;font-weight:600">More time teaching.</span>
+        </p>
+        <div class="shell-buttons">
+          <a href="/onboarding" style="display:inline-flex;align-items:center;justify-content:center;gap:0.5rem;padding:1rem 2rem;background:#171717;color:#fff;font-weight:700;border-radius:9999px;text-decoration:none;font-family:inherit">
+            Get Started ›
+          </a>
+          <a href="https://docs.google.com/forms/d/e/1FAIpQLSf_iZpFA8pDCv5ESQ8OwESB7YzlMjWETwwRirk-MV6LddQBeQ/viewform" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;justify-content:center;padding:1rem 2rem;font-weight:700;color:#404040;border:1px solid #e5e5e5;border-radius:9999px;text-decoration:none;font-family:inherit;background:rgba(255,255,255,0.6)">
+            Request Demo
+          </a>
+        </div>
+      </div>
+
+      <!-- Mobile mockup image (visible < 768px) -->
+      <div class="shell-mobile-mockup">
+        <img src="/images/features/dashboard-mobile.webp" alt="MathLogs mobile app dashboard" fetchpriority="high" width="1920" height="1440" style="width:220%;max-width:1000px;flex-shrink:0;object-fit:contain;filter:drop-shadow(0 24px 48px rgba(0,0,0,0.18))">
+      </div>
+
+      <!-- Tablet mockup image (visible md -> lg) -->
+      <div class="shell-tablet-mockup">
+        <img src="/images/features/dashboard-tablet.webp" alt="MathLogs tablet app dashboard" fetchpriority="high" width="1920" height="1440" style="width:160%;min-width:1000px;max-width:1400px;flex-shrink:0;object-fit:contain;filter:drop-shadow(0 24px 48px rgba(0,0,0,0.14))">
+      </div>
+
+      <!-- Desktop mockup image (visible lg+) -->
+      <div class="shell-desktop-mockup">
+        <div style="position:absolute;left:50%;transform:translateX(-33%);top:10%;width:160%;max-width:1300px;z-index:10;display:flex;flex-direction:column;background:white;border-radius:1.5rem;box-shadow:0 30px 100px -20px rgba(0,0,0,0.2);border:1px solid rgba(229,229,229,0.6);overflow:hidden">
+          <div style="width:100%;background:rgba(245,245,247,0.8);border-bottom:1px solid rgba(229,229,229,0.8);padding:0.75rem 1rem;display:flex;align-items:center;gap:0.5rem">
+            <div style="display:flex;gap:0.5rem">
+              <div style="width:12px;height:12px;border-radius:50%;background:#ff5f56;border:1px solid #e0443e"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#ffbd2e;border:1px solid #dea123"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#27c93f;border:1px solid #1aab29"></div>
+            </div>
+          </div>
+          <div style="width:100%;background:#fafafa">
+            <img src="/dashboard.webp" alt="MathLogs dashboard" fetchpriority="high" width="2880" height="2231" style="width:100%;height:auto;object-fit:cover;pointer-events:none">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>
