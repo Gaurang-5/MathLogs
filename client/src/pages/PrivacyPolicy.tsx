@@ -14,6 +14,7 @@ export default function PrivacyPolicy() {
 
                 <div className="space-y-6 text-gray-600 leading-relaxed text-lg">
                     <p><strong>Effective Date:</strong> March 2026</p>
+                    <p>This Privacy Policy is published in compliance with the Information Technology Act, 2000, the Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011, and the Digital Personal Data Protection (DPDP) Act, 2023 of India.</p>
 
                     <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">1. Information We Collect</h2>
                     <p>We collect information you provide directly to us when using MathLogs, including:</p>
@@ -23,32 +24,35 @@ export default function PrivacyPolicy() {
                         <li>Student data entered by you (names, parent contact numbers, academic performance, fee records).</li>
                     </ul>
 
-                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">2. How We Use Your Information</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">2. Role under DPDP Act, 2023</h2>
+                    <p>Under the DPDP Act, the educational institute or teacher using our platform acts as the <strong>Data Fiduciary</strong>, determining the purpose and means of processing personal data. MathLogs acts strictly as a <strong>Data Processor</strong>, processing data on behalf of the Data Fiduciary. Institutes must ensure they have obtained verifiable and explicit consent from students or their legal guardians before entering their data into our system.</p>
+
+                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">3. How We Use Your Information</h2>
                     <p>We use the collected information solely for providing and improving the MathLogs service:</p>
                     <ul className="list-disc pl-6 space-y-2">
                         <li>To operate, maintain, and provide the features of the application.</li>
                         <li>To send automated notifications (like emails and WhatsApp messages) on your behalf to students and parents.</li>
-                        <li>To analyze usage patterns to improve the user experience.</li>
+                        <li>To maintain secure electronic records as mandated by the IT Act, 2000.</li>
                     </ul>
 
-                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">3. Data Security and Privacy</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">4. Data Security and Privacy</h2>
                     <p>
-                        Your data belongs to you. We implement robust security measures to protect your information and the information of your students. We <strong>never</strong> sell, rent, or share your data or your students' data with third-party advertisers or data brokers.
+                        We implement reasonable security practices and procedures (RSPP) as required under Indian laws to protect your information and the information of your students. We <strong>never</strong> sell, rent, or share your data or your students' data with third-party advertisers or data brokers.
                     </p>
 
-                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">4. Third-Party Services</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">5. Third-Party Services</h2>
                     <p>
-                        We use third-party services like MSG91 strictly for delivering WhatsApp notifications and transactional emails. These services are bound by confidentiality agreements and are only permitted to use the data for the purpose of message delivery.
+                        We use third-party services like MSG91 strictly for delivering WhatsApp notifications and transactional emails. These services are bound by confidentiality agreements and are compliant with applicable data protection laws.
                     </p>
 
-                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">5. Your Rights</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">6. Your Rights (Data Principal Rights)</h2>
                     <p>
-                        You have the right to access, modify, or delete your account data at any time. Upon account deletion, all associated student data, fee records, and marks will be permanently removed from our active servers.
+                        As per the DPDP Act, Data Principals (users/students) have the right to access, correct, erase, and nominate a representative for their data. You, as the Data Fiduciary, can manage or delete your account data at any time. Upon account deletion, all associated student data will be permanently removed from our active servers.
                     </p>
 
-                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">6. Contact Us</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">7. Grievance Redressal</h2>
                     <p>
-                        If you have any questions about this Privacy Policy, please contact us via the WhatsApp support number provided on our website.
+                        In accordance with the Information Technology Act, 2000 and rules made there under, if you have any grievances regarding data privacy, you may contact our designated Grievance Officer via the support contact details provided on our website.
                     </p>
                 </div>
             </div>
