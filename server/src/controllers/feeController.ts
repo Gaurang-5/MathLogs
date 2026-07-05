@@ -573,6 +573,20 @@ export const payInstallment = async (req: Request, res: Response) => {
                 throw { statusCode: 404, message: 'Installment not found' };
             }
 
+            // ✅ SECURITY: Verify student is eligible to pay this installment
+            const isCustomInstallment = installment.studentId === student.id;
+            
+            const isBatchInstallment = installment.studentId === null && installment.batchId === student.batchId;
+            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
+            const isAfterJoin = new Date(installment.createdAt) >= studentJoinDate;
+            const hasPriorPayment = totalPaidSoFar > 0;
+            
+            const isEligibleBatchInstallment = isBatchInstallment && (isAfterJoin || hasPriorPayment);
+
+            if (!isCustomInstallment && !isEligibleBatchInstallment) {
+                throw { statusCode: 403, message: 'Forbidden: Installment is not valid for this student' };
+            }
+
             const remainingBalance = installment.amount - totalPaidSoFar;
             const newPaymentAmount = parseFloat(String(amount));
 
@@ -671,7 +685,17 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Student email not found' });
         }
 
-        // Calculate breakdown
+        // Calculate total securely using server-side source of truth
+        const snapshot = calculateStudentFeeSnapshot(student as any);
+        
+        // Clamp to 0 (no negative fee reminders for overpaid students)
+        const totalPendingCalc = Math.max(0, snapshot.balance);
+        
+        if (totalPendingCalc <= 0) {
+            return res.status(400).json({ error: 'Student has no pending balance. Reminder skipped.' });
+        }
+
+        // Calculate visual breakdown lines for the email
         const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
         const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
         const installments = (student.batch?.feeInstallments || []).filter((inst: any) => {
@@ -682,26 +706,23 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
             const hasPayment = paidInstallmentIds.has(inst.id);
             return isAfterJoin || hasPayment;
         });
+        
         const breakdownLines: string[] = [];
-        let totalPendingCalc = 0;
 
         // Check Installments
         installments.forEach(inst => {
-            // BUG FIX: Sum ALL payments for this installment, not just one
             const paymentsForThis = student.feePayments.filter(p => p.installmentId === inst.id);
             const paidAmount = paymentsForThis.reduce((sum, p) => sum + p.amountPaid, 0);
             const remaining = inst.amount - paidAmount;
 
             if (remaining > 0) {
                 breakdownLines.push(`- ${inst.name}: Rs. ${remaining} (Due)`);
-                totalPendingCalc += remaining;
             }
         });
 
         // If no installments but there is a due amount (legacy flat fee)
-        if (installments.length === 0 && amountDue > 0) {
-            breakdownLines.push(`- Outstanding Balance: Rs. ${amountDue}`);
-            totalPendingCalc = amountDue; // Fallback to provided amount
+        if (installments.length === 0) {
+            breakdownLines.push(`- Outstanding Balance: Rs. ${totalPendingCalc}`);
         }
 
         const subject = `Fee Payment Reminder for ${student.name}`;
