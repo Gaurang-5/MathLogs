@@ -16,6 +16,7 @@ export interface LegacyFeeSnapshot {
 }
 
 export interface StudentFeeSnapshotInput {
+    id?: string;
     createdAt?: string | Date | null;
     fees: LegacyFeeSnapshot[];
     feePayments: FeePaymentSnapshot[];
@@ -45,7 +46,7 @@ export function calculateStudentFeeSnapshot(student: StudentFeeSnapshotInput): S
     // Valid installments: global ones after join date OR have payments, plus custom ones for this student
     const sortedInstallments = (student.batch?.feeInstallments || [])
         .filter((installment) => {
-            if (installment.studentId) return true; // custom invoice
+            if (installment.studentId) return installment.studentId === student.id; // custom invoice
             const isAfterJoin = new Date(installment.createdAt) >= studentJoinDate;
             const hasPayment = paidInstallmentIds.has(installment.id);
             return isAfterJoin || hasPayment;
@@ -62,7 +63,10 @@ export function calculateStudentFeeSnapshot(student: StudentFeeSnapshotInput): S
 
     const totalFee = (isBatchInstallmentActive ? globalInstallmentsTotal : (student.batch?.feeAmount || 0)) + customInstallmentsTotal;
 
-    const paidInstallments = student.feePayments.reduce((sum, payment) => sum + payment.amountPaid, 0);
+    const validInstallmentIds = new Set(sortedInstallments.map((i) => i.id));
+    const paidInstallments = student.feePayments
+        .filter((payment) => validInstallmentIds.has(payment.installmentId))
+        .reduce((sum, payment) => sum + payment.amountPaid, 0);
     const balance = totalFee - paidSimple - paidInstallments;
 
     const paymentsByInstallment = new Map<string, number>();
