@@ -219,7 +219,9 @@ test('POST /api/fees/pay-installment records a payment for an authenticated teac
         batchId: 'batch-1',
         parentWhatsapp: '',
         instituteId: 'inst-1',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
         batch: {
+            id: 'batch-1',
             teacherId: 'teacher-1',
             institute: { name: 'MathLogs Institute' },
         },
@@ -229,6 +231,9 @@ test('POST /api/fees/pay-installment records a payment for an authenticated teac
         id: 'installment-1',
         name: 'April Fee',
         amount: 500,
+        studentId: null,
+        batchId: 'batch-1',
+        createdAt: new Date('2026-04-01T00:00:00Z')
     }) as never) as typeof prisma.feeInstallment.findUnique);
     replaceMethod(prisma.feePayment, 'create', (async ({ data }: { data: Record<string, unknown> }) => ({
         id: 'payment-route-1',
@@ -413,13 +418,18 @@ test('POST /api/fees/pay-installment is idempotent and prevents double-payment',
         id: '123e4567-e89b-12d3-a456-426614174003',
         name: 'Installment Test',
         instituteId: 'inst-1',
-        batch: { teacherId: 'teacher-1', institute: { name: 'Inst' } }
+        batchId: 'batch-1',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        batch: { id: 'batch-1', teacherId: 'teacher-1', institute: { name: 'Inst' } }
     }) as never) as typeof prisma.student.findUnique);
 
     replaceMethod(prisma.feeInstallment, 'findUnique', (async () => ({
         id: '123e4567-e89b-12d3-a456-426614174004',
         name: 'May Fee',
-        amount: 500
+        amount: 500,
+        studentId: null,
+        batchId: 'batch-1',
+        createdAt: new Date('2026-04-01T00:00:00Z')
     }) as never) as typeof prisma.feeInstallment.findUnique);
 
     let createdInstallmentPayments: any[] = [];
