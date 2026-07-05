@@ -10,7 +10,7 @@ import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, deleteOnlineQuiz, deleteTest, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReport, downloadOnlineQuizReportPdf, downloadTestReport, finalizeOnlineQuiz, generateAITest, generateSingleQuestionRoute, generateVariantQuestionRoute, getOnlineQuizzes, getStudentByHumanId, getTestDetails, getTestEligibleStudents, getTests, saveOnlineQuiz, sendTestResultsEmail, submitMark, updateOnlineQuiz, updateTest } from '../controllers/testController';
 import { getLiveQuizStatus, getOnlineQuizAnalytics } from '../controllers/analyticsController';
-import { approveUpiVerification, createCustomInvoice, downloadMonthlyReport, downloadPendingFeesReport, getCustomInvoices, getFeeSummary, getPaymentHistory, getRecentTransactions, getUpiVerifications, payInstallment, recordPayment, rejectUpiVerification, scanReceipt, sendFeeReminder } from '../controllers/feeController';
+import { approveUpiVerification, createCustomInvoice, downloadMonthlyReport, downloadPendingFeesReport, getCustomInvoices, getFeeSummary, getPaymentHistory, getRecentTransactions, getUpiVerifications, payInstallment, recordPayment, rejectUpiVerification, scanReceipt, sendFeeReminder, assignInstallmentToStudent } from '../controllers/feeController';
 import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, getInstitutes, setupAccount, validateInvite } from '../controllers/inviteController';
 import { createOrder, resendSetupLink, startTrial, trackLead, verifyPayment } from '../controllers/onboardingController';
@@ -157,6 +157,7 @@ router.post('/fees/upi-verifications/:id/approve', authenticateToken, paymentLim
 router.post('/fees/upi-verifications/:id/reject', authenticateToken, paymentLimiter, rejectUpiVerification);
 router.get('/fees/custom-invoices', authenticateToken, getCustomInvoices);
 router.post('/fees/custom-invoices', authenticateToken, paymentLimiter, validateRequest(createCustomInvoiceSchema), createCustomInvoice);
+router.post('/fees/assign', authenticateToken, assignInstallmentToStudent);
 router.post('/fees/scan-receipt', authenticateToken, ocrLimiter, upload.single('image'), scanReceipt);
 
 // Stats

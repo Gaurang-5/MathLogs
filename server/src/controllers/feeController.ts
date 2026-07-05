@@ -95,9 +95,9 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
                     sb.balance, 
                     COALESCE(
                         (SELECT MIN(fi."createdAt") 
-                         FROM "FeeInstallment" fi 
-                         WHERE fi."batchId" = b.id 
-                           AND (fi."studentId" = s.id OR fi."studentId" IS NULL)
+                         FROM "FeeInstallmentAssignment" fia
+                         JOIN "FeeInstallment" fi ON fi.id = fia."installmentId"
+                         WHERE fia."studentId" = s.id 
                            AND fi.amount > COALESCE((SELECT SUM("amountPaid") FROM "FeePayment" fp WHERE fp."installmentId" = fi.id AND fp."studentId" = s.id), 0)
                         ), 
                         s."createdAt"
@@ -242,6 +242,9 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                         date: true,
                         installmentId: true
                     }
+                },
+                feeAssignments: {
+                    select: { installmentId: true }
                 }
             },
             orderBy: { name: 'asc' }
@@ -256,18 +259,11 @@ export const getFeeSummary = async (req: Request, res: Response) => {
             // Build a set of installment IDs that have existing payments for this student
             const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
 
-            // Filter installments: include global ones (no studentId) that are after join date OR have payments,
-            // plus student-specific ones that belong to THIS student
-            const validInstallments = allBatchInstallments.filter((inst: any) => {
-                if (inst.studentId) {
-                    // Student-specific installment: only include if it belongs to this student
-                    return inst.studentId === student.id;
-                }
-                // Global installment: include if after join date OR student has payments for it
-                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
-                const hasPayment = paidInstallmentIds.has(inst.id);
-                return isAfterJoin || hasPayment;
-            });
+            // Build a set of assigned installment IDs
+            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+
+            // Filter installments: include only those explicitly assigned to this student
+            const validInstallments = allBatchInstallments.filter((inst: any) => assignedIds.has(inst.id));
             const validInstallmentIds = new Set(validInstallments.map((inst: any) => inst.id));
 
             // Calculate adhoc/generic cash payments (FeeRecords)
@@ -386,7 +382,8 @@ export const recordPayment = async (req: Request, res: Response) => {
                 include: {
                     batch: { include: { feeInstallments: { orderBy: { createdAt: 'asc' } }, institute: true } },
                     feePayments: true,
-                    fees: true
+                    fees: true,
+                    feeAssignments: { select: { installmentId: true } }
                 }
             });
 
@@ -398,17 +395,9 @@ export const recordPayment = async (req: Request, res: Response) => {
                 throw { statusCode: 404, message: 'Student not found' };
             }
 
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
             const allBatchInstallments = student.batch?.feeInstallments || [];
-            const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
-            const installments = allBatchInstallments.filter((inst: any) => {
-                if (inst.studentId) {
-                    return inst.studentId === studentId;
-                }
-                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
-                const hasPayment = paidInstallmentIds.has(inst.id);
-                return isAfterJoin || hasPayment;
-            });
+            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+            const installments = allBatchInstallments.filter((inst: any) => assignedIds.has(inst.id));
             const validInstallmentIds = new Set(installments.map(i => i.id));
 
             // Validation: Prevent Overpayment
@@ -489,8 +478,8 @@ export const recordPayment = async (req: Request, res: Response) => {
             let phone = result.parentWhatsapp.replace(/[^0-9+]/g, '');
             if (phone.length === 10) phone = '+91' + phone;
 
-            const studentJoinDate = result.createdAt ? new Date(result.createdAt) : new Date(0);
-            const installments = (result.batch?.feeInstallments || []).filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
+            const assignedIds = new Set((result.feeAssignments || []).map((a: any) => a.installmentId));
+            const installments = (result.batch?.feeInstallments || []).filter((inst: any) => assignedIds.has(inst.id));
             const allocatedInstallments = installments
                 .filter(inst => {
                     const paidBefore = result.feePayments.filter(p => p.installmentId === inst.id).reduce((s, p) => s + p.amountPaid, 0);
@@ -573,18 +562,18 @@ export const payInstallment = async (req: Request, res: Response) => {
                 throw { statusCode: 404, message: 'Installment not found' };
             }
 
-            // ✅ SECURITY: Verify student is eligible to pay this installment
-            const isCustomInstallment = installment.studentId === student.id;
-            
-            const isBatchInstallment = installment.studentId === null && installment.batchId === student.batchId;
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const isAfterJoin = new Date(installment.createdAt) >= studentJoinDate;
-            const hasPriorPayment = totalPaidSoFar > 0;
-            
-            const isEligibleBatchInstallment = isBatchInstallment && (isAfterJoin || hasPriorPayment);
+            // ✅ SECURITY: Verify student is assigned to this installment
+            const assignment = await tx.feeInstallmentAssignment.findUnique({
+                where: {
+                    studentId_installmentId: {
+                        studentId: studentId,
+                        installmentId: installmentId
+                    }
+                }
+            });
 
-            if (!isCustomInstallment && !isEligibleBatchInstallment) {
-                throw { statusCode: 403, message: 'Forbidden: Installment is not valid for this student' };
+            if (!assignment) {
+                throw { statusCode: 403, message: 'Forbidden: Installment is not assigned to this student' };
             }
 
             const remainingBalance = installment.amount - totalPaidSoFar;
@@ -675,7 +664,8 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
             where: { id: studentId },
             include: {
                 batch: { include: { feeInstallments: true, institute: true } },
-                feePayments: true
+                feePayments: true,
+                feeAssignments: { select: { installmentId: true } }
             }
         });
 
@@ -696,16 +686,10 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
         }
 
         // Calculate visual breakdown lines for the email
-        const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
+        const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+        const installments = (student.batch?.feeInstallments || []).filter((inst: any) => assignedIds.has(inst.id));
+
         const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
-        const installments = (student.batch?.feeInstallments || []).filter((inst: any) => {
-            if (inst.studentId) {
-                return inst.studentId === studentId;
-            }
-            const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
-            const hasPayment = paidInstallmentIds.has(inst.id);
-            return isAfterJoin || hasPayment;
-        });
         
         const breakdownLines: string[] = [];
 
@@ -1181,7 +1165,7 @@ export const approveUpiVerification = async (req: Request, res: Response) => {
                 // If it was custom amount without installment, intelligently waterfall allocate
                 const studentData = await tx.student.findUnique({
                     where: { id: verification.studentId },
-                    include: { feePayments: true, batch: { include: { feeInstallments: true } } }
+                    include: { feePayments: true, feeAssignments: { select: { installmentId: true } }, batch: { include: { feeInstallments: true } } }
                 });
 
                 if (!studentData || !studentData.batch) {
@@ -1189,9 +1173,9 @@ export const approveUpiVerification = async (req: Request, res: Response) => {
                 }
 
                 let remainingAmount = verification.amount;
-                const studentJoinDate = studentData.createdAt ? new Date(studentData.createdAt) : new Date(0);
+                const assignedIds = new Set((studentData.feeAssignments || []).map((a: any) => a.installmentId));
                 const installments = studentData.batch.feeInstallments
-                    .filter(inst => new Date(inst.createdAt) >= studentJoinDate)
+                    .filter((inst: any) => assignedIds.has(inst.id))
                     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
                 for (const inst of installments) {
@@ -1484,6 +1468,13 @@ export const createCustomInvoice = async (req: Request, res: Response) => {
             }
         });
 
+        await prisma.feeInstallmentAssignment.create({
+            data: {
+                studentId: student.id,
+                installmentId: installment.id
+            }
+        });
+
         let payment = null;
         if (markAsPaid) {
             payment = await prisma.feePayment.create({
@@ -1573,5 +1564,78 @@ export const scanReceipt = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("❌ Receipt Scan Error:", error);
         res.status(500).json({ error: "Receipt Scan Failed", details: error.message });
+    }
+};
+
+export const assignInstallmentToStudent = async (req: Request, res: Response) => {
+    try {
+        const { studentId, installmentId, markAsPaid } = req.body;
+        const user = req.user;
+        const teacherId = user?.id;
+
+        const student = await prisma.student.findUnique({
+            where: { id: String(studentId) },
+            include: { 
+                batch: {
+                    include: {
+                        institute: true
+                    }
+                } 
+            }
+        });
+
+        if (!student || student.batch?.teacherId !== teacherId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        const installment = await prisma.feeInstallment.findUnique({
+            where: { id: String(installmentId) }
+        });
+
+        if (!installment || installment.batchId !== student.batchId) {
+            return res.status(400).json({ error: 'Installment does not belong to this student\'s batch' });
+        }
+
+        await prisma.feeInstallmentAssignment.upsert({
+            where: {
+                studentId_installmentId: {
+                    studentId: student.id,
+                    installmentId: installment.id
+                }
+            },
+            create: {
+                studentId: student.id,
+                installmentId: installment.id
+            },
+            update: {} // Do nothing if it already exists
+        });
+
+        if (markAsPaid) {
+            await prisma.feePayment.create({
+                data: {
+                    studentId: student.id,
+                    installmentId: installment.id,
+                    amountPaid: installment.amount,
+                    date: new Date()
+                }
+            });
+
+            if (student.instituteId) {
+                const whatsapp = await import('../utils/whatsapp');
+                const instituteName = student.batch.institute?.name || 'MathLogs';
+                await whatsapp.sendPaymentReceiptWhatsApp(student.parentWhatsapp, {
+                    studentName: student.name,
+                    amountPaid: `Rs. ${installment.amount.toLocaleString()}`,
+                    installmentName: installment.name,
+                    instituteName,
+                    instituteId: student.instituteId
+                }).catch(e => console.error("Failed to send WhatsApp receipt:", e));
+            }
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error assigning installment:', error);
+        res.status(500).json({ error: 'Failed to assign installment' });
     }
 };

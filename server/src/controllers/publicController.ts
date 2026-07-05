@@ -161,6 +161,7 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
                         }
                     }
                 },
+                feeAssignments: { select: { installmentId: true } },
                 feePayments: true,
                 fees: { where: { status: 'PAID' } },
                 upiPaymentVerifications: {
@@ -175,21 +176,13 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
         }
 
         const studentData = students.map(student => {
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const paidInstallmentIds = new Set(student.feePayments.map(p => p.installmentId));
-            
+            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+
             return {
                 studentId: student.id,
                 studentName: student.name,
                 batchName: student.batch?.name || 'N/A',
-                feeInstallments: (student.batch?.feeInstallments || []).filter(inst => {
-                    if (inst.studentId) {
-                        return inst.studentId === student.id;
-                    }
-                    const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
-                    const hasPayment = paidInstallmentIds.has(inst.id);
-                    return isAfterJoin || hasPayment;
-                }),
+                feeInstallments: (student.batch?.feeInstallments || []).filter(inst => assignedIds.has(inst.id)),
                 feePayments: student.feePayments || [],
                 feeRecords: student.fees || [],
                 pendingVerifications: student.upiPaymentVerifications || []
@@ -259,6 +252,7 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
                         feeInstallments: true
                     }
                 },
+                feeAssignments: { select: { installmentId: true } },
                 feePayments: true,
                 fees: { where: { status: 'PAID' } }
             }
@@ -294,16 +288,8 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
                 return res.status(400).json({ error: `Amount exceeds pending installment balance (₹${pendingForInstallment.toLocaleString()}).` });
             }
         } else {
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
-            const installments = (student.batch?.feeInstallments || []).filter(inst => {
-                if (inst.studentId) {
-                    return inst.studentId === studentId;
-                }
-                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
-                const hasPayment = paidInstallmentIds.has(inst.id);
-                return isAfterJoin || hasPayment;
-            });
+            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+            const installments = (student.batch?.feeInstallments || []).filter(inst => assignedIds.has(inst.id));
             const totalFee = installments.reduce((sum, inst) => sum + Number(inst.amount || 0), 0);
 
             const validInstallmentIds = new Set(installments.map(inst => inst.id));

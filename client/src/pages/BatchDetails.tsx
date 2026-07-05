@@ -25,6 +25,7 @@ interface Student {
     marks?: StudentMark[];
     createdAt?: string;
     additionalData?: any;
+    feeAssignments?: { installmentId: string }[];
 }
 
 interface FeeInstallment {
@@ -97,6 +98,7 @@ export default function BatchDetails() {
     const [showRegModal, setShowRegModal] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showAssignConfirm, setShowAssignConfirm] = useState<{ studentId: string, installmentId: string } | null>(null);
     const [deleteCodeInput, setDeleteCodeInput] = useState('');
     const [viewMarksId, setViewMarksId] = useState<string | null>(null);
 
@@ -575,7 +577,7 @@ export default function BatchDetails() {
         const toastId = toast.loading('Creating custom invoice...');
         try {
             if (customInvoice.existingInstallmentId) {
-                await apiRequest(`/fees/custom-invoices`, 'POST', {
+                await apiRequest(`/fees/assign`, 'POST', {
                     studentId: showCustomInvoice.id,
                     installmentId: customInvoice.existingInstallmentId,
                     markAsPaid: customInvoice.markAsPaid
@@ -608,6 +610,21 @@ export default function BatchDetails() {
             setTimeout(() => fetchDetails(), 300);
         } catch (error: unknown) {
             toast.error(getErrorMessage(error, 'Failed to create custom invoice'), { id: toastId });
+        }
+    };
+
+    const handleAssignInstallment = async (studentId: string, installmentId: string) => {
+        const toastId = toast.loading('Assigning fee column...');
+        try {
+            await apiRequest(`/fees/assign`, 'POST', {
+                studentId,
+                installmentId
+            });
+            toast.success('Fee assigned successfully', { id: toastId });
+            setShowAssignConfirm(null);
+            setTimeout(() => fetchDetails(), 300);
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to assign fee'), { id: toastId });
         }
     };
 
@@ -1060,12 +1077,21 @@ export default function BatchDetails() {
 
                                             const studentJoinDate = getStudentJoinDate(student.createdAt);
                                             const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
-                                            const isNotApplicable = instDate < studentJoinDate && payments.length === 0;
+                                            const isAssigned = student.feeAssignments?.some(a => a.installmentId === inst.id);
+                                            const isNotApplicable = instDate < studentJoinDate && payments.length === 0 && !isAssigned;
 
                                             if (isNotApplicable) {
                                                 return (
-                                                    <td key={inst.id} className={cn("text-center font-medium text-app-text-tertiary cursor-not-allowed", getCellPadding())} title="Not applicable. Student joined after this fee was generated.">
-                                                        -
+                                                    <td key={inst.id} className={cn("text-center", getCellPadding())}>
+                                                        <button 
+                                                            onClick={() => {
+                                                                setShowAssignConfirm({ studentId: student.id, installmentId: inst.id });
+                                                            }}
+                                                            className={cn("rounded-full flex items-center justify-center transition-all mx-auto text-app-text-tertiary border border-dashed border-app-text-tertiary/50 hover:border-black hover:text-black hover:bg-black/5 hover:scale-105", getPaymentButtonSize())}
+                                                            title="Assign this past fee to student"
+                                                        >
+                                                            <Plus className={getPaymentInnerSize()} />
+                                                        </button>
                                                     </td>
                                                 );
                                             }
@@ -1280,7 +1306,8 @@ export default function BatchDetails() {
                                                     const studentJoinDate = getStudentJoinDate(student.createdAt);
                                                     const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
                                                     const hasPayment = student.feePayments?.some(p => p.installmentId === inst.id);
-                                                    return instDate >= studentJoinDate || hasPayment;
+                                                    const isAssigned = student.feeAssignments?.some(a => a.installmentId === inst.id);
+                                                    return instDate >= studentJoinDate || hasPayment || isAssigned;
                                                 }).map((inst) => {
                                                     const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
                                                     const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);
@@ -2436,6 +2463,49 @@ export default function BatchDetails() {
                                     className="flex-1 py-3 rounded-xl font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 transition-all active:scale-[0.98]"
                                 >
                                     Close Forever
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Assign Confirmation Modal */}
+            <AnimatePresence>
+                {showAssignConfirm && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                            onClick={() => setShowAssignConfirm(null)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-6 max-w-sm w-full shadow-2xl relative z-10 text-center"
+                        >
+                            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Plus className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-xl font-bold text-app-text mb-2">Assign Past Fee?</h3>
+                            <p className="text-sm text-app-text-secondary mb-6 leading-relaxed">
+                                Are you sure you want to assign this past fee to the student?
+                            </p>
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={() => handleAssignInstallment(showAssignConfirm.studentId, showAssignConfirm.installmentId)}
+                                    className="w-full bg-black hover:bg-neutral-800 text-white font-semibold py-3.5 rounded-xl transition-all active:scale-[0.98]"
+                                >
+                                    Yes, Assign Fee
+                                </button>
+                                <button
+                                    onClick={() => setShowAssignConfirm(null)}
+                                    className="w-full bg-neutral-100 hover:bg-neutral-200 text-app-text font-semibold py-3.5 rounded-xl transition-all active:scale-[0.98]"
+                                >
+                                    Cancel
                                 </button>
                             </div>
                         </motion.div>
