@@ -248,6 +248,11 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                                 installmentId: true
                             }
                         },
+                        feeAssignments: {
+                            select: {
+                                installmentId: true
+                            }
+                        },
                         fees: {
                             select: {
                                 id: true,
@@ -435,6 +440,23 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
                 studentId: studentId || null
             }
         });
+
+        // Create explicit assignments for the created installment
+        if (studentId) {
+            await prisma.feeInstallmentAssignment.create({
+                data: { studentId, installmentId: installment.id }
+            });
+        } else {
+            const studentsToAssign = batch.students.map(s => ({
+                studentId: s.id,
+                installmentId: installment.id
+            }));
+            if (studentsToAssign.length > 0) {
+                await prisma.feeInstallmentAssignment.createMany({
+                    data: studentsToAssign
+                });
+            }
+        }
 
         // --- Auto-Send Fee Reminder Logic (Background Queue) ---
         // Sending directly to DB queue, no throttling required.

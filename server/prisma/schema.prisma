@@ -115,6 +115,7 @@ model Student {
   instituteId             String?
   feePayments             FeePayment[]
   feeInstallments         FeeInstallment[]
+  feeAssignments          FeeInstallmentAssignment[]
   fees                    FeeRecord[]
   marks                   Mark[]
   attendanceRecords       AttendanceRecord[]
@@ -196,6 +197,7 @@ model FeeInstallment {
   batch                   Batch                    @relation(fields: [batchId], references: [id], onDelete: Cascade)
   student                 Student?                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
   payments                FeePayment[]
+  assignments             FeeInstallmentAssignment[]
   upiPaymentVerifications UpiPaymentVerification[]
 
   @@index([batchId])
@@ -218,6 +220,20 @@ model FeePayment {
   @@index([date])
   @@index([date, installmentId])
 }
+
+model FeeInstallmentAssignment {
+  id            String         @id @default(uuid())
+  studentId     String
+  installmentId String
+  createdAt     DateTime       @default(now())
+  student       Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  installment   FeeInstallment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, installmentId])
+  @@index([studentId])
+  @@index([installmentId])
+}
+
 
 model StudentBalance {
   studentId       String    @id

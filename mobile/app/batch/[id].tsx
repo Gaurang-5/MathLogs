@@ -206,17 +206,31 @@ export default function BatchDetailScreen() {
     if (!showCustomInvoice) return;
     try {
       if (customInvoice.existingInstallmentId) {
-        if (customInvoice.markAsPaid) {
-          const existingInst = batch?.feeInstallments?.find(i => i.id === customInvoice.existingInstallmentId);
-          const paymentAmount = Number(existingInst?.amount || 0);
-          await api.post('/fees/pay-installment', {
+        const existingInst = batch?.feeInstallments?.find(i => i.id === customInvoice.existingInstallmentId);
+        
+        if (existingInst && existingInst.studentId) {
+          // This is a custom installment owned by another student. 
+          // Clone it into a NEW custom invoice for the target student.
+          await api.post('/fees/custom-invoices', {
+            name: existingInst.name,
+            amount: Number(existingInst.amount),
             studentId: showCustomInvoice.id,
-            installmentId: customInvoice.existingInstallmentId,
-            amount: paymentAmount,
-            date: new Date().toISOString().split('T')[0]
+            markAsPaid: customInvoice.markAsPaid
           });
+          Alert.alert("Success", customInvoice.markAsPaid ? "Invoice cloned and marked as paid" : "Invoice cloned for this student");
+        } else {
+          // This is a global batch installment, safe to reuse directly
+          if (customInvoice.markAsPaid) {
+            const paymentAmount = Number(existingInst?.amount || 0);
+            await api.post('/fees/pay-installment', {
+              studentId: showCustomInvoice.id,
+              installmentId: customInvoice.existingInstallmentId,
+              amount: paymentAmount,
+              date: new Date().toISOString().split('T')[0]
+            });
+          }
+          Alert.alert("Success", customInvoice.markAsPaid ? "Installment marked as paid" : "This installment is already visible for this student");
         }
-        Alert.alert("Success", customInvoice.markAsPaid ? "Installment marked as paid" : "This installment is already visible for this student");
       } else {
         if (!customInvoice.name || !customInvoice.amount) return Alert.alert("Required", "Invoice Name and Amount are mandatory");
         await api.post('/fees/custom-invoices', {

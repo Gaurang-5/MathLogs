@@ -158,7 +158,9 @@ test('payInstallment records a valid installment payment', async () => {
         batchId: 'batch-1',
         parentWhatsapp: '',
         instituteId: 'inst-1',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
         batch: {
+            id: 'batch-1',
             teacherId: 'teacher-1',
             institute: { name: 'MathLogs Institute' },
         },
@@ -168,6 +170,9 @@ test('payInstallment records a valid installment payment', async () => {
         id: 'installment-1',
         name: 'April Fee',
         amount: 500,
+        studentId: null,
+        batchId: 'batch-1',
+        createdAt: new Date('2026-04-01T00:00:00Z')
     }) as never) as typeof prisma.feeInstallment.findUnique);
 
     let paymentCreateCalls = 0;
