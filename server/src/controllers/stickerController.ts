@@ -7,11 +7,22 @@ import { secureLogger } from '../utils/secureLogger';
 
 export const generateStickerSheet = async (req: Request, res: Response) => {
     const { batchId } = req.query;
-    const teacherId = req.user?.id;
+    const user = (req as any).user;
+    const teacherId = user?.id;
+    const instituteId = user?.instituteId;
+    const role = user?.role;
+
     const whereClause: any = {
-        status: 'APPROVED',
-        batch: { teacherId }
+        status: 'APPROVED'
     };
+
+    if (instituteId) {
+        whereClause.instituteId = instituteId;
+    }
+
+    if (role !== 'SUPER_ADMIN') {
+        whereClause.batch = { teacherId };
+    }
     if (batchId) {
         whereClause.batchId = String(batchId);
     }

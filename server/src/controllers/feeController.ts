@@ -200,13 +200,25 @@ export const getPaymentHistory = async (req: Request, res: Response) => {
 
 export const getFeeSummary = async (req: Request, res: Response) => {
     try {
-        const teacherId = req.user?.id;
+        const user = (req as any).user;
+        const teacherId = user?.id;
+        const instituteId = user?.instituteId;
+        const role = user?.role;
+
+        const whereClause: any = {
+            status: 'APPROVED'
+        };
+
+        if (instituteId) {
+            whereClause.instituteId = instituteId;
+        }
+
+        if (role !== 'SUPER_ADMIN') {
+            whereClause.batch = { teacherId };
+        }
 
         const students = await prisma.student.findMany({
-            where: {
-                status: 'APPROVED',
-                batch: { teacherId }
-            },
+            where: whereClause,
             select: {
                 id: true,
                 humanId: true,
@@ -779,16 +791,29 @@ ${senderName}`;
 
 export const getRecentTransactions = async (req: Request, res: Response) => {
     try {
-        const teacherId = req.user?.id;
+        const user = (req as any).user;
+        const teacherId = user?.id;
+        const instituteId = user?.instituteId;
+        const role = user?.role;
+
+        const whereClause: any = {
+            status: 'APPROVED'
+        };
+
+        if (instituteId) {
+            whereClause.instituteId = instituteId;
+        }
+
+        if (role !== 'SUPER_ADMIN') {
+            whereClause.batch = { teacherId };
+        }
 
         secureLogger.debug('Fetching recent transactions for teacher', { teacherId });
 
         // Fetch recent installment payments (NO academic year filter)
         const recentInstallments = await prisma.feePayment.findMany({
             where: {
-                student: {
-                    batch: { teacherId }
-                }
+                student: whereClause
             },
             take: 10,
             orderBy: { date: 'desc' },
@@ -803,9 +828,7 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
         // Fetch recent ad-hoc payments (FeeRecord)
         const recentRecords = await prisma.feeRecord.findMany({
             where: {
-                student: {
-                    batch: { teacherId }
-                }
+                student: whereClause
             },
             take: 10,
             orderBy: { date: 'desc' },
@@ -861,16 +884,26 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         const endDate = new Date(Date.UTC(yearNum, monthIdx + 1, 1, -5, -30, 0, -1));
 
         // Fetch Installment Payments
-        const instituteId = req.user?.instituteId;
-        const teacherId = req.user?.id;
+        const user = (req as any).user;
+        const instituteId = user?.instituteId;
+        const teacherId = user?.id;
+        const role = user?.role;
+
+        const whereClause: any = {
+            status: 'APPROVED'
+        };
+
+        if (instituteId) {
+            whereClause.instituteId = instituteId;
+        }
+
+        if (role !== 'SUPER_ADMIN') {
+            whereClause.batch = { teacherId };
+        }
 
         const payments = await prisma.feePayment.findMany({
             where: {
-                student: {
-                    instituteId: instituteId,
-                    status: 'APPROVED',
-                    batch: { teacherId }
-                },
+                student: whereClause,
                 date: {
                     gte: startDate,
                     lte: endDate
@@ -887,11 +920,7 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         const records = await prisma.feeRecord.findMany({
             where: {
                 status: 'PAID',
-                student: {
-                    instituteId: instituteId,
-                    status: 'APPROVED',
-                    batch: { teacherId }
-                },
+                student: whereClause,
                 date: {
                     gte: startDate,
                     lte: endDate
