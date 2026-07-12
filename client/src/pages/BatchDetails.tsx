@@ -987,7 +987,7 @@ export default function BatchDetails() {
                                     </div>
                                 </th>
                                 {formFields.map((field: any) => (
-                                    <th key={field.id} className={cn("bg-transparent", getCellPadding())} style={{ minWidth: field.id === 'parentEmail' ? '200px' : '180px', whiteSpace: 'nowrap' }}>
+                                    <th key={field.id} className={cn("bg-transparent", getCellPadding())} style={{ width: field.id === 'studentName' ? 'auto' : '1%', minWidth: field.id === 'parentEmail' ? '200px' : '180px', whiteSpace: 'nowrap' }}>
                                         {field.label}
                                     </th>
                                 ))}
@@ -1046,7 +1046,7 @@ export default function BatchDetails() {
                                             const isStudentName = field.id === 'studentName';
 
                                             return (
-                                                <td key={field.id} className={cn(isStudentName ? "font-semibold text-app-text" : "text-app-text-secondary", getCellPadding(), isStudentName ? getTextSizeClass('body') : getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }} title={rawText}>
+                                                <td key={field.id} className={cn(isStudentName ? "font-semibold text-app-text" : "text-app-text-secondary truncate", getCellPadding(), isStudentName ? getTextSizeClass('body') : getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap', maxWidth: isStudentName ? 'none' : '200px' }} title={rawText}>
                                                     {content}
                                                 </td>
                                             );

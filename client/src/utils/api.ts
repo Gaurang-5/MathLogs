@@ -77,8 +77,10 @@ async function request<T = unknown>(
     const headers: Record<string, string> = { ...options?.headers };
     const isFormData = typeof window !== 'undefined' && body instanceof FormData;
     
-    if (method !== 'GET' && method !== 'DELETE' && !isFormData && !headers['Content-Type']) {
-        headers['Content-Type'] = 'application/json';
+    if (method !== 'GET' && !isFormData && !headers['Content-Type']) {
+        if (method !== 'DELETE' || body !== undefined) {
+            headers['Content-Type'] = 'application/json';
+        }
     }
     
     if (isFormData) {

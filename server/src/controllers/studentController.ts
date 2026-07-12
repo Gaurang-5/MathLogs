@@ -497,7 +497,7 @@ export const rejectStudent = async (req: Request, res: Response) => {
 
 export const archiveStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { leaveReason } = req.body;
+    const { leaveReason } = req.body || {};
 
     try {
         const user = (req as any).user;
