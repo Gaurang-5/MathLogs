@@ -14,7 +14,62 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
     try {
         const batchFilter = req.query.batch as string;
         const sortBy = req.query.sortBy as string;
-        const teacherId = req.user?.id;
+        
+        const user = (req as any).user;
+        const teacherId = user?.id;
+        const instituteId = user?.instituteId;
+        const role = user?.role;
+
+        const whereClause: any = {
+            status: 'APPROVED',
+        };
+
+        if (instituteId) {
+            whereClause.instituteId = instituteId;
+        }
+
+        if (role !== 'SUPER_ADMIN') {
+            whereClause.batch = { teacherId };
+        }
+
+        const students = await prisma.student.findMany({
+            where: whereClause,
+            include: {
+                batch: { include: { feeInstallments: true } },
+                fees: true,
+                feePayments: true
+            },
+            orderBy: { name: 'asc' }
+        });
+
+        // PERF OPTIMIZATION: Calculate dues and filter defaulters (O(n) instead of O(n²))
+        let defaulters = students.map((student: any) => {
+            const { balance, oldestDue } = calculateStudentFeeSnapshot(student);
+
+            return {
+                humanId: student.humanId || '-',
+                name: student.name,
+                batch: student.batch?.name || 'N/A',
+                parentName: student.parentName || '-',
+                phone: student.parentWhatsapp || '-',
+                balance,
+                oldestDue
+            };
+        }).filter((s: any) => s.balance > 0);
+
+        // Filter
+        if (batchFilter && batchFilter !== 'All') {
+            defaulters = defaulters.filter((s: any) => s.batch === batchFilter);
+        }
+
+        // Sort
+        if (sortBy === 'date') {
+            // Sort by Oldest Due Date (Ascending: Oldest first)
+            defaulters.sort((a: any, b: any) => a.oldestDue.getTime() - b.oldestDue.getTime());
+        } else {
+            // Default: Amount High -> Low
+            defaulters.sort((a: any, b: any) => b.balance - a.balance);
+        }
 
         // Generate PDF
         const doc = new PDFDocument({ margin: 30, size: 'A4' });
@@ -75,76 +130,30 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
         drawPendingFeesHeader(currentY);
         currentY += rowHeight;
 
+        // Rows
         let totalPending = 0;
-        let offset = 0;
-        const limit = 100;
-        let hasMore = true;
 
-        const { Prisma } = await import('@prisma/client');
-        const batchCondition = batchFilter && batchFilter !== 'All' ? Prisma.sql`AND b.name = ${batchFilter}` : Prisma.empty;
-        const sortCondition = sortBy === 'date' ? Prisma.sql`"oldestDue" ASC` : Prisma.sql`sb.balance DESC`;
-
-        while (hasMore) {
-            const defaulters = await prisma.$queryRaw<any[]>`
-                SELECT 
-                    s."humanId", 
-                    s.name, 
-                    b.name as batch, 
-                    s."parentName", 
-                    s."parentWhatsapp" as phone, 
-                    sb.balance, 
-                    COALESCE(
-                        (SELECT MIN(fi."createdAt") 
-                         FROM "FeeInstallment" fi 
-                         WHERE fi."batchId" = b.id 
-                           AND (fi."studentId" = s.id OR fi."studentId" IS NULL)
-                           AND fi.amount > COALESCE((SELECT SUM("amountPaid") FROM "FeePayment" fp WHERE fp."installmentId" = fi.id AND fp."studentId" = s.id), 0)
-                        ), 
-                        s."createdAt"
-                    ) as "oldestDue"
-                FROM "Student" s
-                JOIN "Batch" b ON b.id = s."batchId"
-                JOIN "StudentBalance" sb ON sb."studentId" = s.id
-                WHERE s.status = 'APPROVED'
-                  AND b."teacherId" = ${teacherId}
-                  AND sb.balance > 0
-                  ${batchCondition}
-                ORDER BY ${sortCondition}
-                LIMIT ${limit} OFFSET ${offset}
-            `;
-
-            if (defaulters.length === 0) {
-                hasMore = false;
-                break;
+        defaulters.forEach((s) => {
+            if (currentY > 750) {
+                doc.addPage({ margin: 30, size: 'A4' });
+                currentY = 40;
+                drawPendingFeesHeader(currentY);
+                currentY += rowHeight;
             }
 
-            defaulters.forEach((s) => {
-                if (currentY > 750) {
-                    doc.addPage({ margin: 30, size: 'A4' });
-                    currentY = 40;
-                    drawPendingFeesHeader(currentY);
-                    currentY += rowHeight;
-                }
+            doc.font('Helvetica').fontSize(9).fillColor('black');
+            doc.text(s.humanId, startX + 5, currentY + 7, { width: 75, ellipsis: true });
+            doc.text(s.name, startX + 90, currentY + 7, { width: 110, ellipsis: true });
+            doc.text(s.batch, startX + 210, currentY + 7, { width: 95, ellipsis: true });
+            doc.text(s.phone, startX + 315, currentY + 7, { width: 65, ellipsis: true });
+            doc.text(s.oldestDue.toLocaleDateString(), startX + 390, currentY + 7, { width: 60, ellipsis: true });
+            doc.font('Helvetica-Bold').fillColor('red')
+                .text(`Rs. ${s.balance.toLocaleString()}`, startX + 460, currentY + 7, { width: 70, align: 'right', ellipsis: true });
 
-                doc.font('Helvetica').fontSize(9).fillColor('black');
-                doc.text(s.humanId || '-', startX + 5, currentY + 7, { width: 75, ellipsis: true });
-                doc.text(s.name, startX + 90, currentY + 7, { width: 110, ellipsis: true });
-                doc.text(s.batch, startX + 210, currentY + 7, { width: 95, ellipsis: true });
-                doc.text(s.phone || '-', startX + 315, currentY + 7, { width: 65, ellipsis: true });
-                
-                const oldestDueStr = s.oldestDue ? new Date(s.oldestDue).toLocaleDateString() : '-';
-                doc.text(oldestDueStr, startX + 390, currentY + 7, { width: 60, ellipsis: true });
-                
-                doc.font('Helvetica-Bold').fillColor('red')
-                    .text(`Rs. ${Number(s.balance).toLocaleString()}`, startX + 460, currentY + 7, { width: 70, align: 'right', ellipsis: true });
-
-                drawPendingBorders(currentY);
-                currentY += rowHeight;
-                totalPending += Number(s.balance);
-            });
-
-            offset += limit;
-        }
+            drawPendingBorders(currentY);
+            currentY += rowHeight;
+            totalPending += s.balance;
+        });
 
         doc.moveDown(1.5);
         currentY = doc.y;
@@ -175,7 +184,7 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
 
 export const getPaymentHistory = async (req: Request, res: Response) => {
     const { studentId } = req.params;
-    const teacherId = req.user?.id;
+    const teacherId = (req as any).user?.id;
 
     try {
         const student = await prisma.student.findUnique({
@@ -200,13 +209,25 @@ export const getPaymentHistory = async (req: Request, res: Response) => {
 
 export const getFeeSummary = async (req: Request, res: Response) => {
     try {
-        const teacherId = req.user?.id;
+        const user = (req as any).user;
+        const teacherId = user?.id;
+        const instituteId = user?.instituteId;
+        const role = user?.role;
+
+        const whereClause: any = {
+            status: 'APPROVED',
+        };
+
+        if (instituteId) {
+            whereClause.instituteId = instituteId;
+        }
+
+        if (role !== 'SUPER_ADMIN') {
+            whereClause.batch = { teacherId };
+        }
 
         const students = await prisma.student.findMany({
-            where: {
-                status: 'APPROVED',
-                batch: { teacherId }
-            },
+            where: whereClause,
             select: {
                 id: true,
                 humanId: true,
@@ -372,7 +393,7 @@ export const recordPayment = async (req: Request, res: Response) => {
     }
 
     try {
-        const teacherId = req.user?.id;
+        const teacherId = (req as any).user?.id;
 
         // CONCURRENCY FIX: Wrap entire read-validate-write in a serializable transaction.
         // Previously, two concurrent payments could both pass the balance check
@@ -532,92 +553,88 @@ export const payInstallment = async (req: Request, res: Response) => {
     }
 
     try {
-        const teacherId = req.user?.id;
-        const user = req.user;
+        const teacherId = (req as any).user?.id;
+        const user = (req as any).user;
 
-        const result = await prisma.$transaction(async (tx) => {
-            // Verify student ownership
-            const student = await tx.student.findUnique({
-                where: { id: studentId },
-                include: { batch: { include: { institute: true } } }
+        // Verify student ownership
+        const student = await prisma.student.findUnique({
+            where: { id: studentId },
+            include: { batch: { include: { institute: true } } }
+        });
+
+        secureLogger.debug('Student found', student ? { id: student.id, name: student.name, batchId: student.batchId, hasBatch: !!student.batch } : 'NOT FOUND');
+
+        if (!student) return res.status(404).json({ error: 'Student not found' });
+
+        // ✅ SECURITY: Defense-in-depth - validate instituteId directly
+        if (!student.batch) {
+            return res.status(400).json({ error: 'Student has no batch assigned' });
+        }
+        if (student.instituteId && student.instituteId !== user.instituteId) {
+            return res.status(403).json({ error: 'Unauthorized: Cross-institute access denied' });
+        }
+        if (student.batch.teacherId && student.batch.teacherId !== teacherId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        // Calculate total already paid for this installment
+        const existingPayments = await prisma.feePayment.findMany({
+            where: { studentId, installmentId }
+        });
+
+        const totalPaidSoFar = existingPayments.reduce((sum, p) => sum + p.amountPaid, 0);
+
+        // Find the installment details to get the max amount
+        const installment = await prisma.feeInstallment.findUnique({
+            where: { id: installmentId }
+        });
+
+        if (!installment) {
+            return res.status(404).json({ error: 'Installment not found' });
+        }
+
+        const remainingBalance = installment.amount - totalPaidSoFar;
+        const newPaymentAmount = parseFloat(String(amount));
+
+        // Precision check (handle floating point tiny differences)
+        if (remainingBalance <= 0.01) {
+            return res.status(400).json({ error: 'Installment is already fully paid' });
+        }
+
+        if (newPaymentAmount > remainingBalance + 0.01) {
+            return res.status(400).json({
+                error: `Payment amount (₹${newPaymentAmount}) exceeds remaining balance (₹${remainingBalance})`
             });
+        }
 
-            secureLogger.debug('Student found', student ? { id: student.id, name: student.name, batchId: student.batchId, hasBatch: !!student.batch } : 'NOT FOUND');
 
-            if (!student) throw { statusCode: 404, message: 'Student not found' };
-
-            // ✅ SECURITY: Defense-in-depth - validate instituteId directly
-            if (!student.batch) {
-                throw { statusCode: 400, message: 'Student has no batch assigned' };
+        // Create payment record
+        const payment = await prisma.feePayment.create({
+            data: {
+                studentId,
+                installmentId,
+                amountPaid: newPaymentAmount,
+                date: date ? new Date(date) : new Date(),
             }
-            if (student.instituteId && student.instituteId !== user.instituteId) {
-                throw { statusCode: 403, message: 'Unauthorized: Cross-institute access denied' };
+        });
+
+        if (student.instituteId) {
+            try {
+                await prisma.systemLog.create({
+                    data: {
+                        instituteId: student.instituteId,
+                        action: 'FEE_COLLECTED',
+                        entityId: student.id,
+                        entityName: student.name,
+                        details: { amount: newPaymentAmount, installmentName: installment.name }
+                    }
+                });
+            } catch (logError) {
+                console.warn('[WARN] Failed to write fee collection audit log:', logError);
             }
-            if (student.batch.teacherId && student.batch.teacherId !== teacherId) {
-                throw { statusCode: 403, message: 'Unauthorized' };
-            }
+        }
 
-            // Calculate total already paid for this installment
-            const existingPayments = await tx.feePayment.findMany({
-                where: { studentId, installmentId }
-            });
-
-            const totalPaidSoFar = existingPayments.reduce((sum, p) => sum + p.amountPaid, 0);
-
-            // Find the installment details to get the max amount
-            const installment = await tx.feeInstallment.findUnique({
-                where: { id: installmentId }
-            });
-
-            if (!installment) {
-                throw { statusCode: 404, message: 'Installment not found' };
-            }
-
-            const remainingBalance = installment.amount - totalPaidSoFar;
-            const newPaymentAmount = parseFloat(String(amount));
-
-            // Precision check (handle floating point tiny differences)
-            if (remainingBalance <= 0.01) {
-                throw { statusCode: 400, message: 'Installment is already fully paid' };
-            }
-
-            if (newPaymentAmount > remainingBalance + 0.01) {
-                throw { statusCode: 400, message: `Payment amount (₹${newPaymentAmount}) exceeds remaining balance (₹${remainingBalance})` };
-            }
-
-
-            // Create payment record
-            const payment = await tx.feePayment.create({
-                data: {
-                    studentId,
-                    installmentId,
-                    amountPaid: newPaymentAmount,
-                    date: date ? new Date(date) : new Date(),
-                }
-            });
-
-            if (student.instituteId) {
-                try {
-                    await tx.systemLog.create({
-                        data: {
-                            instituteId: student.instituteId,
-                            action: 'FEE_COLLECTED',
-                            entityId: student.id,
-                            entityName: student.name,
-                            details: { amount: newPaymentAmount, installmentName: installment.name }
-                        }
-                    });
-                } catch (logError) {
-                    secureLogger.warn('[WARN] Failed to write fee collection audit log:', logError);
-                }
-            }
-            
-            return { payment, student, installment, newPaymentAmount };
-        }, { isolationLevel: 'Serializable' });
-
-        const { payment, student, installment, newPaymentAmount } = result;
-
-        secureLogger.info('[DEBUG] Payment created successfully:', {
+        console.log('[DEBUG] Payment created successfully:', {
             paymentId: payment.id,
             studentId: payment.studentId,
             installmentId: payment.installmentId,
@@ -643,10 +660,7 @@ export const payInstallment = async (req: Request, res: Response) => {
 
         // Payment recorded successfully (this will automatically appear in transaction reports)
         res.json(payment);
-    } catch (error: any) {
-        if (error.statusCode) {
-            return res.status(error.statusCode).json({ error: error.message });
-        }
+    } catch (error) {
         console.error('[ERROR] Error paying installment:', error);
         res.status(500).json({ error: 'Failed to record payment' });
     }
@@ -656,7 +670,7 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
     const { studentId, amountDue } = req.body;
 
     try {
-        const teacherId = req.user?.id;
+        const teacherId = (req as any).user?.id;
         const student = await prisma.student.findUnique({
             where: { id: studentId },
             include: {
@@ -774,16 +788,25 @@ ${senderName}`;
 
 export const getRecentTransactions = async (req: Request, res: Response) => {
     try {
-        const teacherId = req.user?.id;
+        const user = (req as any).user;
+        const teacherId = user?.id;
+        const instituteId = user?.instituteId;
+        const role = user?.role;
 
-        secureLogger.debug('Fetching recent transactions for teacher', { teacherId });
+        const studentWhereClause: any = {};
+        if (instituteId) {
+            studentWhereClause.instituteId = instituteId;
+        }
+        if (role !== 'SUPER_ADMIN') {
+            studentWhereClause.batch = { teacherId };
+        }
+
+        secureLogger.debug('Fetching recent transactions', { teacherId, instituteId });
 
         // Fetch recent installment payments (NO academic year filter)
         const recentInstallments = await prisma.feePayment.findMany({
             where: {
-                student: {
-                    batch: { teacherId }
-                }
+                student: studentWhereClause
             },
             take: 10,
             orderBy: { date: 'desc' },
@@ -798,9 +821,7 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
         // Fetch recent ad-hoc payments (FeeRecord)
         const recentRecords = await prisma.feeRecord.findMany({
             where: {
-                student: {
-                    batch: { teacherId }
-                }
+                student: studentWhereClause
             },
             take: 10,
             orderBy: { date: 'desc' },
@@ -856,8 +877,8 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         const endDate = new Date(Date.UTC(yearNum, monthIdx + 1, 1, -5, -30, 0, -1));
 
         // Fetch Installment Payments
-        const instituteId = req.user?.instituteId;
-        const teacherId = req.user?.id;
+        const instituteId = (req as any).user?.instituteId;
+        const teacherId = (req as any).user?.id;
 
         const payments = await prisma.feePayment.findMany({
             where: {
@@ -1033,8 +1054,8 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
 
 export const getUpiVerifications = async (req: Request, res: Response) => {
     try {
-        const teacherId = req.user?.id;
-        const instituteId = req.user?.instituteId;
+        const teacherId = (req as any).user?.id;
+        const instituteId = (req as any).user?.instituteId;
         const nowEpoch = Math.floor(Date.now() / 1000);
 
         const verifications = await prisma.upiPaymentVerification.findMany({
@@ -1097,8 +1118,8 @@ class PaymentValidationError extends Error {
 export const approveUpiVerification = async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const teacherId = req.user?.id;
-        const instituteId = req.user?.instituteId;
+        const teacherId = (req as any).user?.id;
+        const instituteId = (req as any).user?.instituteId;
 
         const rawVerification = await prisma.upiPaymentVerification.findUnique({
             where: { id },
@@ -1262,8 +1283,8 @@ export const rejectUpiVerification = async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
         const reason = typeof req.body?.reason === 'string' ? req.body.reason : '';
-        const teacherId = req.user?.id;
-        const instituteId = req.user?.instituteId;
+        const teacherId = (req as any).user?.id;
+        const instituteId = (req as any).user?.instituteId;
 
         const rawVerification = await prisma.upiPaymentVerification.findUnique({
             where: { id },
@@ -1318,8 +1339,8 @@ export const rejectUpiVerification = async (req: Request, res: Response) => {
 
 export const getCustomInvoices = async (req: Request, res: Response) => {
     try {
-        const teacherId = req.user?.id;
-        const instituteId = req.user?.instituteId;
+        const teacherId = (req as any).user?.id;
+        const instituteId = (req as any).user?.instituteId;
 
         const invoices = await prisma.feeInstallment.findMany({
             where: {
@@ -1385,7 +1406,7 @@ export const getCustomInvoices = async (req: Request, res: Response) => {
 export const createCustomInvoice = async (req: Request, res: Response) => {
     try {
         const { studentId, installmentId, name, amount, markAsPaid } = req.body;
-        const user = req.user;
+        const user = (req as any).user;
         const teacherId = user?.id;
         const instituteId = user?.instituteId;
 
@@ -1486,7 +1507,7 @@ export const createCustomInvoice = async (req: Request, res: Response) => {
                         }
                     });
                 } catch (logError) {
-                    secureLogger.warn('[WARN] Failed to write custom invoice audit log:', logError);
+                    console.warn('[WARN] Failed to write custom invoice audit log:', logError);
                 }
             }
         }
@@ -1537,8 +1558,8 @@ export const scanReceipt = async (req: Request, res: Response) => {
     try {
         let imageBuffer: Buffer | string | undefined;
 
-        if (req.file) {
-            imageBuffer = req.file.buffer;
+        if ((req as any).file) {
+            imageBuffer = (req as any).file.buffer;
         } else if (req.body.image) {
             imageBuffer = req.body.image;
         }

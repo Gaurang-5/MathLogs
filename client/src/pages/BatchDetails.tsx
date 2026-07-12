@@ -459,10 +459,12 @@ export default function BatchDetails() {
 
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
     const [deleteInput, setDeleteInput] = useState('');
+    const [leaveReason, setLeaveReason] = useState('');
 
     const handleDelete = (student: Student) => {
         setStudentToDelete(student);
         setDeleteInput('');
+        setLeaveReason('');
     };
 
     const confirmDeleteStudent = async (e: React.FormEvent) => {
@@ -471,8 +473,12 @@ export default function BatchDetails() {
 
         const toastId = toast.loading('Removing student...');
         try {
-            await apiRequest(`/students/${studentToDelete.id}/reject`, 'POST');
-            toast.success('Student removed', { id: toastId });
+            const res = await apiRequest(`/students/${studentToDelete.id}/archive`, 'DELETE', { leaveReason });
+            if (res.action === 'archived') {
+                toast.success('Student has been archived', { id: toastId });
+            } else {
+                toast.success('Student permanently deleted', { id: toastId });
+            }
             setStudentToDelete(null);
             setTimeout(() => fetchDetails(), 300);
         } catch {
@@ -1883,16 +1889,25 @@ export default function BatchDetails() {
                                     <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center mb-4">
                                         <Trash2 className="w-6 h-6" />
                                     </div>
-                                    <h3 className="text-xl font-bold text-app-text">Delete Student?</h3>
+                                    <h3 className="text-xl font-bold text-app-text">Remove Student?</h3>
                                     <p className="text-app-text-secondary mt-1 text-sm">
-                                        This will permanently remove <span className="font-bold text-app-text">{studentToDelete.name}</span> and all their data including fees and marks.
+                                        If the student has fee or attendance records, they will be <span className="font-bold text-app-text">Archived</span>. Otherwise, they will be permanently deleted.
                                     </p>
                                 </div>
-                                <button onClick={() => setStudentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
+                                <button type="button" onClick={() => setStudentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
                             </div>
 
                             <form onSubmit={confirmDeleteStudent} className="space-y-4">
                                 <div>
+                                    <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider mb-2 block">
+                                        Reason for leaving (Optional)
+                                    </label>
+                                    <input
+                                        value={leaveReason}
+                                        onChange={(e) => setLeaveReason(e.target.value)}
+                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-black/20 outline-none transition-all mb-4 placeholder:text-app-text-tertiary/50"
+                                        placeholder="e.g. Graduated, Transferred, Dropped out"
+                                    />
                                     <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider mb-2 block">
                                         Type <span className="text-red-500">delete</span> to confirm
                                     </label>

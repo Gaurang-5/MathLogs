@@ -495,6 +495,77 @@ export const rejectStudent = async (req: Request, res: Response) => {
     }
 };
 
+export const archiveStudent = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { leaveReason } = req.body;
+
+    try {
+        const user = (req as any).user;
+
+        const student = await prisma.student.findUnique({
+            where: { id: String(id) },
+            include: {
+                fees: true,
+                feePayments: true,
+                attendanceRecords: true,
+                marks: true,
+                quizSubmissions: true
+            }
+        });
+
+        if (!student) return res.status(404).json({ error: 'Student not found' });
+        if (student.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const hasActivity = 
+            student.fees.length > 0 || 
+            student.feePayments.length > 0 || 
+            student.attendanceRecords.length > 0 || 
+            student.marks.length > 0 || 
+            student.quizSubmissions.length > 0;
+
+        if (hasActivity) {
+            // Soft Delete / Archive
+            await prisma.student.update({
+                where: { id: String(id) },
+                data: {
+                    status: 'LEFT',
+                    leaveReason: leaveReason || 'No reason provided',
+                    leftAt: new Date(),
+                    batchId: null
+                }
+            });
+            return res.json({ success: true, action: 'archived' });
+        } else {
+            // Hard Delete with Log
+            await prisma.$transaction([
+                prisma.systemLog.create({
+                    data: {
+                        instituteId: user.instituteId,
+                        action: 'STUDENT_HARD_DELETE',
+                        entityName: student.name,
+                        details: {
+                            leaveReason: leaveReason || 'No activity',
+                            deletedAt: new Date().toISOString(),
+                            studentData: {
+                                humanId: student.humanId,
+                                parentName: student.parentName,
+                                parentWhatsapp: student.parentWhatsapp
+                            }
+                        } as any
+                    }
+                }),
+                prisma.student.delete({
+                    where: { id: String(id) }
+                })
+            ]);
+            return res.json({ success: true, action: 'hard_deleted' });
+        }
+    } catch (e) {
+        console.error("Archive error:", e);
+        res.status(500).json({ error: 'Failed to remove or archive student' });
+    }
+};
+
 export const getStudentGrowthStats = async (req: Request, res: Response) => {
     try {
         const students = await prisma.student.findMany({

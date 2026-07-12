@@ -104,7 +104,9 @@ model Student {
   parentName              String
   parentWhatsapp          String
   parentEmail             String?
-  status                  String                   @default("PENDING")
+  status                  String                   @default("PENDING") // PENDING, ACTIVE, LEFT
+  leaveReason             String?
+  leftAt                  DateTime?
   batchId                 String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
