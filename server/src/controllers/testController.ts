@@ -36,6 +36,7 @@ export const createTest = async (req: Request, res: Response) => {
         });
         res.json(test);
     } catch (e) {
+        console.error("Error creating test/quiz:", e);
         res.status(500).json({ error: 'Failed to create test' });
     }
 };
@@ -204,6 +205,7 @@ export const updateTest = async (req: Request, res: Response) => {
         });
         res.json(updated);
     } catch (e) {
+        console.error('Error updating test:', e);
         res.status(500).json({ error: 'Failed to update test' });
     }
 };
