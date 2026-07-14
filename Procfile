@@ -1,2 +1,2 @@
-web: cd server && npm start
-release: cd server && npx prisma migrate deploy
+web: cd server && DATABASE_URL="${DATABASE_URL}?sslmode=require" npm start
+release: cd server && DATABASE_URL="${DATABASE_URL}?sslmode=require" npx prisma migrate deploy
