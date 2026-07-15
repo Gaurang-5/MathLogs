@@ -12,9 +12,9 @@ interface QuizBillingProps {
 }
 
 const creditPackages = [
-    { id: 'quiz_credits_50', credits: 50, price: 999, popular: false, oldPrice: 1499 },
-    { id: 'quiz_credits_200', credits: 200, price: 2999, popular: true, oldPrice: 4999 },
-    { id: 'quiz_credits_500', credits: 500, price: 5999, popular: false, oldPrice: 9999 }
+    { id: 'quiz_credits_10', credits: 10, price: 1000, popular: false, oldPrice: 1599 },
+    { id: 'quiz_credits_25', credits: 25, price: 2000, popular: true, oldPrice: 3499 },
+    { id: 'quiz_credits_40', credits: 40, price: 3000, popular: false, oldPrice: 5999 }
 ];
 
 export default function QuizBilling({ institute, fetchInstituteDetails, isCheckoutLoading, setIsCheckoutLoading, loadScript }: QuizBillingProps) {

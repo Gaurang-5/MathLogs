@@ -33,11 +33,12 @@ export const createBillingSession = async (req: Request, res: Response) => {
 
         if (planId.startsWith('quiz_credits_')) {
             let amountInINR = 0;
-            if (planId === 'quiz_credits_50') amountInINR = 999;
-            else if (planId === 'quiz_credits_200') amountInINR = 2999;
-            else if (planId === 'quiz_credits_500') amountInINR = 5999;
-            else return res.status(400).json({ error: 'Invalid quiz credits plan' });
-            
+            if (planId === 'quiz_credits_10') amountInINR = 1000;
+            else if (planId === 'quiz_credits_25') amountInINR = 2000;
+            else if (planId === 'quiz_credits_40') amountInINR = 3000;
+            else {
+                return res.status(400).json({ error: 'Invalid plan selected' });
+            }
             const order = await razorpay.orders.create({
                 amount: amountInINR * 100,
                 currency: 'INR',
@@ -186,10 +187,12 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
 
         if (planId.startsWith('quiz_credits_')) {
             let addedCredits = 0;
-            if (planId === 'quiz_credits_50') addedCredits = 50;
-            else if (planId === 'quiz_credits_200') addedCredits = 200;
-            else if (planId === 'quiz_credits_500') addedCredits = 500;
-            
+            if (planId === 'quiz_credits_10') addedCredits = 10;
+            else if (planId === 'quiz_credits_25') addedCredits = 25;
+            else if (planId === 'quiz_credits_40') addedCredits = 40;
+            else {
+                return res.status(400).json({ success: false, error: 'Invalid plan selected' });
+            }
             await prisma.institute.update({
                 where: { id: admin.institute.id },
                 data: {
