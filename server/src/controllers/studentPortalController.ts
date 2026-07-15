@@ -663,7 +663,7 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
             },
             student: {
                 name: student.name,
-                phone: student.phone
+                phone: student.parentWhatsapp
             }
         });
     } catch (error) {
