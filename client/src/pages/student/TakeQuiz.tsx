@@ -156,6 +156,7 @@ export default function TakeQuiz() {
     const submittingRef = useRef(false);
     const startAttemptedRef = useRef(false);
     const lastEventTimeRef = useRef<number>(0);
+    const isUnloadingRef = useRef<boolean>(false);
 
     // Stable ref for submitQuiz — breaks dep cycle with countdown effect
     const submitQuizRef = useRef<(auto?: boolean) => Promise<void>>(() => Promise.resolve());
@@ -214,10 +215,12 @@ export default function TakeQuiz() {
             setShowMask(true);
         } else {
             setShowMask(true);
-            maskTimer.current = setTimeout(() => {
-                setShowMask(false);
-                setViolationReason(null);
-            }, 4000);
+            if (reason !== 'FULLSCREEN_EXIT') {
+                maskTimer.current = setTimeout(() => {
+                    setShowMask(false);
+                    setViolationReason(null);
+                }, 4000);
+            }
         }
     }, [logCheat, phase]);
 
@@ -287,6 +290,14 @@ export default function TakeQuiz() {
 
             setPhase('quiz');
             goTo(0);
+
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                }
+            } catch (err) {
+                console.error("Failed to enter fullscreen:", err);
+            }
         } catch (e: any) {
             toast.error(e?.response?.data?.error || 'Failed to start quiz attempt.');
         } finally {
@@ -409,10 +420,12 @@ export default function TakeQuiz() {
     /* ── Proctoring ── */
     useEffect(() => {
         if (phase !== 'quiz') return;
-        const onVis = () => { if (document.hidden) triggerMask('TAB_SWITCH'); };
+        const onVis = () => { 
+            if (isUnloadingRef.current) return;
+            if (document.hidden) triggerMask('TAB_SWITCH'); 
+        };
         const onBlur = () => {
-            // Only trigger WINDOW_BLUR if the document/tab is still visible.
-            // If the document is hidden, it's a tab switch or minimized window, which is already handled by TAB_SWITCH.
+            if (isUnloadingRef.current) return;
             if (!document.hidden) {
                 triggerMask('WINDOW_BLUR');
             }
@@ -424,13 +437,24 @@ export default function TakeQuiz() {
             if ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3', '4', 's', 'S'].includes(e.key)) {
                 e.preventDefault(); triggerMask('SCREENSHOT_KEY');
             }
+            if (e.key === 'F12' || ((e.metaKey || e.ctrlKey) && e.shiftKey && ['i', 'I', 'j', 'J', 'c', 'C'].includes(e.key))) {
+                e.preventDefault(); triggerMask('DEV_TOOLS_SHORTCUT');
+            }
         };
+        const onFullscreenChange = () => {
+            if (isUnloadingRef.current) return;
+            if (!document.fullscreenElement) {
+                triggerMask('FULLSCREEN_EXIT');
+            }
+        };
+        
         document.addEventListener('visibilitychange', onVis);
         window.addEventListener('blur', onBlur);
         document.addEventListener('contextmenu', noCtx);
         document.addEventListener('copy', noCopy);
         document.addEventListener('cut', noCopy);
         document.addEventListener('keydown', noKey);
+        document.addEventListener('fullscreenchange', onFullscreenChange);
         return () => {
             document.removeEventListener('visibilitychange', onVis);
             window.removeEventListener('blur', onBlur);
@@ -438,6 +462,7 @@ export default function TakeQuiz() {
             document.removeEventListener('copy', noCopy);
             document.removeEventListener('cut', noCopy);
             document.removeEventListener('keydown', noKey);
+            document.removeEventListener('fullscreenchange', onFullscreenChange);
         };
     }, [phase, triggerMask]);
 
@@ -447,12 +472,18 @@ export default function TakeQuiz() {
     useEffect(() => {
         if (phase !== 'quiz') return;
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            e.preventDefault();
-            e.returnValue = 'Are you sure you want to leave? Your quiz attempt is active and leaving will be logged.';
-            return e.returnValue;
+            isUnloadingRef.current = true;
+            // No longer prompting, just preventing the false positive flag
+        };
+        const handlePageHide = () => {
+            isUnloadingRef.current = true;
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('pagehide', handlePageHide);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('pagehide', handlePageHide);
+        };
     }, [phase]);
 
     /* ── Print block ── */
