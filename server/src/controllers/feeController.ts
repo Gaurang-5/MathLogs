@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
-import PDFDocument from 'pdfkit';
+// const PDFDocument = require('pdfkit');
 import { secureLogger } from '../utils/secureLogger';
 import { sendEmail } from '../utils/email';
 import { addMathLogsHeader } from '../utils/pdfUtils';
@@ -72,6 +72,7 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
         }
 
         // Generate PDF
+        const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 30, size: 'A4' });
 
         res.setHeader('Content-Type', 'application/pdf');
@@ -943,6 +944,7 @@ export const downloadMonthlyReport = async (req: Request, res: Response) => {
         }
 
         // Generate PDF
+        const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 30, size: 'A4' });
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=Transactions_${month}_${year}.pdf`);

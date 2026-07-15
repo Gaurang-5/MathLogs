@@ -16,6 +16,7 @@ import {
     Eye,
     EyeOff,
     Minimize2,
+    Maximize,
     CameraOff,
     Loader,
     Lock,
@@ -143,6 +144,7 @@ export default function TakeQuiz() {
     const [warnCount, setWarnCount] = useState(0);
     const [showMask, setShowMask] = useState(false);
     const [locked, setLocked] = useState(false);
+    const [isNotInFullscreen, setIsNotInFullscreen] = useState(false);
     const [timeExpired, setTimeExpired] = useState(false); // ← drives "Time's Up" overlay
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [isFirstView, setIsFirstView] = useState(false);
@@ -156,7 +158,7 @@ export default function TakeQuiz() {
     const submittingRef = useRef(false);
     const startAttemptedRef = useRef(false);
     const lastEventTimeRef = useRef<number>(0);
-    const isUnloadingRef = useRef<boolean>(false);
+    const isUnloadingRef = useRef(false);
 
     // Stable ref for submitQuiz — breaks dep cycle with countdown effect
     const submitQuizRef = useRef<(auto?: boolean) => Promise<void>>(() => Promise.resolve());
@@ -172,7 +174,7 @@ export default function TakeQuiz() {
             const r = await axios.get<QuizResult>(`/api/student-portal/quizzes/${quizId}/result`, { headers });
             setResult(r.data);
             setPhase('result');
-            localStorage.removeItem(`student_quiz_draft_${quizId}`); // Clear local draft
+            if (submission?.id) localStorage.removeItem(`student_quiz_draft_${submission.id}`); // Clear local draft
             return true;
         } catch { return false; }
     }, [headers, quizId, token]);
@@ -236,7 +238,7 @@ export default function TakeQuiz() {
                 { answers: answersRef.current },
                 { headers }
             );
-            localStorage.removeItem(`student_quiz_draft_${quizId}`); // Clear local draft
+            if (submission?.id) localStorage.removeItem(`student_quiz_draft_${submission.id}`); // Clear local draft
             toast.success(auto ? 'Time up! Quiz submitted.' : 'Quiz submitted successfully!');
             await loadResult();
         } catch (e: any) {
@@ -259,6 +261,18 @@ export default function TakeQuiz() {
     const [startingAttempt, setStartingAttempt] = useState(false);
 
     const startOrContinueQuiz = async () => {
+        try {
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                }
+            } catch (err) {
+                console.warn('Fullscreen API not supported or denied by this device/browser (often happens on iOS Safari or mobile).', err);
+            }
+        } catch (e) {
+            console.warn('Fullscreen request failed:', e);
+        }
+
         if (submission) {
             setPhase('quiz');
             goTo(0);
@@ -277,7 +291,7 @@ export default function TakeQuiz() {
             setWarnCount(r.data.submission.cheatingWarnings || 0);
 
             // Restore from local draft if any exists
-            const localDraftStr = localStorage.getItem(`student_quiz_draft_${quizId}`);
+            const localDraftStr = localStorage.getItem(`student_quiz_draft_${r.data.submission.id}`);
             let localDraft = null;
             try {
                 if (localDraftStr) localDraft = JSON.parse(localDraftStr);
@@ -320,7 +334,7 @@ export default function TakeQuiz() {
                     setWarnCount(r.data.submission.cheatingWarnings || 0);
 
                     // Restore from local draft first, merging with server autosave
-                    const localDraftStr = localStorage.getItem(`student_quiz_draft_${quizId}`);
+                    const localDraftStr = localStorage.getItem(`student_quiz_draft_${r.data.submission.id}`);
                     let localDraft = null;
                     try {
                         if (localDraftStr) localDraft = JSON.parse(localDraftStr);
@@ -376,10 +390,10 @@ export default function TakeQuiz() {
 
     useEffect(() => {
         answersRef.current = answers;
-        if (quizId && Object.keys(answers).length > 0) {
-            localStorage.setItem(`student_quiz_draft_${quizId}`, JSON.stringify(answers));
+        if (submission?.id && Object.keys(answers).length > 0) {
+            localStorage.setItem(`student_quiz_draft_${submission.id}`, JSON.stringify(answers));
         }
-    }, [answers, quizId]);
+    }, [answers, submission?.id]);
 
     /* ── Autosave interval ── */
     useEffect(() => {
@@ -420,14 +434,18 @@ export default function TakeQuiz() {
     /* ── Proctoring ── */
     useEffect(() => {
         if (phase !== 'quiz') return;
-        const onVis = () => { 
-            if (isUnloadingRef.current) return;
-            if (document.hidden) triggerMask('TAB_SWITCH'); 
-        };
+        const onVis = () => { if (document.hidden && !isUnloadingRef.current) triggerMask('TAB_SWITCH'); };
         const onBlur = () => {
-            if (isUnloadingRef.current) return;
-            if (!document.hidden) {
+            if (!document.hidden && !isUnloadingRef.current) {
                 triggerMask('WINDOW_BLUR');
+            }
+        };
+        const onFullscreenChange = () => {
+            if (!document.fullscreenElement && !isUnloadingRef.current) {
+                setIsNotInFullscreen(true);
+                triggerMask('FULLSCREEN_EXIT');
+            } else {
+                setIsNotInFullscreen(false);
             }
         };
         const noCtx = (e: Event) => e.preventDefault();
@@ -441,15 +459,10 @@ export default function TakeQuiz() {
                 e.preventDefault(); triggerMask('DEV_TOOLS_SHORTCUT');
             }
         };
-        const onFullscreenChange = () => {
-            if (isUnloadingRef.current) return;
-            if (!document.fullscreenElement) {
-                triggerMask('FULLSCREEN_EXIT');
-            }
-        };
         
         document.addEventListener('visibilitychange', onVis);
         window.addEventListener('blur', onBlur);
+        document.addEventListener('fullscreenchange', onFullscreenChange);
         document.addEventListener('contextmenu', noCtx);
         document.addEventListener('copy', noCopy);
         document.addEventListener('cut', noCopy);
@@ -458,6 +471,7 @@ export default function TakeQuiz() {
         return () => {
             document.removeEventListener('visibilitychange', onVis);
             window.removeEventListener('blur', onBlur);
+            document.removeEventListener('fullscreenchange', onFullscreenChange);
             document.removeEventListener('contextmenu', noCtx);
             document.removeEventListener('copy', noCopy);
             document.removeEventListener('cut', noCopy);
@@ -817,8 +831,8 @@ export default function TakeQuiz() {
                             exit={{ scale: 0.92, y: 15 }}
                             className={`w-full max-w-md rounded-3xl p-6 sm:p-8 text-center border shadow-2xl space-y-6 transition-all ${
                                 locked
-                                    ? 'bg-red-950/45 border-red-500/20 text-white'
-                                    : 'bg-gray-900 border-gray-800 text-white'
+                                    ? 'bg-red-950 border-red-500/30 text-white'
+                                    : 'bg-gray-900 border-gray-700 text-white'
                             }`}
                         >
                             {locked ? (
@@ -832,10 +846,10 @@ export default function TakeQuiz() {
                                         <Lock className="w-8 h-8 sm:w-10 sm:h-10 text-red-500 relative z-10" />
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="text-xl sm:text-2xl font-black tracking-tight text-red-400">
+                                        <h3 className="text-xl sm:text-2xl font-black tracking-tight !text-white">
                                             Attempt Permanently Locked
                                         </h3>
-                                        <p className="text-xs sm:text-sm text-gray-400 leading-relaxed max-w-xs mx-auto">
+                                        <p className="text-xs sm:text-sm text-gray-300 leading-relaxed max-w-xs mx-auto">
                                             Academic integrity violation threshold exceeded. You have committed {MAX_WARNS} warnings during this quiz. Your attempt is locked. Please contact your instructor.
                                         </p>
                                     </div>
@@ -860,7 +874,7 @@ export default function TakeQuiz() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
+                                        <h3 className="text-xl sm:text-2xl font-black tracking-tight !text-white leading-tight">
                                             {violationReason === 'TAB_SWITCH' ? (
                                                 'Tab Switch Detected'
                                             ) : violationReason === 'WINDOW_BLUR' ? (
@@ -871,11 +885,11 @@ export default function TakeQuiz() {
                                                 'Security Alert'
                                             )}
                                         </h3>
-                                        <p className="text-xs sm:text-sm text-gray-400 leading-relaxed max-w-xs mx-auto">
+                                        <p className="text-xs sm:text-sm text-gray-300 leading-relaxed max-w-xs mx-auto">
                                             {violationReason === 'TAB_SWITCH' ? (
-                                                'You switched away from the active assessment tab. This behavior is strictly monitored to ensure academic integrity.'
+                                                'Navigating away from the quiz window is strictly prohibited. This incident has been logged.'
                                             ) : violationReason === 'WINDOW_BLUR' ? (
-                                                'The browser window lost focus (e.g., switching apps, opening developer tools, or clicking away). Please keep your focus on the quiz.'
+                                                'Clicking outside the quiz or opening other applications is prohibited. This incident has been logged.'
                                             ) : violationReason === 'SCREENSHOT_KEY' ? (
                                                 'Taking screenshots or screen snippets of quiz questions is strictly forbidden and has been logged.'
                                             ) : (
@@ -911,6 +925,38 @@ export default function TakeQuiz() {
                             )}
                         </motion.div>
                     </motion.div>
+                )}
+
+                {/* ── NOT IN FULLSCREEN MASK ── */}
+                {isNotInFullscreen && !locked && (
+                    <div className="fixed inset-0 z-[9998] bg-black/90 backdrop-blur-md flex items-center justify-center px-4">
+                        <div className="w-full max-w-md bg-gray-900 border border-gray-700 rounded-3xl p-6 sm:p-8 text-center shadow-2xl">
+                            <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center mb-6">
+                                <Maximize className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+                            </div>
+                            <h3 className="text-xl sm:text-2xl font-black !text-white mb-3">Fullscreen Required</h3>
+                            <p className="text-sm text-gray-300 mb-8 max-w-xs mx-auto">
+                                You must remain in fullscreen mode while taking this quiz. Please return to fullscreen to continue.
+                            </p>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        if (document.documentElement.requestFullscreen) {
+                                            await document.documentElement.requestFullscreen();
+                                            setIsNotInFullscreen(false);
+                                        } else {
+                                            setIsNotInFullscreen(false);
+                                        }
+                                    } catch (e) {
+                                        setIsNotInFullscreen(false);
+                                    }
+                                }}
+                                className="w-full bg-white text-black font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors"
+                            >
+                                Return to Fullscreen
+                            </button>
+                        </div>
+                    </div>
                 )}
             </AnimatePresence>
 
@@ -1000,6 +1046,25 @@ export default function TakeQuiz() {
                                     );
                                 })}
                             </div>
+                            
+                            {answers[q.id] !== undefined && (
+                                <div className="px-3.5 pb-3">
+                                    <button
+                                        onClick={() => {
+                                            if (timeExpired) return;
+                                            setAnswers(prev => {
+                                                const next = { ...prev };
+                                                delete next[q.id];
+                                                return next;
+                                            });
+                                        }}
+                                        disabled={timeExpired}
+                                        className="text-xs font-semibold text-gray-400 hover:text-gray-900 transition-colors"
+                                    >
+                                        Clear selection
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Nav buttons */}

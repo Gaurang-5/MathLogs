@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { quizCache } from '../utils/redis';
-import PDFDocument from 'pdfkit';
+// const PDFDocument = require('pdfkit');
 import { addMathLogsHeader } from '../utils/pdfUtils';
 import { generateTest, generateSingleQuestion, generateTestWithVariants, generateVariantQuestion } from '../utils/ai/test-generator';
 import { sendQuizMarksBroadcast, sendQuizScheduleBroadcast } from '../utils/quizBroadcasts';
@@ -252,6 +252,7 @@ export const downloadTestReport = async (req: Request, res: Response) => {
             return;
         }
 
+        const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 50 });
 
         res.setHeader('Content-Type', 'application/pdf');
@@ -1332,6 +1333,7 @@ export const downloadOnlineQuizQuestionsPdf = async (req: Request, res: Response
             return res.status(404).send('Quiz not found');
         }
 
+        const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
         res.setHeader('Content-Type', 'application/pdf');
@@ -1493,6 +1495,7 @@ export const downloadOnlineQuizReportPdf = async (req: Request, res: Response) =
         const passRate = completedCount > 0 ? (passCount / completedCount) : 0;
         const flagRate = totalSubmissions > 0 ? (flaggedCount / totalSubmissions) : 0;
 
+        const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
         res.setHeader('Content-Type', 'application/pdf');

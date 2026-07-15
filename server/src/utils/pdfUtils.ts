@@ -1,4 +1,4 @@
-import PDFDocument from 'pdfkit';
+// removed pdfkit require
 import path from 'path';
 import fs from 'fs';
 
@@ -7,7 +7,7 @@ import fs from 'fs';
  * @param doc - PDFKit document instance
  * @param y - Y position to start (default: 20)
  */
-export const addMathLogsHeader = (doc: typeof PDFDocument, y: number = 20) => {
+export const addMathLogsHeader = (doc: any, y: number = 20) => {
     const logoPath = path.join(__dirname, '../assets/mathlogs-logo.png');
 
     // Check if logo exists
