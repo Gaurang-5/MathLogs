@@ -210,6 +210,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
                 phoneNumber: phone,
                 email: email,
                 plan: tier,
+                isQuizOnly: planId === 'quiz_only',
                 quizCredits: planId === 'quiz_only' ? 10 : 0,
                 config: {
                     requiresGrades: true,

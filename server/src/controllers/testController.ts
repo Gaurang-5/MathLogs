@@ -733,7 +733,7 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
         if (!institute) return res.status(404).json({ error: 'Institute not found' });
         
         const config = institute.config as any;
-        const isQuizOnly = config?.isQuizOnly === true;
+        const isQuizOnly = institute.isQuizOnly === true || config?.isQuizOnly === true || config?.planName === 'QUIZ_ONLY';
 
         if (!title || (!isPublic && finalBatchIds.length === 0) || !Array.isArray(questions) || questions.length === 0 || !instituteId || !availableFrom || !availableUntil) {
             return res.status(400).json({ error: 'Missing required fields' });
