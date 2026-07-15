@@ -659,13 +659,16 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
                 autoSavedAnswers: autoSavedAnswers || {},
                 startedAt: submission.startedAt,
                 submittedAt: submission.submittedAt,
-                cheatingWarnings: cheatingCount,
-                maxWarnings: MAX_CHEATING_WARNINGS
+                cheatingWarnings: cheatingCount
+            },
+            student: {
+                name: student.name,
+                phone: student.phone
             }
         });
     } catch (error) {
         console.error('Error starting quiz:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Failed to start quiz' });
     }
 };
 

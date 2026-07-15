@@ -136,6 +136,7 @@ export default function TakeQuiz() {
     const [submitting, setSubmitting] = useState(false);
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [submission, setSubmission] = useState<Submission | null>(null);
+    const [studentData, setStudentData] = useState<{ name: string; phone: string } | null>(null);
     const [result, setResult] = useState<QuizResult | null>(null);
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [visited, setVisited] = useState<Set<string>>(new Set());
@@ -281,13 +282,14 @@ export default function TakeQuiz() {
 
         setStartingAttempt(true);
         try {
-            const r = await axios.post<{ quiz: Quiz; submission: Submission }>(
+            const r = await axios.post<{ quiz: Quiz; submission: Submission; student?: { name: string; phone: string } }>(
                 `/api/student-portal/quizzes/${quizId}/start`,
                 { preview: false },
                 { headers }
             );
             setQuiz(r.data.quiz);
             setSubmission(r.data.submission);
+            if (r.data.student) setStudentData(r.data.student);
             setWarnCount(r.data.submission.cheatingWarnings || 0);
 
             // Restore from local draft if any exists
@@ -998,7 +1000,24 @@ export default function TakeQuiz() {
             </header>
 
             {/* ── Layout ── */}
-            <div className="flex flex-1 min-h-0 max-w-5xl mx-auto w-full">
+            <div className="flex flex-1 min-h-0 max-w-5xl mx-auto w-full relative">
+                
+                {/* ── Dynamic Watermark Overlay ── */}
+                {studentData && (
+                    <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden flex flex-wrap justify-center content-center opacity-[0.04] select-none mix-blend-multiply">
+                        {Array.from({ length: 40 }).map((_, i) => (
+                            <div
+                                key={i}
+                                className="transform -rotate-45 text-black font-black text-2xl whitespace-nowrap m-12"
+                                style={{
+                                    transform: `rotate(-30deg) translate(${Math.sin(i) * 50}px, ${Math.cos(i) * 50}px)`
+                                }}
+                            >
+                                {studentData.name} • {studentData.phone}
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 {/* ── Question panel ── */}
                 <main className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-5 pb-[calc(13.5rem+env(safe-area-inset-bottom))] lg:pb-6">
