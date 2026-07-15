@@ -275,7 +275,8 @@ export const getLiveQuizStatus = async (req: Request, res: Response) => {
 
 export const unlockQuizSubmission = async (req: Request, res: Response) => {
     try {
-        const { id: quizId, submissionId } = req.params;
+        const quizId = req.params.id as string;
+        const submissionId = req.params.submissionId as string;
         const teacherId = req.user?.id;
         const instituteId = req.user?.instituteId;
 

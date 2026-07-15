@@ -7,10 +7,14 @@ import { secureLogger } from './utils/secureLogger';
 // Production-grade Prisma configuration with connection pooling and query logging
 // HEROKU TIP: Basic/Mini Postgres has a 20 connection limit. 
 // If scaling to multiple dynos, keep CONNECTION_LIMIT low (e.g. 3-5) or use PgBouncer.
-const CONNECTION_LIMIT = parseInt(process.env.DB_CONNECTION_LIMIT || '15', 10);
+const CONNECTION_LIMIT = parseInt(process.env.DB_CONNECTION_LIMIT || '3', 10);
 const POOL_TIMEOUT = parseInt(process.env.DB_POOL_TIMEOUT || '30', 10);
 
-export const prisma = new PrismaClient({
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient({
     log: process.env.NODE_ENV === 'production'
         ? [
             { level: 'error', emit: 'stdout' },
@@ -24,7 +28,9 @@ export const prisma = new PrismaClient({
                 : undefined
         }
     }
-});
+  });
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 // PERF: Automatic slow query monitoring with Sentry integration
 // Logs queries > 1s and sends alerts to Sentry for investigation

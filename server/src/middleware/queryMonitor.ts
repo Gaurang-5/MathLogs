@@ -5,7 +5,7 @@
  */
 
 import { Prisma } from '@prisma/client';
-const Sentry = { captureException: () => {}, captureMessage: () => {}, metrics: { distribution: () => {} } };
+const Sentry = { captureException: (e?: any, ctx?: any) => {}, captureMessage: (m?: any, ctx?: any) => {}, metrics: { distribution: (n?: any, v?: any, o?: any) => {} } };
 import { performance } from 'perf_hooks';
 import { secureLogger } from '../utils/secureLogger';
 
