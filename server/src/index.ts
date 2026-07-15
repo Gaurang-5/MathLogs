@@ -1,3 +1,4 @@
+console.log("Starting index.ts");
 console.log('[DEBUG] index.ts module loading started');
 import 'dotenv/config';
 import path from 'path';
@@ -9,7 +10,7 @@ import { prisma } from './prisma';
 import { configureSecurityHeaders, apiLimiter } from './middleware/security';
 import { authenticateToken } from './middleware/auth';
 import { initializeSentry } from './monitoring/sentry';
-import * as Sentry from '@sentry/node';
+import Sentry from './monitoring/sentry';
 import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
 import { emailWorker } from './utils/emailWorker';
 import { Client } from 'pg';
@@ -187,7 +188,7 @@ export function createApp() {
     return app;
 }
 
-export const app = createApp();
+console.log("Before createApp"); export const app = createApp(); console.log("After createApp");
 
 function startServer() {
     process.on('unhandledRejection', (reason: any) => {

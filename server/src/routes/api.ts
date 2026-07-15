@@ -9,7 +9,7 @@ import { registerStudent, getPendingStudents, approveStudent, rejectStudent, arc
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute } from '../controllers/testController';
-import { getOnlineQuizAnalytics, getLiveQuizStatus } from '../controllers/analyticsController';
+import { getOnlineQuizAnalytics, getLiveQuizStatus, unlockQuizSubmission } from '../controllers/analyticsController';
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt } from '../controllers/feeController';
 
 
@@ -280,6 +280,7 @@ router.put('/tests/online/:id', authenticateToken as any, updateOnlineQuiz as an
 router.delete('/tests/online/:id', authenticateToken as any, deleteOnlineQuiz as any);
 router.get('/tests/online/:id/analytics', authenticateToken as any, getOnlineQuizAnalytics as any);
 router.get('/tests/online/:id/monitor', authenticateToken as any, getLiveQuizStatus as any);
+router.post('/tests/online/:id/submissions/:submissionId/unlock', authenticateToken as any, unlockQuizSubmission as any);
 router.post('/tests/online/:id/finalize', authenticateToken as any, bulkNotifyLimiter, finalizeOnlineQuiz as any);
 router.get('/tests/online/:id/report', authenticateToken as any, downloadOnlineQuizReport as any);
 router.get('/tests/online/:id/questions-pdf', authenticateToken as any, downloadOnlineQuizQuestionsPdf as any);

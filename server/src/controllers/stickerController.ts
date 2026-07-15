@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
-import PDFDocument from 'pdfkit';
 import bwipjs from 'bwip-js';
 
 export const generateStickerSheet = async (req: Request, res: Response) => {
@@ -9,6 +8,7 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
     const teacherId = user?.id;
     const instituteId = user?.instituteId;
     const role = user?.role;
+    const PDFDocument = require('pdfkit');
 
     const whereClause: any = {
         status: 'APPROVED'

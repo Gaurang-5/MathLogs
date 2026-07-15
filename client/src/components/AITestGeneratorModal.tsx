@@ -35,8 +35,8 @@ function ProgressLoader() {
             <div className="w-full max-w-sm space-y-3 text-center">
                 <p className="text-sm font-bold text-neutral-900 animate-pulse">{ProgressSteps[stepIndex]}</p>
                 <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
-                    <div 
-                        className="h-full bg-emerald-500 transition-all duration-1000 ease-out" 
+                    <div
+                        className="h-full bg-emerald-500 transition-all duration-1000 ease-out"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
@@ -110,7 +110,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
         if (firstIndex !== -1) {
             const updatedQuestions = [...generatedTest.questions];
             updatedQuestions.splice(firstIndex, count, ...oldQuestions);
-            
+
             const newReverts = { ...pendingReverts };
             delete newReverts[regenId];
             setPendingReverts(newReverts);
@@ -126,7 +126,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
 
     const handleConfirmRegeneration = (regenId: string) => {
         if (!generatedTest) return;
-        
+
         const updatedQuestions = generatedTest.questions.map((q: any) => {
             if (q.regenId === regenId) {
                 const { regenId: _, ...rest } = q;
@@ -216,7 +216,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                     variantSubIndex++;
                 }
                 labels.push(`Question ${currentNumber}${String.fromCharCode(65 + variantSubIndex)}`);
-                
+
                 // If next question isn't in this variant group, increment currentNumber
                 const nextQ = generatedTest.questions[i + 1];
                 if (!nextQ || nextQ.variantGroup !== q.variantGroup) {
@@ -335,7 +335,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
         setRegeneratingIndex(index);
         try {
             const targetQ = generatedTest.questions[index];
-            
+
             let groupIndices = [index];
             let isGroup = false;
             if (targetQ.variantGroup) {
@@ -344,7 +344,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                     .map((q, i) => q.variantGroup === targetQ.variantGroup ? i : -1)
                     .filter(i => i !== -1);
             }
-            
+
             const excludeQuestions = generatedTest.questions.map(q => q.questionText);
             const res = await api.post('/tests/generate-single-question', {
                 topic,
@@ -355,11 +355,11 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
             }, { timeoutMs: 60000 });
 
             const newQuestions: any[] = [];
-            
+
             if (isGroup) {
                 const newVariantGroup = Date.now().toString();
                 newQuestions.push({ ...res, variantGroup: newVariantGroup });
-                
+
                 const variantRes = await api.post('/tests/generate-variant-question', {
                     topic,
                     grade,
@@ -374,7 +374,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
 
             const regenId = Date.now().toString();
             const oldQuestions = groupIndices.map(i => generatedTest.questions[i]);
-            
+
             const processedNewQuestions = newQuestions.map(q => ({
                 ...q,
                 kept: false,
@@ -415,7 +415,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
             const variantGroupId = `vgroup-${Date.now()}`;
             const updatedOriginal = { ...originalQuestion, variantGroup: variantGroupId };
             const newVariant = { ...res, kept: false, variantGroup: variantGroupId };
-            
+
             const updatedQuestions = [...generatedTest.questions];
             updatedQuestions[index] = updatedOriginal;
             // Insert variant right after the original
@@ -779,11 +779,10 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                             return (
                                                 <div
                                                     key={i}
-                                                    className={`border rounded-xl p-3.5 sm:p-4 space-y-3 transition-all duration-200 ${
-                                                        q.kept
+                                                    className={`border rounded-xl p-3.5 sm:p-4 space-y-3 transition-all duration-200 ${q.kept
                                                             ? 'border-emerald-400 bg-emerald-50/30 shadow-sm'
                                                             : 'border-black/10 bg-white'
-                                                    } ${q.variantGroup ? 'relative' : ''}`}
+                                                        } ${q.variantGroup ? 'relative' : ''}`}
                                                 >
                                                     {/* Sibling linker visual line */}
                                                     {isVariantA && generatedTest.questions.find((x, idx) => x.variantGroup === q.variantGroup && idx !== i) && (
@@ -806,177 +805,175 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                                             <textarea
                                                                 rows={2}
                                                                 className="w-full bg-neutral-50/50 border border-black/5 hover:border-black/20 focus:border-neutral-900 p-2.5 rounded-lg text-sm font-medium focus:outline-none focus:bg-white transition-all text-black"
-                                                            value={q.questionText}
-                                                            onChange={(e) => {
-                                                                const updatedQuestions = generatedTest.questions.map((item, idx) =>
-                                                                    idx === i ? { ...item, questionText: e.target.value } : item
-                                                                );
-                                                                setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="w-full sm:w-24 shrink-0">
-                                                        <label className="block text-xs font-bold text-neutral-400 uppercase mb-1">Marks</label>
-                                                        <input
-                                                            type="number"
-                                                            min="1"
-                                                            className="w-full bg-neutral-50/50 border border-black/5 hover:border-black/20 focus:border-neutral-900 p-2.5 rounded-lg text-base sm:text-sm font-medium focus:outline-none focus:bg-white transition-all text-black sm:text-center"
-                                                            value={q.marks}
-                                                            onChange={(e) => {
-                                                                const newMark = Number(e.target.value) || 1;
-                                                                const updatedQuestions = generatedTest.questions.map((item, idx) =>
-                                                                    idx === i ? { ...item, marks: newMark } : item
-                                                                );
-                                                                setGeneratedTest({
-                                                                    ...generatedTest,
-                                                                    questions: updatedQuestions,
-                                                                    totalMarks: recalcTotalMarks(updatedQuestions)
-                                                                });
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                {q.options && q.options.length > 0 && (
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-neutral-400 uppercase mb-1">Options</label>
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                            {q.options.map((opt: string, oi: number) => (
-                                                                <div key={oi} className="relative flex items-center bg-neutral-50 rounded-lg border border-black/5">
-                                                                    <span className="pl-3 pr-1 text-sm font-bold text-neutral-400">{String.fromCharCode(65 + oi)}.</span>
-                                                                    <input
-                                                                        type="text"
-                                                                        className="w-full bg-transparent p-2.5 rounded-lg text-sm font-medium focus:outline-none text-black"
-                                                                        value={opt}
-                                                                        onChange={(e) => {
-                                                                            const updatedOptions = q.options.map((o: string, oidx: number) =>
-                                                                                oidx === oi ? e.target.value : o
-                                                                            );
-                                                                            const updatedQuestions = generatedTest.questions.map((item, idx) =>
-                                                                                idx === i ? { ...item, options: updatedOptions } : item
-                                                                            );
-                                                                            setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <div className="space-y-3 pt-3 border-t border-black/5">
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-neutral-400 uppercase mb-1">Correct Answer</label>
-                                                        {q.options && q.options.length > 0 ? (
-                                                            <div className="grid grid-cols-1 gap-2">
-                                                                {q.options.map((opt: string, oi: number) => {
-                                                                    const selected = q.correctAnswer === opt;
-                                                                    return (
-                                                                        <button
-                                                                            key={`${i}-answer-${oi}`}
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                const updatedQuestions = generatedTest.questions.map((item, idx) =>
-                                                                                    idx === i ? { ...item, correctAnswer: opt } : item
-                                                                                );
-                                                                                setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
-                                                                            }}
-                                                                            className={`min-h-11 w-full rounded-xl border px-3 py-2.5 text-left transition-all active:scale-[0.99] ${
-                                                                                selected
-                                                                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
-                                                                                    : 'border-black/5 bg-neutral-50/70 text-black hover:border-black/15 hover:bg-white'
-                                                                            }`}
-                                                                        >
-                                                                            <span className="flex items-start gap-3">
-                                                                                <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-black ${
-                                                                                    selected
-                                                                                        ? 'bg-emerald-600 text-white'
-                                                                                        : 'bg-white text-neutral-400 border border-black/10'
-                                                                                }`}>
-                                                                                    {String.fromCharCode(65 + oi)}
-                                                                                </span>
-                                                                                <span className="min-w-0 flex-1 text-sm font-semibold leading-relaxed">{opt}</span>
-                                                                                {selected && <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />}
-                                                                            </span>
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        ) : (
-                                                            <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-                                                                Add options above to choose the correct answer.
-                                                            </p>
-                                                        )}
-                                                        {q.correctAnswer && q.options?.length > 0 && !q.options.includes(q.correctAnswer) && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
+                                                                value={q.questionText}
+                                                                onChange={(e) => {
                                                                     const updatedQuestions = generatedTest.questions.map((item, idx) =>
-                                                                        idx === i ? { ...item, correctAnswer: q.options[0] || '' } : item
+                                                                        idx === i ? { ...item, questionText: e.target.value } : item
                                                                     );
                                                                     setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
                                                                 }}
-                                                                className="mt-2 text-xs font-bold text-amber-700 underline"
-                                                            >
-                                                                Current answer is not in options. Tap to use option A.
-                                                            </button>
-                                                        )}
+                                                            />
+                                                        </div>
+                                                        <div className="w-full sm:w-24 shrink-0">
+                                                            <label className="block text-xs font-bold text-neutral-400 uppercase mb-1">Marks</label>
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                className="w-full bg-neutral-50/50 border border-black/5 hover:border-black/20 focus:border-neutral-900 p-2.5 rounded-lg text-base sm:text-sm font-medium focus:outline-none focus:bg-white transition-all text-black sm:text-center"
+                                                                value={q.marks}
+                                                                onChange={(e) => {
+                                                                    const newMark = Number(e.target.value) || 1;
+                                                                    const updatedQuestions = generatedTest.questions.map((item, idx) =>
+                                                                        idx === i ? { ...item, marks: newMark } : item
+                                                                    );
+                                                                    setGeneratedTest({
+                                                                        ...generatedTest,
+                                                                        questions: updatedQuestions,
+                                                                        totalMarks: recalcTotalMarks(updatedQuestions)
+                                                                    });
+                                                                }}
+                                                            />
+                                                        </div>
                                                     </div>
-                                                    <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2 w-full">
-                                                        {q.regenId ? (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleRevertQuestion(q.regenId!)}
-                                                                    className="min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-100 hover:bg-red-50 text-xs font-bold text-neutral-600 hover:text-red-600 hover:border-red-200 rounded-lg transition-all active:scale-95 border border-transparent"
-                                                                >
-                                                                    Revert
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleConfirmRegeneration(q.regenId!)}
-                                                                    className="min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-xs font-bold text-white rounded-lg transition-all active:scale-95 shadow-sm"
-                                                                >
-                                                                    Confirm New Question
-                                                                </button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                {/* Regenerate single question */}
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleRegenerateQuestion(i)}
-                                                                    disabled={regeneratingIndex === i || regeneratingUnkept}
-                                                                    className="min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-xs font-bold text-neutral-800 rounded-lg transition-all disabled:opacity-50 active:scale-95"
-                                                                >
-                                                                    {regeneratingIndex === i ? (
-                                                                        <Loader className="w-3.5 h-3.5 animate-spin" />
-                                                                    ) : (
-                                                                        <Sparkles className="w-3.5 h-3.5" />
-                                                                    )}
-                                                                    {regeneratingIndex === i ? 'Regenerating...' : 'Regenerate'}
-                                                                </button>
 
-                                                                {!q.variantGroup && (
+                                                    {q.options && q.options.length > 0 && (
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-neutral-400 uppercase mb-1">Options</label>
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                                {q.options.map((opt: string, oi: number) => (
+                                                                    <div key={oi} className="relative flex items-center bg-neutral-50 rounded-lg border border-black/5">
+                                                                        <span className="pl-3 pr-1 text-sm font-bold text-neutral-400">{String.fromCharCode(65 + oi)}.</span>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="w-full bg-transparent p-2.5 rounded-lg text-sm font-medium focus:outline-none text-black"
+                                                                            value={opt}
+                                                                            onChange={(e) => {
+                                                                                const updatedOptions = q.options.map((o: string, oidx: number) =>
+                                                                                    oidx === oi ? e.target.value : o
+                                                                                );
+                                                                                const updatedQuestions = generatedTest.questions.map((item, idx) =>
+                                                                                    idx === i ? { ...item, options: updatedOptions } : item
+                                                                                );
+                                                                                setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="space-y-3 pt-3 border-t border-black/5">
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-neutral-400 uppercase mb-1">Correct Answer</label>
+                                                            {q.options && q.options.length > 0 ? (
+                                                                <div className="grid grid-cols-1 gap-2">
+                                                                    {q.options.map((opt: string, oi: number) => {
+                                                                        const selected = q.correctAnswer === opt;
+                                                                        return (
+                                                                            <button
+                                                                                key={`${i}-answer-${oi}`}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    const updatedQuestions = generatedTest.questions.map((item, idx) =>
+                                                                                        idx === i ? { ...item, correctAnswer: opt } : item
+                                                                                    );
+                                                                                    setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
+                                                                                }}
+                                                                                className={`min-h-11 w-full rounded-xl border px-3 py-2.5 text-left transition-all active:scale-[0.99] ${selected
+                                                                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                                                                                        : 'border-black/5 bg-neutral-50/70 text-black hover:border-black/15 hover:bg-white'
+                                                                                    }`}
+                                                                            >
+                                                                                <span className="flex items-start gap-3">
+                                                                                    <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-black ${selected
+                                                                                            ? 'bg-emerald-600 text-white'
+                                                                                            : 'bg-white text-neutral-400 border border-black/10'
+                                                                                        }`}>
+                                                                                        {String.fromCharCode(65 + oi)}
+                                                                                    </span>
+                                                                                    <span className="min-w-0 flex-1 text-sm font-semibold leading-relaxed">{opt}</span>
+                                                                                    {selected && <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />}
+                                                                                </span>
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            ) : (
+                                                                <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                                                                    Add options above to choose the correct answer.
+                                                                </p>
+                                                            )}
+                                                            {q.correctAnswer && q.options?.length > 0 && !q.options.includes(q.correctAnswer) && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const updatedQuestions = generatedTest.questions.map((item, idx) =>
+                                                                            idx === i ? { ...item, correctAnswer: q.options[0] || '' } : item
+                                                                        );
+                                                                        setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
+                                                                    }}
+                                                                    className="mt-2 text-xs font-bold text-amber-700 underline"
+                                                                >
+                                                                    Current answer is not in options. Tap to use option A.
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2 w-full">
+                                                            {q.regenId ? (
+                                                                <>
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => handleGenerateVariant(i)}
+                                                                        onClick={() => handleRevertQuestion(q.regenId!)}
+                                                                        className="min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-100 hover:bg-red-50 text-xs font-bold text-neutral-600 hover:text-red-600 hover:border-red-200 rounded-lg transition-all active:scale-95 border border-transparent"
+                                                                    >
+                                                                        Revert
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleConfirmRegeneration(q.regenId!)}
+                                                                        className="min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-xs font-bold text-white rounded-lg transition-all active:scale-95 shadow-sm"
+                                                                    >
+                                                                        Confirm New Question
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    {/* Regenerate single question */}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleRegenerateQuestion(i)}
                                                                         disabled={regeneratingIndex === i || regeneratingUnkept}
-                                                                        className="col-span-2 sm:col-span-1 min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-xs font-bold text-emerald-600 rounded-lg transition-all disabled:opacity-50 active:scale-95 border border-emerald-200"
+                                                                        className="min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-xs font-bold text-neutral-800 rounded-lg transition-all disabled:opacity-50 active:scale-95"
                                                                     >
                                                                         {regeneratingIndex === i ? (
                                                                             <Loader className="w-3.5 h-3.5 animate-spin" />
                                                                         ) : (
-                                                                            <Layers className="w-3.5 h-3.5" />
+                                                                            <Sparkles className="w-3.5 h-3.5" />
                                                                         )}
-                                                                        Create Variant
+                                                                        {regeneratingIndex === i ? 'Regenerating...' : 'Regenerate'}
                                                                     </button>
-                                                                )}
-                                                            </>
-                                                        )}
+
+                                                                    {!q.variantGroup && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleGenerateVariant(i)}
+                                                                            disabled={regeneratingIndex === i || regeneratingUnkept}
+                                                                            className="col-span-2 sm:col-span-1 min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-xs font-bold text-emerald-600 rounded-lg transition-all disabled:opacity-50 active:scale-95 border border-emerald-200"
+                                                                        >
+                                                                            {regeneratingIndex === i ? (
+                                                                                <Loader className="w-3.5 h-3.5 animate-spin" />
+                                                                            ) : (
+                                                                                <Layers className="w-3.5 h-3.5" />
+                                                                            )}
+                                                                            Create Variant
+                                                                        </button>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
                                             );
                                         })}
                                     </div>
@@ -993,8 +990,8 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                                     ) : (
                                                         batchOptions.map(b => (
                                                             <label key={b.value} className="flex items-center gap-2 text-sm font-medium cursor-pointer text-neutral-700 hover:text-black">
-                                                                <input 
-                                                                    type="checkbox" 
+                                                                <input
+                                                                    type="checkbox"
                                                                     className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500 accent-emerald-600"
                                                                     checked={batchIds.includes(b.value)}
                                                                     onChange={(e) => {

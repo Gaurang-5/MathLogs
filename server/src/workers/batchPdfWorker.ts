@@ -1,5 +1,5 @@
 import { parentPort, workerData } from 'worker_threads';
-import PDFDocument from 'pdfkit';
+// const PDFDocument = require('pdfkit');
 
 // Inline the header utility to avoid cross-thread import issues
 function addMathLogsHeader(doc: PDFKit.PDFDocument, x: number) {
@@ -37,7 +37,8 @@ async function generate(data: BatchPdfData): Promise<Buffer> {
     const installments = batch.feeInstallments || [];
     const numInstallments = installments.length;
 
-    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
+    const PDFDocument = require('pdfkit');
+        const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
     const chunks: Buffer[] = [];
 
     doc.on('data', chunk => chunks.push(chunk));

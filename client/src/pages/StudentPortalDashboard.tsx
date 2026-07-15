@@ -94,7 +94,6 @@ export default function StudentPortalDashboard() {
                 navigate(`/${instituteSlug}/student`);
             } finally {
                 setLoading(false);
-                setRefreshing(false);
             }
         };
 
