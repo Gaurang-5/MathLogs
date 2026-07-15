@@ -144,7 +144,8 @@ export default function Onboarding() {
     const planRef = useRef<HTMLDivElement>(null);
     const checkoutRef = useRef<HTMLDivElement>(null);
 
-    const isFreeTrial = true;
+    const isQuizOnly = new URLSearchParams(window.location.search).get('type') === 'quiz_only';
+    const isFreeTrial = isQuizOnly ? false : true;
 
     const isStep1Valid = tuitionName.length > 2 && ownerName.length > 2 && phone.length >= 10 && email.includes('@');
 
@@ -169,8 +170,13 @@ export default function Onboarding() {
             console.error('Failed to track lead', err);
         }
 
-        setActiveStep(2);
-        scrollToRef(planRef);
+        if (isQuizOnly) {
+            setActiveStep(3);
+            scrollToRef(checkoutRef);
+        } else {
+            setActiveStep(2);
+            scrollToRef(planRef);
+        }
     };
 
     const handleSelectPlan = async (planId: PlanId) => {
@@ -237,7 +243,7 @@ export default function Onboarding() {
                 ownerName,
                 phone,
                 email,
-                planId: selectedPlan,
+                planId: isQuizOnly ? 'quiz_only' : selectedPlan,
                 billingCycle,
             });
 
@@ -271,7 +277,7 @@ export default function Onboarding() {
                             ownerName,
                             phone,
                             email,
-                            planId: selectedPlan,
+                            planId: isQuizOnly ? 'quiz_only' : selectedPlan,
                             billingCycle,
                         });
 
@@ -490,7 +496,7 @@ export default function Onboarding() {
 
                 {/* STEP 2: PRICING */}
                 <AnimatePresence>
-                    {activeStep >= 2 && (
+                    {!isQuizOnly && activeStep >= 2 && (
                         <motion.div
                             ref={planRef}
                             initial={{ opacity: 0, y: 50 }}
@@ -598,16 +604,22 @@ export default function Onboarding() {
                             <div className="relative z-10 flex flex-col gap-6 sm:gap-8">
                                 <div>
                                     <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2 !text-white">
-                                        {isFreeTrial ? "Start your 14-Day Free Trial" : "Ready to initialize?"}
+                                        {isQuizOnly ? "Complete your purchase" : (isFreeTrial ? "Start your 14-Day Free Trial" : "Ready to initialize?")}
                                     </h2>
                                     <p className="text-neutral-400 font-medium mb-4 text-sm sm:text-base">
-                                        You have selected the <span className="!text-white font-bold">{pricingPlans.find(p => p.id === selectedPlan)?.name}</span>.
-                                        {isFreeTrial 
-                                            ? " Start your 14-day free trial immediately without a credit card. You can upgrade anytime during the trial." 
-                                            : " Secure your payment via Razorpay to activate your center immediately."}
+                                        {isQuizOnly ? (
+                                            <>You have selected the <span className="!text-white font-bold">Quiz Starter Pack (10 Credits)</span>. Secure your one-time payment of ₹500 via Razorpay to get started instantly.</>
+                                        ) : (
+                                            <>
+                                                You have selected the <span className="!text-white font-bold">{pricingPlans.find(p => p.id === selectedPlan)?.name}</span>.
+                                                {isFreeTrial 
+                                                    ? " Start your 14-day free trial immediately without a credit card. You can upgrade anytime during the trial." 
+                                                    : " Secure your payment via Razorpay to activate your center immediately."}
+                                            </>
+                                        )}
                                     </p>
 
-                                    {!isFreeTrial && (
+                                    {!isFreeTrial && !isQuizOnly && (
                                         <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs sm:text-sm font-medium text-neutral-300">
                                             <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 shrink-0 mt-0.5" />
                                             <p>
@@ -661,10 +673,16 @@ export default function Onboarding() {
                                             ) : (
                                                 <>
                                                     <CreditCard className="w-6 h-6" />
-                                                    Pay ₹{(billingCycle === 'yearly'
-                                                        ? pricingPlans.find(p => p.id === selectedPlan)?.yearlyPrice
-                                                        : pricingPlans.find(p => p.id === selectedPlan)?.monthlyPrice)?.toLocaleString('en-IN')
-                                                    } Securely
+                                                    {isQuizOnly ? (
+                                                        <span>Pay ₹500 Securely</span>
+                                                    ) : (
+                                                        <span>
+                                                            Pay ₹{(billingCycle === 'yearly'
+                                                                ? pricingPlans.find(p => p.id === selectedPlan)?.yearlyPrice
+                                                                : pricingPlans.find(p => p.id === selectedPlan)?.monthlyPrice)?.toLocaleString('en-IN')
+                                                            } Securely
+                                                        </span>
+                                                    )}
                                                 </>
                                             )}
                                         </>

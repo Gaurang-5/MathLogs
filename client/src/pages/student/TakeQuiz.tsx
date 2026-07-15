@@ -500,16 +500,19 @@ export default function TakeQuiz() {
     /* ── Proctoring ── */
     useEffect(() => {
         if (phase !== 'quiz') return;
-        const onVis = () => { if (document.hidden && !isUnloadingRef.current) triggerMask('TAB_SWITCH'); };
+        const onVis = () => { /* if (document.hidden && !isUnloadingRef.current) triggerMask('TAB_SWITCH'); */ };
         const onBlur = () => {
-            if (!document.hidden && !isUnloadingRef.current) {
+            /* if (!document.hidden && !isUnloadingRef.current) {
                 triggerMask('WINDOW_BLUR');
-            }
+            } */
         };
         const onFullscreenChange = () => {
             if (!document.fullscreenElement && !isUnloadingRef.current) {
                 setIsNotInFullscreen(true);
-                triggerMask('FULLSCREEN_EXIT');
+                // triggerMask('FULLSCREEN_EXIT'); // Commenting out to just use UI prompt without flag penalization, or keeping it?
+                // The user says "have only full screen and bookmark feature on", so the UI should prompt them to go fullscreen, but not flag them for cheating?
+                // Actually they said "see cheating flag is not wrokling preplery we need to fix it so for now remove or pause it and have only full screen and bookmark feature on"
+                // So I'll pause ALL triggerMask cheating flags, but keep the `setIsNotInFullscreen(true)` which prompts the user to re-enter fullscreen.
             } else {
                 setIsNotInFullscreen(false);
             }
@@ -517,6 +520,7 @@ export default function TakeQuiz() {
         const noCtx = (e: Event) => e.preventDefault();
         const noCopy = (e: Event) => e.preventDefault();
         const noKey = (e: KeyboardEvent) => {
+            /*
             if (e.key === 'PrintScreen') { e.preventDefault(); triggerMask('SCREENSHOT_KEY'); }
             if ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3', '4', 's', 'S'].includes(e.key)) {
                 e.preventDefault(); triggerMask('SCREENSHOT_KEY');
@@ -524,6 +528,7 @@ export default function TakeQuiz() {
             if (e.key === 'F12' || ((e.metaKey || e.ctrlKey) && e.shiftKey && ['i', 'I', 'j', 'J', 'c', 'C'].includes(e.key))) {
                 e.preventDefault(); triggerMask('DEV_TOOLS_SHORTCUT');
             }
+            */
         };
         
         document.addEventListener('visibilitychange', onVis);

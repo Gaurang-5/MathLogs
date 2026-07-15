@@ -6,7 +6,8 @@ import {
     ChevronRight, MessageSquare, Shield,
     CheckCircle, ArrowRight, Database, LineChart,
     Camera, X, Maximize2, Settings,
-    Download, FileText, Printer, Wallet, Plus, Minus
+    Download, FileText, Printer, Wallet, Plus, Minus,
+    Sparkles
 } from 'lucide-react';
 
 /** Static data outside components to prevent recreation on every render */
@@ -194,6 +195,7 @@ export default function Home() {
     const carouselRef = useRef<HTMLDivElement>(null);
     
     const isFreeTrial = true;
+    const [planType, setPlanType] = useState<'quiz_only' | 'with_quiz'>('with_quiz');
 
     // Auto-scroll logic for mobile carousel
     useEffect(() => {
@@ -384,7 +386,7 @@ export default function Home() {
                                 <span className="block min-h-[2.2em] sm:min-h-[1.15em]">
                                     <TypewriterText texts={[
                                         "modern coaching.",
-                                        "instant grading.",
+                                        "online quizzes.",
                                         "fee collection.",
                                         "parent updates."
                                     ]} />
@@ -805,7 +807,7 @@ export default function Home() {
                             </div>
                         </motion.div>
 
-                        {/* Feature 4 - Smart Sticker Scanning */}
+                        {/* Feature 4 - Online Quizzes */}
                         <motion.div
                             initial={{ opacity: 0, y: 30 }}
                             whileInView={{ opacity: 1, y: 0 }}
@@ -814,84 +816,73 @@ export default function Home() {
                             className="md:col-span-2 bg-white rounded-3xl md:rounded-[2.5rem] p-8 md:p-12 lg:p-16 border border-neutral-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group flex flex-col md:flex-row items-center justify-between min-h-[580px]"
                         >
                             <button
-                                onClick={() => setExpandedFeature('scan')}
-                                aria-label="Expand smart scanning details"
+                                onClick={() => setExpandedFeature('quiz')}
+                                aria-label="Expand online quiz details"
                                 className="absolute top-8 right-8 md:top-12 md:right-12 lg:top-16 lg:right-16 w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-neutral-700 hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm z-50 border border-neutral-200/50"
                             >
                                 <Maximize2 className="w-4 h-4" />
                             </button>
 
                             <div className="relative z-10 mb-12 md:mb-0 max-w-full max-w-[460px]">
-                                <Camera className="w-8 h-8 text-neutral-700 mb-8" strokeWidth={1.5} />
-                                <h4 className="text-[32px] md:text-[40px] font-bold text-[#1a1f36] tracking-[-0.03em] mb-5 leading-[1.1]">Smart Sticker Scanning</h4>
+                                <FileText className="w-8 h-8 text-neutral-700 mb-8" strokeWidth={1.5} />
+                                <h4 className="text-[32px] md:text-[40px] font-bold text-[#1a1f36] tracking-[-0.03em] mb-5 leading-[1.1]">Online Quizzes & Assessments</h4>
                                 <ul className="space-y-4">
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-900 shrink-0 mt-0.5" strokeWidth={2} />
-                                        <span className="text-[#697386] font-medium text-[15px] leading-snug">Generate and print custom QR stickers for each test sheet</span>
+                                        <span className="text-[#697386] font-medium text-[15px] leading-snug">Create and assign multiple-choice quizzes in seconds</span>
                                     </li>
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-900 shrink-0 mt-0.5" strokeWidth={2} />
-                                        <span className="text-[#697386] font-medium text-[15px] leading-snug">Teacher manually writes the student's marks directly on the sticker</span>
+                                        <span className="text-[#697386] font-medium text-[15px] leading-snug">Students take quizzes directly on their devices with instant feedback</span>
                                     </li>
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-900 shrink-0 mt-0.5" strokeWidth={2} />
-                                        <span className="text-[#697386] font-medium text-[15px] leading-snug">Scan the sheet: instantly identify the student (QR) and read their score (OCR)</span>
+                                        <span className="text-[#697386] font-medium text-[15px] leading-snug">Automated grading and performance analytics synced to your dashboard</span>
                                     </li>
                                 </ul>
                             </div>
 
-                            {/* Scanning UI Animation */}
-                            <div className="relative z-0 mt-8 md:mt-0 h-[320px] w-[100%] md:w-full max-w-[420px] bg-neutral-50 rounded-[2rem] border border-neutral-100 overflow-hidden shadow-inner shrink-0 group">
-                                {/* Fake Test Paper Background */}
-                                <div className="absolute inset-x-8 -bottom-16 top-12 bg-[#fdfdfd] rounded-t-md border border-neutral-300 shadow-[0_0_30px_rgba(0,0,0,0.1)] overflow-hidden transition-transform duration-700 ease-in-out group-hover:-translate-y-2">
-                                    {/* Vertical Red Margin Line */}
-                                    <div className="absolute left-10 top-0 bottom-0 w-[1.5px] bg-red-200/80"></div>
-
-                                    {/* Paper Header / Name Field */}
-                                    <div className="pt-6 pl-14 pr-6 pb-3 border-b border-neutral-200 flex flex-col gap-2 relative z-0">
-                                        <div className="text-[#9ca3af] font-medium text-[11px] tracking-wide uppercase">Physics Final Exam</div>
-                                        <div className="flex items-end gap-2 text-[#cbd5e1] font-mono text-sm leading-none">
-                                            <span className="text-[#64748b] text-[12px]">Name:</span>
-                                            <span className="flex-1 border-b border-neutral-300 border-dashed"></span>
+                            {/* Quiz UI Animation */}
+                            <div className="relative z-0 mt-8 md:mt-0 h-[320px] w-[100%] md:w-full max-w-[420px] bg-neutral-50 rounded-[2rem] border border-neutral-100 overflow-hidden shadow-inner shrink-0 group flex items-center justify-center">
+                                {/* Fake Mobile Quiz Screen */}
+                                <motion.div 
+                                    className="w-[240px] h-[360px] bg-white rounded-3xl border-[6px] border-neutral-800 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden relative"
+                                    initial={{ y: 20 }}
+                                    whileInView={{ y: 0 }}
+                                    transition={{ duration: 0.6 }}
+                                >
+                                    <div className="bg-neutral-900 text-white text-[10px] font-medium py-3 px-4 text-center relative">
+                                        Physics Mock Test
+                                        <div className="absolute top-3 left-3 w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                                    </div>
+                                    <div className="p-4 flex-1 bg-neutral-50/50">
+                                        <div className="h-2 w-full bg-neutral-200 rounded-full mb-4 overflow-hidden">
+                                            <motion.div 
+                                                className="h-full bg-neutral-800" 
+                                                initial={{ width: '40%' }}
+                                                whileInView={{ width: '70%' }}
+                                                transition={{ duration: 1.5, delay: 0.5 }}
+                                            />
+                                        </div>
+                                        <div className="text-[12px] font-bold text-neutral-900 mb-4 leading-relaxed">
+                                            What is the derivative of position with respect to time?
+                                        </div>
+                                        <div className="space-y-2">
+                                            {['Acceleration', 'Velocity', 'Force', 'Momentum'].map((opt, i) => (
+                                                <motion.div 
+                                                    key={i} 
+                                                    className={`p-2.5 rounded-xl border text-[11px] font-medium transition-colors ${i === 1 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-neutral-200 text-neutral-600'}`}
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    whileInView={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: 0.2 + i * 0.1 }}
+                                                >
+                                                    <span className="mr-2 opacity-50">{String.fromCharCode(65 + i)}.</span> {opt}
+                                                    {i === 1 && <CheckCircle className="inline-block w-3 h-3 ml-2 text-green-500" />}
+                                                </motion.div>
+                                            ))}
                                         </div>
                                     </div>
-
-                                    {/* Horizontal Ruled Lines */}
-                                    <div className="w-full flex-1 flex flex-col relative z-0">
-                                        {[...Array(7)].map((_, i) => (
-                                            <div key={i} className="w-full h-[36px] bg-transparent border-b border-neutral-200/60"></div>
-                                        ))}
-                                    </div>
-
-                                    {/* Handwritten mock student answers underneath the sticker */}
-                                    <div className="absolute left-14 top-24 right-6 text-[#1a1f36] z-0 flex flex-col gap-3 pointer-events-none">
-                                        <div className="text-[13px] font-medium text-neutral-600 font-serif italic -rotate-1">
-                                            Q1. State Newton's Second Law of Motion.
-                                        </div>
-                                        <div className="text-[14px] text-neutral-700 italic pl-2 rotate-1 leading-relaxed">
-                                            "The rate of change of momentum of a body <br />
-                                            is directly proportional to the applied force <br />
-                                            and takes place in the direction of the force."
-                                        </div>
-                                        <div className="text-red-500 font-bold text-xl ml-48 -rotate-6 mt-1 opacity-80">
-                                            ✓
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Real Smart Sticker Image Placed on the test paper */}
-                                <motion.img
-                                    src="/sticker-mockup.png"
-                                    alt="Smart QR sticker with handwritten marks for OCR scanning"
-                                    loading="lazy"
-                                    width={200}
-                                    className="w-[200px] h-auto object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.25)] absolute top-14 right-4 z-20 cursor-pointer"
-                                    initial={{ opacity: 0, scale: 1.5, rotate: 15, y: -40 }}
-                                    whileInView={{ opacity: 1, scale: 1, rotate: 4, y: 0 }}
-                                    viewport={{ once: true }}
-                                    transition={{ duration: 0.7, type: 'spring', bounce: 0.4, delay: 0.1 }}
-                                    whileHover={{ scale: 1.05, rotate: 2, transition: { duration: 0.2 } }}
-                                />
+                                </motion.div>
                             </div>
                         </motion.div>
                     </div>
@@ -953,112 +944,174 @@ export default function Home() {
             {/* PRICING SECTION */}
             <section id="pricing" className="py-24 md:py-32 bg-neutral-50 relative z-20 border-t border-neutral-100">
                 <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-16 md:mb-24">
+                    <div className="text-center mb-12 md:mb-16">
                         <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-neutral-900 mb-6">
                             Simple, transparent pricing
                         </h2>
-                        <p className="text-xl text-neutral-500 max-w-2xl mx-auto">
+                        <p className="text-xl text-neutral-500 max-w-2xl mx-auto mb-10">
                             Choose the plan that fits your coaching center. No hidden fees or surprise charges.
                         </p>
-                    </div>
 
-                    <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-start">
-                        {/* Basic Tier */}
-                        <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                            <h3 className="text-xl font-bold text-neutral-900 mb-2">Basic</h3>
-                            <p className="text-neutral-500 text-sm mb-6 h-10">Perfect for independent tutors starting their journey.</p>
-                            <div className="mb-8">
-                                <span className="text-4xl font-extrabold text-neutral-900">₹999</span>
-                                <span className="text-neutral-500"> /mo</span>
+                        {/* Plan Type Toggle */}
+                        <div className="flex items-center justify-center">
+                            <div className="bg-white border border-neutral-200 p-1.5 rounded-full inline-flex shadow-sm">
+                                <button
+                                    onClick={() => setPlanType('quiz_only')}
+                                    className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all ${
+                                        planType === 'quiz_only'
+                                            ? 'bg-neutral-900 text-white shadow-md'
+                                            : 'text-neutral-500 hover:text-neutral-900'
+                                    }`}
+                                >
+                                    Quiz Only
+                                </button>
+                                <button
+                                    onClick={() => setPlanType('with_quiz')}
+                                    className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all ${
+                                        planType === 'with_quiz'
+                                            ? 'bg-neutral-900 text-white shadow-md'
+                                            : 'text-neutral-500 hover:text-neutral-900'
+                                    }`}
+                                >
+                                    Full Platform
+                                </button>
                             </div>
-                            <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-100 text-neutral-900 font-bold hover:bg-neutral-200 transition-colors mb-8">
-                                {isFreeTrial ? 'Start 14-Day Free Trial' : 'Get Started'}
-                            </Link>
-                            <ul className="space-y-4">
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">Up to 100 students</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">Unlimited Batches</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">Automated Grading</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">WhatsApp Alerts</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        {/* Pro Tier (Most Popular) */}
-                        <div className="bg-white rounded-3xl p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200 relative transform md:-translate-y-4">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider py-1.5 px-3 rounded-full">
-                                Most Popular
-                            </div>
-                            <h3 className="text-xl font-bold text-neutral-900 mb-2">Pro</h3>
-                            <p className="text-neutral-500 text-sm mb-6 h-10">For growing coaching centers with more students.</p>
-                            <div className="mb-8">
-                                <span className="text-4xl font-extrabold text-neutral-900">₹1,999</span>
-                                <span className="text-neutral-500"> /mo</span>
-                            </div>
-                            <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-900 text-white font-bold hover:bg-neutral-800 transition-colors mb-8 shadow-md">
-                                {isFreeTrial ? 'Start 14-Day Free Trial' : 'Try Pro Today'}
-                            </Link>
-                            <ul className="space-y-4">
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-900 font-medium">Up to 250 students</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">Unlimited Batches</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">Automated Grading</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">WhatsApp Alerts</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        {/* Enterprise Tier */}
-                        <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                            <h3 className="text-xl font-bold text-neutral-900 mb-2">Enterprise</h3>
-                            <p className="text-neutral-500 text-sm mb-6 h-10">Custom deployment & limits for large coaching networks.</p>
-                            <div className="mb-8">
-                                <span className="text-4xl font-extrabold text-neutral-900">Custom</span>
-                                <span className="text-neutral-500"> pricing</span>
-                            </div>
-                            <a href="https://docs.google.com/forms/d/e/1FAIpQLSf_iZpFA8pDCv5ESQ8OwESB7YzlMjWETwwRirk-MV6LddQBeQ/viewform" target="_blank" rel="noopener noreferrer" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-100 text-neutral-900 font-bold hover:bg-neutral-200 transition-colors mb-8">
-                                Request Demo
-                            </a>
-                            <ul className="space-y-4">
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">Unlimited students</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">Unlimited Batches</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">White-label branding</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                    <span className="text-neutral-600">Dedicated account manager</span>
-                                </li>
-                            </ul>
                         </div>
                     </div>
+
+                    {planType === 'quiz_only' ? (
+                        <div className="max-w-md mx-auto">
+                            <div className="bg-white rounded-3xl p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200 relative transform md:-translate-y-4">
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-green-500 text-white text-xs font-bold uppercase tracking-wider py-1.5 px-3 rounded-full flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3" /> Special Offer
+                                </div>
+                                <h3 className="text-2xl font-bold text-neutral-900 mb-2 text-center">Quiz Starter Pack</h3>
+                                <p className="text-neutral-500 text-sm mb-6 text-center">Get started with our credit-based quiz system.</p>
+                                <div className="mb-8 flex flex-col items-center">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-xl font-bold text-neutral-400 line-through">₹1000</span>
+                                        <span className="text-5xl font-extrabold text-neutral-900">₹500</span>
+                                    </div>
+                                    <span className="text-green-600 font-bold text-sm bg-green-50 px-3 py-1 rounded-full mt-2">50% OFF One-Time Payment</span>
+                                </div>
+                                <Link to="/onboarding?type=quiz_only" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-900 text-white font-bold hover:bg-neutral-800 transition-colors mb-8 shadow-md">
+                                    Buy 10 Credits Now
+                                </Link>
+                                <ul className="space-y-4">
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-900 font-medium">10 Quiz Credits Included</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Create & Assign Online Quizzes</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Instant Automated Grading</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Performance Analytics</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-start">
+                            {/* Basic Tier */}
+                            <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
+                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Basic</h3>
+                                <p className="text-neutral-500 text-sm mb-6 h-10">Perfect for independent tutors starting their journey.</p>
+                                <div className="mb-8">
+                                    <span className="text-4xl font-extrabold text-neutral-900">₹999</span>
+                                    <span className="text-neutral-500"> /mo</span>
+                                </div>
+                                <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-100 text-neutral-900 font-bold hover:bg-neutral-200 transition-colors mb-8">
+                                    {isFreeTrial ? 'Start 14-Day Free Trial' : 'Get Started'}
+                                </Link>
+                                <ul className="space-y-4">
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Up to 100 students</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Unlimited Quizzes</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Batch Management</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Fee Collection</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            {/* Pro Tier (Most Popular) */}
+                            <div className="bg-white rounded-3xl p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200 relative transform md:-translate-y-4">
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider py-1.5 px-3 rounded-full">
+                                    Most Popular
+                                </div>
+                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Pro</h3>
+                                <p className="text-neutral-500 text-sm mb-6 h-10">For growing coaching centers with more students.</p>
+                                <div className="mb-8">
+                                    <span className="text-4xl font-extrabold text-neutral-900">₹1,999</span>
+                                    <span className="text-neutral-500"> /mo</span>
+                                </div>
+                                <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-900 text-white font-bold hover:bg-neutral-800 transition-colors mb-8 shadow-md">
+                                    {isFreeTrial ? 'Start 14-Day Free Trial' : 'Try Pro Today'}
+                                </Link>
+                                <ul className="space-y-4">
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-900 font-medium">Up to 250 students</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Unlimited Quizzes</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Automated Grading</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">WhatsApp Alerts</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            {/* Enterprise Tier */}
+                            <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
+                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Enterprise</h3>
+                                <p className="text-neutral-500 text-sm mb-6 h-10">Custom deployment & limits for large coaching networks.</p>
+                                <div className="mb-8">
+                                    <span className="text-4xl font-extrabold text-neutral-900">Custom</span>
+                                    <span className="text-neutral-500"> pricing</span>
+                                </div>
+                                <a href="https://docs.google.com/forms/d/e/1FAIpQLSf_iZpFA8pDCv5ESQ8OwESB7YzlMjWETwwRirk-MV6LddQBeQ/viewform" target="_blank" rel="noopener noreferrer" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-100 text-neutral-900 font-bold hover:bg-neutral-200 transition-colors mb-8">
+                                    Request Demo
+                                </a>
+                                <ul className="space-y-4">
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Unlimited students</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">White-label branding</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Dedicated account manager</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </section>
 
