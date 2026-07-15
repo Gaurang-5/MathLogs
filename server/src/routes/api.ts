@@ -8,7 +8,7 @@ import { createBatch, getBatches, getBatchDetails, downloadBatchPDF, toggleBatch
 import { registerStudent, getPendingStudents, approveStudent, rejectStudent, archiveStudent, updateStudent, addStudentManually, getStudentGrowthStats, getClassAverageStats } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
-import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute } from '../controllers/testController';
+import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
 import { getOnlineQuizAnalytics, getLiveQuizStatus } from '../controllers/analyticsController';
 import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt } from '../controllers/feeController';
 
@@ -274,6 +274,7 @@ router.post('/tests', authenticateToken as any, validateRequest(createTestSchema
 router.post('/tests/generate', authenticateToken as any, testDocUpload.array('files', 5), generateAITest as any);
 router.post('/tests/generate-single-question', authenticateToken as any, generateSingleQuestionRoute as any);
 router.post('/tests/generate-variant-question', authenticateToken as any, generateVariantQuestionRoute as any);
+router.get('/tests/generate/status/:jobId', authenticateToken as any, getAITestJobStatus as any);
 router.post('/tests/online', authenticateToken as any, saveOnlineQuiz as any);
 router.get('/tests/online', authenticateToken as any, getOnlineQuizzes as any);
 router.put('/tests/online/:id', authenticateToken as any, updateOnlineQuiz as any);
