@@ -9,6 +9,9 @@ import { sendEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
 import jwt from 'jsonwebtoken';
 import { sendStudentInviteWhatsApp } from '../utils/whatsapp';
+import { getJwtSecret } from '../utils/env';
+
+const JWT_SECRET = getJwtSecret();
 
 export const createBatch = async (req: Request, res: Response) => {
     const { timeSlot, feeAmount, className, batchNumber, subject, customName } = req.body;
@@ -653,7 +656,7 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
 
         if (token) {
             try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-123') as any;
+                const decoded = jwt.verify(token, JWT_SECRET) as any;
                 if (decoded.batchId === id && decoded.whatsapp) {
                     isTokenValid = true;
                     invitePhone = decoded.whatsapp;
@@ -1057,7 +1060,7 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
             whatsapp: whatsappNumber,
             exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days expiration
         };
-        const token = jwt.sign(payload, process.env.JWT_SECRET || 'fallback-secret-123');
+        const token = jwt.sign(payload, JWT_SECRET);
         const fullUrl = `${getClientUrl(req)}/register/${batch.id}?token=${token}`;
 
         const shortCode = crypto.randomBytes(4).toString('hex');
@@ -1082,4 +1085,3 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Failed to send invite link" });
     }
 };
-

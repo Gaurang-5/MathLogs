@@ -6,13 +6,12 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getItemAsync, deleteItemAsync } from './storage';
 import { Platform } from 'react-native';
 
-// We are pointing DEV to PROD by default so that data works seamlessly for testing
-// Change this back to your local IP if you want to test with a local backend
-const DEV_URL = process.env.EXPO_PUBLIC_API_URL || 'https://mathlogs.app';
-
+const DEFAULT_DEV_URL = Platform.select({
+  android: 'http://10.0.2.2:3001',
+  default: 'http://localhost:3001',
+});
 const PROD_URL = 'https://mathlogs.app';
-
-const BASE_URL = __DEV__ ? DEV_URL : PROD_URL;
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? DEFAULT_DEV_URL : PROD_URL);
 
 const api = axios.create({
   baseURL: `${BASE_URL}/api`,

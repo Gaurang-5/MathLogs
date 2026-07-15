@@ -6,11 +6,13 @@ import { getClientUrl } from '../utils/urlConfig';
 import { sendSetupLinkWhatsApp } from '../utils/whatsapp';
 import { sendSetupLinkEmail } from '../utils/email';
 import { secureLogger } from '../utils/secureLogger';
+import { getRazorpayConfig } from '../utils/env';
 
+const razorpayConfig = getRazorpayConfig();
 
 const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key',
-    key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_secret',
+    key_id: razorpayConfig.keyId,
+    key_secret: razorpayConfig.keySecret,
 });
 
 // Base prices in paise
@@ -21,6 +23,9 @@ const BASE_PRICES = {
 
 // Helper: Calculate actual price in paise for a link
 function getPriceInPaise(link: any, billingCycle: 'monthly' | 'yearly'): number {
+    if (link.plan === 'QUIZ_ONLY') {
+        return link.customPriceMonthlyPaise || 0;
+    }
     if (link.plan === 'CUSTOM') {
         return billingCycle === 'monthly'
             ? (link.customPriceMonthlyPaise || 0)
@@ -51,8 +56,8 @@ export const createAdminOnboardingLink = async (req: Request, res: Response) => 
         trialDays = 14,
     } = req.body;
 
-    if (!plan || !['BASIC', 'PRO', 'CUSTOM'].includes(plan)) {
-        return res.status(400).json({ error: 'Valid plan is required (BASIC, PRO, CUSTOM).' });
+    if (!plan || !['BASIC', 'PRO', 'CUSTOM', 'QUIZ_ONLY'].includes(plan)) {
+        return res.status(400).json({ error: 'Valid plan is required (BASIC, PRO, CUSTOM, QUIZ_ONLY).' });
     }
 
     if (plan === 'CUSTOM' && !customPriceMonthly && !customPriceYearly) {
@@ -67,6 +72,7 @@ export const createAdminOnboardingLink = async (req: Request, res: Response) => 
     let resolvedMaxStudents = Number(maxStudents) || 100;
     if (plan === 'BASIC') resolvedMaxStudents = 100;
     else if (plan === 'PRO') resolvedMaxStudents = 250;
+    else if (plan === 'QUIZ_ONLY') resolvedMaxStudents = 1000; // arbitrary high limit or could be null if unlimited
 
     try {
         const token = crypto.randomBytes(16).toString('hex');
@@ -75,8 +81,8 @@ export const createAdminOnboardingLink = async (req: Request, res: Response) => 
             data: {
                 token,
                 plan,
-                discountPercent: plan !== 'CUSTOM' ? Math.min(100, Math.max(0, Number(discountPercent))) : 0,
-                customPriceMonthlyPaise: plan === 'CUSTOM' ? Math.round(Number(customPriceMonthly) * 100) : null,
+                discountPercent: (plan !== 'CUSTOM' && plan !== 'QUIZ_ONLY') ? Math.min(100, Math.max(0, Number(discountPercent))) : 0,
+                customPriceMonthlyPaise: (plan === 'CUSTOM' || plan === 'QUIZ_ONLY') ? Math.round(Number(customPriceMonthly) * 100) : null,
                 customPriceYearlyPaise: plan === 'CUSTOM' ? Math.round(Number(customPriceYearly) * 100) : null,
                 maxStudents: resolvedMaxStudents,
                 isFreeTrial: Boolean(isFreeTrial),
@@ -158,7 +164,7 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
         if (link.isFreeTrial) {
             let planEnum: any = 'BASIC';
             if (link.plan === 'PRO') planEnum = 'PRO';
-            else if (link.plan === 'CUSTOM') planEnum = 'ENTERPRISE';
+            else if (link.plan === 'CUSTOM' || link.plan === 'QUIZ_ONLY') planEnum = 'ENTERPRISE';
 
             const planStartDate = new Date();
             const planExpiryDate = new Date();
@@ -176,6 +182,7 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
                     phoneNumber: finalPhone,
                     email: finalEmail,
                     plan: planEnum,
+                    quizCredits: link.plan === 'QUIZ_ONLY' ? 10 : 0,
                     planStartDate,
                     planExpiryDate,
                     config: {
@@ -247,7 +254,7 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
             // Directly provision the institute — no payment needed
             let planEnum: any = 'BASIC';
             if (link.plan === 'PRO') planEnum = 'PRO';
-            else if (link.plan === 'CUSTOM') planEnum = 'ENTERPRISE';
+            else if (link.plan === 'CUSTOM' || link.plan === 'QUIZ_ONLY') planEnum = 'ENTERPRISE';
 
             const planStartDate = new Date();
             const planExpiryDate = new Date();
@@ -270,6 +277,7 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
                     phoneNumber: finalPhone,
                     email: finalEmail,
                     plan: planEnum,
+                    quizCredits: link.plan === 'QUIZ_ONLY' ? 10 : 0,
                     planStartDate,
                     planExpiryDate,
                     config: {
@@ -350,7 +358,7 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
             orderId: order.id,
             amount: order.amount,
             currency: order.currency,
-            keyId: process.env.RAZORPAY_KEY_ID || 'dummy_key',
+            keyId: razorpayConfig.keyId,
         });
 
     } catch (error: any) {
@@ -382,7 +390,7 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
         if (link.status !== 'PENDING') return res.status(400).json({ error: 'This link has already been used.' });
 
         // 1. Verify Razorpay Signature
-        const secret = process.env.RAZORPAY_KEY_SECRET || 'dummy_secret';
+        const secret = razorpayConfig.keySecret;
         const bodyText = razorpay_order_id + '|' + razorpay_payment_id;
         const expectedSignature = crypto
             .createHmac('sha256', secret)
@@ -396,7 +404,7 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
         // 2. Map plan to Tier enum
         let planEnum: any = 'BASIC';
         if (link.plan === 'PRO') planEnum = 'PRO';
-        else if (link.plan === 'CUSTOM') planEnum = 'ENTERPRISE';
+        else if (link.plan === 'CUSTOM' || link.plan === 'QUIZ_ONLY') planEnum = 'ENTERPRISE';
 
         // 3. Set dates based on billing cycle
         const planStartDate = new Date();
@@ -421,6 +429,7 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
                 phoneNumber: finalPhone,
                 email: finalEmail,
                 plan: planEnum,
+                quizCredits: link.plan === 'QUIZ_ONLY' ? 10 : 0,
                 planStartDate,
                 planExpiryDate,
                 config: {

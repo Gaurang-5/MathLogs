@@ -26,6 +26,8 @@ import {
     XCircle,
     SkipForward,
     Timer,
+    Phone,
+    User,
 } from 'lucide-react';
 
 /* ─── Types ─── */
@@ -132,7 +134,7 @@ export default function TakeQuiz() {
     const { instituteSlug, quizId } = useParams<{ instituteSlug: string; quizId: string }>();
     const navigate = useNavigate();
 
-    const [phase, setPhase] = useState<'loading' | 'instructions' | 'quiz' | 'result'>('loading');
+    const [phase, setPhase] = useState<'loading' | 'instructions' | 'quiz' | 'result' | 'public_registration'>('loading');
     const [submitting, setSubmitting] = useState(false);
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [submission, setSubmission] = useState<Submission | null>(null);
@@ -150,6 +152,51 @@ export default function TakeQuiz() {
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [isFirstView, setIsFirstView] = useState(false);
     const [violationReason, setViolationReason] = useState<string | null>(null);
+
+    const [publicName, setPublicName] = useState('');
+    const [publicPhone, setPublicPhone] = useState('');
+    const [registering, setRegistering] = useState(false);
+    const [regStep, setRegStep] = useState<'phone' | 'confirm' | 'new_name'>('phone');
+    const [foundStudent, setFoundStudent] = useState<{ studentId: string; name: string } | null>(null);
+    const [lookingUp, setLookingUp] = useState(false);
+
+    const lookupPhone = async () => {
+        const clean = publicPhone.replace(/\D/g, '');
+        if (clean.length < 10) { toast.error("Please enter a valid 10-digit phone number"); return; }
+        setLookingUp(true);
+        try {
+            const r = await axios.post(`/api/student-portal/quizzes/${quizId}/lookup-public`, { phone: clean });
+            if (r.data.found) {
+                setFoundStudent({ studentId: r.data.studentId, name: r.data.name });
+                setRegStep('confirm');
+            } else {
+                setRegStep('new_name');
+            }
+        } catch (e: any) {
+            toast.error(e?.response?.data?.error || "Lookup failed");
+        } finally {
+            setLookingUp(false);
+        }
+    };
+
+    const registerPublicGuest = async (existingStudentId?: string) => {
+        if (!existingStudentId && (!publicName.trim() || publicName.trim().length < 2)) { toast.error("Please enter your name"); return; }
+        setRegistering(true);
+        try {
+            const body: any = existingStudentId 
+                ? { studentId: existingStudentId } 
+                : { name: publicName, phone: publicPhone.replace(/\D/g, '') };
+            const r = await axios.post(`/api/student-portal/quizzes/${quizId}/register-public`, body);
+            if (r.data.token) {
+                localStorage.setItem(`student_token_${instituteSlug}`, r.data.token);
+                window.location.reload();
+            }
+        } catch (e: any) {
+            toast.error(e?.response?.data?.error || "Registration failed");
+        } finally {
+            setRegistering(false);
+        }
+    };
 
     const maskTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const answersRef = useRef<Record<string, string>>({});
@@ -324,10 +371,26 @@ export default function TakeQuiz() {
 
     /* ── Boot ── */
     useEffect(() => {
-        if (!token) { goBack(); return; }
         if (startAttemptedRef.current) return;
         startAttemptedRef.current = true;
         (async () => {
+            if (!token) {
+                try {
+                    const r = await axios.get<{ isPublic: boolean; title: string; totalMarks: number; timeLimitMins: number }>(`/api/student-portal/quizzes/${quizId}/info-public`);
+                    if (r.data.isPublic) {
+                        setQuiz(r.data as any);
+                        setPhase('public_registration');
+                        return;
+                    } else {
+                        goBack();
+                        return;
+                    }
+                } catch {
+                    goBack();
+                    return;
+                }
+            }
+
             try {
                 const r = await axios.post<{ quiz: Quiz; submission: Submission | null }>(
                     `/api/student-portal/quizzes/${quizId}/start`, { preview: true }, { headers });
@@ -668,6 +731,119 @@ export default function TakeQuiz() {
                         Back to Dashboard
                     </button>
                 </main>
+            </div>
+        );
+    }
+
+    /* ────────── PUBLIC REGISTRATION ────────── */
+    if (phase === 'public_registration' && quiz) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="bg-white max-w-md w-full rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+                    <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-6">
+                        <BookOpen className="w-6 h-6 text-gray-700" />
+                    </div>
+                    <h1 className="text-2xl font-black text-gray-900 leading-tight mb-2">{quiz.title}</h1>
+                    <p className="text-sm text-gray-500 mb-6 flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        {quiz.timeLimitMins} mins • {quiz.totalMarks} Marks
+                    </p>
+                    
+                    <AnimatePresence mode="wait">
+                        {/* STEP 1: Phone number */}
+                        {regStep === 'phone' && (
+                            <motion.div key="phone" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Phone Number</label>
+                                    <div className="relative">
+                                        <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input 
+                                            type="tel"
+                                            value={publicPhone}
+                                            onChange={e => setPublicPhone(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && lookupPhone()}
+                                            placeholder="Enter your 10-digit phone number"
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-3.5 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={lookupPhone}
+                                    disabled={lookingUp || publicPhone.replace(/\D/g, '').length < 10}
+                                    className="w-full bg-black text-white font-black py-4 rounded-xl hover:bg-gray-900 active:scale-95 transition-all text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {lookingUp ? <Loader className="w-5 h-5 animate-spin" /> : 'Continue'}
+                                </button>
+                            </motion.div>
+                        )}
+
+                        {/* STEP 2a: Existing student — confirm name */}
+                        {regStep === 'confirm' && foundStudent && (
+                            <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                                <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-black text-sm">
+                                            {foundStudent.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-gray-900">{foundStudent.name}</p>
+                                            <p className="text-xs text-gray-400">{publicPhone}</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500">Is this you? Confirm to start the quiz.</p>
+                                </div>
+                                <button 
+                                    onClick={() => registerPublicGuest(foundStudent.studentId)}
+                                    disabled={registering}
+                                    className="w-full bg-black text-white font-black py-4 rounded-xl hover:bg-gray-900 active:scale-95 transition-all text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {registering ? <Loader className="w-5 h-5 animate-spin" /> : "Yes, that's me — Start Quiz"}
+                                </button>
+                                <button 
+                                    onClick={() => { setFoundStudent(null); setRegStep('new_name'); }}
+                                    className="w-full text-gray-500 font-bold py-3 rounded-xl hover:bg-gray-50 active:scale-95 transition-all text-sm"
+                                >
+                                    Not me — use a different name
+                                </button>
+                            </motion.div>
+                        )}
+
+                        {/* STEP 2b: New student — enter name */}
+                        {regStep === 'new_name' && (
+                            <motion.div key="new_name" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Your Name</label>
+                                    <div className="relative">
+                                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input 
+                                            type="text"
+                                            value={publicName}
+                                            onChange={e => setPublicName(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && registerPublicGuest()}
+                                            placeholder="Enter your full name"
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-3.5 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => registerPublicGuest()}
+                                    disabled={registering || !publicName.trim()}
+                                    className="w-full bg-black text-white font-black py-4 rounded-xl hover:bg-gray-900 active:scale-95 transition-all text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {registering ? <Loader className="w-5 h-5 animate-spin" /> : 'Start Quiz'}
+                                </button>
+                                <button 
+                                    onClick={() => { setRegStep('phone'); setPublicPhone(''); }}
+                                    className="w-full text-gray-500 font-bold py-3 rounded-xl hover:bg-gray-50 active:scale-95 transition-all text-sm"
+                                >
+                                    ← Change phone number
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
             </div>
         );
     }

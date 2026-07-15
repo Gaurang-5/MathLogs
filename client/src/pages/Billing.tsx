@@ -4,7 +4,7 @@ import { CreditCard, Sparkles, Building, Check, CalendarCheck, CalendarOff, Info
 import Layout from '../components/Layout';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
-
+import QuizBilling from './QuizBilling';
 type PlanId = 'basic' | 'pro';
 type BillingCycle = 'monthly' | 'yearly';
 
@@ -292,6 +292,21 @@ export default function Billing() {
         );
     }
 
+    const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+
+    if (isQuizOnly) {
+        return (
+            <Layout title="Buy Credits">
+                <QuizBilling 
+                    institute={institute} 
+                    fetchInstituteDetails={fetchInstituteDetails} 
+                    isCheckoutLoading={isCheckoutLoading} 
+                    setIsCheckoutLoading={setIsCheckoutLoading} 
+                    loadScript={loadScript} 
+                />
+            </Layout>
+        );
+    }
     const today = new Date();
     const expiry = institute?.planExpiryDate ? new Date(institute.planExpiryDate) : null;
     const daysLeft = expiry ? Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : 0;

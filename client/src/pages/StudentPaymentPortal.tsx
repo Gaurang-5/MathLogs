@@ -1,10 +1,9 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, CheckCircle, AlertCircle, Loader, Phone, ChevronRight, IndianRupee, ArrowLeft, Clock, GraduationCap, PartyPopper, ArrowRight } from 'lucide-react';
-
-const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
+import { API_URL } from '../utils/api';
 
 interface FeeInstallment { id: string; name: string; amount: number; dueDate?: string; }
 interface FeePayment { id: string; amount?: number; amountPaid?: number; installmentId?: string; }
@@ -36,6 +35,13 @@ export default function StudentPaymentPortal() {
     const [paidByName, setPaidByName] = useState('');
 
     const [paymentType, setPaymentType] = useState<'full' | 'custom'>('full');
+    const filePreviewUrl = useMemo(() => file ? URL.createObjectURL(file) : null, [file]);
+
+    useEffect(() => {
+        return () => {
+            if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+        };
+    }, [filePreviewUrl]);
 
     // Auto-fetch when visited via personalized WhatsApp link (?phone=...)
     // Also fetch basic institute profile so logo/name display immediately
@@ -139,8 +145,9 @@ export default function StudentPaymentPortal() {
             // Client-side Image Compression (massive speed up for network upload)
             const compressedFile = await new Promise<File>((resolve) => {
                 const img = new Image();
+                const objectUrl = URL.createObjectURL(file);
                 img.onload = () => {
-                    URL.revokeObjectURL(img.src);
+                    URL.revokeObjectURL(objectUrl);
                     const canvas = document.createElement('canvas');
                     const MAX_SIZE = 1200;
                     let { width, height } = img;
@@ -167,8 +174,11 @@ export default function StudentPaymentPortal() {
                         0.75 // 75% quality is perfect for receipts
                     );
                 };
-                img.onerror = () => resolve(file); // fallback
-                img.src = URL.createObjectURL(file);
+                img.onerror = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    resolve(file);
+                };
+                img.src = objectUrl;
             });
 
             const formData = new FormData();
@@ -493,7 +503,7 @@ export default function StudentPaymentPortal() {
                                                             {file ? (
                                                                 <div className="flex flex-col items-center gap-2 w-full">
                                                                     <img 
-                                                                        src={URL.createObjectURL(file)} 
+                                                                        src={filePreviewUrl || ''} 
                                                                         alt="Payment preview" 
                                                                         className="w-full max-h-48 object-contain rounded-lg border border-neutral-200"
                                                                     />

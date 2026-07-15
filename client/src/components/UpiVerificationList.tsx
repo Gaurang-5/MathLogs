@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, AlertCircle, Eye } from 'lucide-react';
-
-const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
+import { API_URL } from '../utils/api';
 
 interface UpiVerification {
     id: string;

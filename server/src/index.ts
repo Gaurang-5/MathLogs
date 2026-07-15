@@ -1,5 +1,3 @@
-console.log("Starting index.ts");
-console.log('[DEBUG] index.ts module loading started');
 import 'dotenv/config';
 import path from 'path';
 import express from 'express';
@@ -31,13 +29,10 @@ const PRODUCTION_ORIGINS = new Set([
 ]);
 
 export function createApp() {
-    console.log('[DEBUG] createApp started');
     const app = express();
 
     if (process.env.NODE_ENV !== 'test') {
-        console.log('[DEBUG] Initializing Sentry...');
         initializeSentry();
-        console.log('[DEBUG] Sentry initialized');
     }
 
     configureSecurityHeaders(app);
@@ -188,7 +183,7 @@ export function createApp() {
     return app;
 }
 
-console.log("Before createApp"); export const app = createApp(); console.log("After createApp");
+export const app = createApp();
 
 function startServer() {
     process.on('unhandledRejection', (reason: any) => {

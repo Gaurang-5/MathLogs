@@ -161,12 +161,16 @@ export default function TestDetails() {
             })
             .then(blob => {
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${test?.name || 'Test'}_Report.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+                try {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${test?.name || 'Test'}_Report.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } finally {
+                    window.URL.revokeObjectURL(url);
+                }
                 toast.success('Report downloaded', { id: toastId });
             })
             .catch(() => toast.error("Failed to download report", { id: toastId }));

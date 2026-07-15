@@ -38,6 +38,8 @@ model Institute {
   systemLogs              SystemLog[]
   upiPaymentVerifications UpiPaymentVerification[]
   onlineQuizzes           OnlineQuiz[]
+  quizCredits             Int                      @default(0)
+  isQuizOnly              Boolean                  @default(false)
 }
 
 model InviteToken {
@@ -98,18 +100,18 @@ model Batch {
 }
 
 model Student {
-  id                      String                   @id @default(uuid())
+  id                      String                     @id @default(uuid())
   humanId                 String?
   name                    String
   parentName              String
   parentWhatsapp          String
   parentEmail             String?
-  status                  String                   @default("PENDING") // PENDING, ACTIVE, LEFT
+  status                  String                     @default("PENDING") // PENDING, ACTIVE, LEFT
   leaveReason             String?
   leftAt                  DateTime?
   batchId                 String?
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
   schoolName              String?
   additionalData          Json?
   instituteId             String?
@@ -119,8 +121,8 @@ model Student {
   fees                    FeeRecord[]
   marks                   Mark[]
   attendanceRecords       AttendanceRecord[]
-  batch                   Batch?                   @relation(fields: [batchId], references: [id])
-  institute               Institute?               @relation(fields: [instituteId], references: [id])
+  batch                   Batch?                     @relation(fields: [batchId], references: [id])
+  institute               Institute?                 @relation(fields: [instituteId], references: [id])
   balance                 StudentBalance?
   upiPaymentVerifications UpiPaymentVerification[]
   quizSubmissions         QuizSubmission[]
@@ -188,14 +190,14 @@ model Mark {
 }
 
 model FeeInstallment {
-  id                      String                   @id @default(uuid())
+  id                      String                     @id @default(uuid())
   name                    String
   amount                  Float
   batchId                 String
   studentId               String?
-  createdAt               DateTime                 @default(now())
-  batch                   Batch                    @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  student                 Student?                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                   @default(now())
+  batch                   Batch                      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  student                 Student?                   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   payments                FeePayment[]
   assignments             FeeInstallmentAssignment[]
   upiPaymentVerifications UpiPaymentVerification[]
@@ -233,7 +235,6 @@ model FeeInstallmentAssignment {
   @@index([studentId])
   @@index([installmentId])
 }
-
 
 model StudentBalance {
   studentId       String    @id
@@ -503,6 +504,7 @@ model OnlineQuiz {
   availableFrom  DateTime?
   availableUntil DateTime?
   isFinalized    Boolean   @default(false)
+  isPublic       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

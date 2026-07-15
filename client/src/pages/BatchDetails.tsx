@@ -324,8 +324,7 @@ export default function BatchDetails() {
         const toastId = toast.loading('Generating PDF...');
         try {
             const token = localStorage.getItem('token');
-            const API_BASE = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
-            const res = await fetch(`${API_BASE}/batches/${id}/download`, {
+            const res = await fetch(`${API_URL}/batches/${id}/download`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -545,12 +544,16 @@ export default function BatchDetails() {
             })
             .then(blob => {
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${batch?.name || 'batch'}_stickers.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+                try {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${batch?.name || 'batch'}_stickers.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } finally {
+                    window.URL.revokeObjectURL(url);
+                }
                 toast.success('Stickers downloaded', { id: toastId });
             })
             .catch(() => toast.error("Failed to download stickers", { id: toastId }));

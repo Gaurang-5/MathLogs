@@ -1,7 +1,7 @@
 /* eslint-disable */
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../utils/api';
+import { api, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Loader, X, TrendingUp, TrendingDown, IndianRupee, Mail, History, CheckCircle, Download, ArrowUpRight, FileText, ArrowUpDown, ChevronDown, Check, Receipt, MessageSquare, Send, ChevronRight, AlertCircle, Phone, Calendar, User, Square, CheckSquare } from 'lucide-react';
@@ -1008,18 +1008,22 @@ const Fees: React.FC = () => {
                                             const toastId = toast.loading('Downloading...');
                                             try {
                                                 const token = localStorage.getItem('token');
-                                                const API_BASE = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
-                                                const response = await fetch(`${API_BASE}/fees/download-pending?batch=${reportBatch}&sortBy=${reportSort}`, {
+                                                const response = await fetch(`${API_URL}/fees/download-pending?batch=${reportBatch}&sortBy=${reportSort}`, {
                                                     headers: { 'Authorization': `Bearer ${token}` }
                                                 });
                                                 if (!response.ok) throw new Error('Download failed');
                                                 const blob = await response.blob();
                                                 const url = window.URL.createObjectURL(blob);
-                                                const a = document.createElement('a');
-                                                a.href = url;
-                                                a.download = `pending_dues_report_${reportBatch}.pdf`;
-                                                document.body.appendChild(a);
-                                                a.click();
+                                                try {
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = `pending_dues_report_${reportBatch}.pdf`;
+                                                    document.body.appendChild(a);
+                                                    a.click();
+                                                    a.remove();
+                                                } finally {
+                                                    window.URL.revokeObjectURL(url);
+                                                }
                                                 toast.success('Downloaded!', { id: toastId });
                                             } catch {
                                                 toast.error('Download failed', { id: toastId });
@@ -1110,18 +1114,22 @@ const Fees: React.FC = () => {
                                             const toastId = toast.loading('Generating...');
                                             try {
                                                 const token = localStorage.getItem('token');
-                                                const API_BASE = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
-                                                const response = await fetch(`${API_BASE}/fees/download-transactions?month=${reportMonth}&year=${reportYear}`, {
+                                                const response = await fetch(`${API_URL}/fees/download-transactions?month=${reportMonth}&year=${reportYear}`, {
                                                     headers: { 'Authorization': `Bearer ${token}` }
                                                 });
                                                 if (!response.ok) throw new Error('Download failed');
                                                 const blob = await response.blob();
                                                 const url = window.URL.createObjectURL(blob);
-                                                const a = document.createElement('a');
-                                                a.href = url;
-                                                a.download = `Transactions_${reportMonth}_${reportYear}.pdf`;
-                                                document.body.appendChild(a);
-                                                a.click();
+                                                try {
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = `Transactions_${reportMonth}_${reportYear}.pdf`;
+                                                    document.body.appendChild(a);
+                                                    a.click();
+                                                    a.remove();
+                                                } finally {
+                                                    window.URL.revokeObjectURL(url);
+                                                }
                                                 toast.success('Downloaded!', { id: toastId });
                                             } catch {
                                                 toast.error('Failed', { id: toastId });

@@ -2,8 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
+import { useNavigate } from 'react-router-dom';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart, BarChart, Bar } from 'recharts';
-import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee } from 'lucide-react';
+import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee, Sparkles } from 'lucide-react';
 import CountUp from 'react-countup';
 
 interface ClassAveragePoint {
@@ -39,6 +40,9 @@ interface DashboardSummaryResponse {
 const formatIndianRupee = (value: number) => new Intl.NumberFormat('en-IN').format(value);
 
 export default function Dashboard() {
+    const navigate = useNavigate();
+    const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+
     // Privacy toggle for fee data — persisted across sessions
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
@@ -118,12 +122,32 @@ export default function Dashboard() {
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-black tracking-tighter mb-1.5">
                     {getGreeting()}, <span className="text-app-text-tertiary">{userName}</span>
                 </h1>
-                <p className="text-app-text-secondary font-medium text-sm sm:text-base">Here's what's happening with your institute today.</p>
+                <p className="text-app-text-secondary font-medium text-sm sm:text-base">
+                    {isQuizOnly ? "Welcome to your Quiz Portal." : "Here's what's happening with your institute today."}
+                </p>
             </div>
 
-
-            {/* Stats Overview - Premium Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            {isQuizOnly ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+                    <div
+                        onClick={() => navigate('/quizzes')}
+                        className="animate-fade-in-up group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-6 sm:py-8 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden"
+                    >
+                        <div className="flex flex-col items-center justify-center text-center gap-4 relative z-10">
+                            <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center">
+                                <Sparkles className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg text-black mb-1">Create a Quiz</h3>
+                                <p className="text-sm text-app-text-tertiary">Generate or manage your quizzes</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <>
+                    {/* Stats Overview - Premium Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {/* Total Students */}
                 {loading.summary ? (
                     <div className="h-[100px] sm:h-[110px] rounded-2xl sm:rounded-[24px] bg-neutral-50/80 border border-black/5 animate-pulse" />
@@ -441,6 +465,8 @@ export default function Dashboard() {
                         </div>
                     )}
                 </div>
+            )}
+            </>
             )}
         </Layout>
     );

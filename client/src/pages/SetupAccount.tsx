@@ -6,8 +6,7 @@ import {
     Eye, EyeOff, Loader2, CheckCircle, AlertTriangle, Building2,
     BookOpen, Users, ChevronRight, Settings, Plus, X, Phone, RotateCcw
 } from 'lucide-react';
-
-const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
+import { API_URL } from '../utils/api';
 
 type Step = 'loading' | 'invalid' | 'configure' | 'credentials' | 'done';
 
@@ -17,6 +16,8 @@ interface ApiErrorResponse {
 
 interface InviteValidationResponse {
     instituteName: string;
+    plan?: string;
+    config?: any;
 }
 
 interface ResendSetupLinkResponse {
@@ -28,6 +29,7 @@ interface SetupAccountResponse {
     adminId: string;
     token: string;
     refreshToken: string;
+    isQuizOnly?: boolean;
 }
 
 const getAxiosErrorMessage = (error: unknown, fallback: string) => {
@@ -75,7 +77,12 @@ export default function SetupAccount() {
             try {
                 const res = await axios.get<InviteValidationResponse>(`${API_URL}/invites/${token}`);
                 setInstituteName(res.data.instituteName);
-                setStep('configure');
+                
+                if (res.data.plan === 'QUIZ_ONLY' || res.data.config?.planName === 'QUIZ_ONLY') {
+                    setStep('credentials');
+                } else {
+                    setStep('configure');
+                }
             } catch (error: unknown) {
                 setError(getAxiosErrorMessage(error, 'Invalid or expired invite link.'));
                 setStep('invalid');
@@ -146,7 +153,8 @@ export default function SetupAccount() {
             if (res.data.success) {
                 localStorage.setItem('adminId', res.data.adminId);
                 localStorage.setItem('token', res.data.token);
-                localStorage.setItem('refreshToken', res.data.refreshToken);
+                if (res.data.refreshToken) localStorage.setItem('refreshToken', res.data.refreshToken);
+                localStorage.setItem('isQuizOnly', String(res.data.isQuizOnly || false));
                 setStep('done');
                 setTimeout(() => navigate('/dashboard'), 1500);
             }

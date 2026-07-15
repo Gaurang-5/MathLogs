@@ -5,7 +5,9 @@ import { sendWelcomeWhatsApp } from '../utils/whatsapp';
 import { getCourseCode, getInstituteCode } from '../utils/studentIds';
 import jwt from 'jsonwebtoken';
 import { secureLogger } from '../utils/secureLogger';
+import { getJwtSecret } from '../utils/env';
 
+const JWT_SECRET = getJwtSecret();
 
 // H5 fix: Shared constant so both registerStudent and addStudentManually
 // always include the fields that autoSendWelcomeInvite depends on.
@@ -134,7 +136,7 @@ export const registerStudent = async (req: Request, res: Response) => {
 
     if (token) {
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-123') as any;
+            const decoded = jwt.verify(token, JWT_SECRET) as any;
             if (decoded.batchId !== batchId) {
                 return res.status(403).json({ error: 'This invite link is for a different batch.' });
             }
@@ -699,4 +701,3 @@ export const getClassAverageStats = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to fetch class average stats' });
     }
 };
-

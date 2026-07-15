@@ -99,7 +99,8 @@ export default function BatchDetailScreen() {
     try {
       const token = await getItemAsync('auth_token');
       const url = type === 'pdf' ? `/batches/${id}/download` : `/stickers/download?batchId=${id}`;
-      const baseUrl = api.defaults.baseURL || 'http://localhost:3001/api';
+      const baseUrl = api.defaults.baseURL;
+      if (!baseUrl) throw new Error('API base URL is not configured');
       const fileUri = FileSystem.documentDirectory + `${type}_${id}.pdf`;
 
       const res = await FileSystem.downloadAsync(`${baseUrl}${url}`, fileUri, {

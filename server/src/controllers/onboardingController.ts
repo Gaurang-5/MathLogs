@@ -6,11 +6,13 @@ import { sendSetupLinkWhatsApp } from '../utils/whatsapp';
 import { sendSetupLinkEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
 import { secureLogger } from '../utils/secureLogger';
+import { getRazorpayConfig } from '../utils/env';
 
+const razorpayConfig = getRazorpayConfig();
 
 const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key',
-    key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_secret',
+    key_id: razorpayConfig.keyId,
+    key_secret: razorpayConfig.keySecret,
 });
 
 // Track Lead Progress
@@ -101,7 +103,7 @@ export const createOrder = async (req: Request, res: Response) => {
                 orderId: order.id,
                 amount: order.amount,
                 currency: order.currency,
-                keyId: process.env.RAZORPAY_KEY_ID || 'dummy_key',
+                keyId: razorpayConfig.keyId,
             });
         } else {
             // MONTHLY AUTOPAY
@@ -147,7 +149,7 @@ export const createOrder = async (req: Request, res: Response) => {
                 return res.json({
                     success: true,
                     subscriptionId: subscription.id,
-                    keyId: process.env.RAZORPAY_KEY_ID || 'dummy_key',
+                    keyId: razorpayConfig.keyId,
                 });
 
             } catch (error) {
@@ -179,7 +181,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
         } = req.body;
 
         // 1. Verify Signature
-        const secret = process.env.RAZORPAY_KEY_SECRET || 'dummy_secret';
+        const secret = razorpayConfig.keySecret;
 
         let bodyText = '';
         if (billingCycle === 'yearly') {

@@ -15,6 +15,7 @@ let ADMIN_ID = '';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { secureLogger } from '../utils/secureLogger';
+import { getJwtSecret } from '../utils/env';
 
 
 const prisma = new PrismaClient();
@@ -32,7 +33,7 @@ async function loginAndSetup() {
                 passwordVersion: admin.passwordVersion,
                 instituteId: admin.instituteId,
                 role: admin.role
-            }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1h' });
+            }, getJwtSecret(), { expiresIn: '1h' });
             
             ADMIN_ID = admin.id;
             secureLogger.info(`✅ Successfully authenticated as ${admin.username}!`);

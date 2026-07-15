@@ -86,13 +86,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithPassword = useCallback(async (identifier: string, password: string) => {
     try {
-      console.log('[AUTH] Attempting login with identifier:', identifier);
-      console.log('[AUTH] API base URL:', api.defaults.baseURL);
+      if (__DEV__) console.debug('[AUTH] Attempting login', { apiBaseUrl: api.defaults.baseURL });
       
       const response = await api.post('/auth/login', { username: identifier, password });
       
-      console.log('[AUTH] Login response status:', response.status);
-      console.log('[AUTH] Login response data:', JSON.stringify(response.data));
+      if (__DEV__) console.debug('[AUTH] Login response status:', response.status);
 
       if (!response.data.success) {
          throw new Error(response.data.error || 'Login failed');
@@ -108,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
          const profileResponse = await api.get('/auth/me');
          profile = profileResponse.data;
-         console.log('[AUTH] Profile fetched:', JSON.stringify(profile));
+         if (__DEV__) console.debug('[AUTH] Profile fetched');
       } catch (e: any) {
          console.warn('[AUTH] Could not fetch /auth/me:', e?.response?.status, e?.message);
          profile = { username: 'Admin', email: identifier };
@@ -130,12 +128,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setToken(newToken);
       setUser(userData);
-      console.log('[AUTH] Login successful, user stored.');
+      if (__DEV__) console.debug('[AUTH] Login successful');
     } catch (error: any) {
       console.error('[AUTH] Login FAILED:');
       console.error('[AUTH]   message:', error?.message);
       console.error('[AUTH]   status:', error?.response?.status);
-      console.error('[AUTH]   data:', JSON.stringify(error?.response?.data));
       console.error('[AUTH]   code:', error?.code);
       if (error.response?.data?.reason) {
          throw new Error(error.response.data.reason);

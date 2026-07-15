@@ -18,7 +18,8 @@ import {
     Trash2,
     Edit3,
     CalendarDays,
-    X
+    X,
+    Link2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AITestGeneratorModal from '../components/AITestGeneratorModal';
@@ -111,6 +112,8 @@ export default function QuizList() {
     const [loading, setLoading] = useState(true);
     const [showAIModal, setShowAIModal] = useState(false);
     const [finalizingQuizId, setFinalizingQuizId] = useState<string | null>(null);
+    const [instituteSlug, setInstituteSlug] = useState<string | null>(null);
+    const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
 
     // Active Selected Quiz & Current Cockpit Tab
     const [activeQuiz, setActiveQuiz] = useState<OnlineQuiz | null>(null);
@@ -149,12 +152,16 @@ export default function QuizList() {
 
     const fetchData = async () => {
         try {
-            const [quizzesData, batchesData] = await Promise.all([
+            const [quizzesData, batchesData, instituteData] = await Promise.all([
                 apiRequest<OnlineQuiz[]>('/tests/online'),
-                apiRequest<Batch[]>('/batches')
+                apiRequest<Batch[]>('/batches'),
+                apiRequest<any>('/institute/me').catch(() => null)
             ]);
             setOnlineQuizzes(quizzesData);
             setBatches(batchesData);
+            if (instituteData?.slug) {
+                setInstituteSlug(instituteData.slug);
+            }
 
             const currentActive = activeQuizRef.current;
             if (currentActive) {
@@ -633,6 +640,24 @@ export default function QuizList() {
                                             </button>
                                         );
                                     })()}
+
+                                    {isQuizOnly && activeQuiz.isPublic && (
+                                        <button
+                                            onClick={() => {
+                                                if (!instituteSlug) {
+                                                    toast.error('Could not fetch institute slug.');
+                                                    return;
+                                                }
+                                                const link = `${window.location.origin}/${instituteSlug}/student/quiz/${activeQuiz.id}`;
+                                                navigator.clipboard.writeText(link);
+                                                toast.success('Shareable link copied!');
+                                            }}
+                                            className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-bold hover:bg-emerald-100 active:scale-95 hover:scale-[1.02] transition-all duration-200"
+                                        >
+                                            <Link2 className="w-4 h-4" />
+                                            Copy Link
+                                        </button>
+                                    )}
 
                                     <button
                                         onClick={() => downloadQuestionsPdf(activeQuiz)}

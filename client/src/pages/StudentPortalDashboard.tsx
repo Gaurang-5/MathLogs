@@ -83,6 +83,10 @@ export default function StudentPortalDashboard() {
                 const quizData = Array.isArray(quizRes.data) ? quizRes.data : [];
                 setQuizzes(quizData);
                 
+                if (dashboardRes.data?.student?.isQuizOnly) {
+                    setActiveTab('quizzes');
+                }
+                
                 // PERF: Cache for instant loading on next visit
                 sessionStorage.setItem(`student_dash_${instituteSlug}`, JSON.stringify(dashboardRes.data));
                 sessionStorage.setItem(`student_quizzes_${instituteSlug}`, JSON.stringify(quizData));
@@ -142,7 +146,7 @@ export default function StudentPortalDashboard() {
                     {/* Name + batch centred */}
                     <div className="text-center min-w-0 flex-1 px-3">
                         <p className="font-bold text-sm leading-tight truncate">{data.student.name}</p>
-                        <p className="text-xs text-gray-400 truncate">{data.student.batchName}</p>
+                        {!data.student.isQuizOnly && <p className="text-xs text-gray-400 truncate">{data.student.batchName}</p>}
                     </div>
 
                     {/* Logout */}
@@ -442,7 +446,7 @@ export default function StudentPortalDashboard() {
             {/* ── BOTTOM NAV — Floating Island (matches teacher dashboard) ── */}
             <nav className="fixed bottom-6 left-4 right-4 z-50 bg-white/80 backdrop-blur-3xl border border-gray-200/60 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] rounded-[32px] h-[72px]">
                 <div className="flex items-center h-full w-full px-2">
-                    {TABS.map(({ key, label, Icon }) => {
+                    {TABS.filter(t => !data.student.isQuizOnly || t.key === 'quizzes').map(({ key, label, Icon }) => {
                         const active = activeTab === key;
                         return (
                             <button
@@ -512,8 +516,12 @@ export default function StudentPortalDashboard() {
 
                             {/* Profile rows */}
                             <div className="px-2 py-2">
-                                <ProfileRow icon={GraduationCap} label="Batch" value={data.student.batchName} />
-                                <ProfileRow icon={User} label="Parent / Guardian" value={data.student.parentName} />
+                                {!data.student.isQuizOnly && (
+                                    <>
+                                        <ProfileRow icon={GraduationCap} label="Batch" value={data.student.batchName} />
+                                        <ProfileRow icon={User} label="Parent / Guardian" value={data.student.parentName} />
+                                    </>
+                                )}
                                 <ProfileRow icon={Phone} label="Mobile" value={data.student.parentWhatsapp} />
                                 {data.student.parentEmail && <ProfileRow icon={Mail} label="Email" value={data.student.parentEmail} />}
                                 {data.student.schoolName && <ProfileRow icon={School} label="School" value={data.student.schoolName} />}

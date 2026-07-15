@@ -11,6 +11,8 @@ interface LoginResponse {
     token?: string;
     refreshToken?: string;
     role?: string;
+    isQuizOnly?: boolean;
+    quizCredits?: number;
     error?: string;
 }
 
@@ -81,6 +83,8 @@ export default function AdminLogin() {
                 localStorage.setItem('adminId', data.adminId ?? '');
                 localStorage.setItem('token', data.token ?? '');
                 localStorage.setItem('refreshToken', data.refreshToken ?? '');
+                localStorage.setItem('isQuizOnly', String(data.isQuizOnly || false));
+                localStorage.setItem('quizCredits', String(data.quizCredits || 0));
                 
                 await new Promise(r => setTimeout(r, 600));
                 setLoadingText('Loading Dashboard...');

@@ -98,6 +98,8 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
     // Track original questions when regenerated
     const [pendingReverts, setPendingReverts] = useState<Record<string, GeneratedQuestion[]>>({});
 
+    const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+
     const handleRevertQuestion = (regenId: string) => {
         if (!generatedTest) return;
         const oldQuestions = pendingReverts[regenId];
@@ -476,7 +478,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
     };
 
     const handleSaveTest = async () => {
-        if (!generatedTest || batchIds.length === 0) {
+        if (!generatedTest || (!isQuizOnly && batchIds.length === 0)) {
             toast.error('Please assign the quiz to at least one batch.');
             return;
         }
@@ -505,6 +507,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                     availableFrom: fromDate.toISOString(),
                     availableUntil: untilDate.toISOString(),
                     batchIds,
+                    isPublic: isQuizOnly,
                     questions: generatedTest.questions,
                     studentQuestionCount: parseInt(questionCount) || null
                 });
@@ -519,9 +522,16 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                     availableFrom: fromDate.toISOString(),
                     availableUntil: untilDate.toISOString(),
                     batchIds,
+                    isPublic: isQuizOnly,
                     questions: generatedTest.questions,
                     studentQuestionCount: parseInt(questionCount) || null
                 });
+                
+                if (isQuizOnly) {
+                    const currentCredits = parseInt(localStorage.getItem('quizCredits') || '0', 10);
+                    localStorage.setItem('quizCredits', Math.max(0, currentCredits - 1).toString());
+                    window.dispatchEvent(new Event('storage')); // trigger update across tabs/components
+                }
                 toast.success('Online Quiz saved successfully!');
             }
             onSaved();
@@ -982,32 +992,34 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                     <div className="bg-neutral-50 border border-neutral-100 p-3.5 sm:p-4 rounded-xl mt-4 space-y-4">
                                         <h4 className="font-bold text-neutral-900 text-sm">Quiz Settings</h4>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div className="col-span-1 sm:col-span-2">
-                                                <label className="block text-xs font-bold text-neutral-800 uppercase mb-2">Assign to Batches</label>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-3 bg-white border border-neutral-200 rounded-lg">
-                                                    {batchOptions.length === 0 ? (
-                                                        <p className="text-sm text-neutral-400 col-span-full">No batches available.</p>
-                                                    ) : (
-                                                        batchOptions.map(b => (
-                                                            <label key={b.value} className="flex items-center gap-2 text-sm font-medium cursor-pointer text-neutral-700 hover:text-black">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500 accent-emerald-600"
-                                                                    checked={batchIds.includes(b.value)}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) {
-                                                                            setBatchIds([...batchIds, b.value]);
-                                                                        } else {
-                                                                            setBatchIds(batchIds.filter(id => id !== b.value));
-                                                                        }
-                                                                    }}
-                                                                />
-                                                                {b.label}
-                                                            </label>
-                                                        ))
-                                                    )}
+                                            {!isQuizOnly && (
+                                                <div className="col-span-1 sm:col-span-2">
+                                                    <label className="block text-xs font-bold text-neutral-800 uppercase mb-2">Assign to Batches</label>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-3 bg-white border border-neutral-200 rounded-lg">
+                                                        {batchOptions.length === 0 ? (
+                                                            <p className="text-sm text-neutral-400 col-span-full">No batches available.</p>
+                                                        ) : (
+                                                            batchOptions.map(b => (
+                                                                <label key={b.value} className="flex items-center gap-2 text-sm font-medium cursor-pointer text-neutral-700 hover:text-black">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500 accent-emerald-600"
+                                                                        checked={batchIds.includes(b.value)}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setBatchIds([...batchIds, b.value]);
+                                                                            } else {
+                                                                                setBatchIds(batchIds.filter(id => id !== b.value));
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    <span>{b.label}</span>
+                                                                </label>
+                                                            ))
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                             <div>
                                                 <label className="block text-xs font-bold text-neutral-800 uppercase mb-2">Time Limit (mins)</label>
                                                 <input
@@ -1051,7 +1063,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                         )}
                                         <button
                                             onClick={handleSaveTest}
-                                            disabled={saving || batchIds.length === 0}
+                                            disabled={saving || (!isQuizOnly && batchIds.length === 0)}
                                             className="flex-1 min-h-11 bg-neutral-900 text-white font-bold py-3 rounded-xl hover:bg-neutral-800 flex justify-center items-center gap-2 disabled:opacity-50"
                                         >
                                             {saving ? <Loader className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}

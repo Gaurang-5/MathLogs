@@ -21,6 +21,7 @@ import { getPaymentHistory } from '../controllers/feeController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
 import { processOCRTextract } from '../utils/ocrTextract';
+import { secureLogger } from '../utils/secureLogger';
 
 import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
 
@@ -144,21 +145,17 @@ if (process.env.NODE_ENV !== 'test') {
 // OCR Scan Endpoint
 router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('image'), async (req, res) => {
     try {
-        console.log("📥 Received OCR Request", (req as any).user?.username);
-
         let imageBuffer: Buffer | string | undefined;
 
         if ((req as any).file) {
-            console.log(`📎 File received: ${(req as any).file.originalname} (${(req as any).file.size} bytes)`);
             imageBuffer = (req as any).file.buffer;
         } else if (req.body.image) {
             // Fallback for JSON Base64 (Legacy/Dev)
-            console.log("⚠️ Legacy Base64 JSON received");
+            secureLogger.debug('Legacy base64 OCR payload received');
             imageBuffer = req.body.image;
         }
 
         if (!imageBuffer) {
-            console.error("❌ No image data found in request");
             return res.status(400).json({ error: "Missing image data" });
         }
 
@@ -169,14 +166,12 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
         // Check DB-backed cache first (works across all server instances)
         const cached = await checkOcrCache(hash);
         if (cached) {
-            console.log("♻️ Duplicate Scan — Returning DB-Cached Result");
             return res.json(cached);
         }
 
         // DUAL ENGINE: Textract + Gemini run in parallel
         // Parse maxMarks from form data (sent alongside the image)
         const maxMarks = req.body.maxMarks ? parseFloat(req.body.maxMarks) : undefined;
-        if (maxMarks) console.log(`📏 MaxMarks constraint: ${maxMarks}`);
 
         const [geminiResult, textractResult] = await Promise.allSettled([
             processOCR(imageBuffer),
@@ -195,7 +190,7 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
             : { score: "TEXTRACT_ERROR", confidence: 0, raw: (textractResult as any).reason?.message || "Unknown error", rawTexts: [] };
 
         const match = gemini.score === (textract as any).score;
-        console.log(`✅ OCR | Gemini: "${gemini.score}" (${(gemini.confidence * 100).toFixed(0)}%) | Textract: "${(textract as any).score}" (${((textract as any).confidence * 100).toFixed(0)}%) | Match: ${match ? '✅' : '❌'}`);
+        secureLogger.debug('OCR completed', { sourceMatch: match, source: match ? 'both' : 'fallback' });
 
         const geminiOk = gemini.score && !gemini.score.includes('ERROR');
         const textractOk = (textract as any).score && !(textract as any).score.includes('ERROR');
