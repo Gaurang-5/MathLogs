@@ -287,6 +287,7 @@ export default function TakeQuiz() {
                 { preview: false },
                 { headers }
             );
+            
             setQuiz(r.data.quiz);
             setSubmission(r.data.submission);
             if (r.data.student) setStudentData(r.data.student);
