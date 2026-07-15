@@ -908,6 +908,13 @@ export const getOnlineQuizzes = async (req: Request, res: Response) => {
                         submittedAt: true,
                         score: true,
                         shuffledQuestions: true,
+                        student: {
+                            select: {
+                                id: true,
+                                name: true,
+                                humanId: true
+                            }
+                        },
                         answers: {
                             select: {
                                 questionId: true,

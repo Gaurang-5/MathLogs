@@ -40,6 +40,7 @@ interface QuizSubmission {
     startedAt: string | null;
     submittedAt: string | null;
     score: number | null;
+    student?: { id: string, name: string, humanId: string };
     answers?: QuizAnswer[];
     shuffledQuestions?: any;
 }
@@ -358,6 +359,13 @@ export default function QuizList() {
             quiz.batches.forEach((b: any) => {
                 if (b.students) {
                     b.students.forEach((s: any) => studentsMap.set(s.id, s));
+                }
+            });
+        }
+        if (quiz.submissions) {
+            quiz.submissions.forEach((sub) => {
+                if (sub.student && !studentsMap.has(sub.studentId)) {
+                    studentsMap.set(sub.studentId, sub.student);
                 }
             });
         }
@@ -795,9 +803,13 @@ export default function QuizList() {
                                 <div className="bg-white border border-black/5 rounded-2xl shadow-sm overflow-hidden">
                                     <div className="px-4 sm:px-5 py-4 border-b border-black/5 bg-neutral-50/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                         <div>
-                                            <h3 className="font-black text-app-text">Batch Enrolled Submissions Grid</h3>
+                                            <h3 className="font-black text-app-text">
+                                                {isQuizOnly ? 'Guest Student Submissions Grid' : 'Batch Enrolled Submissions Grid'}
+                                            </h3>
                                             <p className="text-xs text-app-text-secondary mt-0.5">
-                                                All students approved for this batch and their attempt records.
+                                                {isQuizOnly
+                                                    ? 'All guest students who started this quiz and their attempt records.'
+                                                    : 'All students approved for this batch and their attempt records.'}
                                             </p>
                                         </div>
                                         {activeQuiz.isFinalized && (
