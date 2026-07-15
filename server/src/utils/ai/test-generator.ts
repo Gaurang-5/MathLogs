@@ -1,3 +1,4 @@
+function parseAIResponseJSON(text: string) { let clean = text.trim(); if (clean.startsWith("```json")) clean = clean.substring(7); else if (clean.startsWith("```")) clean = clean.substring(3); if (clean.endsWith("```")) clean = clean.substring(0, clean.length - 3); return JSON.parse(clean.trim()); }
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { secureLogger } from '../secureLogger';
 
@@ -121,7 +122,7 @@ Make sure the questions are clear, accurate, and age-appropriate. Include multip
 
     return runWithFallback(async (model) => {
         const result = await model.generateContent(contents);
-        return JSON.parse(result.response.text()) as GeneratedTest;
+        return parseAIResponseJSON(result.response.text()) as GeneratedTest;
     }, 0.7, schema);
 }
 
@@ -221,7 +222,7 @@ Make sure Variant B is substantially different from Variant A (different numbers
 
     return runWithFallback(async (model) => {
         const result = await model.generateContent(contents);
-        const raw = JSON.parse(result.response.text()) as {
+        const raw = parseAIResponseJSON(result.response.text()) as {
             title: string;
             description: string;
             totalMarks: number;
@@ -310,7 +311,7 @@ It should be a multiple-choice question.`;
 
     return runWithFallback(async (model) => {
         const result = await model.generateContent(contents);
-        return JSON.parse(result.response.text()) as GeneratedQuestion;
+        return parseAIResponseJSON(result.response.text()) as GeneratedQuestion;
     }, 0.7, schema);
 }
 
@@ -359,6 +360,6 @@ Topic: "${topic}"`;
 
     return runWithFallback(async (model) => {
         const result = await model.generateContent(contents);
-        return JSON.parse(result.response.text()) as GeneratedQuestion;
+        return parseAIResponseJSON(result.response.text()) as GeneratedQuestion;
     }, 0.8, schema);
 }

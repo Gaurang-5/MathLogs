@@ -65,7 +65,11 @@ function createRequestInit(method: HttpMethod, headers: Record<string, string>, 
 }
 
 async function parseJsonResponse<T>(res: Response): Promise<T> {
-    return res.json() as Promise<T>;
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+        return res.json() as Promise<T>;
+    }
+    throw new Error('Server returned an invalid response (expected JSON, got ' + (contentType || 'unknown') + '). Please ensure the backend is running.');
 }
 
 async function request<T = unknown>(
@@ -163,8 +167,13 @@ async function request<T = unknown>(
             }
 
             // Extract error message from response
-            const errorData = await res.json().catch(() => ({} as { error?: string; message?: string }));
-            const serverMessage = errorData.error || errorData.message || 'Request failed';
+            let serverMessage = 'Request failed';
+            try {
+                const errorData = await parseJsonResponse<{ error?: string; message?: string }>(res);
+                serverMessage = errorData.error || errorData.message || serverMessage;
+            } catch (e) {
+                // Ignore JSON parse errors for error responses, just use default message
+            }
 
             // Special case for expired free trial / subscription
             if (res.status === 402) {
