@@ -1037,7 +1037,7 @@ export const submitOnlineQuiz = async (req: Request, res: Response): Promise<voi
                 where: { quizId_studentId: { quizId, studentId } },
                 include: {
                     cheatingEvents: { select: { id: true } },
-                    quiz: { select: { timeLimitMins: true, totalMarks: true } }
+                    quiz: { select: { timeLimitMins: true, totalMarks: true, title: true, institute: { select: { name: true } } } }
                 }
             });
 
@@ -1115,16 +1115,34 @@ export const submitOnlineQuiz = async (req: Request, res: Response): Promise<voi
                 }))
             });
 
-            return { totalScore, totalMarks: quiz.totalMarks };
+            return { totalScore, totalMarks: quiz.totalMarks, quizTitle: quiz.title, instituteName: quiz.institute?.name };
         });
 
         // Recalculate score for the response
         const finalSubmission = await prisma.quizSubmission.findUnique({
             where: { quizId_studentId: { quizId, studentId } },
-            select: { score: true }
+            select: { score: true, student: { select: { name: true, parentWhatsapp: true } } }
         });
 
-        res.json({ success: true, score: finalSubmission?.score ?? 0, totalMarks: result.totalMarks });
+        const finalScore = finalSubmission?.score ?? 0;
+        res.json({ success: true, score: finalScore, totalMarks: result.totalMarks });
+
+        // Fire and forget WhatsApp
+        if (finalSubmission?.student?.parentWhatsapp) {
+            import('../utils/whatsapp').then(({ sendTestMarksWhatsApp }) => {
+                let phone = finalSubmission.student.parentWhatsapp!.replace(/[^0-9+]/g, '');
+                if (!phone.startsWith('+')) {
+                    if (phone.length === 10) phone = '+91' + phone;
+                }
+                sendTestMarksWhatsApp(phone, {
+                    studentName: finalSubmission.student.name,
+                    instituteName: result.instituteName || "our institute",
+                    testName: result.quizTitle,
+                    totalMarks: String(result.totalMarks),
+                    marksObtained: String(finalScore)
+                }).catch(err => console.error('Online Quiz WhatsApp Error:', err));
+            }).catch(err => console.error('Failed to import whatsapp utils:', err));
+        }
     } catch (error: any) {
         if (error?.message === 'QUIZ_NOT_STARTED') {
             res.status(400).json({ error: 'Quiz not started.' });
