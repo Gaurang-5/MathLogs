@@ -357,6 +357,9 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                         include: { installment: true },
                         orderBy: { date: 'desc' }
                     },
+                    feeAssignments: {
+                        select: { installmentId: true }
+                    },
                     marks: {
                         include: { test: true }
                     }
@@ -395,10 +398,12 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
 
         const studentJoinDate = new Date(student.createdAt);
 
+        const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+        
         const eligibleInstallments = batchInstallments.filter((inst: any) => {
             if (inst.studentId && inst.studentId !== studentId) return false;
             if (inst.studentId === studentId) return true;
-            return new Date(inst.createdAt) >= studentJoinDate || inst.payments.length > 0;
+            return new Date(inst.createdAt) >= studentJoinDate || inst.payments.length > 0 || assignedIds.has(inst.id);
         });
 
         // Build a map of testId -> mark for fast lookup

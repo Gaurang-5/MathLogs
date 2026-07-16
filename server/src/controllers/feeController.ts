@@ -264,6 +264,11 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                         date: true,
                         installmentId: true
                     }
+                },
+                feeAssignments: {
+                    select: {
+                        installmentId: true
+                    }
                 }
             },
             orderBy: { name: 'asc' }
@@ -278,17 +283,21 @@ export const getFeeSummary = async (req: Request, res: Response) => {
             // Build a set of installment IDs that have existing payments for this student
             const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
 
-            // Filter installments: include global ones (no studentId) that are after join date OR have payments,
+            // Build a set of explicit assignments for this student
+            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+
+            // Filter installments: include global ones (no studentId) that are after join date OR have payments OR are explicitly assigned,
             // plus student-specific ones that belong to THIS student
             const validInstallments = allBatchInstallments.filter((inst: any) => {
                 if (inst.studentId) {
                     // Student-specific installment: only include if it belongs to this student
                     return inst.studentId === student.id;
                 }
-                // Global installment: include if after join date OR student has payments for it
+                // Global installment: include if after join date OR student has payments for it OR is explicitly assigned
                 const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
                 const hasPayment = paidInstallmentIds.has(inst.id);
-                return isAfterJoin || hasPayment;
+                const isAssigned = assignedIds.has(inst.id);
+                return isAfterJoin || hasPayment || isAssigned;
             });
             const validInstallmentIds = new Set(validInstallments.map((inst: any) => inst.id));
 
