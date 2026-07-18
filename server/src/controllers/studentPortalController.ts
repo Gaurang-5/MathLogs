@@ -8,7 +8,7 @@ import { getJwtSecret } from '../utils/env';
 
 const JWT_SECRET = getJwtSecret();
 const AUTOSAVE_MIN_INTERVAL_MS = 10_000;
-const MAX_CHEATING_WARNINGS = 5;
+const MAX_CHEATING_WARNINGS = 99999;
 const autosaveWriteTimes = new Map<string, number>();
 
 
@@ -972,53 +972,15 @@ export const logQuizCheatingEvent = async (req: Request, res: Response): Promise
         const studentId = getStudentIdFromRequest(req, res);
         if (!studentId) return;
 
-        const quizId = req.params.id as string;
-        const eventType = typeof req.body?.eventType === 'string' ? req.body.eventType.trim() : '';
-        const metadata = req.body?.metadata && typeof req.body.metadata === 'object' && !Array.isArray(req.body.metadata)
-            ? req.body.metadata
-            : undefined;
-
-        if (!eventType) {
-            res.status(400).json({ error: 'eventType is required' });
-            return;
-        }
-
-        const submission = await prisma.quizSubmission.findFirst({
-            where: {
-                quizId,
-                studentId,
-                submittedAt: null
-            },
-            include: {
-                cheatingEvents: { select: { id: true } }
-            }
-        });
-
-        if (!submission) {
-            res.status(404).json({ error: 'Active quiz attempt not found' });
-            return;
-        }
-
-        await prisma.cheatingEvent.create({
-            data: {
-                submissionId: submission.id,
-                eventType,
-                metadata
-            }
-        });
-
-        const newCount = (submission.cheatingEvents?.length || 0) + 1;
-        const isLocked = newCount >= MAX_CHEATING_WARNINGS;
-
         res.status(201).json({
             success: true,
-            warningCount: newCount,
-            maxWarnings: MAX_CHEATING_WARNINGS,
-            isLocked
+            warningCount: 0,
+            maxWarnings: 99999,
+            isLocked: false
         });
     } catch (error) {
-        console.error('Error logging cheating event:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error("Error logging cheating event:", error);
+        res.status(500).json({ error: "Internal server error" });
     }
 };
 

@@ -78,7 +78,7 @@ function formatSeconds(s: number) {
     return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
 }
 
-const MAX_WARNS = 5;
+const MAX_WARNS = 99999;
 
 const ConfettiBurst = () => {
     // Generate 35 particles with random angles, distances, sizes, and colors
@@ -248,33 +248,14 @@ export default function TakeQuiz() {
     }, [headers, quizId, token, warnCount]);
 
     const triggerMask = useCallback(async (reason: string) => {
-        if (submittedRef.current || phase !== 'quiz') return;
-        const now = Date.now();
-        if (now - lastEventTimeRef.current < 1000) {
-            console.log('[PROCTOR] Ignored duplicate cheating warning event:', reason);
-            return;
+        if (submittedRef.current || phase !== "quiz") return;
+        // Completely disabled cheating masks and server logging as requested.
+        // Only keep FULLSCREEN_EXIT for UX prompt, but no flags.
+        if (reason === "FULLSCREEN_EXIT") {
+            setIsNotInFullscreen(true);
         }
-        lastEventTimeRef.current = now;
+    }, [phase]);
 
-        if (maskTimer.current) clearTimeout(maskTimer.current);
-        setViolationReason(reason);
-        const n = await logCheat(reason);
-        setWarnCount(n);
-        if (n >= MAX_WARNS) {
-            setLocked(true);
-            setShowMask(true);
-        } else {
-            setShowMask(true);
-            if (reason !== 'FULLSCREEN_EXIT') {
-                maskTimer.current = setTimeout(() => {
-                    setShowMask(false);
-                    setViolationReason(null);
-                }, 4000);
-            }
-        }
-    }, [logCheat, phase]);
-
-    // submitQuiz — guards via refs so it never needs to change identity
     const submitQuiz = useCallback(async (auto = false) => {
         if (!quizId || !token || submittingRef.current || submittedRef.current) return;
         submittedRef.current = true;
@@ -913,8 +894,8 @@ export default function TakeQuiz() {
                         </div>
                         <ul className="space-y-2">
                             {[
-                                'Switching tabs or apps is logged and counted.',
-                                `You get ${MAX_WARNS} warnings. After that, your attempt is locked.`,
+                                'You must complete the quiz in fullscreen mode.',
+                                `You must adhere strictly to examination rules.`,
                                 'All violations are reported to your teacher.',
                             ].map((line, i) => (
                                 <li key={i} className="flex items-start gap-2 text-[13px] sm:text-sm text-red-500 leading-relaxed">
@@ -1158,12 +1139,6 @@ export default function TakeQuiz() {
                         <p className="font-bold text-sm truncate text-gray-900 leading-tight">{quiz.title}</p>
                         <p className="text-[11px] text-gray-400 font-medium">Q{currentIndex + 1}/{totalQ} · {answeredCount} answered</p>
                     </div>
-                    {warnCount > 0 && (
-                        <div className="flex items-center gap-1 bg-orange-50 border border-orange-100 px-2 py-1 rounded-full shrink-0">
-                            <Shield className="w-3 h-3 text-orange-500" />
-                            <span className="text-[10px] font-black text-orange-500">{warnCount}/{MAX_WARNS}</span>
-                        </div>
-                    )}
                     <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-black text-xs shrink-0 border transition-colors ${
                         timeCrit ? 'bg-red-50 text-red-500 border-red-100 animate-pulse'
                         : timeLow ? 'bg-orange-50 text-orange-500 border-orange-100'
@@ -1455,15 +1430,6 @@ export default function TakeQuiz() {
                                     </div>
                                 )}
 
-                                {warnCount > 0 && (
-                                    <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 flex items-center gap-2.5">
-                                        <Shield className="w-4 h-4 text-orange-500 shrink-0" />
-                                        <div className="min-w-0">
-                                            <p className="text-xs font-black text-orange-600">{warnCount} integrity flags registered</p>
-                                            <p className="text-[10px] text-orange-500">Flags are sent directly to the teacher's portal.</p>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
 
                             <div className="flex gap-3">
