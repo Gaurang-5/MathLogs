@@ -154,6 +154,7 @@ export default function TakeQuiz() {
     const [showMask, setShowMask] = useState(false);
     const [locked, setLocked] = useState(false);
     const [isNotInFullscreen, setIsNotInFullscreen] = useState(false);
+    const [contentHidden, setContentHidden] = useState(false);
     const [timeExpired, setTimeExpired] = useState(false); // ← drives "Time's Up" overlay
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [isFirstView, setIsFirstView] = useState(false);
@@ -523,54 +524,102 @@ export default function TakeQuiz() {
     /* ── Proctoring ── */
     useEffect(() => {
         if (phase !== 'quiz') return;
-        const onVis = () => { /* if (document.hidden && !isUnloadingRef.current) triggerMask('TAB_SWITCH'); */ };
+        const onVis = () => {
+            if (document.hidden && !isUnloadingRef.current) {
+                setContentHidden(true);
+                triggerMask('TAB_SWITCH');
+            } else if (!document.hidden && document.hasFocus() && document.fullscreenElement) {
+                setContentHidden(false);
+            }
+        };
         const onBlur = () => {
-            /* if (!document.hidden && !isUnloadingRef.current) {
+            if (!document.hidden && !isUnloadingRef.current) {
+                setContentHidden(true);
                 triggerMask('WINDOW_BLUR');
-            } */
+            }
+        };
+        const onFocus = () => {
+            if (!document.hidden && document.fullscreenElement) {
+                setContentHidden(false);
+            }
         };
         const onFullscreenChange = () => {
             if (!document.fullscreenElement && !isUnloadingRef.current) {
+                setContentHidden(true);
                 setIsNotInFullscreen(true);
-                // triggerMask('FULLSCREEN_EXIT'); // Commenting out to just use UI prompt without flag penalization, or keeping it?
-                // The user says "have only full screen and bookmark feature on", so the UI should prompt them to go fullscreen, but not flag them for cheating?
-                // Actually they said "see cheating flag is not wrokling preplery we need to fix it so for now remove or pause it and have only full screen and bookmark feature on"
-                // So I'll pause ALL triggerMask cheating flags, but keep the `setIsNotInFullscreen(true)` which prompts the user to re-enter fullscreen.
+                triggerMask('FULLSCREEN_EXIT');
             } else {
                 setIsNotInFullscreen(false);
+                if (!document.hidden && document.hasFocus()) {
+                    setContentHidden(false);
+                }
             }
         };
-        const noCtx = (e: Event) => e.preventDefault();
-        const noCopy = (e: Event) => e.preventDefault();
+        const blockInteraction = (eventType: string) => (e: Event) => {
+            e.preventDefault();
+            triggerMask(eventType);
+        };
+        const noCtx = blockInteraction('RIGHT_CLICK');
+        const noCopy = blockInteraction('COPY_ATTEMPT');
+        const noCut = blockInteraction('CUT_ATTEMPT');
+        const noPaste = blockInteraction('PASTE_ATTEMPT');
+        const onBeforePrint = (e: Event) => {
+            e.preventDefault();
+            setContentHidden(true);
+            triggerMask('PRINT_ATTEMPT');
+        };
         const noKey = (e: KeyboardEvent) => {
-            /*
-            if (e.key === 'PrintScreen') { e.preventDefault(); triggerMask('SCREENSHOT_KEY'); }
+            const key = e.key.toLowerCase();
+            if (e.key === 'PrintScreen') {
+                e.preventDefault();
+                triggerMask('SCREENSHOT_KEY');
+            }
             if ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3', '4', 's', 'S'].includes(e.key)) {
-                e.preventDefault(); triggerMask('SCREENSHOT_KEY');
+                e.preventDefault();
+                triggerMask('SCREENSHOT_KEY');
+            }
+            if ((e.metaKey || e.ctrlKey) && ['c', 'x', 'v', 'p', 's'].includes(key)) {
+                e.preventDefault();
+                triggerMask(
+                    key === 'p'
+                        ? 'PRINT_ATTEMPT'
+                        : key === 's'
+                            ? 'SAVE_ATTEMPT'
+                            : key === 'x'
+                                ? 'CUT_ATTEMPT'
+                                : key === 'v'
+                                    ? 'PASTE_ATTEMPT'
+                                    : 'COPY_ATTEMPT'
+                );
             }
             if (e.key === 'F12' || ((e.metaKey || e.ctrlKey) && e.shiftKey && ['i', 'I', 'j', 'J', 'c', 'C'].includes(e.key))) {
-                e.preventDefault(); triggerMask('DEV_TOOLS_SHORTCUT');
+                e.preventDefault();
+                triggerMask('DEV_TOOLS_SHORTCUT');
             }
-            */
         };
         
         document.addEventListener('visibilitychange', onVis);
         window.addEventListener('blur', onBlur);
+        window.addEventListener('focus', onFocus);
         document.addEventListener('fullscreenchange', onFullscreenChange);
         document.addEventListener('contextmenu', noCtx);
         document.addEventListener('copy', noCopy);
-        document.addEventListener('cut', noCopy);
+        document.addEventListener('cut', noCut);
+        document.addEventListener('paste', noPaste);
         document.addEventListener('keydown', noKey);
-        document.addEventListener('fullscreenchange', onFullscreenChange);
+        window.addEventListener('beforeprint', onBeforePrint);
         return () => {
             document.removeEventListener('visibilitychange', onVis);
             window.removeEventListener('blur', onBlur);
+            window.removeEventListener('focus', onFocus);
             document.removeEventListener('fullscreenchange', onFullscreenChange);
             document.removeEventListener('contextmenu', noCtx);
             document.removeEventListener('copy', noCopy);
-            document.removeEventListener('cut', noCopy);
+            document.removeEventListener('cut', noCut);
+            document.removeEventListener('paste', noPaste);
             document.removeEventListener('keydown', noKey);
-            document.removeEventListener('fullscreenchange', onFullscreenChange);
+            window.removeEventListener('beforeprint', onBeforePrint);
+            setContentHidden(false);
         };
     }, [phase, triggerMask]);
 
@@ -1158,6 +1207,8 @@ export default function TakeQuiz() {
                                             <Minimize2 className="w-8 h-8 sm:w-10 sm:h-10 text-amber-400 relative z-10" />
                                         ) : violationReason === 'SCREENSHOT_KEY' ? (
                                             <CameraOff className="w-8 h-8 sm:w-10 sm:h-10 text-amber-400 relative z-10" />
+                                        ) : violationReason === 'FULLSCREEN_EXIT' ? (
+                                            <Maximize className="w-8 h-8 sm:w-10 sm:h-10 text-amber-400 relative z-10" />
                                         ) : (
                                             <AlertTriangle className="w-8 h-8 sm:w-10 sm:h-10 text-amber-400 relative z-10" />
                                         )}
@@ -1171,6 +1222,22 @@ export default function TakeQuiz() {
                                                 'Loss of Window Focus'
                                             ) : violationReason === 'SCREENSHOT_KEY' ? (
                                                 'Screenshot Attempt Blocked'
+                                            ) : violationReason === 'FULLSCREEN_EXIT' ? (
+                                                'Fullscreen Exit Detected'
+                                            ) : violationReason === 'RIGHT_CLICK' ? (
+                                                'Right Click Blocked'
+                                            ) : violationReason === 'COPY_ATTEMPT' ? (
+                                                'Copy Blocked'
+                                            ) : violationReason === 'CUT_ATTEMPT' ? (
+                                                'Cut Blocked'
+                                            ) : violationReason === 'PASTE_ATTEMPT' ? (
+                                                'Paste Blocked'
+                                            ) : violationReason === 'PRINT_ATTEMPT' ? (
+                                                'Print Attempt Blocked'
+                                            ) : violationReason === 'SAVE_ATTEMPT' ? (
+                                                'Save Attempt Blocked'
+                                            ) : violationReason === 'DEV_TOOLS_SHORTCUT' ? (
+                                                'Developer Tools Blocked'
                                             ) : (
                                                 'Security Alert'
                                             )}
@@ -1182,6 +1249,22 @@ export default function TakeQuiz() {
                                                 'Clicking outside the quiz or opening other applications is prohibited. This incident has been logged.'
                                             ) : violationReason === 'SCREENSHOT_KEY' ? (
                                                 'Taking screenshots or screen snippets of quiz questions is strictly forbidden and has been logged.'
+                                            ) : violationReason === 'FULLSCREEN_EXIT' ? (
+                                                'Leaving fullscreen hides the quiz content and is logged as an integrity event.'
+                                            ) : violationReason === 'RIGHT_CLICK' ? (
+                                                'Right-click actions are disabled during the quiz and this incident has been logged.'
+                                            ) : violationReason === 'COPY_ATTEMPT' ? (
+                                                'Copy actions are disabled during the quiz and this incident has been logged.'
+                                            ) : violationReason === 'CUT_ATTEMPT' ? (
+                                                'Cut actions are disabled during the quiz and this incident has been logged.'
+                                            ) : violationReason === 'PASTE_ATTEMPT' ? (
+                                                'Paste actions are disabled during the quiz and this incident has been logged.'
+                                            ) : violationReason === 'PRINT_ATTEMPT' ? (
+                                                'Printing quiz content is prohibited and this incident has been logged.'
+                                            ) : violationReason === 'SAVE_ATTEMPT' ? (
+                                                'Saving quiz content is prohibited and this incident has been logged.'
+                                            ) : violationReason === 'DEV_TOOLS_SHORTCUT' ? (
+                                                'Developer tools shortcuts are disabled during the quiz and this incident has been logged.'
                                             ) : (
                                                 'An integrity violation has been detected. Please complete your quiz without switching windows or tabs.'
                                             )}
@@ -1244,6 +1327,34 @@ export default function TakeQuiz() {
                                 className="w-full bg-white text-black font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors"
                             >
                                 Return to Fullscreen
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── CONTENT PRIVACY SHIELD ── */}
+                {contentHidden && !locked && !isNotInFullscreen && (
+                    <div className="fixed inset-0 z-[9997] bg-gray-950/95 backdrop-blur-xl flex items-center justify-center px-4">
+                        <div className="w-full max-w-md bg-gray-900 border border-gray-700 rounded-3xl p-6 sm:p-8 text-center shadow-2xl">
+                            <div className="mx-auto w-16 h-16 rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center mb-5">
+                                <EyeOff className="w-8 h-8 text-white" />
+                            </div>
+                            <h3 className="text-xl sm:text-2xl font-black !text-white mb-3">Quiz Hidden</h3>
+                            <p className="text-sm text-gray-300 mb-7 max-w-xs mx-auto leading-relaxed">
+                                Return focus to this quiz window to continue. This protects quiz content and logs focus changes.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!document.hidden && document.hasFocus() && document.fullscreenElement) {
+                                        setContentHidden(false);
+                                    } else if (!document.fullscreenElement) {
+                                        setIsNotInFullscreen(true);
+                                    }
+                                }}
+                                className="w-full bg-white text-black font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors"
+                            >
+                                Continue Quiz
                             </button>
                         </div>
                     </div>
