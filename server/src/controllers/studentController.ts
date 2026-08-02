@@ -702,6 +702,50 @@ export const getClassAverageStats = async (req: Request, res: Response) => {
     }
 };
 
+export const searchStudents = async (req: Request, res: Response) => {
+    const { q } = req.query;
+    const instituteId = req.user.instituteId;
+
+    if (!q || typeof q !== 'string' || q.trim().length < 2) {
+        return res.json([]);
+    }
+
+    const query = q.trim();
+
+    try {
+        const students = await prisma.student.findMany({
+            where: {
+                instituteId,
+                status: { not: 'LEFT' },
+                OR: [
+                    { name: { contains: query, mode: 'insensitive' } },
+                    { parentWhatsapp: { contains: query } },
+                    { humanId: { contains: query, mode: 'insensitive' } },
+                    { schoolName: { contains: query, mode: 'insensitive' } },
+                    { parentName: { contains: query, mode: 'insensitive' } },
+                ]
+            },
+            select: {
+                id: true,
+                humanId: true,
+                name: true,
+                parentName: true,
+                parentWhatsapp: true,
+                schoolName: true,
+                status: true,
+                batch: { select: { name: true, className: true } }
+            },
+            take: 15,
+            orderBy: { name: 'asc' }
+        });
+
+        res.json(students);
+    } catch (error) {
+        console.error('Student search error:', error);
+        res.status(500).json({ error: 'Search failed' });
+    }
+};
+
 export const getStudentProfile = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
@@ -711,26 +755,57 @@ export const getStudentProfile = async (req: Request, res: Response) => {
             where: {
                 id: String(id)
             },
-            include: {
+            select: {
+                id: true,
+                humanId: true,
+                name: true,
+                parentName: true,
+                parentWhatsapp: true,
+                parentEmail: true,
+                schoolName: true,
+                status: true,
+                createdAt: true,
+                instituteId: true,
                 batch: {
                     select: { name: true, className: true, subject: true }
                 },
                 feePayments: {
-                    include: { installment: { select: { name: true } } },
-                    orderBy: { date: 'desc' }
-                },
-                fees: { // Ad-hoc fees
-                    orderBy: { date: 'desc' }
+                    select: {
+                        id: true,
+                        amountPaid: true,
+                        date: true,
+                        installment: { select: { name: true } }
+                    },
+                    orderBy: { date: 'desc' },
+                    take: 100
                 },
                 marks: {
-                    include: { test: { select: { name: true, date: true, maxMarks: true, subject: true, className: true } } },
-                    orderBy: { test: { date: 'desc' } }
+                    select: {
+                        id: true,
+                        score: true,
+                        test: { select: { name: true, date: true, maxMarks: true, subject: true, className: true } }
+                    },
+                    orderBy: { test: { date: 'desc' } },
+                    take: 100
                 },
                 attendanceRecords: {
+                    select: {
+                        id: true,
+                        attendanceDate: true,
+                        checkedInAt: true,
+                        source: true,
+                        note: true
+                    },
                     orderBy: { attendanceDate: 'desc' },
                     take: 50 // Recent 50 records
                 },
-                balance: true
+                balance: {
+                    select: {
+                        totalFee: true,
+                        totalPaid: true,
+                        balance: true
+                    }
+                }
             }
         });
 
@@ -743,8 +818,8 @@ export const getStudentProfile = async (req: Request, res: Response) => {
         }
 
         // Calculate summary stats
-        let totalClasses = student.attendanceRecords.length;
-        let classesAttended = student.attendanceRecords.filter(r => r.source === 'KIOSK' || r.note === 'PRESENT').length; // Assuming some convention or just count total records if they only record presence
+        const totalClasses = student.attendanceRecords.length;
+        const classesAttended = student.attendanceRecords.filter(r => r.source === 'KIOSK' || r.note === 'PRESENT').length; // Assuming some convention or just count total records if they only record presence
         // Actually, let's just return raw records and let client process or process simple stats:
         // Wait, what does attendance actually store? Let's check: attendanceRecords usually store when present.
         const attendancePercentage = totalClasses > 0 ? Math.round((classesAttended / totalClasses) * 100) : null;
@@ -752,7 +827,9 @@ export const getStudentProfile = async (req: Request, res: Response) => {
         res.json({
             ...student,
             stats: {
-                attendancePercentage
+                attendancePercentage,
+                attendedClasses: classesAttended,
+                totalClasses
             }
         });
     } catch (error) {

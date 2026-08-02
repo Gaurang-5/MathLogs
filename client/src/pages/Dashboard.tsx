@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart, BarChart, Bar } from 'recharts';
 import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee, Sparkles } from 'lucide-react';
 import CountUp from 'react-countup';
+import StudentSearch from '../components/StudentSearch';
 
 interface ClassAveragePoint {
     name: string;
@@ -117,14 +118,20 @@ export default function Dashboard() {
 
     return (
         <Layout>
-            {/* Personalized Greeting */}
-            <div className="mb-6 sm:mb-8 animate-fade-in-up">
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-black tracking-tighter mb-1.5">
-                    {getGreeting()}, <span className="text-app-text-tertiary">{userName}</span>
-                </h1>
-                <p className="text-app-text-secondary font-medium text-sm sm:text-base">
-                    {isQuizOnly ? "Welcome to your Quiz Portal." : "Here's what's happening with your institute today."}
-                </p>
+            <div className="relative z-50 flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6 sm:mb-8 animate-fade-in-up">
+                <div>
+                    <h1 className="text-3xl sm:text-4xl font-extrabold text-black tracking-tighter mb-1.5">
+                        {getGreeting()}, <span className="text-app-text-tertiary">{userName}</span>
+                    </h1>
+                    <p className="text-app-text-secondary font-medium text-sm sm:text-base">
+                        {isQuizOnly ? "Welcome to your Quiz Portal." : "Here's what's happening with your institute today."}
+                    </p>
+                </div>
+                {!isQuizOnly && (
+                    <div className="w-full md:w-96">
+                        <StudentSearch />
+                    </div>
+                )}
             </div>
 
             {isQuizOnly ? (

@@ -5,7 +5,7 @@ import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimit
 import { validateRequest } from '../middleware/validation';
 import { changePasswordSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, registerStudentSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateStudentSchema, updateTestSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
-import { addStudentManually, approveStudent, archiveStudent, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, updateStudent } from '../controllers/studentController';
+import { addStudentManually, approveStudent, archiveStudent, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
@@ -253,6 +253,7 @@ router.get('/public/batch/:id', publicLimiter, getBatchPublicStatus as any); // 
 router.post('/public/register', publicLimiter, validateRequest(registerStudentSchema), registerStudent as any); // Public
 router.get('/public/check-status', publicLimiter, checkRegistrationStatus as any); // Public - Check if registered
 router.post('/students/manual', authenticateToken as any, validateRequest(registerStudentSchema), addStudentManually as any); // Authenticated Manual Add
+router.get('/students/search', authenticateToken as any, searchStudents as any);
 router.get('/students/pending', authenticateToken as any, getPendingStudents as any);
 router.post('/students/:id/approve', authenticateToken as any, approveStudent as any);
 router.post('/students/:id/reject', authenticateToken as any, rejectStudent as any);

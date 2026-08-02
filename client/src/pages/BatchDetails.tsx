@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
 import { getInstallmentPaidMap, getStudentJoinDate, type LegacyFee } from '../utils/fees';
+import StudentProfileDrawer from '../components/StudentProfileDrawer';
 
 interface Student {
     id: string;
@@ -92,6 +93,7 @@ export default function BatchDetails() {
     const navigate = useNavigate();
     const [batch, setBatch] = useState<Batch | null>(null);
     const [loading, setLoading] = useState(true);
+    const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [showAddStudent, setShowAddStudent] = useState(false);
     const [showRegMenu, setShowRegMenu] = useState(false);
@@ -1043,8 +1045,8 @@ export default function BatchDetails() {
 
                                 return (
                                     <tr key={student.id} className="hover:bg-neutral-50/70 transition-colors group">
-                                        <td className={cn("font-mono text-blue-600 hover:text-blue-800 hover:underline font-semibold cursor-pointer", getCellPadding(), getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }} onClick={(e) => { e.stopPropagation(); navigate(`/students/${student.id}`); }}>
-                                            {student.humanId || 'View'}
+                                        <td className={cn("font-mono font-semibold text-app-text-tertiary", getCellPadding(), getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap' }}>
+                                            {student.humanId || '-'}
                                         </td>
                                         {formFields.map((field: any, index: number) => {
                                             let content: React.ReactNode = '-';
@@ -1053,7 +1055,7 @@ export default function BatchDetails() {
                                             
                                             if (field.system || isStudentNameField) {
                                                 if (isStudentNameField) { 
-                                                    content = <button onClick={(e) => { e.stopPropagation(); navigate(`/students/${student.id}`); }} className="text-blue-600 hover:text-blue-800 hover:underline text-left font-semibold">{student.name}</button>; 
+                                                    content = <div className="text-left font-semibold text-app-text group-hover:text-black transition-colors">{student.name}</div>; 
                                                     rawText = student.name; 
                                                 }
                                                 else if (field.id === 'schoolName') { content = student.schoolName || '-'; rawText = student.schoolName || ''; }
@@ -1075,8 +1077,8 @@ export default function BatchDetails() {
                                             const isStudentName = isStudentNameField;
 
                                             return (
-                                                <td key={field.id} className={cn(
-                                                    isStudentName ? "font-semibold text-app-text sticky left-0 z-10 bg-white group-hover:bg-neutral-50 shadow-md border-r border-black/5" : "text-app-text-secondary truncate", 
+                                                <td key={field.id} onClick={(e) => { if (isStudentName) { e.stopPropagation(); setSelectedStudentId(student.id); } }} className={cn(
+                                                    isStudentName ? "font-semibold text-app-text sticky left-0 z-10 bg-white group-hover:bg-neutral-50 shadow-md border-r border-black/5 cursor-pointer" : "text-app-text-secondary truncate", 
                                                     getCellPadding(), 
                                                     isStudentName ? getTextSizeClass('body') : getTextSizeClass('sub')
                                                 )} style={{ whiteSpace: 'nowrap', maxWidth: isStudentName ? 'none' : '200px' }} title={rawText}>
@@ -1273,16 +1275,14 @@ export default function BatchDetails() {
                             const avg = getStudentAverage(student);
 
                             return (
-                                <div key={student.id} className="bg-white active:bg-neutral-50 transition-colors">
+                                <div key={student.id} onClick={() => setSelectedStudentId(student.id)} className="bg-white active:bg-neutral-50 transition-colors cursor-pointer">
                                     {/* Card body */}
                                     <div className="px-4 pt-4 pb-3">
                                         {/* Row 1: Name + ID pill */}
                                         <div className="flex items-start justify-between gap-3 mb-2">
                                             <div className="flex-1 min-w-0">
-                                                <h4 className="font-black text-[17px] text-black tracking-tight leading-snug break-words">
-                                                    <button onClick={() => { console.log('Navigating to', student.id); navigate(`/students/${student.id}`); }} className="text-blue-600 hover:text-blue-800 hover:underline text-left">
-                                                        {student.name}
-                                                    </button>
+                                                <h4 className="font-black text-[17px] text-black tracking-tight leading-snug break-words text-left">
+                                                    {student.name}
                                                 </h4>
                                                 {student.humanId && (
                                                     <span className="inline-flex items-center gap-1 mt-1 font-mono text-[11px] bg-neutral-100 border border-black/[0.06] px-2 py-0.5 rounded-md text-app-text-secondary font-bold">
@@ -2946,6 +2946,10 @@ export default function BatchDetails() {
                 )}
             </AnimatePresence>
 
+            <StudentProfileDrawer
+                studentId={selectedStudentId}
+                onClose={() => setSelectedStudentId(null)}
+            />
         </Layout >
     );
 }

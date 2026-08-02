@@ -58,7 +58,7 @@ export default function StudentProfile() {
     const navigate = useNavigate();
     const [student, setStudent] = useState<StudentProfileData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'performance' | 'fees'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'fees'>('overview');
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -141,12 +141,6 @@ export default function StudentProfile() {
                         {/* Quick Stats Summary */}
                         <div className="flex flex-wrap gap-4 md:justify-end">
                             <div className="bg-neutral-50 px-4 py-3 rounded-xl border border-black/5 min-w-[120px]">
-                                <p className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-widest mb-1">Attendance</p>
-                                <p className="text-xl font-black text-black">
-                                    {student.stats.attendancePercentage !== null ? `${student.stats.attendancePercentage}%` : 'N/A'}
-                                </p>
-                            </div>
-                            <div className="bg-neutral-50 px-4 py-3 rounded-xl border border-black/5 min-w-[120px]">
                                 <p className="text-[10px] font-bold text-app-text-tertiary uppercase tracking-widest mb-1">Fee Balance</p>
                                 <p className={cn("text-xl font-black", student.balance?.balance ? "text-red-500" : "text-green-500")}>
                                     ₹{student.balance?.balance || 0}
@@ -160,7 +154,6 @@ export default function StudentProfile() {
                 <div className="flex overflow-x-auto scrollbar-hide border-b border-black/[0.06] mb-6">
                     {[
                         { id: 'overview', label: 'Overview', icon: Activity },
-                        { id: 'attendance', label: 'Attendance', icon: CalendarDays },
                         { id: 'performance', label: 'Performance', icon: GraduationCap },
                         { id: 'fees', label: 'Fee History', icon: CreditCard }
                     ].map(tab => (
@@ -239,38 +232,7 @@ export default function StudentProfile() {
                         </div>
                     )}
 
-                    {/* ATTENDANCE TAB */}
-                    {activeTab === 'attendance' && (
-                        <div className="space-y-6">
-                            <h2 className="text-lg font-black text-black tracking-tight">Attendance Record (Last 50 Classes)</h2>
-                            {student.attendanceRecords.length > 0 ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                    {student.attendanceRecords.map(record => {
-                                        const isPresent = record.source === 'KIOSK' || record.note === 'PRESENT';
-                                        return (
-                                            <div key={record.id} className={cn(
-                                                "p-3 rounded-xl border text-center flex flex-col items-center gap-2",
-                                                isPresent ? "bg-green-50/50 border-green-100" : "bg-red-50/50 border-red-100"
-                                            )}>
-                                                {isPresent ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <XCircle className="w-5 h-5 text-red-500" />}
-                                                <div>
-                                                    <p className="text-xs font-bold text-black">{new Date(record.attendanceDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
-                                                    <p className="text-[10px] text-app-text-tertiary">
-                                                        {new Date(record.checkedInAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="text-center py-12 text-app-text-tertiary border-2 border-dashed border-neutral-200 rounded-xl">
-                                    <CalendarDays className="w-8 h-8 mx-auto mb-3 opacity-20" />
-                                    <p className="font-semibold">No attendance records found.</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    {/* Attendance UI removed */}
 
                     {/* PERFORMANCE TAB */}
                     {activeTab === 'performance' && (
