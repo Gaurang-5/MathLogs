@@ -310,7 +310,7 @@ export const getPublicQuizInfo = async (req: Request, res: Response): Promise<vo
         }
         const quiz = await prisma.onlineQuiz.findUnique({
             where: { id },
-            select: { title: true, isPublic: true, timeLimitMins: true, totalMarks: true }
+            select: { title: true, isPublic: true, timeLimitMins: true, totalMarks: true, availableFrom: true, availableUntil: true }
         });
 
         if (!quiz) {
@@ -712,18 +712,20 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
             return;
         }
 
+        const preview = Boolean(req.body?.preview);
         const now = new Date();
-        if (quiz.availableFrom && now < quiz.availableFrom) {
+        const availableFrom = quiz.availableFrom ? new Date(quiz.availableFrom) : null;
+        const availableUntil = quiz.availableUntil ? new Date(quiz.availableUntil) : null;
+
+        if (!preview && availableFrom && now < availableFrom) {
             res.status(403).json({ error: 'This quiz is not available yet.' });
             return;
         }
 
-        if (quiz.availableUntil && now > quiz.availableUntil) {
+        if (!preview && availableUntil && now > availableUntil) {
             res.status(403).json({ error: 'This quiz window has expired.' });
             return;
         }
-
-        const preview = Boolean(req.body?.preview);
 
         // Get or Create submission (using upsert to avoid P2002 race conditions)
         let submission = await prisma.quizSubmission.findUnique({
@@ -742,10 +744,12 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
                     difficulty: quiz.difficulty,
                     timeLimitMins: quiz.timeLimitMins,
                     totalMarks: quiz.totalMarks,
+                    availableFrom: quiz.availableFrom,
+                    availableUntil: quiz.availableUntil,
                     questions: (quiz.questions as any[]).map((q: any) => ({
                         id: q.id,
-                        questionText: q.questionText,
-                        options: q.options,
+                        questionText: '',
+                        options: [],
                         marks: q.marks
                     }))
                 },
@@ -854,6 +858,8 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
                 difficulty: quiz.difficulty,
                 timeLimitMins: quiz.timeLimitMins,
                 totalMarks: quiz.totalMarks,
+                availableFrom: quiz.availableFrom,
+                availableUntil: quiz.availableUntil,
                 questions: clientQuestions
             },
             submission: {

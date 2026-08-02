@@ -44,6 +44,8 @@ interface Quiz {
     difficulty?: string | null;
     timeLimitMins: number;
     totalMarks: number;
+    availableFrom?: string | null;
+    availableUntil?: string | null;
     questions: QuizQuestion[];
 }
 interface Submission {
@@ -76,6 +78,10 @@ type QState = 'unanswered' | 'answered' | 'skipped' | 'active';
 function formatSeconds(s: number) {
     const t = Math.max(0, s);
     return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
+
+function formatQuizDateTime(value?: string | null) {
+    return value ? new Date(value).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 }
 
 const MAX_WARNS = 5;
@@ -152,6 +158,7 @@ export default function TakeQuiz() {
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [isFirstView, setIsFirstView] = useState(false);
     const [violationReason, setViolationReason] = useState<string | null>(null);
+    const [showStartConfirm, setShowStartConfirm] = useState(false);
 
     const [publicName, setPublicName] = useState('');
     const [publicPhone, setPublicPhone] = useState('');
@@ -309,22 +316,38 @@ export default function TakeQuiz() {
     const [startingAttempt, setStartingAttempt] = useState(false);
 
     const startOrContinueQuiz = async () => {
-        try {
-            try {
-                if (document.documentElement.requestFullscreen) {
-                    await document.documentElement.requestFullscreen();
-                }
-            } catch (err) {
-                console.warn('Fullscreen API not supported or denied by this device/browser (often happens on iOS Safari or mobile).', err);
-            }
-        } catch (e) {
-            console.warn('Fullscreen request failed:', e);
+        const now = Date.now();
+        const startsAt = quiz?.availableFrom ? new Date(quiz.availableFrom).getTime() : null;
+        const endsAt = quiz?.availableUntil ? new Date(quiz.availableUntil).getTime() : null;
+
+        if (startsAt && now < startsAt) {
+            toast.error(`This quiz starts ${formatQuizDateTime(quiz?.availableFrom)}.`);
+            return;
+        }
+
+        if (endsAt && now > endsAt) {
+            toast.error('This quiz window has expired.');
+            return;
         }
 
         if (submission) {
             setPhase('quiz');
             goTo(0);
             return;
+        }
+
+        setShowStartConfirm(true);
+    };
+
+    const beginQuizAttempt = async () => {
+        if (!quiz || startingAttempt) return;
+        setShowStartConfirm(false);
+        try {
+            if (document.documentElement.requestFullscreen) {
+                await document.documentElement.requestFullscreen();
+            }
+        } catch (err) {
+            console.warn('Fullscreen API not supported or denied by this device/browser (often happens on iOS Safari or mobile).', err);
         }
 
         setStartingAttempt(true);
@@ -796,14 +819,14 @@ export default function TakeQuiz() {
                                             <p className="text-xs text-gray-400">{publicPhone}</p>
                                         </div>
                                     </div>
-                                    <p className="text-xs text-gray-500">Is this you? Confirm to start the quiz.</p>
+                                    <p className="text-xs text-gray-500">Is this you? Confirm to continue to the quiz instructions.</p>
                                 </div>
                                 <button 
                                     onClick={() => registerPublicGuest(foundStudent.studentId)}
                                     disabled={registering}
                                     className="w-full bg-black text-white font-black py-4 rounded-xl hover:bg-gray-900 active:scale-95 transition-all text-sm disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
-                                    {registering ? <Loader className="w-5 h-5 animate-spin" /> : "Yes, that's me — Start Quiz"}
+                                    {registering ? <Loader className="w-5 h-5 animate-spin" /> : "Yes, that's me"}
                                 </button>
                                 <button 
                                     onClick={() => { setFoundStudent(null); setRegStep('new_name'); }}
@@ -837,7 +860,7 @@ export default function TakeQuiz() {
                                     disabled={registering || !publicName.trim()}
                                     className="w-full bg-black text-white font-black py-4 rounded-xl hover:bg-gray-900 active:scale-95 transition-all text-sm disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
-                                    {registering ? <Loader className="w-5 h-5 animate-spin" /> : 'Start Quiz'}
+                                    {registering ? <Loader className="w-5 h-5 animate-spin" /> : 'Continue to Instructions'}
                                 </button>
                                 <button 
                                     onClick={() => { setRegStep('phone'); setPublicPhone(''); }}
@@ -856,6 +879,12 @@ export default function TakeQuiz() {
     /* ────────── INSTRUCTIONS ────────── */
     if (phase === 'instructions' && quiz) {
         const answeredCount = Object.keys(answers).length;
+        const now = Date.now();
+        const startsAt = quiz.availableFrom ? new Date(quiz.availableFrom).getTime() : null;
+        const endsAt = quiz.availableUntil ? new Date(quiz.availableUntil).getTime() : null;
+        const isScheduled = Boolean(startsAt && now < startsAt);
+        const isExpired = Boolean(endsAt && now > endsAt);
+        const cannotStart = isScheduled || isExpired;
         return (
             <div className="min-h-screen bg-gray-50 text-gray-900">
                 <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
@@ -886,6 +915,23 @@ export default function TakeQuiz() {
                             </div>
                         ))}
                     </div>
+                    {(quiz.availableFrom || quiz.availableUntil) && (
+                        <div className={`rounded-2xl border p-4 sm:p-5 ${isScheduled ? 'bg-amber-50 border-amber-100' : isExpired ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
+                            <div className="flex items-start gap-3">
+                                <Clock className={`w-5 h-5 shrink-0 mt-0.5 ${isScheduled ? 'text-amber-600' : isExpired ? 'text-red-600' : 'text-green-600'}`} />
+                                <div>
+                                    <p className={`font-black text-sm ${isScheduled ? 'text-amber-800' : isExpired ? 'text-red-700' : 'text-green-700'}`}>
+                                        {isScheduled ? 'Quiz not open yet' : isExpired ? 'Quiz window closed' : 'Quiz is open'}
+                                    </p>
+                                    <p className={`text-xs sm:text-sm mt-1 leading-relaxed ${isScheduled ? 'text-amber-700' : isExpired ? 'text-red-600' : 'text-green-700'}`}>
+                                        {quiz.availableFrom && `Starts ${formatQuizDateTime(quiz.availableFrom)}`}
+                                        {quiz.availableFrom && quiz.availableUntil && ' • '}
+                                        {quiz.availableUntil && `Ends ${formatQuizDateTime(quiz.availableUntil)}`}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
                         <div className="flex items-center gap-2 mb-4">
                             <BookOpen className="w-4 h-4 text-gray-500" />
@@ -931,14 +977,74 @@ export default function TakeQuiz() {
                             </p>
                         </div>
                     )}
+                    <AnimatePresence>
+                        {showStartConfirm && (
+                            <motion.div
+                                className="fixed inset-0 z-[70] bg-black/45 backdrop-blur-sm flex items-end sm:items-center justify-center p-3 sm:p-4"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                            >
+                                <motion.div
+                                    className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-gray-100 overflow-hidden"
+                                    initial={{ y: 24, scale: 0.98, opacity: 0 }}
+                                    animate={{ y: 0, scale: 1, opacity: 1 }}
+                                    exit={{ y: 24, scale: 0.98, opacity: 0 }}
+                                    transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+                                >
+                                    <div className="p-5 sm:p-6">
+                                        <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                                            <Shield className="w-6 h-6 text-gray-800" />
+                                        </div>
+                                        <h2 className="text-xl font-black text-gray-900 leading-tight">Start quiz now?</h2>
+                                        <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                                            Your {quiz.timeLimitMins}-minute timer will begin immediately for <span className="font-bold text-gray-900">{quiz.title}</span>.
+                                        </p>
+                                        <div className="mt-5 grid grid-cols-2 gap-2">
+                                            <div className="rounded-2xl bg-gray-50 border border-gray-100 p-3">
+                                                <p className="text-lg font-black text-gray-900">{quiz.questions.length}</p>
+                                                <p className="text-[11px] font-bold text-gray-400">Questions</p>
+                                            </div>
+                                            <div className="rounded-2xl bg-gray-50 border border-gray-100 p-3">
+                                                <p className="text-lg font-black text-gray-900">{quiz.timeLimitMins}m</p>
+                                                <p className="text-[11px] font-bold text-gray-400">Timer</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-50 border-t border-gray-100 p-3 grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowStartConfirm(false)}
+                                            disabled={startingAttempt}
+                                            className="rounded-2xl bg-white border border-gray-200 text-gray-700 font-black py-3.5 text-sm active:scale-95 transition-all disabled:opacity-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={beginQuizAttempt}
+                                            disabled={startingAttempt}
+                                            className="rounded-2xl bg-black text-white font-black py-3.5 text-sm active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {startingAttempt ? <Loader className="w-4 h-4 animate-spin" /> : 'Start Quiz'}
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_18px_rgba(0,0,0,0.08)] sm:static sm:p-0 sm:shadow-none sm:border-0 sm:bg-transparent">
                         <button
                             onClick={startOrContinueQuiz}
-                            disabled={startingAttempt}
+                            disabled={startingAttempt || cannotStart}
                             className="w-full bg-black text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 text-sm hover:bg-gray-900 active:scale-95 transition-all disabled:opacity-50"
                         >
                             {startingAttempt ? (
                                 <Loader className="w-4 h-4 animate-spin" />
+                            ) : isScheduled ? (
+                                `Starts ${formatQuizDateTime(quiz.availableFrom)}`
+                            ) : isExpired ? (
+                                'Quiz Window Closed'
                             ) : submission ? (
                                 'Continue Quiz'
                             ) : (

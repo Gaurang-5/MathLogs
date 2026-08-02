@@ -7,6 +7,7 @@ import { prisma } from '../src/prisma';
 import { loginAdmin, refreshTokenUser } from '../src/controllers/authController';
 import { payInstallment } from '../src/controllers/feeController';
 import { startOnlineQuiz, submitOnlineQuiz } from '../src/controllers/studentPortalController';
+import { quizCache } from '../src/utils/redis';
 
 type MockRequest = {
     body: Record<string, unknown>;
@@ -222,21 +223,35 @@ test('startOnlineQuiz creates an attempt without exposing correct answers', asyn
         id: 'student-quiz-1',
         batchId: 'batch-quiz-1',
         createdAt: new Date('2026-05-01T00:00:00.000Z'),
+        quizSubmissions: [],
     }) as never) as typeof prisma.student.findUnique);
+    replaceMethod(prisma.onlineQuiz, 'findUnique', (async () => ({
+        timeLimitMins: 10,
+    }) as never) as typeof prisma.onlineQuiz.findUnique);
+    replaceMethod(prisma.quizSubmission, 'findMany', (async () => [] as never) as typeof prisma.quizSubmission.findMany);
+    replaceMethod(quizCache, 'get', (async () => null) as typeof quizCache.get);
+    replaceMethod(quizCache, 'set', (async () => undefined) as typeof quizCache.set);
     replaceMethod(prisma.onlineQuiz, 'findFirst', (async () => ({
         id: 'quiz-1',
         title: 'Online Quiz',
+        batchId: 'batch-quiz-1',
+        isPublic: false,
+        availableFrom: null,
+        availableUntil: null,
         timeLimitMins: 10,
         totalMarks: 1,
+        batches: [],
         questions: [
             {
                 id: 'question-1',
                 questionText: '2 + 2?',
                 options: ['3', '4'],
+                correctOption: '4',
                 marks: 1,
             },
         ],
     }) as never) as typeof prisma.onlineQuiz.findFirst);
+    replaceMethod(prisma.quizSubmission, 'findUnique', (async () => null as never) as typeof prisma.quizSubmission.findUnique);
     replaceMethod(prisma.quizSubmission, 'upsert', (async () => ({
         id: 'submission-1',
         quizId: 'quiz-1',
@@ -271,6 +286,51 @@ test('startOnlineQuiz creates an attempt without exposing correct answers', asyn
     assert.deepEqual(body.submission.autoSavedAnswers, { 'question-1': '4' });
     assert.equal(body.quiz.questions[0].questionText, '2 + 2?');
     assert.equal('correctOption' in body.quiz.questions[0], false);
+});
+
+test('startOnlineQuiz rejects scheduled cached quizzes before creating an attempt', async () => {
+    replaceMethod(jwt, 'verify', (() => ({ studentId: 'student-quiz-1' }) as never) as typeof jwt.verify);
+    replaceMethod(prisma.onlineQuiz, 'findUnique', (async () => ({
+        timeLimitMins: 10,
+    }) as never) as typeof prisma.onlineQuiz.findUnique);
+    replaceMethod(prisma.quizSubmission, 'findMany', (async () => [] as never) as typeof prisma.quizSubmission.findMany);
+    replaceMethod(prisma.student, 'findUnique', (async () => ({
+        id: 'student-quiz-1',
+        batchId: 'batch-quiz-1',
+        createdAt: new Date('2026-05-01T00:00:00.000Z'),
+        quizSubmissions: [],
+    }) as never) as typeof prisma.student.findUnique);
+    replaceMethod(quizCache, 'get', (async () => ({
+        id: 'quiz-1',
+        title: 'Scheduled Quiz',
+        batchId: 'batch-quiz-1',
+        isPublic: false,
+        availableFrom: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        availableUntil: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+        timeLimitMins: 10,
+        totalMarks: 1,
+        questions: [],
+        batches: [],
+    })) as typeof quizCache.get);
+
+    let upsertCalled = false;
+    replaceMethod(prisma.quizSubmission, 'upsert', (async () => {
+        upsertCalled = true;
+        return {} as never;
+    }) as typeof prisma.quizSubmission.upsert);
+
+    const req = {
+        headers: { authorization: 'Bearer student-token' },
+        params: { id: 'quiz-1' },
+        body: {},
+    } as MockRequest;
+    const res = createMockResponse();
+
+    await startOnlineQuiz(req as never, res as never);
+
+    assert.equal(res.statusCode, 403);
+    assert.deepEqual(res.body, { error: 'This quiz is not available yet.' });
+    assert.equal(upsertCalled, false);
 });
 
 test('submitOnlineQuiz grades answers and prevents duplicate submissions', async () => {
