@@ -1006,11 +1006,14 @@ export default function BatchDetails() {
                                         )}
                                     </div>
                                 </th>
-                                {formFields.map((field: any) => (
-                                    <th key={field.id} className={cn("bg-transparent", getCellPadding())} style={{ width: field.id === 'studentName' ? 'auto' : '1%', minWidth: field.id === 'parentEmail' ? '200px' : '180px', whiteSpace: 'nowrap' }}>
-                                        {field.label}
-                                    </th>
-                                ))}
+                                {formFields.map((field: any) => {
+                                    const isStudentName = field.id === 'studentName';
+                                    return (
+                                        <th key={field.id} className={cn("bg-transparent", getCellPadding(), isStudentName ? "sticky left-0 z-30 bg-neutral-50 shadow-md border-r border-black/5" : "")} style={{ width: field.id === 'studentName' ? 'auto' : '1%', minWidth: field.id === 'parentEmail' ? '200px' : '180px', whiteSpace: 'nowrap' }}>
+                                            {field.label}
+                                        </th>
+                                    );
+                                })}
                                 <th className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Tests</th>
                                 <th className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Avg (10)</th>
                                 {batch.feeInstallments?.filter(inst => !inst.studentId).map(inst => (
@@ -1066,7 +1069,11 @@ export default function BatchDetails() {
                                             const isStudentName = field.id === 'studentName';
 
                                             return (
-                                                <td key={field.id} className={cn(isStudentName ? "font-semibold text-app-text" : "text-app-text-secondary truncate", getCellPadding(), isStudentName ? getTextSizeClass('body') : getTextSizeClass('sub'))} style={{ whiteSpace: 'nowrap', maxWidth: isStudentName ? 'none' : '200px' }} title={rawText}>
+                                                <td key={field.id} className={cn(
+                                                    isStudentName ? "font-semibold text-app-text sticky left-0 z-10 bg-white group-hover:bg-neutral-50 shadow-md border-r border-black/5" : "text-app-text-secondary truncate", 
+                                                    getCellPadding(), 
+                                                    isStudentName ? getTextSizeClass('body') : getTextSizeClass('sub')
+                                                )} style={{ whiteSpace: 'nowrap', maxWidth: isStudentName ? 'none' : '200px' }} title={rawText}>
                                                     {content}
                                                 </td>
                                             );
