@@ -1,8 +1,11 @@
 import type { Request } from 'express';
 import jwt, { JsonWebTokenError, type JwtPayload } from 'jsonwebtoken';
+import { requireEnv } from './env';
 
-const FALLBACK_SECRET = process.env.JWT_SECRET || 'dev-attendance-photo-secret';
-const ATTENDANCE_LINK_SECRET = process.env.ATTENDANCE_LINK_SECRET || FALLBACK_SECRET;
+const ATTENDANCE_LINK_SECRET = requireEnv('ATTENDANCE_LINK_SECRET', {
+    fallbackEnv: 'JWT_SECRET',
+    devDefault: 'dev-attendance-photo-secret',
+});
 
 // Default: 15 minutes
 export const ATTENDANCE_LINK_TTL_MS = Number(process.env.ATTENDANCE_LINK_TTL_MS || 15 * 60 * 1000);

@@ -18,7 +18,8 @@ import {
     Trash2,
     Edit3,
     CalendarDays,
-    X
+    X,
+    Link2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AITestGeneratorModal from '../components/AITestGeneratorModal';
@@ -39,6 +40,7 @@ interface QuizSubmission {
     startedAt: string | null;
     submittedAt: string | null;
     score: number | null;
+    student?: { id: string, name: string, humanId: string };
     answers?: QuizAnswer[];
     shuffledQuestions?: any;
 }
@@ -111,6 +113,8 @@ export default function QuizList() {
     const [loading, setLoading] = useState(true);
     const [showAIModal, setShowAIModal] = useState(false);
     const [finalizingQuizId, setFinalizingQuizId] = useState<string | null>(null);
+    const [instituteSlug, setInstituteSlug] = useState<string | null>(null);
+    const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
 
     // Active Selected Quiz & Current Cockpit Tab
     const [activeQuiz, setActiveQuiz] = useState<OnlineQuiz | null>(null);
@@ -149,12 +153,16 @@ export default function QuizList() {
 
     const fetchData = async () => {
         try {
-            const [quizzesData, batchesData] = await Promise.all([
+            const [quizzesData, batchesData, instituteData] = await Promise.all([
                 apiRequest<OnlineQuiz[]>('/tests/online'),
-                apiRequest<Batch[]>('/batches')
+                apiRequest<Batch[]>('/batches'),
+                apiRequest<any>('/institute/me').catch(() => null)
             ]);
             setOnlineQuizzes(quizzesData);
             setBatches(batchesData);
+            if (instituteData?.slug) {
+                setInstituteSlug(instituteData.slug);
+            }
 
             const currentActive = activeQuizRef.current;
             if (currentActive) {
@@ -351,6 +359,13 @@ export default function QuizList() {
             quiz.batches.forEach((b: any) => {
                 if (b.students) {
                     b.students.forEach((s: any) => studentsMap.set(s.id, s));
+                }
+            });
+        }
+        if (quiz.submissions) {
+            quiz.submissions.forEach((sub) => {
+                if (sub.student && !studentsMap.has(sub.studentId)) {
+                    studentsMap.set(sub.studentId, sub.student);
                 }
             });
         }
@@ -634,6 +649,24 @@ export default function QuizList() {
                                         );
                                     })()}
 
+                                    {isQuizOnly && activeQuiz.isPublic && (
+                                        <button
+                                            onClick={() => {
+                                                if (!instituteSlug) {
+                                                    toast.error('Could not fetch institute slug.');
+                                                    return;
+                                                }
+                                                const link = `${window.location.origin}/${instituteSlug}/student/quiz/${activeQuiz.id}`;
+                                                navigator.clipboard.writeText(link);
+                                                toast.success('Shareable link copied!');
+                                            }}
+                                            className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-bold hover:bg-emerald-100 active:scale-95 hover:scale-[1.02] transition-all duration-200"
+                                        >
+                                            <Link2 className="w-4 h-4" />
+                                            Copy Link
+                                        </button>
+                                    )}
+
                                     <button
                                         onClick={() => downloadQuestionsPdf(activeQuiz)}
                                         className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 sm:px-4.5 py-2.5 rounded-xl border border-neutral-300 bg-white text-neutral-800 text-xs sm:text-sm font-bold hover:bg-neutral-50 active:scale-95 hover:scale-[1.02] transition-all duration-200"
@@ -770,9 +803,13 @@ export default function QuizList() {
                                 <div className="bg-white border border-black/5 rounded-2xl shadow-sm overflow-hidden">
                                     <div className="px-4 sm:px-5 py-4 border-b border-black/5 bg-neutral-50/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                         <div>
-                                            <h3 className="font-black text-app-text">Batch Enrolled Submissions Grid</h3>
+                                            <h3 className="font-black text-app-text">
+                                                {isQuizOnly ? 'Guest Student Submissions Grid' : 'Batch Enrolled Submissions Grid'}
+                                            </h3>
                                             <p className="text-xs text-app-text-secondary mt-0.5">
-                                                All students approved for this batch and their attempt records.
+                                                {isQuizOnly
+                                                    ? 'All guest students who started this quiz and their attempt records.'
+                                                    : 'All students approved for this batch and their attempt records.'}
                                             </p>
                                         </div>
                                         {activeQuiz.isFinalized && (

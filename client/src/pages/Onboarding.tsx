@@ -130,6 +130,10 @@ export default function Onboarding() {
     const [activeStep, setActiveStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
 
+    // Consents
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [dpdpAccepted, setDpdpAccepted] = useState(false);
+
     // Resend Setup Link State
     const [showResend, setShowResend] = useState(false);
     const [resendPhone, setResendPhone] = useState('');
@@ -140,16 +144,17 @@ export default function Onboarding() {
     const planRef = useRef<HTMLDivElement>(null);
     const checkoutRef = useRef<HTMLDivElement>(null);
 
-    const isFreeTrial = true;
+    const isQuizOnly = new URLSearchParams(window.location.search).get('type') === 'quiz_only';
+    const isFreeTrial = isQuizOnly ? false : true;
 
     const isStep1Valid = tuitionName.length > 2 && ownerName.length > 2 && phone.length >= 10 && email.includes('@');
 
     const scrollToRef = (ref: React.RefObject<HTMLDivElement | null>) => {
-        if (ref.current) {
-            setTimeout(() => {
-                ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
-        }
+        setTimeout(() => {
+            if (ref.current) {
+                ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 150);
     };
 
     const handleContinueToPlans = async (e: React.FormEvent) => {
@@ -165,8 +170,13 @@ export default function Onboarding() {
             console.error('Failed to track lead', err);
         }
 
-        setActiveStep(2);
-        scrollToRef(planRef);
+        if (isQuizOnly) {
+            setActiveStep(3);
+            scrollToRef(checkoutRef);
+        } else {
+            setActiveStep(2);
+            scrollToRef(planRef);
+        }
     };
 
     const handleSelectPlan = async (planId: PlanId) => {
@@ -233,7 +243,7 @@ export default function Onboarding() {
                 ownerName,
                 phone,
                 email,
-                planId: selectedPlan,
+                planId: isQuizOnly ? 'quiz_only' : selectedPlan,
                 billingCycle,
             });
 
@@ -267,7 +277,7 @@ export default function Onboarding() {
                             ownerName,
                             phone,
                             email,
-                            planId: selectedPlan,
+                            planId: isQuizOnly ? 'quiz_only' : selectedPlan,
                             billingCycle,
                         });
 
@@ -486,7 +496,7 @@ export default function Onboarding() {
 
                 {/* STEP 2: PRICING */}
                 <AnimatePresence>
-                    {activeStep >= 2 && (
+                    {!isQuizOnly && activeStep >= 2 && (
                         <motion.div
                             ref={planRef}
                             initial={{ opacity: 0, y: 50 }}
@@ -594,16 +604,22 @@ export default function Onboarding() {
                             <div className="relative z-10 flex flex-col gap-6 sm:gap-8">
                                 <div>
                                     <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2 !text-white">
-                                        {isFreeTrial ? "Start your 14-Day Free Trial" : "Ready to initialize?"}
+                                        {isQuizOnly ? "Complete your purchase" : (isFreeTrial ? "Start your 14-Day Free Trial" : "Ready to initialize?")}
                                     </h2>
                                     <p className="text-neutral-400 font-medium mb-4 text-sm sm:text-base">
-                                        You have selected the <span className="!text-white font-bold">{pricingPlans.find(p => p.id === selectedPlan)?.name}</span>.
-                                        {isFreeTrial 
-                                            ? " Start your 14-day free trial immediately without a credit card. You can upgrade anytime during the trial." 
-                                            : " Secure your payment via Razorpay to activate your center immediately."}
+                                        {isQuizOnly ? (
+                                            <>You have selected the <span className="!text-white font-bold">Quiz Starter Pack (10 Credits)</span>. Secure your one-time payment of ₹500 via Razorpay to get started instantly.</>
+                                        ) : (
+                                            <>
+                                                You have selected the <span className="!text-white font-bold">{pricingPlans.find(p => p.id === selectedPlan)?.name}</span>.
+                                                {isFreeTrial 
+                                                    ? " Start your 14-day free trial immediately without a credit card. You can upgrade anytime during the trial." 
+                                                    : " Secure your payment via Razorpay to activate your center immediately."}
+                                            </>
+                                        )}
                                     </p>
 
-                                    {!isFreeTrial && (
+                                    {!isFreeTrial && !isQuizOnly && (
                                         <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs sm:text-sm font-medium text-neutral-300">
                                             <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 shrink-0 mt-0.5" />
                                             <p>
@@ -611,12 +627,39 @@ export default function Onboarding() {
                                             </p>
                                         </div>
                                     )}
+
+                                    {/* Legal Consents (Indian Laws) */}
+                                    <div className="space-y-4 bg-white/5 border border-white/10 p-4 rounded-xl mt-4">
+                                        <label className="flex items-start gap-3 cursor-pointer group">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={termsAccepted}
+                                                onChange={e => setTermsAccepted(e.target.checked)}
+                                                className="mt-0.5 w-4 h-4 text-accent-primary border-white/20 rounded focus:ring-accent-primary accent-accent-primary transition-all cursor-pointer"
+                                            />
+                                            <span className="text-[13px] text-neutral-400 leading-snug group-hover:text-neutral-300 transition-colors">
+                                                I agree to the <a href="/terms" target="_blank" className="text-white hover:underline font-medium">Terms & Conditions</a> and <a href="/privacy-policy" target="_blank" className="text-white hover:underline font-medium">Privacy Policy</a>.
+                                            </span>
+                                        </label>
+                                        
+                                        <label className="flex items-start gap-3 cursor-pointer group">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={dpdpAccepted}
+                                                onChange={e => setDpdpAccepted(e.target.checked)}
+                                                className="mt-0.5 w-4 h-4 text-accent-primary border-white/20 rounded focus:ring-accent-primary accent-accent-primary transition-all cursor-pointer"
+                                            />
+                                            <span className="text-[13px] text-neutral-400 leading-snug group-hover:text-neutral-300 transition-colors">
+                                                As a Data Fiduciary, I agree to comply with the <span className="text-white font-medium">Digital Personal Data Protection (DPDP) Act, 2023</span> and ensure verifiable consent from students/parents before adding their data to MathLogs.
+                                            </span>
+                                        </label>
+                                    </div>
                                 </div>
 
                                 <button
                                     onClick={handleCheckout}
-                                    disabled={isLoading}
-                                    className="w-full whitespace-nowrap px-6 sm:px-8 py-4 sm:py-5 bg-white text-black rounded-2xl font-bold text-base sm:text-lg flex items-center justify-center gap-3 hover:bg-neutral-200 transition-all active:scale-95 disabled:opacity-70 cursor-pointer shadow-[0_0_40px_rgba(255,255,255,0.2)]"
+                                    disabled={isLoading || !termsAccepted || !dpdpAccepted}
+                                    className="w-full whitespace-nowrap px-6 sm:px-8 py-4 sm:py-5 bg-white text-black rounded-2xl font-bold text-base sm:text-lg flex items-center justify-center gap-3 hover:bg-neutral-200 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-[0_0_40px_rgba(255,255,255,0.2)]"
                                 >
                                     {isLoading ? (
                                         <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
@@ -630,10 +673,16 @@ export default function Onboarding() {
                                             ) : (
                                                 <>
                                                     <CreditCard className="w-6 h-6" />
-                                                    Pay ₹{(billingCycle === 'yearly'
-                                                        ? pricingPlans.find(p => p.id === selectedPlan)?.yearlyPrice
-                                                        : pricingPlans.find(p => p.id === selectedPlan)?.monthlyPrice)?.toLocaleString('en-IN')
-                                                    } Securely
+                                                    {isQuizOnly ? (
+                                                        <span>Pay ₹500 Securely</span>
+                                                    ) : (
+                                                        <span>
+                                                            Pay ₹{(billingCycle === 'yearly'
+                                                                ? pricingPlans.find(p => p.id === selectedPlan)?.yearlyPrice
+                                                                : pricingPlans.find(p => p.id === selectedPlan)?.monthlyPrice)?.toLocaleString('en-IN')
+                                                            } Securely
+                                                        </span>
+                                                    )}
                                                 </>
                                             )}
                                         </>

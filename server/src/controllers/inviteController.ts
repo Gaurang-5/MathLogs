@@ -136,7 +136,9 @@ export const validateInvite = async (req: Request, res: Response) => {
 
         res.json({
             valid: true,
-            instituteName: invite.institute.name
+            instituteName: invite.institute.name,
+            plan: invite.institute.plan,
+            config: invite.institute.config,
         });
     } catch (e) {
         res.status(500).json({ error: 'Validation failed' });
@@ -233,7 +235,8 @@ export const setupAccount = async (req: Request, res: Response) => {
             role: result.role
         }, JWT_SECRET, { expiresIn: '8h' });
 
-        res.json({ success: true, token: jwtToken, adminId: result.id });
+        const isQuizOnly = invite.institute.isQuizOnly || (invite.institute.config as any)?.planName === 'QUIZ_ONLY';
+        res.json({ success: true, token: jwtToken, adminId: result.id, isQuizOnly });
 
     } catch (e) {
         console.error(e);

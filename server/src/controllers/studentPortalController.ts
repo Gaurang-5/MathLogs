@@ -3,9 +3,10 @@ import { prisma } from '../prisma';
 import jwt from 'jsonwebtoken';
 import { quizCache, heartbeatManager, brandingCache } from '../utils/redis';
 import { secureLogger } from '../utils/secureLogger';
+import { getJwtSecret } from '../utils/env';
 
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
+const JWT_SECRET = getJwtSecret();
 const AUTOSAVE_MIN_INTERVAL_MS = 10_000;
 const MAX_CHEATING_WARNINGS = 5;
 const autosaveWriteTimes = new Map<string, number>();
@@ -17,6 +18,10 @@ function isPlainAnswerMap(value: unknown): value is Record<string, string> {
     }
 
     return Object.values(value).every((answer) => typeof answer === 'string');
+}
+
+function getRouteParam(value: string | string[] | undefined): string | undefined {
+    return Array.isArray(value) ? value[0] : value;
 }
 
 function getStudentIdFromRequest(req: Request, res: Response): string | null {
@@ -174,6 +179,152 @@ export const loginStudent = async (req: Request, res: Response): Promise<void> =
     }
 };
 
+// Look up an existing student by phone number for a public quiz
+export const lookupPublicStudent = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = getRouteParam(req.params.id);
+        if (!id) {
+            res.status(400).json({ error: 'Quiz id is required' });
+            return;
+        }
+        const { phone } = req.body;
+
+        if (!phone || phone.replace(/\D/g, '').length < 10) {
+            res.status(400).json({ error: 'Please enter a valid phone number' });
+            return;
+        }
+
+        const quiz = await prisma.onlineQuiz.findUnique({
+            where: { id },
+            select: { id: true, isPublic: true, instituteId: true }
+        });
+
+        if (!quiz || !quiz.isPublic) {
+            res.status(404).json({ error: 'Public quiz not found' });
+            return;
+        }
+
+        const cleanPhone = phone.replace(/\D/g, '');
+        const variants = [cleanPhone, `+91${cleanPhone}`, `91${cleanPhone}`];
+
+        const student = await prisma.student.findFirst({
+            where: {
+                instituteId: quiz.instituteId,
+                parentWhatsapp: { in: variants }
+            },
+            select: { id: true, name: true }
+        });
+
+        if (student) {
+            res.json({ found: true, studentId: student.id, name: student.name });
+        } else {
+            res.json({ found: false });
+        }
+    } catch (error) {
+        console.error('[LOOKUP_PUBLIC_STUDENT_ERROR]', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+export const registerPublicQuiz = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = getRouteParam(req.params.id);
+        if (!id) {
+            res.status(400).json({ error: 'Quiz id is required' });
+            return;
+        }
+        const { name, phone, studentId } = req.body;
+
+        const quiz = await prisma.onlineQuiz.findUnique({
+            where: { id },
+            include: { institute: true }
+        });
+
+        if (!quiz || !quiz.isPublic) {
+            res.status(404).json({ error: 'Public quiz not found' });
+            return;
+        }
+
+        let student;
+
+        // If studentId is provided, reuse the existing student (phone lookup confirmed)
+        if (studentId) {
+            student = await prisma.student.findUnique({ where: { id: studentId } });
+            if (!student || student.instituteId !== quiz.instituteId) {
+                res.status(404).json({ error: 'Student not found' });
+                return;
+            }
+        } else {
+            // New guest — require name
+            if (!name || name.trim().length < 2) {
+                res.status(400).json({ error: 'Please enter a valid name' });
+                return;
+            }
+
+            const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+            const guestWhatsapp = cleanPhone.length >= 10 ? cleanPhone : `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+            
+            student = await prisma.student.create({
+                data: {
+                    name: name.trim(),
+                    parentName: 'Guest',
+                    parentWhatsapp: guestWhatsapp,
+                    status: 'ACTIVE',
+                    instituteId: quiz.instituteId,
+                    batchId: null
+                }
+            });
+        }
+
+        const token = jwt.sign(
+            {
+                studentId: student.id,
+                instituteId: quiz.instituteId,
+                role: 'STUDENT'
+            },
+            JWT_SECRET,
+            { expiresIn: '30d' }
+        );
+
+        res.json({
+            token,
+            student: {
+                id: student.id,
+                name: student.name,
+                batchName: student.batchId ? 'Enrolled' : 'Guest',
+                instituteName: (quiz as { institute?: { name?: string | null } }).institute?.name || 'N/A'
+            }
+        });
+    } catch (error) {
+        console.error('[GUEST_REGISTER_ERROR]', error);
+        res.status(500).json({ error: 'Failed to register for quiz' });
+    }
+};
+
+export const getPublicQuizInfo = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = getRouteParam(req.params.id);
+        if (!id) {
+            res.status(400).json({ error: 'Quiz id is required' });
+            return;
+        }
+        const quiz = await prisma.onlineQuiz.findUnique({
+            where: { id },
+            select: { title: true, isPublic: true, timeLimitMins: true, totalMarks: true }
+        });
+
+        if (!quiz) {
+            res.status(404).json({ error: 'Quiz not found' });
+            return;
+        }
+
+        res.json(quiz);
+    } catch (error) {
+        console.error('[GET_PUBLIC_QUIZ_ERROR]', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 // GET /api/student-portal/dashboard
 export const getStudentDashboard = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -201,9 +352,13 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                 include: {
                     batch: true,
                     balance: true,
+                    institute: { select: { isQuizOnly: true } },
                     feePayments: {
                         include: { installment: true },
                         orderBy: { date: 'desc' }
+                    },
+                    feeAssignments: {
+                        select: { installmentId: true }
                     },
                     marks: {
                         include: { test: true }
@@ -243,10 +398,12 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
 
         const studentJoinDate = new Date(student.createdAt);
 
+        const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+        
         const eligibleInstallments = batchInstallments.filter((inst: any) => {
             if (inst.studentId && inst.studentId !== studentId) return false;
             if (inst.studentId === studentId) return true;
-            return new Date(inst.createdAt) >= studentJoinDate || inst.payments.length > 0;
+            return new Date(inst.createdAt) >= studentJoinDate || inst.payments.length > 0 || assignedIds.has(inst.id);
         });
 
         // Build a map of testId -> mark for fast lookup
@@ -306,6 +463,7 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                 schoolName: student.schoolName || null,
                 humanId: student.humanId || null,
                 status: student.status,
+                isQuizOnly: student.institute?.isQuizOnly || false,
             },
             fees: {
                 balance: student.balance?.balance || 0,
@@ -355,50 +513,85 @@ export const getStudentQuizzes = async (req: Request, res: Response): Promise<vo
             }
         });
 
-        if (!student || !student.batchId) {
+        if (!student) {
             res.json([]);
             return;
         }
 
-        // Auto-finalize any expired submissions for assigned quizzes in parallel
-        const candidateQuizzes = await prisma.onlineQuiz.findMany({
-            where: {
-                OR: [
-                    { batchId: student.batchId },
-                    { batches: { some: { id: student.batchId } } }
-                ]
-            },
-            select: { id: true }
-        });
-        await Promise.all(candidateQuizzes.map((q: { id: string }) => autoFinalizeExpiredSubmissions(q.id)));
+        if (!student.instituteId) {
+            res.json([]);
+            return;
+        }
 
-        const quizzes = await prisma.onlineQuiz.findMany({
-            where: {
-                AND: [
-                    {
-                        OR: [
-                            { batchId: student.batchId },
-                            { batches: { some: { id: student.batchId } } }
-                        ]
-                    },
-                    { createdAt: { gte: student.createdAt } }
-                ]
-            },
-            include: {
-                _count: { select: { questions: true } },
-                submissions: {
-                    where: { studentId },
-                    select: {
-                        id: true,
-                        score: true,
-                        startedAt: true,
-                        submittedAt: true,
-                        cheatingEvents: { select: { id: true } }
+        let quizzes: any[];
+
+        if (student.batchId) {
+            // Normal student with a batch — existing logic
+            // Auto-finalize any expired submissions for assigned quizzes in parallel
+            const candidateQuizzes = await prisma.onlineQuiz.findMany({
+                where: {
+                    OR: [
+                        { batchId: student.batchId },
+                        { batches: { some: { id: student.batchId } } }
+                    ]
+                },
+                select: { id: true }
+            });
+            await Promise.all(candidateQuizzes.map((q: { id: string }) => autoFinalizeExpiredSubmissions(q.id)));
+
+            quizzes = await prisma.onlineQuiz.findMany({
+                where: {
+                    AND: [
+                        {
+                            OR: [
+                                { batchId: student.batchId },
+                                { batches: { some: { id: student.batchId } } }
+                            ]
+                        },
+                        { createdAt: { gte: student.createdAt } }
+                    ]
+                },
+                include: {
+                    _count: { select: { questions: true } },
+                    submissions: {
+                        where: { studentId },
+                        select: {
+                            id: true,
+                            score: true,
+                            startedAt: true,
+                            submittedAt: true,
+                            cheatingEvents: { select: { id: true } }
+                        }
                     }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+        } else {
+            // Guest / quiz-only student — show public quizzes they have submissions for
+            quizzes = await prisma.onlineQuiz.findMany({
+                where: {
+                    instituteId: student.instituteId,
+                    OR: [
+                        { isPublic: true },
+                        { submissions: { some: { studentId } } }
+                    ]
+                },
+                include: {
+                    _count: { select: { questions: true } },
+                    submissions: {
+                        where: { studentId },
+                        select: {
+                            id: true,
+                            score: true,
+                            startedAt: true,
+                            submittedAt: true,
+                            cheatingEvents: { select: { id: true } }
+                        }
+                    }
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+        }
 
         const now = new Date();
         res.json(quizzes.map((quiz) => {
@@ -454,7 +647,11 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
         const studentId = getStudentIdFromRequest(req, res);
         if (!studentId) return;
 
-        const quizId = req.params.id as string;
+        const quizId = getRouteParam(req.params.id);
+        if (!quizId) {
+            res.status(400).json({ error: 'Quiz id is required' });
+            return;
+        }
 
         // Auto-finalize before starting/resuming to clean up database state
         await autoFinalizeExpiredSubmissions(quizId);
@@ -469,11 +666,6 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
                 }
             }
         });
-
-        if (!student?.batchId) {
-            res.status(404).json({ error: 'Student batch not found' });
-            return;
-        }
 
         // PERF: Use Redis cache for Quiz data (questions, settings)
         let quiz = await quizCache.get(quizId);
@@ -499,13 +691,24 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
             return;
         }
 
+        if (!student) {
+            res.status(404).json({ error: 'Student not found' });
+            return;
+        }
+
+        if (!student.batchId && !quiz.isPublic) {
+            res.status(404).json({ error: 'Student batch not found' });
+            return;
+        }
+
         // Security: Check if student has access to this quiz (multi-batch aware)
-        const hasAccess = quiz.batchId === student.batchId || 
-                          quiz.batches.some((b: any) => b.id === student.batchId);
-        const isNotNewerThanQuiz = new Date(quiz.createdAt) <= new Date(student.createdAt); // optional logic from original
+        const quizBatches = Array.isArray((quiz as any).batches) ? (quiz as any).batches : [];
+        const hasAccess = quiz.isPublic || 
+                          quiz.batchId === student.batchId || 
+                          quizBatches.some((b: any) => b.id === student.batchId);
 
         if (!hasAccess) {
-            res.status(404).json({ error: 'Quiz not found' });
+            res.status(404).json({ error: 'Quiz not found or no access' });
             return;
         }
 
@@ -659,13 +862,16 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
                 autoSavedAnswers: autoSavedAnswers || {},
                 startedAt: submission.startedAt,
                 submittedAt: submission.submittedAt,
-                cheatingWarnings: cheatingCount,
-                maxWarnings: MAX_CHEATING_WARNINGS
+                cheatingWarnings: cheatingCount
+            },
+            student: {
+                name: student.name,
+                phone: student.parentWhatsapp
             }
         });
     } catch (error) {
         console.error('Error starting quiz:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Failed to start quiz' });
     }
 };
 
@@ -674,38 +880,15 @@ export const autosaveOnlineQuiz = async (req: Request, res: Response): Promise<v
         const studentId = getStudentIdFromRequest(req, res);
         if (!studentId) return;
 
-        const quizId = req.params.id as string;
+        const quizId = getRouteParam(req.params.id);
+        if (!quizId) {
+            res.status(400).json({ error: 'Quiz id is required' });
+            return;
+        }
         const answers = req.body?.answers;
 
         if (!isPlainAnswerMap(answers)) {
             res.status(400).json({ error: 'Answers are required' });
-            return;
-        }
-
-        const student = await prisma.student.findUnique({
-            where: { id: studentId },
-            select: { batchId: true, createdAt: true }
-        });
-
-        if (!student?.batchId) {
-            res.status(404).json({ error: 'Student batch not found' });
-            return;
-        }
-
-        const quiz = await prisma.onlineQuiz.findFirst({
-            where: {
-                id: quizId,
-                OR: [
-                    { batchId: student.batchId },
-                    { batches: { some: { id: student.batchId } } }
-                ],
-                createdAt: { gte: student.createdAt }
-            },
-            select: { id: true }
-        });
-
-        if (!quiz) {
-            res.status(404).json({ error: 'Quiz not found' });
             return;
         }
 
@@ -852,51 +1035,33 @@ export const submitOnlineQuiz = async (req: Request, res: Response): Promise<voi
             return;
         }
 
-        const student = await prisma.student.findUnique({
-            where: { id: studentId },
-            select: { batchId: true, createdAt: true }
-        });
-
-        if (!student?.batchId) {
-            res.status(404).json({ error: 'Student batch not found' });
-            return;
-        }
-
-        // Fetch quiz — we only need metadata and totalMarks; actual grading uses shuffledQuestions
-        const quiz = await prisma.onlineQuiz.findFirst({
-            where: {
-                id: quizId,
-                OR: [
-                    { batchId: student.batchId },
-                    { batches: { some: { id: student.batchId } } }
-                ],
-                createdAt: { gte: student.createdAt }
-            },
-            select: { id: true, timeLimitMins: true, totalMarks: true }
-        });
-
-        if (!quiz) {
-            res.status(404).json({ error: 'Quiz not found' });
-            return;
-        }
-
         const submittedAt = new Date();
 
-        await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             const existingSubmission = await tx.quizSubmission.findUnique({
                 where: { quizId_studentId: { quizId, studentId } },
                 include: {
-                    cheatingEvents: { select: { id: true } }
+                    cheatingEvents: { select: { id: true } },
+                    quiz: { select: { timeLimitMins: true, totalMarks: true, title: true, institute: { select: { name: true } } } }
                 }
             });
 
-            if (existingSubmission?.submittedAt) {
+            if (!existingSubmission) {
+                throw new Error('QUIZ_NOT_STARTED');
+            }
+
+            if (existingSubmission.submittedAt) {
                 throw new Error('QUIZ_ALREADY_SUBMITTED');
             }
 
-            const cheatingCount = existingSubmission?.cheatingEvents?.length || 0;
+            const cheatingCount = existingSubmission.cheatingEvents?.length || 0;
             if (cheatingCount >= MAX_CHEATING_WARNINGS) {
                 throw new Error('QUIZ_LOCKED');
+            }
+
+            const quiz = existingSubmission.quiz;
+            if (!quiz) {
+                throw new Error('QUIZ_NOT_FOUND');
             }
 
             const startedAt = existingSubmission?.startedAt || submittedAt;
@@ -955,17 +1120,40 @@ export const submitOnlineQuiz = async (req: Request, res: Response): Promise<voi
                 }))
             });
 
-            return totalScore;
+            return { totalScore, totalMarks: quiz.totalMarks, quizTitle: quiz.title, instituteName: quiz.institute?.name };
         });
 
         // Recalculate score for the response
         const finalSubmission = await prisma.quizSubmission.findUnique({
             where: { quizId_studentId: { quizId, studentId } },
-            select: { score: true }
+            select: { score: true, student: { select: { name: true, parentWhatsapp: true } } }
         });
 
-        res.json({ success: true, score: finalSubmission?.score ?? 0, totalMarks: quiz.totalMarks });
+        const finalScore = finalSubmission?.score ?? 0;
+        res.json({ success: true, score: finalScore, totalMarks: result.totalMarks });
+
+        // Fire and forget WhatsApp
+        if (finalSubmission?.student?.parentWhatsapp) {
+            import('../utils/whatsapp').then(({ sendTestMarksWhatsApp }) => {
+                let phone = finalSubmission.student.parentWhatsapp!.replace(/[^0-9+]/g, '');
+                if (!phone.startsWith('+')) {
+                    if (phone.length === 10) phone = '+91' + phone;
+                }
+                sendTestMarksWhatsApp(phone, {
+                    studentName: finalSubmission.student.name,
+                    instituteName: result.instituteName || "our institute",
+                    testName: result.quizTitle,
+                    totalMarks: String(result.totalMarks),
+                    marksObtained: String(finalScore)
+                }).catch(err => console.error('Online Quiz WhatsApp Error:', err));
+            }).catch(err => console.error('Failed to import whatsapp utils:', err));
+        }
     } catch (error: any) {
+        if (error?.message === 'QUIZ_NOT_STARTED') {
+            res.status(400).json({ error: 'Quiz not started.' });
+            return;
+        }
+
         if (error?.message === 'QUIZ_ALREADY_SUBMITTED') {
             res.status(400).json({ error: 'You have already submitted this quiz.' });
             return;

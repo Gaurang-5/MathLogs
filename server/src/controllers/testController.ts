@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { quizCache } from '../utils/redis';
-import PDFDocument from 'pdfkit';
+// const PDFDocument = require('pdfkit');
 import { addMathLogsHeader } from '../utils/pdfUtils';
 import { generateTest, generateSingleQuestion, generateTestWithVariants, generateVariantQuestion } from '../utils/ai/test-generator';
 import { sendQuizMarksBroadcast, sendQuizScheduleBroadcast } from '../utils/quizBroadcasts';
@@ -36,6 +36,7 @@ export const createTest = async (req: Request, res: Response) => {
         });
         res.json(test);
     } catch (e) {
+        console.error("Error creating test/quiz:", e);
         res.status(500).json({ error: 'Failed to create test' });
     }
 };
@@ -204,6 +205,7 @@ export const updateTest = async (req: Request, res: Response) => {
         });
         res.json(updated);
     } catch (e) {
+        console.error('Error updating test:', e);
         res.status(500).json({ error: 'Failed to update test' });
     }
 };
@@ -250,6 +252,7 @@ export const downloadTestReport = async (req: Request, res: Response) => {
             return;
         }
 
+        const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 50 });
 
         res.setHeader('Content-Type', 'application/pdf');
@@ -719,15 +722,25 @@ export const generateVariantQuestionRoute = async (req: Request, res: Response) 
 
 export const saveOnlineQuiz = async (req: Request, res: Response) => {
     try {
-        const { title, topic, difficulty, timeLimitMins, totalMarks, batchId, batchIds, studentQuestionCount, questions, availableFrom, availableUntil } = req.body;
+        const { title, topic, difficulty, timeLimitMins, totalMarks, batchId, batchIds, studentQuestionCount, questions, availableFrom, availableUntil, isPublic } = req.body;
         const teacherId = req.user?.id;
         const instituteId = req.user?.instituteId;
 
         // Support either batchId or batchIds
         const finalBatchIds: string[] = Array.isArray(batchIds) ? batchIds : (batchId ? [batchId] : []);
 
-        if (!title || finalBatchIds.length === 0 || !Array.isArray(questions) || questions.length === 0 || !instituteId || !availableFrom || !availableUntil) {
+        const institute = await prisma.institute.findUnique({ where: { id: instituteId } });
+        if (!institute) return res.status(404).json({ error: 'Institute not found' });
+        
+        const config = institute.config as any;
+        const isQuizOnly = institute.isQuizOnly === true || config?.isQuizOnly === true || config?.planName === 'QUIZ_ONLY';
+
+        if (!title || (!isPublic && finalBatchIds.length === 0) || !Array.isArray(questions) || questions.length === 0 || !instituteId || !availableFrom || !availableUntil) {
             return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        if (isQuizOnly && (institute.quizCredits || 0) <= 0) {
+            return res.status(403).json({ error: 'Insufficient quiz credits. Please purchase more credits to generate quizzes.' });
         }
 
         const availableFromDate = new Date(availableFrom);
@@ -782,32 +795,44 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
             finalTotalMarks = avgMarks * sqCount;
         }
 
-        const quiz = await prisma.onlineQuiz.create({
-            data: {
-                title,
-                topic,
-                difficulty,
-                timeLimitMins: Math.max(1, Number(timeLimitMins) || 30),
-                totalMarks: finalTotalMarks,
-                availableFrom: availableFromDate,
-                availableUntil: availableUntilDate,
-                batchId: finalBatchIds[0], // Backwards compatibility field
-                teacherId,
-                instituteId,
-                studentQuestionCount: sqCount,
-                batches: {
-                    connect: finalBatchIds.map(id => ({ id }))
+        const quiz = await prisma.$transaction(async (tx) => {
+            const createdQuiz = await tx.onlineQuiz.create({
+                data: {
+                    title,
+                    topic,
+                    difficulty,
+                    timeLimitMins: Math.max(1, Number(timeLimitMins) || 30),
+                    totalMarks: finalTotalMarks,
+                    availableFrom: availableFromDate,
+                    availableUntil: availableUntilDate,
+                    batchId: finalBatchIds.length > 0 ? finalBatchIds[0] : null, // Backwards compatibility field
+                    teacherId,
+                    instituteId,
+                    isPublic: isPublic === true,
+                    studentQuestionCount: sqCount,
+                    batches: finalBatchIds.length > 0 ? {
+                        connect: finalBatchIds.map(id => ({ id }))
+                    } : undefined,
+                    questions: {
+                        create: normalizedQuestions
+                    }
                 },
-                questions: {
-                    create: normalizedQuestions
+                include: {
+                    batch: { select: { id: true, name: true, className: true } },
+                    batches: { select: { id: true, name: true, className: true } },
+                    questions: true,
+                    _count: { select: { submissions: true } }
                 }
-            },
-            include: {
-                batch: { select: { id: true, name: true, className: true } },
-                batches: { select: { id: true, name: true, className: true } },
-                questions: true,
-                _count: { select: { submissions: true } }
+            });
+
+            if (isQuizOnly) {
+                await tx.institute.update({
+                    where: { id: instituteId! },
+                    data: { quizCredits: { decrement: 1 } }
+                });
             }
+
+            return createdQuiz;
         });
 
         if (process.env.NODE_ENV !== 'test') {
@@ -883,6 +908,13 @@ export const getOnlineQuizzes = async (req: Request, res: Response) => {
                         submittedAt: true,
                         score: true,
                         shuffledQuestions: true,
+                        student: {
+                            select: {
+                                id: true,
+                                name: true,
+                                humanId: true
+                            }
+                        },
                         answers: {
                             select: {
                                 questionId: true,
@@ -1330,6 +1362,7 @@ export const downloadOnlineQuizQuestionsPdf = async (req: Request, res: Response
             return res.status(404).send('Quiz not found');
         }
 
+        const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
         res.setHeader('Content-Type', 'application/pdf');
@@ -1491,6 +1524,7 @@ export const downloadOnlineQuizReportPdf = async (req: Request, res: Response) =
         const passRate = completedCount > 0 ? (passCount / completedCount) : 0;
         const flagRate = totalSubmissions > 0 ? (flaggedCount / totalSubmissions) : 0;
 
+        const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
         res.setHeader('Content-Type', 'application/pdf');

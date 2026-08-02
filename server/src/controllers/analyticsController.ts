@@ -272,3 +272,40 @@ export const getLiveQuizStatus = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to load live quiz monitor data' });
     }
 };
+
+export const unlockQuizSubmission = async (req: Request, res: Response) => {
+    try {
+        const quizId = req.params.id as string;
+        const submissionId = req.params.submissionId as string;
+        const teacherId = req.user?.id;
+        const instituteId = req.user?.instituteId;
+
+        // Verify teacher owns the quiz
+        const quiz = await prisma.onlineQuiz.findFirst({
+            where: { id: quizId, teacherId, instituteId }
+        });
+
+        if (!quiz) {
+            return res.status(404).json({ error: 'Quiz not found' });
+        }
+
+        // Verify the submission exists for this quiz
+        const submission = await prisma.quizSubmission.findFirst({
+            where: { id: submissionId, quizId }
+        });
+
+        if (!submission) {
+            return res.status(404).json({ error: 'Submission not found' });
+        }
+
+        // Delete all cheating events for this submission to reset the lock
+        await prisma.cheatingEvent.deleteMany({
+            where: { submissionId }
+        });
+
+        res.json({ success: true, message: 'Student attempt unlocked and warnings reset.' });
+    } catch (error) {
+        console.error('Unlock Submission Error:', error);
+        res.status(500).json({ error: 'Failed to unlock submission' });
+    }
+};

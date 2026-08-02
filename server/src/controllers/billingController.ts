@@ -4,11 +4,13 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { Tier } from '@prisma/client';
 import { secureLogger } from '../utils/secureLogger';
+import { getRazorpayConfig } from '../utils/env';
 
+const razorpayConfig = getRazorpayConfig();
 
 const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key',
-    key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_secret',
+    key_id: razorpayConfig.keyId,
+    key_secret: razorpayConfig.keySecret,
 });
 
 export const createBillingSession = async (req: Request, res: Response) => {
@@ -28,6 +30,35 @@ export const createBillingSession = async (req: Request, res: Response) => {
         }
 
         const instituteConfig = (admin.institute.config as any) || {};
+
+        if (planId.startsWith('quiz_credits_')) {
+            let amountInINR = 0;
+            if (planId === 'quiz_credits_10') amountInINR = 1000;
+            else if (planId === 'quiz_credits_25') amountInINR = 2000;
+            else if (planId === 'quiz_credits_40') amountInINR = 3000;
+            else {
+                return res.status(400).json({ error: 'Invalid plan selected' });
+            }
+            const order = await razorpay.orders.create({
+                amount: amountInINR * 100,
+                currency: 'INR',
+                receipt: `rcpt_${admin.institute.id.slice(-8)}_${Date.now()}`,
+                payment_capture: true,
+                notes: {
+                    instituteId: admin.institute.id,
+                    planId,
+                    billingCycle
+                }
+            } as any);
+
+            return res.json({
+                success: true,
+                orderId: (order as any).id,
+                amount: (order as any).amount,
+                currency: (order as any).currency,
+                keyId: razorpayConfig.keyId,
+            });
+        }
 
         // Determine pricing based on plan type
         let monthlyAmountInINR: number;
@@ -64,7 +95,7 @@ export const createBillingSession = async (req: Request, res: Response) => {
                 orderId: (order as any).id,
                 amount: (order as any).amount,
                 currency: (order as any).currency,
-                keyId: process.env.RAZORPAY_KEY_ID || 'dummy_key',
+                keyId: razorpayConfig.keyId,
             });
         } else {
             // MONTHLY AUTOPAY
@@ -105,7 +136,7 @@ export const createBillingSession = async (req: Request, res: Response) => {
             return res.json({
                 success: true,
                 subscriptionId: subscription.id,
-                keyId: process.env.RAZORPAY_KEY_ID || 'dummy_key',
+                keyId: razorpayConfig.keyId,
             });
         }
     } catch (error) {
@@ -137,9 +168,9 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Institute not found' });
         }
 
-        const secret = process.env.RAZORPAY_KEY_SECRET || 'dummy_secret';
+        const secret = razorpayConfig.keySecret;
         let bodyText = '';
-        if (billingCycle === 'yearly') {
+        if (billingCycle === 'yearly' || billingCycle === 'one-time') {
             bodyText = razorpay_order_id + '|' + razorpay_payment_id;
         } else {
             bodyText = razorpay_payment_id + '|' + razorpay_subscription_id;
@@ -152,6 +183,27 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
 
         if (expectedSignature !== razorpay_signature) {
             return res.status(400).json({ error: 'Invalid payment signature.' });
+        }
+
+        if (planId.startsWith('quiz_credits_')) {
+            let addedCredits = 0;
+            if (planId === 'quiz_credits_10') addedCredits = 10;
+            else if (planId === 'quiz_credits_25') addedCredits = 25;
+            else if (planId === 'quiz_credits_40') addedCredits = 40;
+            else {
+                return res.status(400).json({ success: false, error: 'Invalid plan selected' });
+            }
+            await prisma.institute.update({
+                where: { id: admin.institute.id },
+                data: {
+                    quizCredits: { increment: addedCredits }
+                }
+            });
+
+            return res.json({
+                success: true,
+                message: `Payment verified successfully. Added ${addedCredits} quiz credits.`
+            });
         }
 
         // Extend their plan

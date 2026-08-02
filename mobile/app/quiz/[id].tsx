@@ -159,8 +159,7 @@ export default function QuizDashboardScreen() {
   const downloadPDF = async (type: 'pdf' | 'results' | 'integrity') => {
     setShowOptions(false);
     try {
-        const docDir = (FileSystem as any).documentDirectory;
-        const fileUri = `${docDir}${quiz.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${type}.pdf`;
+        const fileUri = `${FileSystem.Paths.document.uri}${quiz.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${type}.pdf`;
         
         // Setup API url
         const url = `${api.defaults.baseURL}/tests/online/${quiz.id}/${type === 'pdf' ? 'pdf' : type === 'results' ? 'report' : 'integrity/report'}`;

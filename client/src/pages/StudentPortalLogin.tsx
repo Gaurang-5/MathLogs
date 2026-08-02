@@ -29,7 +29,11 @@ export default function StudentPortalLogin() {
             try {
                 const data = await apiRequest<Branding>(`/student-portal/branding/${instituteSlug}`);
                 setBranding(data);
-                sessionStorage.setItem(`branding_${instituteSlug}`, JSON.stringify(data));
+                try {
+                    sessionStorage.setItem(`branding_${instituteSlug}`, JSON.stringify(data));
+                } catch (e) {
+                    console.warn('Could not save branding to sessionStorage', e);
+                }
             } catch (err) {
                 if (!branding) {
                     setBranding({ name: 'Student Portal', logoUrl: null, primaryColor: null });

@@ -16,9 +16,11 @@ export interface LegacyFeeSnapshot {
 }
 
 export interface StudentFeeSnapshotInput {
+    id?: string;
     createdAt?: string | Date | null;
     fees: LegacyFeeSnapshot[];
     feePayments: FeePaymentSnapshot[];
+    feeAssignments?: { installmentId: string }[];
     batch?: {
         feeAmount?: number | null;
         feeInstallments?: FeeInstallmentSnapshot[] | null;
@@ -42,14 +44,10 @@ export function calculateStudentFeeSnapshot(student: StudentFeeSnapshotInput): S
     
     const isBatchInstallmentActive = (student.batch?.feeInstallments || []).some((fi) => !fi.studentId);
     
-    // Valid installments: global ones after join date OR have payments, plus custom ones for this student
+    // Valid installments: those that are explicitly assigned to this student
+    const assignedIds = new Set((student.feeAssignments || []).map((a) => a.installmentId));
     const sortedInstallments = (student.batch?.feeInstallments || [])
-        .filter((installment) => {
-            if (installment.studentId) return true; // custom invoice
-            const isAfterJoin = new Date(installment.createdAt) >= studentJoinDate;
-            const hasPayment = paidInstallmentIds.has(installment.id);
-            return isAfterJoin || hasPayment;
-        })
+        .filter((installment) => assignedIds.has(installment.id))
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         
     const globalInstallmentsTotal = sortedInstallments
@@ -62,7 +60,10 @@ export function calculateStudentFeeSnapshot(student: StudentFeeSnapshotInput): S
 
     const totalFee = (isBatchInstallmentActive ? globalInstallmentsTotal : (student.batch?.feeAmount || 0)) + customInstallmentsTotal;
 
-    const paidInstallments = student.feePayments.reduce((sum, payment) => sum + payment.amountPaid, 0);
+    const validInstallmentIds = new Set(sortedInstallments.map((i) => i.id));
+    const paidInstallments = student.feePayments
+        .filter((payment) => validInstallmentIds.has(payment.installmentId))
+        .reduce((sum, payment) => sum + payment.amountPaid, 0);
     const balance = totalFee - paidSimple - paidInstallments;
 
     const paymentsByInstallment = new Map<string, number>();

@@ -114,6 +114,9 @@ export default function JoinOnboarding() {
                 const res = await api.get<LinkData>(`/admin-onboarding/${token}`);
                 if (res.valid) {
                     setLinkData(res);
+                    if (res.plan === 'QUIZ_ONLY') {
+                        setBillingCycle('monthly');
+                    }
                 } else {
                     setError('This link is invalid or has expired.');
                 }
@@ -160,7 +163,12 @@ export default function JoinOnboarding() {
                 setPaymentSuccess(true);
                 toast.success('Your free plan has been activated!');
                 setTimeout(() => {
-                    window.location.href = orderRes.setupLink;
+                    try {
+                        const url = new URL(orderRes.setupLink);
+                        navigate(`${url.pathname}${url.search}`);
+                    } catch {
+                        window.location.href = orderRes.setupLink;
+                    }
                 }, 1500);
                 return;
             }
@@ -198,7 +206,12 @@ export default function JoinOnboarding() {
                             setPaymentSuccess(true);
                             toast.success('Payment verified! Redirecting to setup...');
                             setTimeout(() => {
-                                window.location.href = verifyRes.setupLink;
+                                try {
+                                    const url = new URL(verifyRes.setupLink);
+                                    navigate(`${url.pathname}${url.search}`);
+                                } catch {
+                                    window.location.href = verifyRes.setupLink;
+                                }
                             }, 2000);
                         } else {
                             toast.error('Payment verification failed.');
@@ -311,7 +324,7 @@ export default function JoinOnboarding() {
                             <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Exclusive Invite</span>
                         </div>
                         <h1 className="text-3xl font-black mb-4">
-                            {linkData?.plan === 'PRO' ? 'Pro Plan' : linkData?.plan === 'BASIC' ? 'Basic Plan' : 'Custom Plan'}
+                            {linkData?.plan === 'PRO' ? 'Pro Plan' : linkData?.plan === 'BASIC' ? 'Basic Plan' : linkData?.plan === 'QUIZ_ONLY' ? 'Quiz Only' : 'Custom Plan'}
                             {linkData?.isFreeTrial && (
                                 <span className="ml-3 inline-block bg-amber-500 text-white text-sm font-bold px-3 py-1 rounded-full align-middle shadow-sm">
                                     {linkData.trialDays}-Day Free Trial
@@ -320,7 +333,7 @@ export default function JoinOnboarding() {
                         </h1>
 
                         {/* Billing Cycle Toggle (Hidden for Free Trials) */}
-                        {!linkData?.isFreeTrial && (
+                        {!linkData?.isFreeTrial && linkData?.plan !== 'QUIZ_ONLY' && (
                         <div className="flex gap-2 mb-4">
                             <button
                                 onClick={() => setBillingCycle('monthly')}
@@ -352,9 +365,14 @@ export default function JoinOnboarding() {
                             <span className="text-4xl font-black">
                                 {linkData?.isFreeTrial ? '₹0' : `₹${displayPrice.toLocaleString('en-IN')}`}
                             </span>
-                            {!linkData?.isFreeTrial && (
+                            {!linkData?.isFreeTrial && linkData?.plan !== 'QUIZ_ONLY' && (
                                 <span className="text-sm text-gray-400 font-medium">
                                     / {billingCycle === 'monthly' ? 'month' : 'year'}
+                                </span>
+                            )}
+                            {!linkData?.isFreeTrial && linkData?.plan === 'QUIZ_ONLY' && (
+                                <span className="text-sm text-gray-400 font-medium">
+                                    (One-Time Setup Fee)
                                 </span>
                             )}
                         </div>

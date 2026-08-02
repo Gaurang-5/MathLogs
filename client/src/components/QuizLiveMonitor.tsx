@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
-import { X, Loader, Search, RefreshCw, ShieldAlert, Monitor, CheckCircle2, User, Clock, AlertTriangle } from 'lucide-react';
+import { X, Loader, Search, RefreshCw, ShieldAlert, Monitor, CheckCircle2, User, Clock, AlertTriangle, Unlock } from 'lucide-react';
 import { api } from '../utils/api';
+import toast from 'react-hot-toast';
 
 interface StudentData {
     id: string;
@@ -119,6 +120,16 @@ export default function QuizLiveMonitor({ quizId, onClose }: QuizLiveMonitorProp
         } finally {
             setLoading(false);
             setIsRefreshing(false);
+        }
+    };
+
+    const handleUnlock = async (submissionId: string) => {
+        try {
+            await api.post(`/tests/online/${quizId}/submissions/${submissionId}/unlock`);
+            toast.success('Student unlocked and warnings reset!');
+            loadMonitorData(true); // silent refresh
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Failed to unlock student');
         }
     };
 
@@ -333,22 +344,34 @@ export default function QuizLiveMonitor({ quizId, onClose }: QuizLiveMonitorProp
                                     {/* Warnings Banner / Events */}
                                     {hasWarnings ? (
                                         <div className="flex flex-col gap-2 border-t border-neutral-100 pt-3">
-                                            <button
-                                                onClick={() => setExpandedStudentId(isExpanded ? null : student.id)}
-                                                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                                                    student.cheatingEventsCount >= 3
-                                                        ? 'bg-rose-50 text-rose-700 hover:bg-rose-100/60 border border-rose-100'
-                                                        : 'bg-amber-50 text-amber-700 hover:bg-amber-100/60 border border-amber-100'
-                                                }`}
-                                            >
-                                                <span className="flex items-center gap-1.5">
-                                                    <ShieldAlert className="w-4 h-4" />
-                                                    Cheating Flags: {student.cheatingEventsCount}
-                                                </span>
-                                                <span className="text-[10px] underline">
-                                                    {isExpanded ? 'Hide logs' : 'View logs'}
-                                                </span>
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => setExpandedStudentId(isExpanded ? null : student.id)}
+                                                    className={`flex-1 flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                                                        student.cheatingEventsCount >= 3
+                                                            ? 'bg-rose-50 text-rose-700 hover:bg-rose-100/60 border border-rose-100'
+                                                            : 'bg-amber-50 text-amber-700 hover:bg-amber-100/60 border border-amber-100'
+                                                    }`}
+                                                >
+                                                    <span className="flex items-center gap-1.5">
+                                                        <ShieldAlert className="w-4 h-4" />
+                                                        Cheating Flags: {student.cheatingEventsCount}
+                                                    </span>
+                                                    <span className="text-[10px] underline">
+                                                        {isExpanded ? 'Hide logs' : 'View logs'}
+                                                    </span>
+                                                </button>
+                                                {!student.submittedAt && (
+                                                    <button
+                                                        onClick={() => handleUnlock(student.id)}
+                                                        className="px-3 py-2 rounded-xl text-[11px] font-bold bg-white text-neutral-600 border border-neutral-200 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 transition-all flex items-center gap-1.5 shrink-0"
+                                                        title="Unlock attempt and reset warnings"
+                                                    >
+                                                        <Unlock className="w-3.5 h-3.5" />
+                                                        Unlock
+                                                    </button>
+                                                )}
+                                            </div>
 
                                             {isExpanded && (
                                                 <div className="bg-neutral-50 border border-neutral-200/60 rounded-xl p-2.5 flex flex-col gap-1.5 max-h-40 overflow-y-auto scrollbar-thin">

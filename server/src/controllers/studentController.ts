@@ -5,7 +5,9 @@ import { sendWelcomeWhatsApp } from '../utils/whatsapp';
 import { getCourseCode, getInstituteCode } from '../utils/studentIds';
 import jwt from 'jsonwebtoken';
 import { secureLogger } from '../utils/secureLogger';
+import { getJwtSecret } from '../utils/env';
 
+const JWT_SECRET = getJwtSecret();
 
 // H5 fix: Shared constant so both registerStudent and addStudentManually
 // always include the fields that autoSendWelcomeInvite depends on.
@@ -134,7 +136,7 @@ export const registerStudent = async (req: Request, res: Response) => {
 
     if (token) {
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-123') as any;
+            const decoded = jwt.verify(token, JWT_SECRET) as any;
             if (decoded.batchId !== batchId) {
                 return res.status(403).json({ error: 'This invite link is for a different batch.' });
             }
@@ -495,6 +497,77 @@ export const rejectStudent = async (req: Request, res: Response) => {
     }
 };
 
+export const archiveStudent = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { leaveReason } = req.body || {};
+
+    try {
+        const user = (req as any).user;
+
+        const student = await prisma.student.findUnique({
+            where: { id: String(id) },
+            include: {
+                fees: true,
+                feePayments: true,
+                attendanceRecords: true,
+                marks: true,
+                quizSubmissions: true
+            }
+        });
+
+        if (!student) return res.status(404).json({ error: 'Student not found' });
+        if (student.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const hasActivity = 
+            student.fees.length > 0 || 
+            student.feePayments.length > 0 || 
+            student.attendanceRecords.length > 0 || 
+            student.marks.length > 0 || 
+            student.quizSubmissions.length > 0;
+
+        if (hasActivity) {
+            // Soft Delete / Archive
+            await prisma.student.update({
+                where: { id: String(id) },
+                data: {
+                    status: 'LEFT',
+                    leaveReason: leaveReason || 'No reason provided',
+                    leftAt: new Date(),
+                    batchId: null
+                }
+            });
+            return res.json({ success: true, action: 'archived' });
+        } else {
+            // Hard Delete with Log
+            await prisma.$transaction([
+                prisma.systemLog.create({
+                    data: {
+                        instituteId: user.instituteId,
+                        action: 'STUDENT_HARD_DELETE',
+                        entityName: student.name,
+                        details: {
+                            leaveReason: leaveReason || 'No activity',
+                            deletedAt: new Date().toISOString(),
+                            studentData: {
+                                humanId: student.humanId,
+                                parentName: student.parentName,
+                                parentWhatsapp: student.parentWhatsapp
+                            }
+                        } as any
+                    }
+                }),
+                prisma.student.delete({
+                    where: { id: String(id) }
+                })
+            ]);
+            return res.json({ success: true, action: 'hard_deleted' });
+        }
+    } catch (e) {
+        console.error("Archive error:", e);
+        res.status(500).json({ error: 'Failed to remove or archive student' });
+    }
+};
+
 export const getStudentGrowthStats = async (req: Request, res: Response) => {
     try {
         const students = await prisma.student.findMany({
@@ -687,4 +760,3 @@ export const getStudentProfile = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to fetch student profile' });
     }
 };
-

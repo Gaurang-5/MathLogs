@@ -31,8 +31,7 @@ import {
     Gift
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
+import { API_URL } from '../utils/api';
 
 interface InstituteConfig {
     maxStudents?: number;
@@ -80,6 +79,8 @@ interface Institute {
         batches: number;
         students: number;
     };
+    isQuizOnly?: boolean;
+    quizCredits?: number;
     admins: { username: string }[];
 }
 
@@ -95,7 +96,7 @@ export default function SuperAdminDashboard() {
 
     // Create Onboarding Link State
     const [showOnboardForm, setShowOnboardForm] = useState(false);
-    const [plan, setPlan] = useState<'BASIC' | 'PRO' | 'CUSTOM'>('BASIC');
+    const [plan, setPlan] = useState<'BASIC' | 'PRO' | 'CUSTOM' | 'QUIZ_ONLY'>('BASIC');
     const [discountPercent, setDiscountPercent] = useState<number | ''>(0);
     const [customPriceMonthly, setCustomPriceMonthly] = useState<number | ''>('');
     const [customPriceYearly, setCustomPriceYearly] = useState<number | ''>('');
@@ -127,6 +128,8 @@ export default function SuperAdminDashboard() {
     const [selectedInstitute, setSelectedInstitute] = useState<Institute | null>(null);
     const [configJson, setConfigJson] = useState('');
     const [configMaxStudents, setConfigMaxStudents] = useState<number | ''>('');
+    const [configIsQuizOnly, setConfigIsQuizOnly] = useState(false);
+    const [configQuizCredits, setConfigQuizCredits] = useState<number | ''>('');
     const [isSavingConfig, setIsSavingConfig] = useState(false);
 
     // Edit Details Modal State
@@ -186,6 +189,8 @@ export default function SuperAdminDashboard() {
         const cfg = inst.config || { classes: [] };
         setConfigJson(JSON.stringify(cfg, null, 2));
         setConfigMaxStudents(cfg.maxStudents || '');
+        setConfigIsQuizOnly(inst.isQuizOnly || false);
+        setConfigQuizCredits(inst.quizCredits ?? '');
     };
 
     const handleSaveConfig = async () => {
@@ -198,7 +203,9 @@ export default function SuperAdminDashboard() {
             }
             const token = localStorage.getItem('token');
             await axios.put(`${API_URL}/institutes/${selectedInstitute.id}/config`, {
-                config: parsedConfig
+                config: parsedConfig,
+                isQuizOnly: configIsQuizOnly,
+                quizCredits: configQuizCredits === '' ? 0 : Number(configQuizCredits)
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -497,6 +504,37 @@ export default function SuperAdminDashboard() {
                                     className="w-full bg-gray-50 font-medium border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none transition-all placeholder:text-gray-400"
                                 />
                                 <p className="text-[10px] text-gray-400 pl-1 mt-1">This overrides the selected plan's default student capacity.</p>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                        <GraduationCap className="w-5 h-5 text-indigo-600" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-900">Quiz Only Mode</label>
+                                        <p className="text-[11px] text-gray-500 font-medium">Restricts institute to only quiz features.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setConfigIsQuizOnly(!configIsQuizOnly)}
+                                    className={`relative w-12 h-6 rounded-full transition-colors ${configIsQuizOnly ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${configIsQuizOnly ? 'left-[26px]' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1 mb-2">Quiz Credits</label>
+                                <input 
+                                    type="number"
+                                    value={configQuizCredits}
+                                    onChange={(e) => setConfigQuizCredits(e.target.value === '' ? '' : Number(e.target.value))}
+                                    placeholder="e.g., 500"
+                                    className="w-full bg-gray-50 font-medium border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none transition-all placeholder:text-gray-400"
+                                />
+                                <p className="text-[10px] text-gray-400 pl-1 mt-1">Available credits for Quiz Only institutes.</p>
                             </div>
 
                             <div className="space-y-2">
@@ -1075,8 +1113,8 @@ export default function SuperAdminDashboard() {
                                 {/* Plan Selection */}
                                 <div className="space-y-4">
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Select Plan</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {(['BASIC', 'PRO', 'CUSTOM'] as const).map((p) => (
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        {(['BASIC', 'PRO', 'CUSTOM', 'QUIZ_ONLY'] as const).map((p) => (
                                             <button
                                                 key={p}
                                                 type="button"
@@ -1088,16 +1126,18 @@ export default function SuperAdminDashboard() {
                                                     if (p === 'BASIC') setCustomMaxStudentsForInvite(100);
                                                     else if (p === 'PRO') setCustomMaxStudentsForInvite(250);
                                                     else setCustomMaxStudentsForInvite(100);
+                                                    
+                                                    if (p === 'QUIZ_ONLY') setIsFreeTrial(false);
                                                 }}
-                                                className={`py-3 px-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                                                className={`py-3 px-2 rounded-xl text-sm font-bold border-2 transition-all ${
                                                     plan === p
                                                         ? 'bg-black text-white border-black'
                                                         : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
                                                 }`}
                                             >
                                                 <div className="text-center">
-                                                    <div>{p === 'BASIC' ? 'Basic' : p === 'PRO' ? 'Pro' : 'Custom'}</div>
-                                                    {p !== 'CUSTOM' && (
+                                                    <div>{p === 'BASIC' ? 'Basic' : p === 'PRO' ? 'Pro' : p === 'CUSTOM' ? 'Custom' : 'Quiz Only'}</div>
+                                                    {p !== 'CUSTOM' && p !== 'QUIZ_ONLY' && (
                                                         <div className={`text-[10px] mt-0.5 ${plan === p ? 'text-gray-300' : 'text-gray-400'}`}>
                                                             {p === 'BASIC' ? '100 Students' : '250 Students'}
                                                         </div>
@@ -1161,7 +1201,7 @@ export default function SuperAdminDashboard() {
                                 )}
 
                                 {/* Pricing: Discount for Basic/Pro OR Custom Price */}
-                                {plan !== 'CUSTOM' ? (
+                                {plan === 'BASIC' || plan === 'PRO' ? (
                                     <div className="space-y-3 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
                                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Discount</label>
                                         <div className="text-xs text-gray-500 -mt-1">
@@ -1196,7 +1236,7 @@ export default function SuperAdminDashboard() {
                                             </div>
                                         )}
                                     </div>
-                                ) : (
+                                ) : plan === 'CUSTOM' ? (
                                     <div className="space-y-3 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
                                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Custom Pricing</label>
                                         <div className="grid grid-cols-2 gap-3">
@@ -1239,6 +1279,24 @@ export default function SuperAdminDashboard() {
                                                 className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-medium"
                                                 min="1"
                                             />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3 border border-gray-100 p-4 rounded-xl bg-gray-50/50">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">One-Time Setup Fee</label>
+                                        <div className="space-y-1">
+                                            <div className="relative">
+                                                <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                                <input
+                                                    type="number"
+                                                    value={customPriceMonthly}
+                                                    onChange={(e) => setCustomPriceMonthly(e.target.value === '' ? '' : Number(e.target.value))}
+                                                    placeholder="e.g. 4999 (0 for free)"
+                                                    className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl pl-9 pr-3 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all placeholder:text-gray-400 font-bold"
+                                                    min="0"
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-gray-500 font-medium pl-1">They will pay this once to activate their Quiz Only account with 10 starter credits.</p>
                                         </div>
                                     </div>
                                 )}

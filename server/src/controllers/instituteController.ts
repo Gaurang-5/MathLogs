@@ -38,7 +38,7 @@ export const getGlobalAnalytics = async (req: Request, res: Response) => {
 
 export const updateInstituteConfig = async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const { config } = req.body;
+    const { config, isQuizOnly, quizCredits } = req.body;
     const user = req.user;
 
     if (user.role !== 'SUPER_ADMIN') {
@@ -46,9 +46,13 @@ export const updateInstituteConfig = async (req: Request, res: Response) => {
     }
 
     try {
+        const updateData: any = { config };
+        if (isQuizOnly !== undefined) updateData.isQuizOnly = isQuizOnly;
+        if (quizCredits !== undefined) updateData.quizCredits = quizCredits;
+
         const updated = await prisma.institute.update({
             where: { id },
-            data: { config }
+            data: updateData
         });
         res.json(updated);
     } catch (error) {
@@ -315,7 +319,19 @@ export const getMyInstitute = async (req: Request, res: Response) => {
         if (!admin || !admin.institute) {
             return res.status(404).json({ error: "Institute not found" });
         }
-        res.json(admin.institute);
+        let institute = admin.institute;
+        if (!institute.slug) {
+            const baseSlug = institute.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+            const randomSuffix = Math.random().toString(36).substring(2, 6);
+            const generatedSlug = baseSlug ? `${baseSlug}-${randomSuffix}` : `inst-${randomSuffix}`;
+            
+            institute = await prisma.institute.update({
+                where: { id: institute.id },
+                data: { slug: generatedSlug }
+            });
+        }
+        
+        res.json(institute);
     } catch (error) {
         console.error("Error fetching my institute:", error);
         res.status(500).json({ error: "Failed to fetch institute" });

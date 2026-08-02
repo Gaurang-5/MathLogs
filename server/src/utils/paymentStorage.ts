@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
 import { randomUUID, createHmac, timingSafeEqual } from 'crypto';
+import { requireEnv } from './env';
 
 export const s3 = new S3Client({
     region: process.env.AWS_REGION || 'ap-south-1',
@@ -11,7 +12,10 @@ export const s3 = new S3Client({
 });
 
 const BUCKET = process.env.PAYMENT_PHOTO_BUCKET || 'mathlogs-payment-receipts';
-const SCREENSHOT_SIGNING_SECRET = process.env.PAYMENT_SCREENSHOT_SIGNING_SECRET || process.env.JWT_SECRET || 'change-me-in-production';
+const SCREENSHOT_SIGNING_SECRET = requireEnv('PAYMENT_SCREENSHOT_SIGNING_SECRET', {
+    fallbackEnv: 'JWT_SECRET',
+    devDefault: 'dev-payment-screenshot-secret',
+});
 
 // In-memory concurrency queue to prevent S3 throttling during bursts
 class ConcurrencyQueue {
@@ -89,11 +93,10 @@ export const verifyPaymentScreenshotSignature = (storageKey: string, exp: number
     return timingSafeEqual(expectedBuf, actualBuf);
 };
 
-export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buffer, contentType, recordId }: { instituteId: string, studentId: string, buffer: Buffer, contentType: string, recordId: string }) => {
+export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buffer, contentType }: { instituteId: string, studentId: string, buffer: Buffer, contentType: string, recordId?: string }) => {
     const key = generateStorageKey(contentType, instituteId, studentId);
 
-    // Fire and forget - do not return the promise!
-    uploadQueue.add(async () => {
+    return uploadQueue.add(async () => {
         try {
             await s3.send(new PutObjectCommand({
                 Bucket: BUCKET,
@@ -101,8 +104,8 @@ export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buff
                 Body: buffer,
                 ContentType: contentType
             }));
+            return key;
         } catch (e: any) {
-            let s3Success = false;
             if (e.name === 'NoSuchBucket' || e.Code === 'NoSuchBucket') {
                 secureLogger.info(`[Storage] Bucket ${BUCKET} not found. Attempting to create it...`);
                 try {
@@ -112,7 +115,7 @@ export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buff
                         ...(region !== 'us-east-1' ? { CreateBucketConfiguration: { LocationConstraint: region as any } } : {})
                     }));
                     await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buffer, ContentType: contentType }));
-                    s3Success = true;
+                    return key;
                 } catch (createErr: any) {
                     console.error("[Storage] Failed to auto-create S3 bucket.", createErr.message || createErr);
                 }
@@ -121,24 +124,13 @@ export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buff
             }
 
             // --- LOCAL FALLBACK ---
-            if (!s3Success) {
-                secureLogger.info("[Storage] Falling back to LOCAL disk storage...");
-                const localFileName = key.replace(/\//g, '_');
-                await fs.mkdir(LOCAL_UPLOAD_DIR, { recursive: true }).catch(() => {});
-                await fs.writeFile(path.join(LOCAL_UPLOAD_DIR, localFileName), buffer);
-                const localKey = `LOCAL:${localFileName}`;
-                
-                // Update DB with local key since S3 failed
-                const { prisma } = require('../prisma');
-                await prisma.upiPaymentVerification.update({
-                    where: { id: recordId },
-                    data: { storageKey: localKey }
-                }).catch((err: any) => console.error("[Storage] Failed to update DB with local fallback key", err));
-            }
+            secureLogger.info("[Storage] Falling back to LOCAL disk storage...");
+            const localFileName = key.replace(/\//g, '_');
+            await fs.mkdir(LOCAL_UPLOAD_DIR, { recursive: true });
+            await fs.writeFile(path.join(LOCAL_UPLOAD_DIR, localFileName), buffer);
+            return `LOCAL:${localFileName}`;
         }
     });
-
-    return key; // return the optimistic S3 key immediately
 };
 
 /**

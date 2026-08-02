@@ -71,14 +71,16 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
         navigate('/login');
     };
 
+    const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+
     const navItems = [
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { name: 'Batches', path: '/batches', icon: Users },
-        { name: 'Tests', path: '/tests', icon: FileText },
+        ...(isQuizOnly ? [] : [{ name: 'Batches', path: '/batches', icon: Users }]),
+        ...(isQuizOnly ? [] : [{ name: 'Tests', path: '/tests', icon: FileText }]),
         { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
-        { name: 'Scan Marks', path: '/scan', icon: Scan },
-        { name: 'Fees', path: '/fees', icon: ReceiptIndianRupee },
-        { name: 'Billing', path: '/billing', icon: CreditCard },
+        ...(isQuizOnly ? [] : [{ name: 'Scan Marks', path: '/scan', icon: Scan }]),
+        ...(isQuizOnly ? [] : [{ name: 'Fees', path: '/fees', icon: ReceiptIndianRupee }]),
+        { name: isQuizOnly ? 'Buy Credits' : 'Billing', path: '/billing', icon: CreditCard },
         { name: 'Settings', path: '/settings', icon: Settings },
     ];
 
@@ -150,18 +152,34 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                     })}
                 </nav>
 
-                <div className={cn("p-4 border-t border-app-border shrink-0 flex justify-center", isSidebarCollapsed && "px-2")}>
-                    <button
-                        onClick={() => setShowQuickFeeModal(true)}
-                        className={cn(
-                            "flex items-center justify-center bg-gray-900 text-white hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95 group relative overflow-hidden",
-                            isSidebarCollapsed ? "w-12 h-12 rounded-[18px] mx-auto" : "w-full py-3 rounded-2xl"
-                        )}
-                        title="Log Fee"
-                    >
-                        <IndianRupee className={cn("w-[22px] h-[22px]", !isSidebarCollapsed && "mr-2")} strokeWidth={2.5} />
-                        {!isSidebarCollapsed && <span className="font-bold text-sm">Log Fee</span>}
-                    </button>
+                <div className={cn("p-4 border-t border-app-border shrink-0 flex flex-col gap-3", isSidebarCollapsed && "px-2 items-center")}>
+                    {isQuizOnly && (
+                        <div className={cn("flex items-center justify-between px-3 py-2.5 bg-blue-50 text-blue-700 rounded-xl", isSidebarCollapsed && "justify-center")}>
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4" />
+                                {!isSidebarCollapsed && <span className="text-sm font-semibold tracking-tight">Quiz Credits</span>}
+                            </div>
+                            {!isSidebarCollapsed && (
+                                <span className="text-sm font-bold bg-blue-100 px-2 py-0.5 rounded-full">
+                                    {localStorage.getItem('quizCredits') || 0}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    
+                    {!isQuizOnly && (
+                        <button
+                            onClick={() => setShowQuickFeeModal(true)}
+                            className={cn(
+                                "flex items-center justify-center bg-gray-900 text-white hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95 group relative overflow-hidden",
+                                isSidebarCollapsed ? "w-12 h-12 rounded-[18px] mx-auto" : "w-full py-3 rounded-2xl"
+                            )}
+                            title={isSidebarCollapsed ? "Record Quick Payment" : undefined}
+                        >
+                            <IndianRupee className="w-5 h-5 relative z-10" />
+                            {!isSidebarCollapsed && <span className="font-semibold text-[15px] ml-2 relative z-10">Record Payment</span>}
+                        </button>
+                    )}
                 </div>
 
                 <div className={cn("space-y-2 p-4", isSidebarCollapsed ? "items-center flex flex-col" : "")}>
@@ -310,53 +328,88 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
             {showMobileNav && (
                 <nav className="fixed bottom-6 left-4 right-4 z-50 bg-app-surface/80 backdrop-blur-3xl border border-app-border shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] rounded-[32px] h-[72px] xl:hidden">
 
-                    <div className="grid grid-cols-5 items-center h-full w-full relative z-10 px-2">
-                        <Link to="/dashboard" className="flex flex-col items-center justify-center group h-full">
-                            <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname === '/dashboard' ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
-                                <LayoutDashboard className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname === '/dashboard' ? 2.5 : 1.5} />
-                                <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname === '/dashboard' ? 'opacity-100' : 'opacity-70'}`}>Home</span>
-                                {location.pathname === '/dashboard' && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                    {isQuizOnly ? (
+                        <div className="grid grid-cols-4 items-center h-full w-full relative z-10 px-2">
+                            <Link to="/dashboard" className="flex flex-col items-center justify-center group h-full">
+                                <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname === '/dashboard' ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                    <LayoutDashboard className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname === '/dashboard' ? 2.5 : 1.5} />
+                                    <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname === '/dashboard' ? 'opacity-100' : 'opacity-70'}`}>Home</span>
+                                    {location.pathname === '/dashboard' && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                                </div>
+                            </Link>
+                            <Link to="/quizzes" className="flex flex-col items-center justify-center group h-full">
+                                <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/quizzes') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                    <Sparkles className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/quizzes') ? 2.5 : 1.5} />
+                                    <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/quizzes') ? 'opacity-100' : 'opacity-70'}`}>Quizzes</span>
+                                    {location.pathname.startsWith('/quizzes') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                                </div>
+                            </Link>
+                            <Link to="/billing" className="flex flex-col items-center justify-center group h-full">
+                                <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/billing') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                    <CreditCard className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/billing') ? 2.5 : 1.5} />
+                                    <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/billing') ? 'opacity-100' : 'opacity-70'}`}>Credits</span>
+                                    {location.pathname.startsWith('/billing') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                                </div>
+                            </Link>
+                            <Link to="/settings" className="flex flex-col items-center justify-center group h-full">
+                                <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/settings') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                    <Settings className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/settings') ? 2.5 : 1.5} />
+                                    <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/settings') ? 'opacity-100' : 'opacity-70'}`}>Settings</span>
+                                    {location.pathname.startsWith('/settings') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                                </div>
+                            </Link>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-5 items-center h-full w-full relative z-10 px-2">
+                                <Link to="/dashboard" className="flex flex-col items-center justify-center group h-full">
+                                    <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname === '/dashboard' ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                        <LayoutDashboard className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname === '/dashboard' ? 2.5 : 1.5} />
+                                        <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname === '/dashboard' ? 'opacity-100' : 'opacity-70'}`}>Home</span>
+                                        {location.pathname === '/dashboard' && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                                    </div>
+                                </Link>
+
+                                <Link to="/batches" className="flex flex-col items-center justify-center group h-full">
+                                    <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/batches') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                        <Users className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/batches') ? 2.5 : 1.5} />
+                                        <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/batches') ? 'opacity-100' : 'opacity-70'}`}>Batches</span>
+                                        {location.pathname.startsWith('/batches') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                                    </div>
+                                </Link>
+
+                                {/* Spacer for Center Button */}
+                                <div></div>
+
+                                <Link to="/tests" className="flex flex-col items-center justify-center group h-full">
+                                    <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/tests') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                        <FileText className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/tests') ? 2.5 : 1.5} />
+                                        <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/tests') ? 'opacity-100' : 'opacity-70'}`}>Tests</span>
+                                        {location.pathname.startsWith('/tests') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                                    </div>
+                                </Link>
+
+                                <Link to="/fees" className="flex flex-col items-center justify-center group h-full">
+                                    <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/fees') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
+                                        <ReceiptIndianRupee className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/fees') ? 2.5 : 1.5} />
+                                        <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/fees') ? 'opacity-100' : 'opacity-70'}`}>Fees</span>
+                                        {location.pathname.startsWith('/fees') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                                    </div>
+                                </Link>
                             </div>
-                        </Link>
 
-                        <Link to="/batches" className="flex flex-col items-center justify-center group h-full">
-                            <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/batches') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
-                                <Users className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/batches') ? 2.5 : 1.5} />
-                                <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/batches') ? 'opacity-100' : 'opacity-70'}`}>Batches</span>
-                                {location.pathname.startsWith('/batches') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
+                            {/* Floating Center Action Button (Quick Fee) */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[74px] h-[74px] z-20">
+                                <button
+                                    onClick={() => setShowQuickFeeModal(true)}
+                                    className="relative flex w-full h-full bg-app-text rounded-full items-center justify-center text-app-bg shadow-[0_8px_24px_rgba(30,41,59,0.3)] border-[5px] border-app-surface/95 overflow-hidden active:scale-90 transition-all duration-300 group"
+                                >
+                                    <IndianRupee className="w-7 h-7" strokeWidth={2.5} />
+                                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                </button>
                             </div>
-                        </Link>
-
-                        {/* Spacer for Center Button */}
-                        <div></div>
-
-                        <Link to="/tests" className="flex flex-col items-center justify-center group h-full">
-                            <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/tests') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
-                                <FileText className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/tests') ? 2.5 : 1.5} />
-                                <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/tests') ? 'opacity-100' : 'opacity-70'}`}>Tests</span>
-                                {location.pathname.startsWith('/tests') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
-                            </div>
-                        </Link>
-
-                        <Link to="/fees" className="flex flex-col items-center justify-center group h-full">
-                            <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/fees') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
-                                <ReceiptIndianRupee className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/fees') ? 2.5 : 1.5} />
-                                <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/fees') ? 'opacity-100' : 'opacity-70'}`}>Fees</span>
-                                {location.pathname.startsWith('/fees') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
-                            </div>
-                        </Link>
-                    </div>
-
-                    {/* Floating Center Action Button (Quick Fee) */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[74px] h-[74px] z-20">
-                        <button
-                            onClick={() => setShowQuickFeeModal(true)}
-                            className="relative flex w-full h-full bg-app-text rounded-full items-center justify-center text-app-bg shadow-[0_8px_24px_rgba(30,41,59,0.3)] border-[5px] border-app-surface/95 overflow-hidden active:scale-90 transition-all duration-300 group"
-                        >
-                            <IndianRupee className="w-7 h-7" strokeWidth={2.5} />
-                            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        </button>
-                    </div>
+                        </>
+                    )}
                 </nav>
             )}
 

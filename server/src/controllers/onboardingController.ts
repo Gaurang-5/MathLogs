@@ -6,11 +6,13 @@ import { sendSetupLinkWhatsApp } from '../utils/whatsapp';
 import { sendSetupLinkEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
 import { secureLogger } from '../utils/secureLogger';
+import { getRazorpayConfig } from '../utils/env';
 
+const razorpayConfig = getRazorpayConfig();
 
 const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key',
-    key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_secret',
+    key_id: razorpayConfig.keyId,
+    key_secret: razorpayConfig.keySecret,
 });
 
 // Track Lead Progress
@@ -70,8 +72,8 @@ export const createOrder = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'An account with this phone number already exists.' });
         }
 
-        if (billingCycle === 'yearly') {
-            const amountInINR = planId === 'pro' ? 19999 : 9999;
+        if (billingCycle === 'yearly' || planId === 'quiz_only') {
+            const amountInINR = planId === 'quiz_only' ? 500 : (planId === 'pro' ? 19999 : 9999);
             const amountInPaise = amountInINR * 100;
 
             // Create Razorpay Order
@@ -101,7 +103,7 @@ export const createOrder = async (req: Request, res: Response) => {
                 orderId: order.id,
                 amount: order.amount,
                 currency: order.currency,
-                keyId: process.env.RAZORPAY_KEY_ID || 'dummy_key',
+                keyId: razorpayConfig.keyId,
             });
         } else {
             // MONTHLY AUTOPAY
@@ -147,7 +149,7 @@ export const createOrder = async (req: Request, res: Response) => {
                 return res.json({
                     success: true,
                     subscriptionId: subscription.id,
-                    keyId: process.env.RAZORPAY_KEY_ID || 'dummy_key',
+                    keyId: razorpayConfig.keyId,
                 });
 
             } catch (error) {
@@ -179,10 +181,10 @@ export const verifyPayment = async (req: Request, res: Response) => {
         } = req.body;
 
         // 1. Verify Signature
-        const secret = process.env.RAZORPAY_KEY_SECRET || 'dummy_secret';
+        const secret = razorpayConfig.keySecret;
 
         let bodyText = '';
-        if (billingCycle === 'yearly') {
+        if (billingCycle === 'yearly' || planId === 'quiz_only') {
             bodyText = razorpay_order_id + '|' + razorpay_payment_id;
         } else {
             bodyText = razorpay_payment_id + '|' + razorpay_subscription_id;
@@ -198,7 +200,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
 
         // 2. Provision the Database Records
         // Map plan id to Tier enum
-        const tier = planId === 'pro' ? 'PRO' : 'FREE';
+        const tier = planId === 'pro' ? 'PRO' : (planId === 'quiz_only' ? 'NO_PLAN' : 'FREE');
 
         // A. Create Institute
         const newInstitute = await prisma.institute.create({
@@ -208,6 +210,8 @@ export const verifyPayment = async (req: Request, res: Response) => {
                 phoneNumber: phone,
                 email: email,
                 plan: tier,
+                isQuizOnly: planId === 'quiz_only',
+                quizCredits: planId === 'quiz_only' ? 10 : 0,
                 config: {
                     requiresGrades: true,
                     maxClasses: 12,

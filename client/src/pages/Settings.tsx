@@ -704,14 +704,19 @@ function RegistrationFormBuilder() {
 }
 
 export default function Settings() {
+    const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+
     return (
         <Layout title="Settings">
             <div className="max-w-4xl mx-auto">
                 <ProfileSection />
                 
-                <CoachingConfigSection />
-
-                <RegistrationFormBuilder />
+                {!isQuizOnly && (
+                    <>
+                        <CoachingConfigSection />
+                        <RegistrationFormBuilder />
+                    </>
+                )}
 
                 {/* Security Section */}
                 <div className="max-w-2xl mb-12 mt-12">

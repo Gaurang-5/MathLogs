@@ -161,6 +161,7 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
                         }
                     }
                 },
+                feeAssignments: { select: { installmentId: true } },
                 feePayments: true,
                 fees: { where: { status: 'PAID' } },
                 upiPaymentVerifications: {
@@ -175,21 +176,13 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
         }
 
         const studentData = students.map(student => {
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const paidInstallmentIds = new Set(student.feePayments.map(p => p.installmentId));
-            
+            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+
             return {
                 studentId: student.id,
                 studentName: student.name,
                 batchName: student.batch?.name || 'N/A',
-                feeInstallments: (student.batch?.feeInstallments || []).filter(inst => {
-                    if (inst.studentId) {
-                        return inst.studentId === student.id;
-                    }
-                    const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
-                    const hasPayment = paidInstallmentIds.has(inst.id);
-                    return isAfterJoin || hasPayment;
-                }),
+                feeInstallments: (student.batch?.feeInstallments || []).filter(inst => assignedIds.has(inst.id)),
                 feePayments: student.feePayments || [],
                 feeRecords: student.fees || [],
                 pendingVerifications: student.upiPaymentVerifications || []
@@ -259,6 +252,7 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
                         feeInstallments: true
                     }
                 },
+                feeAssignments: { select: { installmentId: true } },
                 feePayments: true,
                 fees: { where: { status: 'PAID' } }
             }
@@ -294,16 +288,8 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
                 return res.status(400).json({ error: `Amount exceeds pending installment balance (₹${pendingForInstallment.toLocaleString()}).` });
             }
         } else {
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
-            const installments = (student.batch?.feeInstallments || []).filter(inst => {
-                if (inst.studentId) {
-                    return inst.studentId === studentId;
-                }
-                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
-                const hasPayment = paidInstallmentIds.has(inst.id);
-                return isAfterJoin || hasPayment;
-            });
+            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+            const installments = (student.batch?.feeInstallments || []).filter(inst => assignedIds.has(inst.id));
             const totalFee = installments.reduce((sum, inst) => sum + Number(inst.amount || 0), 0);
 
             const validInstallmentIds = new Set(installments.map(inst => inst.id));
@@ -333,32 +319,24 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'A pending verification already exists. Please wait for approval before submitting again.' });
         }
 
-        // Optimistically create the DB record so we can pass its ID to the fallback mechanism
-        const upiRecord = await prisma.upiPaymentVerification.create({
-            data: {
-                studentId,
-                instituteId: institute.id,
-                installmentId: installmentId || null,
-                amount: numericAmount,
-                storageKey: 'pending_key', // This is temporary, will be updated instantly
-                paidByName: typeof paidByName === 'string' ? paidByName.trim() || null : null,
-                status: 'PENDING'
-            }
-        });
-
-        // Fire-and-forget the upload - it returns the expected S3 key instantly so we don't make the user wait
+        // Store the screenshot before exposing the verification record for review.
         const key = await storePaymentScreenshotAsync({
             instituteId: institute.id,
             studentId,
             buffer: file.buffer,
             contentType: file.mimetype,
-            recordId: upiRecord.id
         });
 
-        // Commit the final optimistic key
-        await prisma.upiPaymentVerification.update({
-            where: { id: upiRecord.id },
-            data: { storageKey: key }
+        await prisma.upiPaymentVerification.create({
+            data: {
+                studentId,
+                instituteId: institute.id,
+                installmentId: installmentId || null,
+                amount: numericAmount,
+                storageKey: key,
+                paidByName: typeof paidByName === 'string' ? paidByName.trim() || null : null,
+                status: 'PENDING'
+            }
         });
 
         res.json({ success: true, message: 'Payment submitted for review.' });

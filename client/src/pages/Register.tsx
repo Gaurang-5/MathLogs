@@ -525,6 +525,42 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                             </div>
                         ))}
 
+                        {/* Consents / Legal (Indian Laws) */}
+                        <div className="space-y-3 pt-2">
+                            <label className="flex items-start gap-3 cursor-pointer group">
+                                <input 
+                                    type="checkbox" 
+                                    required 
+                                    className="mt-0.5 w-4 h-4 text-accent border-neutral-300 rounded focus:ring-accent accent-accent transition-all cursor-pointer"
+                                />
+                                <span className="text-[13px] text-app-text-secondary leading-snug group-hover:text-app-text transition-colors">
+                                    I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline font-medium">Terms & Conditions</a> and <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline font-medium">Privacy Policy</a>.
+                                </span>
+                            </label>
+                            
+                            <label className="flex items-start gap-3 cursor-pointer group">
+                                <input 
+                                    type="checkbox" 
+                                    required 
+                                    className="mt-0.5 w-4 h-4 text-accent border-neutral-300 rounded focus:ring-accent accent-accent transition-all cursor-pointer"
+                                />
+                                <span className="text-[13px] text-app-text-secondary leading-snug group-hover:text-app-text transition-colors">
+                                    I consent to the collection and processing of my personal data for registration and administrative purposes as per the <span className="font-medium">Digital Personal Data Protection (DPDP) Act, 2023</span>.
+                                </span>
+                            </label>
+
+                            <label className="flex items-start gap-3 cursor-pointer group">
+                                <input 
+                                    type="checkbox" 
+                                    required 
+                                    className="mt-0.5 w-4 h-4 text-accent border-neutral-300 rounded focus:ring-accent accent-accent transition-all cursor-pointer"
+                                />
+                                <span className="text-[13px] text-app-text-secondary leading-snug group-hover:text-app-text transition-colors">
+                                    I agree to receive transactional updates and communications via WhatsApp and Email.
+                                </span>
+                            </label>
+                        </div>
+
                         {/* Warning */}
                         <div className="pt-2">
                             <p className="text-xs text-app-text-tertiary text-center flex items-center justify-center gap-1.5">

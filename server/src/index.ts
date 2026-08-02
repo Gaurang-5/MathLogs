@@ -8,7 +8,7 @@ import { prisma } from './prisma';
 import { configureSecurityHeaders, apiLimiter } from './middleware/security';
 import { authenticateToken } from './middleware/auth';
 import { initializeSentry } from './monitoring/sentry';
-import * as Sentry from '@sentry/node';
+import Sentry from './monitoring/sentry';
 import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
 import { emailWorker } from './utils/emailWorker';
 import { Client } from 'pg';
