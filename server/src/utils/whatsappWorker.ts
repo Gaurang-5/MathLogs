@@ -99,14 +99,14 @@ const processJob = async (job: any) => {
         }
 
         // Meta Graph API mapping for named variables across different templates.
-        const TEMPLATE_VAR_MAP: Record<string, { body: string[], buttonIndex?: number }> = {
+        const TEMPLATE_VAR_MAP: Record<string, { body: string[], buttonIndex?: number, otpButton?: boolean }> = {
             'welcome_approval_1': { body: ['var_1', 'var_2', 'var_3', 'var_4'] },
             'payment_receipt_1': { body: ['student_name', 'amount_paid', 'installment_name', 'institute_name'] },
             'test_marks_update': { body: ['student_name', 'institute_name', 'test_name', 'total_marks', 'marks_obtained'] },
             'onboarding_invite': { body: ['owner_name', 'tuition_name', 'setup_link'], buttonIndex: 2 },
             'onboarding_setup_link': { body: ['owner_name', 'tuition_name', 'setup_link'], buttonIndex: 2 },
             'fee_breakup_alert_1': { body: ['student_name', 'batch_name', 'fee_breakup', 'total_amount', 'upi_payment_link', 'institute_name'] },
-            'mathlogs_login_otp': { body: ['otp'] },
+            'mathlogs_login_otp': { body: ['otp'], buttonIndex: 0 },
             'student_registration_link': { body: ['var_1', 'var_2', 'var_3'], buttonIndex: 2 }
         };
 
@@ -125,7 +125,20 @@ const processJob = async (job: any) => {
                 }))
             });
 
-            // 2. Build the CTA Button Component (if configured)
+            // 2. Build Copy Code OTP Button (for OTP templates with a "Copy Code" button)
+            if (mapConfig.otpButton) {
+                const otpCode = bodyValues[0]?.toString() || '';
+                components.push({
+                    type: 'button',
+                    sub_type: 'copy_code',
+                    index: '0',
+                    parameters: [
+                        { type: 'coupon_code', coupon_code: otpCode }
+                    ]
+                });
+            }
+
+            // 3. Build the URL CTA Button Component (if configured)
             if (mapConfig.buttonIndex !== undefined && mapConfig.buttonIndex < bodyValues.length) {
                 let buttonVal = bodyValues[mapConfig.buttonIndex]?.toString() || '';
                 

@@ -264,6 +264,9 @@ export const registerStudent = async (req: Request, res: Response) => {
 
         // Auto-send welcome invite if enabled
         await autoSendWelcomeInvite(student!, batch);
+        if (student && batch) {
+            await autoAssignGlobalInstallments(student.id, batch.id, student.createdAt);
+        }
 
         res.json(student);
     } catch (e: any) {
@@ -365,11 +368,37 @@ export const addStudentManually = async (req: Request, res: Response) => {
 
         // Auto-send invite if enabled
         await autoSendWelcomeInvite(student!, batch);
+        if (student && batch) {
+            await autoAssignGlobalInstallments(student.id, batch.id, student.createdAt);
+        }
 
         res.json(student);
     } catch (e) {
         console.error("Manual add error", e);
         res.status(500).json({ error: 'Failed to add student' });
+    }
+};
+
+const autoAssignGlobalInstallments = async (studentId: string, batchId: string, studentCreatedAt: Date) => {
+    try {
+        const globalInstallments = await prisma.feeInstallment.findMany({
+            where: {
+                batchId,
+                studentId: null,
+                createdAt: { lte: studentCreatedAt }
+            }
+        });
+        if (globalInstallments.length > 0) {
+            await prisma.feeInstallmentAssignment.createMany({
+                data: globalInstallments.map(inst => ({
+                    studentId,
+                    installmentId: inst.id
+                })),
+                skipDuplicates: true
+            });
+        }
+    } catch (err) {
+        secureLogger.error('[FeeAssignment] Auto-assign global installments failed:', err);
     }
 };
 
@@ -382,18 +411,34 @@ export const updateStudent = async (req: Request, res: Response) => {
         const student = await prisma.student.findUnique({ where: { id: String(id) }, include: { batch: true } });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
-        if (student.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+        if (student.instituteId && user.instituteId && student.instituteId !== user.instituteId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        const cleanWhatsapp = parentWhatsapp ? parentWhatsapp.replace(/[^0-9+]/g, '') : undefined;
+        const cleanEmail = parentEmail && String(parentEmail).trim() !== '' ? String(parentEmail).trim() : null;
+        const cleanSchool = schoolName && String(schoolName).trim() !== '' ? String(schoolName).trim() : null;
+        const cleanHumanId = humanId && String(humanId).trim() !== '' ? String(humanId).trim() : student.humanId;
 
         // Update logic
         const updated = await prisma.student.update({
             where: { id: String(id) },
-            data: { name, parentName, parentWhatsapp, parentEmail, schoolName, humanId }
+            data: {
+                ...(name ? { name } : {}),
+                ...(parentName ? { parentName } : {}),
+                ...(cleanWhatsapp ? { parentWhatsapp: cleanWhatsapp } : {}),
+                parentEmail: cleanEmail,
+                schoolName: cleanSchool,
+                ...(cleanHumanId ? { humanId: cleanHumanId } : {})
+            }
         });
         res.json(updated);
-    } catch (e) {
-        res.status(500).json({ error: 'Update failed' });
+    } catch (e: any) {
+        secureLogger.error('Update student failed', e);
+        res.status(500).json({ error: e.message || 'Update failed' });
     }
 };
+
 
 export const getPendingStudents = async (req: Request, res: Response) => {
     try {
@@ -472,6 +517,9 @@ export const approveStudent = async (req: Request, res: Response) => {
 
         // Auto-send welcome invite if enabled
         await autoSendWelcomeInvite(student!, studentToApprove.batch);
+        if (student && studentToApprove.batch) {
+            await autoAssignGlobalInstallments(student.id, studentToApprove.batch.id, student.createdAt);
+        }
 
         res.json(student);
     } catch (e: any) {

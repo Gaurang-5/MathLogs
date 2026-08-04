@@ -201,11 +201,15 @@ function startServer() {
         // Initialize background workers
         emailWorker.start();
 
-        if (process.env.NODE_ENV === 'production') {
+        if (process.env.NODE_ENV === 'production' || process.env.WHATSAPP_ACCESS_TOKEN) {
             import('./utils/whatsappWorker').then(({ processWhatsappQueue }) => {
                 secureLogger.info('✅ WhatsApp Worker Initialized');
 
-                const pgClient = new Client({ connectionString: process.env.DATABASE_URL });
+                const cleanConnStr = (process.env.DATABASE_URL || '').replace(/([?&])sslmode=[^&]*/, '$1').replace(/\?$/, '');
+                const pgClient = new Client({
+                    connectionString: cleanConnStr,
+                    ssl: { rejectUnauthorized: false }
+                });
                 let isProcessing = false;
 
                 const triggerProcess = async () => {
@@ -250,7 +254,7 @@ function startServer() {
                 });
             });
         } else {
-            secureLogger.info('⏭️  WhatsApp Worker skipped (development mode)');
+            secureLogger.info('⏭️  WhatsApp Worker skipped (no WHATSAPP_ACCESS_TOKEN configured)');
         }
 
         secureLogger.info(`Server running on http://localhost:${PORT}`);

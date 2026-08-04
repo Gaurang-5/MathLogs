@@ -3,14 +3,14 @@ import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../c
 import { authenticateToken } from '../middleware/auth';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { changePasswordSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, registerStudentSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateStudentSchema, updateTestSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, registerStudentSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateStudentSchema, updateTestSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
 import { addStudentManually, approveStudent, archiveStudent, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
 import { getOnlineQuizAnalytics, getLiveQuizStatus, unlockQuizSubmission } from '../controllers/analyticsController';
-import { getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt } from '../controllers/feeController';
+import { assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt } from '../controllers/feeController';
 
 
 
@@ -305,6 +305,7 @@ router.get('/fees/upi-verifications', authenticateToken as any, getUpiVerificati
 router.post('/fees/upi-verifications/:id/approve', authenticateToken as any, paymentLimiter, approveUpiVerification as any);
 router.post('/fees/upi-verifications/:id/reject', authenticateToken as any, paymentLimiter, rejectUpiVerification as any);
 router.get('/fees/custom-invoices', authenticateToken as any, getCustomInvoices as any);
+router.post('/fees/assign', authenticateToken as any, paymentLimiter, validateRequest(assignFeeSchema), assignFeeInstallment as any);
 router.post('/fees/custom-invoices', authenticateToken as any, paymentLimiter, validateRequest(createCustomInvoiceSchema), createCustomInvoice as any);
 router.post('/fees/scan-receipt', authenticateToken as any, ocrLimiter, upload.single('image'), scanReceipt as any);
 

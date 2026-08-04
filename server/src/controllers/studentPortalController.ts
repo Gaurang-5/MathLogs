@@ -1,15 +1,20 @@
+import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import jwt from 'jsonwebtoken';
 import { quizCache, heartbeatManager, brandingCache } from '../utils/redis';
 import { secureLogger } from '../utils/secureLogger';
 import { getJwtSecret } from '../utils/env';
+import { sendOtpWhatsApp } from '../utils/whatsapp';
 
 
 const JWT_SECRET = getJwtSecret();
 const AUTOSAVE_MIN_INTERVAL_MS = 10_000;
 const MAX_CHEATING_WARNINGS = 5;
 const autosaveWriteTimes = new Map<string, number>();
+const OTP_EXPIRY_MS = 5 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
+
 
 
 function isPlainAnswerMap(value: unknown): value is Record<string, string> {
@@ -22,6 +27,34 @@ function isPlainAnswerMap(value: unknown): value is Record<string, string> {
 
 function getRouteParam(value: string | string[] | undefined): string | undefined {
     return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizeMobile(value: string): string {
+    const digits = value.replace(/\D/g, '');
+    if (digits.startsWith('91') && digits.length === 12) {
+        return digits.slice(2);
+    }
+    return digits;
+}
+
+function getMobileVariants(cleanMobile: string): string[] {
+    return [cleanMobile, `+91${cleanMobile}`, `91${cleanMobile}`];
+}
+
+function getStudentOtpIdentifier(instituteId: string, cleanMobile: string): string {
+    return `student:${instituteId}:${cleanMobile}`;
+}
+
+function createStudentToken(studentId: string, instituteId: string): string {
+    return jwt.sign(
+        {
+            studentId,
+            instituteId,
+            role: 'STUDENT'
+        },
+        JWT_SECRET,
+        { expiresIn: '30d' }
+    );
 }
 
 function getStudentIdFromRequest(req: Request, res: Response): string | null {
@@ -121,18 +154,13 @@ export const loginStudent = async (req: Request, res: Response): Promise<void> =
         }
 
         // Normalize mobile number: Keep only digits
-        const cleanMobile = rawMobile.replace(/\D/g, '');
+        const cleanMobile = normalizeMobile(rawMobile);
         if (cleanMobile.length < 10) {
             res.status(400).json({ error: 'Please enter a valid 10-digit mobile number' });
             return;
         }
 
-        // Prepare possible variants for matching (+91, and raw)
-        const variants = [
-            cleanMobile,                           // 9876543210
-            `+91${cleanMobile}`,                   // +919876543210
-            `91${cleanMobile}`                      // 919876543210
-        ];
+        const variants = getMobileVariants(cleanMobile);
 
         // Find student(s) with matching mobile number in this institute
         const students = await prisma.student.findMany({
@@ -153,19 +181,54 @@ export const loginStudent = async (req: Request, res: Response): Promise<void> =
 
         // Generate token for the first student found
         const student = students[0];
+        const otpIdentifier = getStudentOtpIdentifier(institute.id, cleanMobile);
 
-        const token = jwt.sign(
-            {
-                studentId: student.id,
-                instituteId: institute.id,
-                role: 'STUDENT'
+        // Enforce 30-second cooldown on OTP resends
+        const existingOtp = await prisma.otpToken.findUnique({
+            where: { identifier: otpIdentifier }
+        });
+
+        if (existingOtp) {
+            const timeSinceCreated = Date.now() - new Date(existingOtp.createdAt).getTime();
+            if (timeSinceCreated < OTP_RESEND_COOLDOWN_MS) {
+                const remainingSecs = Math.ceil((OTP_RESEND_COOLDOWN_MS - timeSinceCreated) / 1000);
+                res.status(429).json({ error: `Please wait ${remainingSecs} seconds before requesting a new OTP.` });
+                return;
+            }
+        }
+
+        // Generate a fresh 6-digit cryptographic OTP code
+        const otpCode = crypto.randomInt(100000, 1000000).toString();
+
+        await prisma.otpToken.upsert({
+            where: { identifier: otpIdentifier },
+            update: {
+                otp: otpCode,
+                createdAt: new Date(),
+                expiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
+                verified: false
             },
-            JWT_SECRET,
-            { expiresIn: '30d' }
-        );
+            create: {
+                identifier: otpIdentifier,
+                otp: otpCode,
+                createdAt: new Date(),
+                expiresAt: new Date(Date.now() + OTP_EXPIRY_MS)
+            }
+        });
+
+        const whatsappNumber = student.parentWhatsapp || cleanMobile;
+        await sendOtpWhatsApp(whatsappNumber, otpCode);
+
+        if (process.env.NODE_ENV !== 'production') {
+            secureLogger.info(`[STUDENT_OTP] Sent OTP for ${otpIdentifier}: ${otpCode}`);
+        } else {
+            secureLogger.info(`[STUDENT_OTP] Dispatched WhatsApp OTP for student login: ${otpIdentifier}`);
+        }
 
         res.json({
-            token,
+            success: true,
+            requiresOtp: true,
+            message: 'OTP sent on WhatsApp.',
             student: {
                 id: student.id,
                 name: student.name,
@@ -176,6 +239,94 @@ export const loginStudent = async (req: Request, res: Response): Promise<void> =
     } catch (error) {
         console.error('[STUDENT_LOGIN_ERROR]', error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// POST /api/student-portal/verify-login-otp
+// Body: { instituteSlug: string, mobileNumber: string, otp: string }
+export const verifyStudentLoginOtp = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { instituteSlug, mobileNumber: rawMobile, otp } = req.body;
+
+        if (!instituteSlug || !rawMobile || !otp) {
+            res.status(400).json({ error: 'Institute slug, mobile number, and OTP are required' });
+            return;
+        }
+
+        const institute = await prisma.institute.findUnique({
+            where: { slug: instituteSlug.toLowerCase() }
+        });
+
+        if (!institute) {
+            res.status(404).json({ error: 'Institute not found' });
+            return;
+        }
+
+        const cleanMobile = normalizeMobile(rawMobile);
+        if (cleanMobile.length < 10) {
+            res.status(400).json({ error: 'Please enter a valid 10-digit mobile number' });
+            return;
+        }
+
+        const otpIdentifier = getStudentOtpIdentifier(institute.id, cleanMobile);
+        const storedOtp = await prisma.otpToken.findUnique({
+            where: { identifier: otpIdentifier }
+        });
+
+        if (!storedOtp) {
+            res.status(400).json({ error: 'OTP expired or not requested' });
+            return;
+        }
+
+        if (storedOtp.expiresAt < new Date()) {
+            await prisma.otpToken.delete({ where: { identifier: otpIdentifier } }).catch(() => {});
+            res.status(400).json({ error: 'OTP has expired' });
+            return;
+        }
+
+        if (storedOtp.verified) {
+            res.status(400).json({ error: 'OTP has already been used' });
+            return;
+        }
+
+        const isDevBypass = process.env.NODE_ENV !== 'production' && otp === '000000';
+        if (storedOtp.otp !== otp && !isDevBypass) {
+            res.status(400).json({ error: 'Invalid OTP code' });
+            return;
+        }
+
+        const variants = getMobileVariants(cleanMobile);
+        const student = await prisma.student.findFirst({
+            where: {
+                instituteId: institute.id,
+                parentWhatsapp: { in: variants }
+            },
+            include: {
+                batch: { select: { id: true, name: true } }
+            }
+        });
+
+        if (!student) {
+            res.status(404).json({ error: 'This mobile number is not registered. Please contact your teacher.' });
+            return;
+        }
+
+        await prisma.otpToken.delete({ where: { identifier: otpIdentifier } });
+        const token = createStudentToken(student.id, institute.id);
+
+        res.json({
+            success: true,
+            token,
+            student: {
+                id: student.id,
+                name: student.name,
+                batchName: student.batch?.name || 'N/A',
+                instituteName: institute.name
+            }
+        });
+    } catch (error) {
+        console.error('[STUDENT_OTP_VERIFY_ERROR]', error);
+        res.status(500).json({ error: 'Failed to verify OTP' });
     }
 };
 

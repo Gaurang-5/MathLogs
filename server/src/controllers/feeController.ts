@@ -1495,6 +1495,13 @@ export const createCustomInvoice = async (req: Request, res: Response) => {
             }
         });
 
+        await prisma.feeInstallmentAssignment.create({
+            data: {
+                studentId: student.id,
+                installmentId: installment.id
+            }
+        }).catch(err => console.error('Assignment error in custom invoice:', err));
+
         let payment = null;
         if (markAsPaid) {
             payment = await prisma.feePayment.create({
@@ -1586,3 +1593,49 @@ export const scanReceipt = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Receipt Scan Failed", details: error.message });
     }
 };
+
+export const assignFeeInstallment = async (req: Request, res: Response) => {
+    try {
+        const { studentId, installmentId } = req.body;
+        const user = (req as any).user;
+
+        const student = await prisma.student.findUnique({
+            where: { id: String(studentId) },
+            include: { batch: true }
+        });
+
+        if (!student) return res.status(404).json({ error: 'Student not found' });
+        if (student.instituteId && user?.instituteId && student.instituteId !== user.instituteId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        const installment = await prisma.feeInstallment.findUnique({
+            where: { id: String(installmentId) }
+        });
+
+        if (!installment) return res.status(404).json({ error: 'Installment not found' });
+        if (installment.batchId !== student.batchId) {
+            return res.status(400).json({ error: 'Installment does not belong to student batch' });
+        }
+
+        const assignment = await prisma.feeInstallmentAssignment.upsert({
+            where: {
+                studentId_installmentId: {
+                    studentId: String(studentId),
+                    installmentId: String(installmentId)
+                }
+            },
+            update: {},
+            create: {
+                studentId: String(studentId),
+                installmentId: String(installmentId)
+            }
+        });
+
+        return res.json({ success: true, assignment });
+    } catch (error: any) {
+        secureLogger.error('Error assigning fee installment:', error);
+        return res.status(500).json({ error: error.message || 'Failed to assign fee' });
+    }
+};
+

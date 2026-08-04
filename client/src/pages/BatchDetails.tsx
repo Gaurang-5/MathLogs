@@ -397,52 +397,20 @@ export default function BatchDetails() {
 
     const handleSendWhatsappInvite = async () => {
         if (!batch?.whatsappGroupLink) {
-            toast.error('Please add a WhatsApp link in Settings first');
+            toast.error('Please set a WhatsApp group link first.');
             return;
         }
 
-        const recipients = batch.students.filter(s => s.status === 'APPROVED' && s.parentEmail);
-
-        if (recipients.length === 0) {
-            toast.error('No approved students with valid emails found.');
-            return;
+        const toastId = toast.loading('Sending invites to all batch students...');
+        try {
+            const res = await apiRequest<{ success: boolean; emailCount: number; whatsappCount: number; message: string }>(
+                `/batches/${id}/whatsapp-invite`,
+                'POST'
+            );
+            toast.success(res.message || 'Invites sent successfully!', { id: toastId });
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to send invites'), { id: toastId });
         }
-
-        setSendingState({
-            total: recipients.length,
-            current: 0,
-            status: 'Initializing...',
-            isOpen: true,
-            completed: false
-        });
-
-        let successCount = 0;
-
-        for (let i = 0; i < recipients.length; i++) {
-            const student = recipients[i];
-            setSendingState(prev => ({
-                ...prev,
-                current: i,
-                status: `Sending to ${student.name}...`
-            }));
-
-            try {
-                await apiRequest(`/students/${student.id}/whatsapp-invite`, 'POST');
-                successCount++;
-            } catch {
-                console.error(`Failed to send to ${student.name}`);
-            }
-
-            // Small delay for UI smoothness
-            await new Promise(r => setTimeout(r, 200));
-        }
-
-        setSendingState(prev => ({
-            ...prev,
-            current: recipients.length,
-            status: `Done! Sent ${successCount} invites.`,
-            completed: true
-        }));
     };
 
     const handleAddStudent = async (e: React.FormEvent) => {
@@ -495,7 +463,14 @@ export default function BatchDetails() {
         if (!editingStudent) return;
         const toastId = toast.loading('Updating student...');
         try {
-            await apiRequest(`/students/${editingStudent.id}`, 'PUT', editingStudent);
+            await apiRequest(`/students/${editingStudent.id}`, 'PUT', {
+                name: editingStudent.name,
+                parentName: editingStudent.parentName,
+                parentWhatsapp: editingStudent.parentWhatsapp,
+                parentEmail: editingStudent.parentEmail || '',
+                schoolName: editingStudent.schoolName || '',
+                humanId: editingStudent.humanId || undefined
+            });
             toast.success('Student updated', { id: toastId });
             setEditingStudent(null);
             setTimeout(() => fetchDetails(), 300);
@@ -2089,14 +2064,14 @@ export default function BatchDetails() {
                                             autoFocus
                                         />
                                         <p className="text-xs text-app-text-tertiary">
-                                            Paste the invite link from your WhatsApp Group settings.
+                                            Saving updates the link for future student auto-invites. To send this link to current students in the batch, use the "Send Link to All Students" button below.
                                         </p>
                                     </div>
 
                                     <div className="flex items-center justify-between p-4 bg-neutral-50/50 rounded-xl border-[1.5px] border-black/5">
                                         <div className="space-y-0.5">
                                             <label className="text-sm font-bold text-app-text">Auto-Send Invites</label>
-                                            <p className="text-xs text-app-text-tertiary w-11/12">Automatically send WhatsApp & Email invites to new students.</p>
+                                            <p className="text-xs text-app-text-tertiary w-11/12">Automatically send WhatsApp & Email invites when new students join.</p>
                                         </div>
                                         <button
                                             type="button"
@@ -2115,10 +2090,21 @@ export default function BatchDetails() {
                                         </button>
                                     </div>
 
-                                    <div className="flex justify-end pt-4">
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-black/5">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowWhatsAppModal(false);
+                                                handleSendWhatsappInvite();
+                                            }}
+                                            disabled={!batch?.whatsappGroupLink}
+                                            className="w-full sm:w-auto bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center transition-all active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none"
+                                        >
+                                            <Mail className="w-4 h-4 mr-2" /> Send Link to All Students
+                                        </button>
                                         <button
                                             type="submit"
-                                            className="bg-green-600 hover:bg-green-700 text-white border border-green-600 px-8 py-3 rounded-xl font-bold flex items-center shadow-lg shadow-green-600/20 transition-all active:scale-[0.98]"
+                                            className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white border border-green-600 px-6 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center shadow-lg shadow-green-600/20 transition-all active:scale-[0.98]"
                                         >
                                             <Save className="w-4 h-4 mr-2" /> Save Link
                                         </button>
@@ -2953,4 +2939,3 @@ export default function BatchDetails() {
         </Layout >
     );
 }
-

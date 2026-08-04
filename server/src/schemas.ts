@@ -68,12 +68,24 @@ export const updateStudentSchema = z.object({
     body: z.object({
         name: z.string().min(1).max(200).optional(),
         parentName: z.string().min(1).max(200).optional(),
-        parentWhatsapp: z.string().regex(phoneRegex, "Invalid phone number").optional(),
-        parentEmail: z.string().email("Invalid Email").optional().or(z.literal('')),
-        schoolName: z.string().max(300).optional(),
-        humanId: z.string().max(50).optional()
+        parentWhatsapp: z.string().optional().transform(val => val ? val.replace(/[^0-9+]/g, '') : val),
+        parentEmail: z.string().nullish().transform(val => {
+            if (!val || val.trim() === '') return undefined;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(val.trim()) ? val.trim() : undefined;
+        }),
+        schoolName: z.string().max(300).nullish().transform(val => (val && val.trim() !== '') ? val.trim() : undefined),
+        humanId: z.string().max(50).nullish().transform(val => (val && val.trim() !== '') ? val.trim() : undefined)
     })
 });
+
+export const assignFeeSchema = z.object({
+    body: z.object({
+        studentId: z.string().uuid("Invalid Student ID"),
+        installmentId: z.string().uuid("Invalid Installment ID")
+    })
+});
+
 
 export const paymentSchema = z.object({
     body: z.object({

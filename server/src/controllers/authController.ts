@@ -256,13 +256,28 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'No account found with this credential' });
         }
 
-        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        // Enforce 30-second cooldown on OTP resends
+        const existingOtp = await prisma.otpToken.findUnique({
+            where: { identifier: cleanIdentifier }
+        });
+
+        if (existingOtp) {
+            const timeSinceCreated = Date.now() - new Date(existingOtp.createdAt).getTime();
+            if (timeSinceCreated < 30_000) {
+                const remainingSecs = Math.ceil((30_000 - timeSinceCreated) / 1000);
+                return res.status(429).json({ error: `Please wait ${remainingSecs} seconds before requesting a new OTP.` });
+            }
+        }
+
+        // Generate a fresh 6-digit cryptographic OTP code
+        const otpCode = crypto.randomInt(100000, 1000000).toString();
         
         // Store OTP in Postgres (upsert = one active OTP per identifier)
         await prisma.otpToken.upsert({
             where: { identifier: cleanIdentifier },
             update: {
                 otp: otpCode,
+                createdAt: new Date(),
                 expiresAt: new Date(Date.now() + 5 * 60 * 1000),
                 verified: false
             },
