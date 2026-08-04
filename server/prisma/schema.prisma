@@ -40,6 +40,20 @@ model Institute {
   onlineQuizzes           OnlineQuiz[]
   quizCredits             Int                      @default(0)
   isQuizOnly              Boolean                  @default(false)
+  isPubliclyListed        Boolean                  @default(false)
+  isExclusive             Boolean                  @default(false)
+  isVerified              Boolean                  @default(false)
+  publicPhone             String?
+  whatsappPhone           String?
+  city                    String?
+  area                    String?
+  address                 String?
+  tagline                 String?
+  subjectsOffered         Json?
+  classesOffered          Json?
+  logoUrl                 String?
+  reviews                 Review[]
+  leadInquiries           LeadInquiry[]
 }
 
 model InviteToken {
@@ -600,3 +614,39 @@ model ShortUrl {
   longUrl   String   @db.Text
   createdAt DateTime @default(now())
 }
+
+model Review {
+  id           String    @id @default(uuid())
+  instituteId  String
+  reviewerName String
+  reviewerRole String    @default("Student") // Student, Parent
+  rating       Int // 1 to 5
+  comment      String    @db.Text
+  status       String    @default("APPROVED") // APPROVED, PENDING, REJECTED
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  institute    Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+
+  @@index([instituteId])
+  @@index([instituteId, status])
+  @@index([rating])
+}
+
+model LeadInquiry {
+  id          String    @id @default(uuid())
+  instituteId String
+  studentName String
+  phone       String
+  subject     String?
+  classGrade  String?
+  message     String?   @db.Text
+  status      String    @default("NEW") // NEW, CONTACTED, ENROLLED, CLOSED
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  institute   Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+
+  @@index([instituteId])
+  @@index([instituteId, status])
+  @@index([createdAt])
+}
+

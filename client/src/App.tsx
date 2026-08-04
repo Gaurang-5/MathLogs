@@ -30,6 +30,10 @@ const StudentPortalDashboard = lazy(() => import('./pages/StudentPortalDashboard
 const TakeQuiz = lazy(() => import('./pages/student/TakeQuiz'));
 const StudentProfile = lazy(() => import('./pages/StudentProfile'));
 
+const MarketplaceHome = lazy(() => import('./pages/MarketplaceHome'));
+const CoachingProfile = lazy(() => import('./pages/CoachingProfile'));
+const TeacherRegistration = lazy(() => import('./pages/TeacherRegistration'));
+
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
 const AboutUs = lazy(() => import('./pages/AboutUs'));
@@ -105,6 +109,11 @@ function App() {
             <Route path="/kiosk/register/:batchId" element={<Register mode="kiosk" />} />
             <Route path="/check-status/:batchId" element={<CheckStatus />} />
             <Route path="/pay/:slug" element={<StudentPaymentPortal />} />
+
+            {/* Marketplace Routes */}
+            <Route path="/coaching" element={<MarketplaceHome />} />
+            <Route path="/coaching/:slug" element={<CoachingProfile />} />
+            <Route path="/list-coaching" element={<TeacherRegistration />} />
 
             <Route path="/:instituteSlug/student" element={<StudentPortalLogin />} />
             <Route path="/:instituteSlug/student/dashboard" element={<StudentPortalDashboard />} />

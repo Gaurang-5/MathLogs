@@ -143,6 +143,7 @@ export function createApp() {
     app.use(express.static(path.join(__dirname, '../../client/dist')));
     app.use('/api', apiRoutes);
     app.use('/api/student-portal', require('./routes/studentPortalRoutes').default);
+    app.use('/api/marketplace', require('./routes/marketplaceRoutes').default);
 
     // Sentry error handler MUST be registered after all routes and BEFORE other error handlers
     if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
