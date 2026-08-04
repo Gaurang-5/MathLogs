@@ -24,6 +24,7 @@ export default function TeacherRegistration() {
   const [city, setCity] = useState('');
   const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
+  const [googleMapsUrl, setGoogleMapsUrl] = useState('');
   const [tagline, setTagline] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -77,6 +78,7 @@ export default function TeacherRegistration() {
           city,
           area,
           address,
+          googleMapsUrl,
           tagline,
           subjectsOffered: selectedSubjects,
           classesOffered: selectedClasses
@@ -273,6 +275,17 @@ export default function TeacherRegistration() {
                   placeholder="Street address for Google Maps navigation"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Google Business / Maps Review Link (Optional)</label>
+                <input
+                  type="url"
+                  placeholder="https://maps.google.com/?cid=..."
+                  value={googleMapsUrl}
+                  onChange={(e) => setGoogleMapsUrl(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>

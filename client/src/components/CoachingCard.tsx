@@ -15,6 +15,9 @@ export interface CoachingItem {
   tagline?: string;
   aboutUs?: string;
   logoUrl?: string | null;
+  googleMapsUrl?: string | null;
+  googleRating?: number | null;
+  googleReviewCount?: number;
   subjectsOffered: string[];
   classesOffered: string[];
   isExclusive: boolean;
@@ -92,10 +95,20 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
           </div>
 
           <div className="flex items-center gap-1 font-semibold text-gray-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-            <span>{coaching.avgRating > 0 ? coaching.avgRating : 'New'}</span>
+            {coaching.googleRating ? (
+              <span className="flex items-center gap-1">
+                <span className="font-extrabold text-blue-600 text-[10px]">G</span>
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                <span>{coaching.googleRating}</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                <span>{coaching.avgRating > 0 ? coaching.avgRating : 'New'}</span>
+              </span>
+            )}
             {coaching.reviewCount > 0 && (
-              <span className="text-gray-400 font-normal">({coaching.reviewCount})</span>
+              <span className="text-gray-400 font-normal text-[11px]">({coaching.reviewCount})</span>
             )}
           </div>
         </div>

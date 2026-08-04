@@ -52,6 +52,10 @@ model Institute {
   subjectsOffered         Json?
   classesOffered          Json?
   logoUrl                 String?
+  googlePlaceId           String?
+  googleMapsUrl           String?
+  googleRating            Float?
+  googleReviewCount       Int?
   reviews                 Review[]
   leadInquiries           LeadInquiry[]
 }
@@ -623,6 +627,8 @@ model Review {
   rating       Int // 1 to 5
   comment      String    @db.Text
   status       String    @default("APPROVED") // APPROVED, PENDING, REJECTED
+  source       String    @default("MATHLOGS") // MATHLOGS, GOOGLE
+  googleAuthorUrl String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   institute    Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)

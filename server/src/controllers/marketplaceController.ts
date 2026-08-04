@@ -87,6 +87,10 @@ export async function searchMarketplace(req: Request, res: Response) {
         tagline: true,
         aboutUs: true,
         logoUrl: true,
+        googlePlaceId: true,
+        googleMapsUrl: true,
+        googleRating: true,
+        googleReviewCount: true,
         subjectsOffered: true,
         classesOffered: true,
         plan: true,
@@ -114,9 +118,13 @@ export async function searchMarketplace(req: Request, res: Response) {
     const mapped = filtered.map(inst => {
       const isSubscribedExclusive = inst.isExclusive || inst.plan !== 'FREE';
       const reviewCount = inst.reviews.length;
-      const avgRating = reviewCount > 0
+      const mathlogsAvgRating = reviewCount > 0
         ? Number((inst.reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount).toFixed(1))
         : 0;
+
+      // Combine Google rating if available
+      const displayRating = inst.googleRating || mathlogsAvgRating;
+      const totalReviewsCount = (inst.googleReviewCount || 0) + reviewCount;
 
       // Extract phone numbers prioritizing explicit public phone
       const phone = inst.publicPhone || inst.phoneNumber || null;
@@ -135,12 +143,15 @@ export async function searchMarketplace(req: Request, res: Response) {
         tagline: inst.tagline || '',
         aboutUs: inst.aboutUs || '',
         logoUrl: inst.logoUrl || null,
+        googleMapsUrl: inst.googleMapsUrl || null,
+        googleRating: inst.googleRating || null,
+        googleReviewCount: inst.googleReviewCount || 0,
         subjectsOffered: (inst.subjectsOffered as string[]) || [],
         classesOffered: (inst.classesOffered as string[]) || [],
         isExclusive: isSubscribedExclusive,
         isVerified: inst.isVerified || isSubscribedExclusive,
-        avgRating,
-        reviewCount
+        avgRating: displayRating,
+        reviewCount: totalReviewsCount
       };
     });
 
@@ -223,6 +234,10 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
         tagline: true,
         aboutUs: true,
         logoUrl: true,
+        googlePlaceId: true,
+        googleMapsUrl: true,
+        googleRating: true,
+        googleReviewCount: true,
         subjectsOffered: true,
         classesOffered: true,
         plan: true,
@@ -249,6 +264,8 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
             reviewerRole: true,
             rating: true,
             comment: true,
+            source: true,
+            googleAuthorUrl: true,
             createdAt: true
           }
         }
@@ -259,10 +276,13 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
       return res.status(404).json({ success: false, message: 'Coaching profile not found' });
     }
 
-    const reviewCount = institute.reviews.length;
-    const avgRating = reviewCount > 0
-      ? Number((institute.reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount).toFixed(1))
+    const mathlogsReviewCount = institute.reviews.length;
+    const mathlogsAvgRating = mathlogsReviewCount > 0
+      ? Number((institute.reviews.reduce((acc, r) => acc + r.rating, 0) / mathlogsReviewCount).toFixed(1))
       : 0;
+
+    const displayRating = institute.googleRating || mathlogsAvgRating;
+    const totalReviewsCount = (institute.googleReviewCount || 0) + mathlogsReviewCount;
 
     const ratingBreakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     institute.reviews.forEach(r => {
@@ -288,13 +308,17 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
         tagline: institute.tagline || '',
         aboutUs: institute.aboutUs || '',
         logoUrl: institute.logoUrl || null,
+        googlePlaceId: institute.googlePlaceId || null,
+        googleMapsUrl: institute.googleMapsUrl || null,
+        googleRating: institute.googleRating || null,
+        googleReviewCount: institute.googleReviewCount || 0,
         subjectsOffered: (institute.subjectsOffered as string[]) || [],
         classesOffered: (institute.classesOffered as string[]) || [],
         isExclusive: isSubscribedExclusive,
         isVerified: institute.isVerified || isSubscribedExclusive,
         batches: institute.batches,
-        avgRating,
-        reviewCount,
+        avgRating: displayRating,
+        reviewCount: totalReviewsCount,
         ratingBreakdown,
         reviews: institute.reviews
       }
@@ -414,7 +438,8 @@ export async function registerExternalTeacher(req: Request, res: Response) {
       address,
       tagline,
       subjectsOffered,
-      classesOffered
+      classesOffered,
+      googleMapsUrl
     } = req.body;
 
     if (!coachingName || !teacherName || !username || !password || !phoneNumber || !city) {
@@ -458,6 +483,7 @@ export async function registerExternalTeacher(req: Request, res: Response) {
           city: city.trim(),
           area: area ? area.trim() : null,
           address: address ? address.trim() : null,
+          googleMapsUrl: googleMapsUrl ? googleMapsUrl.trim() : null,
           tagline: tagline ? tagline.trim() : null,
           subjectsOffered: Array.isArray(subjectsOffered) ? subjectsOffered : (subjectsOffered ? [subjectsOffered] : []),
           classesOffered: Array.isArray(classesOffered) ? classesOffered : (classesOffered ? [classesOffered] : []),
@@ -581,6 +607,9 @@ export async function updateMarketplaceProfile(req: any, res: Response) {
       tagline,
       aboutUs,
       logoUrl,
+      googleMapsUrl,
+      googleRating,
+      googleReviewCount,
       subjectsOffered,
       classesOffered,
       isPubliclyListed
@@ -598,6 +627,9 @@ export async function updateMarketplaceProfile(req: any, res: Response) {
     if (tagline !== undefined) updateData.tagline = tagline.trim();
     if (aboutUs !== undefined) updateData.aboutUs = aboutUs.trim();
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl.trim();
+    if (googleMapsUrl !== undefined) updateData.googleMapsUrl = googleMapsUrl.trim();
+    if (googleRating !== undefined) updateData.googleRating = parseFloat(googleRating) || null;
+    if (googleReviewCount !== undefined) updateData.googleReviewCount = parseInt(googleReviewCount, 10) || 0;
     if (subjectsOffered !== undefined) updateData.subjectsOffered = subjectsOffered;
     if (classesOffered !== undefined) updateData.classesOffered = classesOffered;
     if (isPubliclyListed !== undefined) updateData.isPubliclyListed = Boolean(isPubliclyListed);
@@ -618,6 +650,9 @@ export async function updateMarketplaceProfile(req: any, res: Response) {
         tagline: true,
         aboutUs: true,
         logoUrl: true,
+        googleMapsUrl: true,
+        googleRating: true,
+        googleReviewCount: true,
         subjectsOffered: true,
         classesOffered: true,
         isPubliclyListed: true,

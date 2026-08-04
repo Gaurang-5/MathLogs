@@ -9,6 +9,8 @@ interface Review {
   reviewerRole: string;
   rating: number;
   comment: string;
+  source?: string;
+  googleAuthorUrl?: string | null;
   createdAt: string;
 }
 
@@ -34,6 +36,10 @@ interface CoachingProfileData {
   tagline?: string;
   aboutUs?: string;
   logoUrl?: string | null;
+  googlePlaceId?: string | null;
+  googleMapsUrl?: string | null;
+  googleRating?: number | null;
+  googleReviewCount?: number;
   subjectsOffered: string[];
   classesOffered: string[];
   isExclusive: boolean;
@@ -422,6 +428,37 @@ export default function CoachingProfile() {
               </button>
             </div>
 
+            {/* Google Business Profile Reviews Badge */}
+            {profile.googleMapsUrl && (
+              <div className="p-4 bg-gradient-to-r from-blue-50 via-white to-blue-50 rounded-2xl border border-blue-200 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-blue-600 text-lg shadow-2xs">
+                    G
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="font-bold text-slate-900 text-sm">Google Business Profile</h4>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">Verified</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      {profile.googleRating ? `${profile.googleRating} ★ Rating` : 'Verified Google Maps Listing'} 
+                      {profile.googleReviewCount ? ` (${profile.googleReviewCount}+ Google Reviews)` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href={profile.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 shrink-0"
+                >
+                  <span>Read Reviews on Google Maps</span>
+                  <span>↗</span>
+                </a>
+              </div>
+            )}
+
             {/* Rating Summary Bar */}
             <div className="p-6 bg-amber-50/50 rounded-2xl border border-amber-200/60 mb-6 flex flex-col sm:flex-row items-center gap-6">
               <div className="text-center sm:text-left">
@@ -460,14 +497,19 @@ export default function CoachingProfile() {
             {profile.reviews && profile.reviews.length > 0 ? (
               <div className="space-y-4">
                 {profile.reviews.map((rev) => (
-                  <div key={rev.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div key={rev.id} className={`p-4 rounded-2xl border ${rev.source === 'GOOGLE' ? 'bg-blue-50/40 border-blue-200/60' : 'bg-slate-50 border-slate-100'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center">
-                          {rev.reviewerName.substring(0, 1).toUpperCase()}
+                        <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center ${rev.source === 'GOOGLE' ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                          {rev.source === 'GOOGLE' ? 'G' : rev.reviewerName.substring(0, 1).toUpperCase()}
                         </div>
                         <div>
-                          <h4 className="font-bold text-slate-900 text-sm">{rev.reviewerName}</h4>
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-bold text-slate-900 text-sm">{rev.reviewerName}</h4>
+                            {rev.source === 'GOOGLE' && (
+                              <span className="text-[9px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full">Google</span>
+                            )}
+                          </div>
                           <span className="text-[10px] font-medium text-slate-400">{rev.reviewerRole}</span>
                         </div>
                       </div>
