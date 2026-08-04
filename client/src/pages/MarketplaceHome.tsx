@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, MapPin, Sparkles, Filter, SlidersHorizontal, GraduationCap, Star, ArrowRight, Loader2, BookOpen } from 'lucide-react';
-import { CoachingCard, CoachingItem } from '../components/CoachingCard';
+import CoachingCard, { type CoachingItem } from '../components/CoachingCard';
 
 const FEATURED_SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Science', 'English', 'Commerce'];
 

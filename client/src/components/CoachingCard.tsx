@@ -158,3 +158,5 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
     </div>
   );
 };
+
+export default CoachingCard;

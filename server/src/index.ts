@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import 'dotenv/config'; // Updated marketplace schema
 import path from 'path';
 import express from 'express';
 import cors from 'cors';

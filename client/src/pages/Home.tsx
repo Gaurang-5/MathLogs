@@ -293,6 +293,10 @@ export default function Home() {
 
                 {/* Desktop links */}
                 <div className="hidden md:flex items-center gap-8 font-medium text-sm text-neutral-600">
+                    <Link to="/coaching" className="text-indigo-600 font-bold hover:text-indigo-800 transition-colors flex items-center gap-1">
+                        <span>Find Coaching</span>
+                        <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-extrabold">NEW</span>
+                    </Link>
                     <a href="#features" className="hover:text-neutral-900 transition-colors">Features</a>
                     <a href="#pricing" className="hover:text-neutral-900 transition-colors">Pricing</a>
                     <a href="#contact" className="hover:text-neutral-900 transition-colors">Contact Us</a>
