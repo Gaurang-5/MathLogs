@@ -12,6 +12,7 @@ interface LoginResponse {
     refreshToken?: string;
     role?: string;
     isQuizOnly?: boolean;
+    isPageOnly?: boolean;
     quizCredits?: number;
     error?: string;
 }
@@ -84,6 +85,7 @@ export default function AdminLogin() {
                 localStorage.setItem('token', data.token ?? '');
                 localStorage.setItem('refreshToken', data.refreshToken ?? '');
                 localStorage.setItem('isQuizOnly', String(data.isQuizOnly || false));
+                localStorage.setItem('isPageOnly', String(data.isPageOnly || false));
                 localStorage.setItem('quizCredits', String(data.quizCredits || 0));
                 
                 await new Promise(r => setTimeout(r, 600));
@@ -92,6 +94,8 @@ export default function AdminLogin() {
 
                 if (data.role === 'SUPER_ADMIN') {
                     navigate('/super-admin');
+                } else if (data.isPageOnly) {
+                    navigate('/marketplace-settings');
                 } else {
                     navigate('/dashboard');
                 }

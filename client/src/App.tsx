@@ -33,6 +33,7 @@ const StudentProfile = lazy(() => import('./pages/StudentProfile'));
 const MarketplaceHome = lazy(() => import('./pages/MarketplaceHome'));
 const CoachingProfile = lazy(() => import('./pages/CoachingProfile'));
 const TeacherRegistration = lazy(() => import('./pages/TeacherRegistration'));
+const MarketplaceSettings = lazy(() => import('./pages/MarketplaceSettings'));
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
@@ -101,6 +102,7 @@ function App() {
             <Route path="/students/:id" element={<PrivateRoute><StudentProfile /></PrivateRoute>} />
             <Route path="/fees" element={<PrivateRoute><Fees /></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+            <Route path="/marketplace-settings" element={<PrivateRoute><MarketplaceSettings /></PrivateRoute>} />
             <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
 
             <Route path="/approvals" element={<PrivateRoute><Approvals /></PrivateRoute>} />

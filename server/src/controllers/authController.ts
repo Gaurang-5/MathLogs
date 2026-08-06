@@ -89,9 +89,20 @@ export const loginAdmin = async (req: Request, res: Response) => {
         const tokens = await generateAuthTokens(admin);
 
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
+        const isPageOnly = admin.institute?.plan === 'FREE' && !isQuizOnly && !admin.institute?.isExclusive;
         const quizCredits = admin.institute?.quizCredits || 0;
 
-        res.json({ success: true, adminId: admin.id, token: tokens.token, refreshToken: tokens.refreshToken, role: admin.role, isQuizOnly, quizCredits, message: "Login successful" });
+        res.json({
+            success: true,
+            adminId: admin.id,
+            token: tokens.token,
+            refreshToken: tokens.refreshToken,
+            role: admin.role,
+            isQuizOnly,
+            isPageOnly,
+            quizCredits,
+            message: "Login successful"
+        });
     } catch (error) {
         res.status(500).json({ error: 'Login failed' });
     }

@@ -72,9 +72,6 @@ export default function MarketplaceHome() {
             <img src="/logo-64.webp" alt="MathLogs Logo" width={36} height={36} className="w-9 h-9 rounded-xl shadow-md border border-neutral-100 object-cover" />
             <div className="flex items-center gap-2">
               <span className="text-[22px] font-extrabold tracking-tight text-neutral-900">MathLogs</span>
-              <span className="text-[11px] font-extrabold text-neutral-700 bg-neutral-100 border border-neutral-200 px-2.5 py-0.5 rounded-full tracking-wide">
-                MARKETPLACE
-              </span>
             </div>
           </Link>
 
@@ -159,11 +156,10 @@ export default function MarketplaceHome() {
                 <button
                   key={subj}
                   onClick={() => handleSubjectClick(subj)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                    active
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${active
                       ? 'bg-neutral-900 text-white border-neutral-900 shadow-sm scale-105'
                       : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-200/80'
-                  }`}
+                    }`}
                 >
                   {subj}
                 </button>

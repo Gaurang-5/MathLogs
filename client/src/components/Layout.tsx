@@ -2,7 +2,7 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, FileText, Sparkles, Scan, ReceiptIndianRupee, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Sparkles, Scan, ReceiptIndianRupee, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard, Store } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
 import ToastProvider from './ToastProvider';
@@ -27,8 +27,6 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
         return false;
     });
     const [showQuickFeeModal, setShowQuickFeeModal] = useState(false);
-
-
 
     const [pullY, setPullY] = useState(0);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -64,7 +62,7 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
         startYRef.current = 0;
     };
 
-    const showMobileNav = !hideMobileNav && ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing'].includes(location.pathname);
+    const showMobileNav = !hideMobileNav && ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing', '/marketplace-settings'].includes(location.pathname);
 
     const handleLogout = () => {
         localStorage.clear();
@@ -72,17 +70,37 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
     };
 
     const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+    const isPageOnly = localStorage.getItem('isPageOnly') === 'true';
 
-    const navItems = [
-        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        ...(isQuizOnly ? [] : [{ name: 'Batches', path: '/batches', icon: Users }]),
-        ...(isQuizOnly ? [] : [{ name: 'Tests', path: '/tests', icon: FileText }]),
-        { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
-        ...(isQuizOnly ? [] : [{ name: 'Scan Marks', path: '/scan', icon: Scan }]),
-        ...(isQuizOnly ? [] : [{ name: 'Fees', path: '/fees', icon: ReceiptIndianRupee }]),
-        { name: isQuizOnly ? 'Buy Credits' : 'Billing', path: '/billing', icon: CreditCard },
-        { name: 'Settings', path: '/settings', icon: Settings },
-    ];
+    let navItems: { name: string; path: string; icon: any }[] = [];
+
+    if (isPageOnly) {
+        navItems = [
+            { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
+            { name: 'Upgrade ERP Plan', path: '/billing', icon: CreditCard },
+            { name: 'Settings', path: '/settings', icon: Settings },
+        ];
+    } else if (isQuizOnly) {
+        navItems = [
+            { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+            { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
+            { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
+            { name: 'Buy Credits', path: '/billing', icon: CreditCard },
+            { name: 'Settings', path: '/settings', icon: Settings },
+        ];
+    } else {
+        navItems = [
+            { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+            { name: 'Batches', path: '/batches', icon: Users },
+            { name: 'Tests', path: '/tests', icon: FileText },
+            { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
+            { name: 'Scan Marks', path: '/scan', icon: Scan },
+            { name: 'Fees', path: '/fees', icon: ReceiptIndianRupee },
+            { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
+            { name: 'Billing', path: '/billing', icon: CreditCard },
+            { name: 'Settings', path: '/settings', icon: Settings },
+        ];
+    }
 
     return (
         <div className="flex min-h-screen bg-app-bg text-app-text transition-colors duration-500 font-sans selection:bg-accent-subtle selection:text-accent">

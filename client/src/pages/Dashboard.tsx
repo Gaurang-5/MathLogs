@@ -43,6 +43,13 @@ const formatIndianRupee = (value: number) => new Intl.NumberFormat('en-IN').form
 export default function Dashboard() {
     const navigate = useNavigate();
     const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+    const isPageOnly = localStorage.getItem('isPageOnly') === 'true';
+
+    useEffect(() => {
+        if (isPageOnly) {
+            navigate('/marketplace-settings', { replace: true });
+        }
+    }, [isPageOnly, navigate]);
 
     // Privacy toggle for fee data — persisted across sessions
     const [mounted, setMounted] = useState(false);
