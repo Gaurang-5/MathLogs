@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GraduationCap, User, Phone, MapPin, BookOpen, Lock, Loader2, CheckCircle2, Sparkles, ArrowRight, ArrowLeft, Building2 } from 'lucide-react';
+import { GraduationCap, User, Phone, MapPin, Lock, Loader2, CheckCircle2, Sparkles, ArrowRight, ArrowLeft, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const SUBJECT_OPTIONS = [
@@ -107,33 +107,34 @@ export default function TeacherRegistration() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Navbar */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link to="/coaching" className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-indigo-600">
+    <div className="min-h-screen bg-neutral-50 flex flex-col font-sans text-neutral-900 selection:bg-neutral-900 selection:text-white">
+      {/* Header Bar */}
+      <header className="bg-white/90 backdrop-blur-xl border-b border-neutral-200/80 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
+          <Link to="/coaching" className="inline-flex items-center gap-2 text-sm font-bold text-neutral-700 hover:text-neutral-900 transition-colors">
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Marketplace</span>
           </Link>
 
-          <Link to="/" className="font-extrabold text-lg text-slate-900">
-            MathLogs
+          <Link to="/" className="flex items-center gap-2">
+            <img src="/logo-64.webp" alt="MathLogs Logo" width={32} height={32} className="w-8 h-8 rounded-lg shadow-sm border border-neutral-100" />
+            <span className="font-extrabold text-lg text-neutral-900 tracking-tight">MathLogs</span>
           </Link>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center py-8 px-4 sm:px-6">
+      <main className="flex-1 flex flex-col items-center py-12 px-6">
         {/* Header Banner */}
         <div className="text-center max-w-xl mb-8">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold mb-4">
-            <GraduationCap className="w-4 h-4" />
-            <span>Free Teacher Registration</span>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-neutral-200 text-neutral-700 text-xs font-bold mb-4 shadow-2xs">
+            <GraduationCap className="w-4 h-4 text-neutral-900" />
+            <span>Free Teacher Self-Registration</span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1A1F36] tracking-tight">
             List Your Coaching on MathLogs Marketplace
           </h1>
-          <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
+          <p className="mt-2 text-sm text-neutral-500 font-medium max-w-md mx-auto">
             Get discovered by students in your city. Receive direct leads, reviews, and WhatsApp inquiries — completely free.
           </p>
         </div>
@@ -144,77 +145,77 @@ export default function TeacherRegistration() {
             <div key={s} className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                 step > s ? 'bg-emerald-500 text-white' :
-                step === s ? 'bg-indigo-600 text-white scale-110 shadow-md' :
-                'bg-slate-200 text-slate-500'
+                step === s ? 'bg-neutral-900 text-white scale-110 shadow-md' :
+                'bg-neutral-200 text-neutral-500'
               }`}>
                 {step > s ? <CheckCircle2 className="w-4 h-4" /> : s}
               </div>
-              {s < 3 && <div className={`w-12 h-0.5 rounded-full ${step > s ? 'bg-emerald-400' : 'bg-slate-200'}`} />}
+              {s < 3 && <div className={`w-12 h-0.5 rounded-full ${step > s ? 'bg-emerald-400' : 'bg-neutral-200'}`} />}
             </div>
           ))}
         </div>
 
         {/* Form Card */}
-        <form onSubmit={handleSubmit} className="w-full max-w-lg bg-white rounded-3xl border border-slate-200 shadow-lg p-6 sm:p-8">
+        <form onSubmit={handleSubmit} className="w-full max-w-lg bg-white rounded-3xl border border-neutral-200/80 shadow-lg p-6 sm:p-8">
 
           {/* Step 1: Basic Info */}
           {step === 1 && (
             <div className="space-y-5">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-indigo-600" />
-                Coaching Details
+              <h2 className="text-xl font-extrabold text-[#1A1F36] flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-neutral-900" />
+                <span>Coaching Details</span>
               </h2>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Coaching / Institute Name *</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">Coaching / Institute Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Sharma Maths Academy"
                   value={coachingName}
                   onChange={(e) => setCoachingName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Teacher / Faculty Name *</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">Teacher / Faculty Name *</label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <User className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     required
                     placeholder="e.g. Prof. Rajesh Sharma"
                     value={teacherName}
                     onChange={(e) => setTeacherName(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Phone / WhatsApp Number *</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">Phone / WhatsApp Number *</label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Phone className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="tel"
                     required
                     placeholder="10-digit mobile number"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Tagline (Optional)</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">Tagline (Optional)</label>
                 <input
                   type="text"
                   placeholder="e.g. 15+ years of excellence in Board exam preparation"
                   value={tagline}
                   onChange={(e) => setTagline(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                 />
               </div>
 
@@ -227,7 +228,7 @@ export default function TeacherRegistration() {
                   }
                   setStep(2);
                 }}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-all hover:shadow-md active:scale-95 flex items-center justify-center gap-2"
               >
                 <span>Next: Location & Subjects</span>
                 <ArrowRight className="w-4 h-4" />
@@ -238,61 +239,61 @@ export default function TeacherRegistration() {
           {/* Step 2: Location & Subjects */}
           {step === 2 && (
             <div className="space-y-5">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-indigo-600" />
-                Location & Subjects
+              <h2 className="text-xl font-extrabold text-[#1A1F36] flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-neutral-900" />
+                <span>Location & Subjects</span>
               </h2>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">City *</label>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1.5">City *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Jaipur"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Area / Locality</label>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1.5">Area / Locality</label>
                   <input
                     type="text"
                     placeholder="e.g. Malviya Nagar"
                     value={area}
                     onChange={(e) => setArea(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Full Address (Optional)</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">Full Address (Optional)</label>
                 <input
                   type="text"
                   placeholder="Street address for Google Maps navigation"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Google Business / Maps Review Link (Optional)</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">Google Business / Maps Review Link (Optional)</label>
                 <input
                   type="url"
                   placeholder="https://maps.google.com/?cid=..."
                   value={googleMapsUrl}
                   onChange={(e) => setGoogleMapsUrl(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                 />
               </div>
 
               {/* Subjects Selection */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2">Subjects You Teach *</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-2">Subjects You Teach *</label>
                 <div className="flex flex-wrap gap-2">
                   {SUBJECT_OPTIONS.map((sub) => {
                     const active = selectedSubjects.includes(sub);
@@ -301,10 +302,10 @@ export default function TeacherRegistration() {
                         key={sub}
                         type="button"
                         onClick={() => toggleSubject(sub)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all border ${
                           active
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'
+                            ? 'bg-neutral-900 text-white border-neutral-900 shadow-2xs'
+                            : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-100'
                         }`}
                       >
                         {active && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
@@ -314,13 +315,13 @@ export default function TeacherRegistration() {
                   })}
                 </div>
                 {selectedSubjects.length === 0 && (
-                  <p className="text-[10px] text-red-500 mt-1 font-medium">Select at least one subject</p>
+                  <p className="text-[10px] text-red-500 mt-1 font-semibold">Select at least one subject</p>
                 )}
               </div>
 
               {/* Classes Selection */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2">Classes / Grades You Teach</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-2">Classes / Grades You Teach</label>
                 <div className="flex flex-wrap gap-2">
                   {CLASS_OPTIONS.map((cls) => {
                     const active = selectedClasses.includes(cls);
@@ -329,10 +330,10 @@ export default function TeacherRegistration() {
                         key={cls}
                         type="button"
                         onClick={() => toggleClass(cls)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all border ${
                           active
-                            ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50'
+                            ? 'bg-purple-900 text-white border-purple-900 shadow-2xs'
+                            : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-100'
                         }`}
                       >
                         {active && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
@@ -347,7 +348,7 @@ export default function TeacherRegistration() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm rounded-xl transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs rounded-full transition-colors flex items-center justify-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Back</span>
@@ -366,7 +367,7 @@ export default function TeacherRegistration() {
                     }
                     setStep(3);
                   }}
-                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-all hover:shadow-md active:scale-95 flex items-center justify-center gap-2"
                 >
                   <span>Next: Account Setup</span>
                   <ArrowRight className="w-4 h-4" />
@@ -378,51 +379,51 @@ export default function TeacherRegistration() {
           {/* Step 3: Account Credentials */}
           {step === 3 && (
             <div className="space-y-5">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Lock className="w-5 h-5 text-indigo-600" />
-                Create Your Login
+              <h2 className="text-xl font-extrabold text-[#1A1F36] flex items-center gap-2">
+                <Lock className="w-5 h-5 text-neutral-900" />
+                <span>Create Your Login</span>
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-neutral-500 font-medium">
                 Use these credentials to manage your listing, view leads, and respond to student inquiries.
               </p>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Username *</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">Username *</label>
                 <input
                   type="text"
                   required
                   placeholder="Choose a unique username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Password *</label>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">Password *</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
                     required
                     placeholder="At least 6 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                   />
                 </div>
               </div>
 
               {/* Summary Preview */}
-              <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 text-xs text-slate-700 space-y-1.5">
-                <h4 className="font-bold text-indigo-800 text-sm mb-2">Listing Summary</h4>
-                <p><span className="font-semibold text-slate-500">Coaching:</span> {coachingName}</p>
-                <p><span className="font-semibold text-slate-500">Teacher:</span> {teacherName}</p>
-                <p><span className="font-semibold text-slate-500">Phone:</span> {phoneNumber}</p>
-                <p><span className="font-semibold text-slate-500">City:</span> {city}{area ? `, ${area}` : ''}</p>
-                <p><span className="font-semibold text-slate-500">Subjects:</span> {selectedSubjects.join(', ')}</p>
+              <div className="p-5 bg-neutral-50 rounded-2xl border border-neutral-200/80 text-xs text-neutral-700 space-y-1.5 font-medium">
+                <h4 className="font-extrabold text-neutral-900 text-sm mb-2">Listing Summary</h4>
+                <p><span className="font-semibold text-neutral-400">Coaching:</span> {coachingName}</p>
+                <p><span className="font-semibold text-neutral-400">Teacher:</span> {teacherName}</p>
+                <p><span className="font-semibold text-neutral-400">Phone:</span> {phoneNumber}</p>
+                <p><span className="font-semibold text-neutral-400">City:</span> {city}{area ? `, ${area}` : ''}</p>
+                <p><span className="font-semibold text-neutral-400">Subjects:</span> {selectedSubjects.join(', ')}</p>
                 {selectedClasses.length > 0 && (
-                  <p><span className="font-semibold text-slate-500">Classes:</span> {selectedClasses.join(', ')}</p>
+                  <p><span className="font-semibold text-neutral-400">Classes:</span> {selectedClasses.join(', ')}</p>
                 )}
               </div>
 
@@ -430,7 +431,7 @@ export default function TeacherRegistration() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm rounded-xl transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs rounded-full transition-colors flex items-center justify-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Back</span>
@@ -439,7 +440,7 @@ export default function TeacherRegistration() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md"
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-full transition-all hover:shadow-md active:scale-95 flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -456,15 +457,15 @@ export default function TeacherRegistration() {
         </form>
 
         {/* Upgrade CTA */}
-        <div className="mt-8 max-w-lg w-full bg-gradient-to-r from-indigo-900 to-purple-900 text-white rounded-2xl p-6 text-center">
+        <div className="mt-8 max-w-lg w-full bg-neutral-900 text-white rounded-3xl p-6 text-center shadow-lg">
           <Sparkles className="w-6 h-6 text-amber-400 mx-auto mb-2" />
-          <h3 className="text-base font-bold">Want Exclusive Partner Status?</h3>
-          <p className="text-xs text-indigo-200 mt-1 max-w-sm mx-auto">
+          <h3 className="text-base font-extrabold">Want Exclusive Partner Status?</h3>
+          <p className="text-xs text-neutral-400 font-medium mt-1 max-w-sm mx-auto">
             Upgrade to MathLogs ERP to unlock top search priority, verified badge, attendance management, fee tracking, WhatsApp messaging, and more.
           </p>
           <Link
             to="/onboarding"
-            className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs rounded-xl transition-transform hover:scale-105"
+            className="inline-flex items-center gap-2 mt-4 px-6 py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-900 font-bold text-xs rounded-full transition-transform hover:scale-105"
           >
             <span>Explore MathLogs ERP Plans</span>
             <ArrowRight className="w-3.5 h-3.5" />

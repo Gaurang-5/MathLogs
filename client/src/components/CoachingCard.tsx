@@ -33,68 +33,72 @@ interface CoachingCardProps {
 export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
   const whatsappUrl = coaching.whatsappPhone
     ? `https://wa.me/${coaching.whatsappPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-        `Hi ${coaching.teacherName}, I found your coaching "${coaching.name}" on MathLogs Marketplace and would like to inquire about admissions.`
+        `Hi ${coaching.teacherName}, I saw your listing on MathLogs Marketplace and would like to inquire about coaching classes.`
       )}`
     : null;
 
   return (
-    <div className={`relative flex flex-col bg-white rounded-2xl border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
-      coaching.isExclusive ? 'border-amber-300 ring-2 ring-amber-400/20 shadow-amber-100/50 shadow-md' : 'border-gray-200 shadow-sm'
-    }`}>
-      {/* Top Banner & Badge Header */}
-      <div className="p-5 pb-4">
-        <div className="flex items-start justify-between gap-3">
+    <div className="bg-white rounded-3xl border border-neutral-200/80 p-6 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between relative overflow-hidden">
+      {/* Exclusive Gold Top Accent Line */}
+      {coaching.isExclusive && (
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500" />
+      )}
+
+      <div>
+        {/* Top Header Row */}
+        <div className="flex items-start justify-between gap-3 mb-3.5">
           <div className="flex items-center gap-3">
             {coaching.logoUrl ? (
               <img
                 src={coaching.logoUrl}
                 alt={coaching.name}
-                className="w-14 h-14 rounded-xl object-cover border border-gray-100 shadow-xs"
+                className="w-12 h-12 rounded-2xl object-cover border border-neutral-100 shadow-xs"
               />
             ) : (
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-xs">
+              <div className="w-12 h-12 rounded-2xl bg-neutral-100 border border-neutral-200/80 flex items-center justify-center text-neutral-900 font-extrabold text-lg shadow-2xs">
                 {coaching.name.substring(0, 2).toUpperCase()}
               </div>
             )}
+
             <div>
-              <Link to={`/coaching/${coaching.slug}`} className="group">
-                <h3 className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors line-clamp-1">
+              <Link to={`/coaching/${coaching.slug}`} className="group-hover:text-neutral-700 transition-colors">
+                <h3 className="font-bold text-[#1A1F36] text-base leading-snug line-clamp-1">
                   {coaching.name}
                 </h3>
               </Link>
-              <p className="text-sm font-medium text-gray-600 flex items-center gap-1.5 mt-0.5">
+              <p className="text-xs text-neutral-500 font-medium flex items-center gap-1 mt-0.5">
                 <span>By {coaching.teacherName}</span>
                 {coaching.isVerified && (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-50 inline-block" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 inline shrink-0" title="Verified Teacher" />
                 )}
               </p>
             </div>
           </div>
-
-          {/* Exclusive Partner Gold Badge */}
-          {coaching.isExclusive && (
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold text-xs shadow-xs animate-pulse">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Exclusive Partner</span>
-            </div>
-          )}
         </div>
+
+        {/* Exclusive Partner Badge */}
+        {coaching.isExclusive && (
+          <div className="mb-3.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-[11px] font-bold text-amber-800 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400 shrink-0" />
+            <span>Exclusive MathLogs Partner</span>
+          </div>
+        )}
 
         {/* Tagline */}
         {coaching.tagline && (
-          <p className="text-xs text-gray-500 italic mt-3 line-clamp-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
+          <p className="text-xs text-neutral-500 italic mt-1 mb-3 line-clamp-2 bg-neutral-50 p-2.5 rounded-xl border border-neutral-100">
             "{coaching.tagline}"
           </p>
         )}
 
         {/* Location & Rating */}
-        <div className="mt-4 flex items-center justify-between text-xs text-gray-600 border-t border-gray-100 pt-3">
-          <div className="flex items-center gap-1 text-gray-500 font-medium line-clamp-1">
-            <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+        <div className="mt-3 flex items-center justify-between text-xs text-neutral-600 border-t border-neutral-100 pt-3">
+          <div className="flex items-center gap-1.5 text-neutral-500 font-medium line-clamp-1">
+            <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
             <span>{coaching.area ? `${coaching.area}, ${coaching.city}` : coaching.city}</span>
           </div>
 
-          <div className="flex items-center gap-1 font-semibold text-gray-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+          <div className="flex items-center gap-1 font-bold text-neutral-800 bg-amber-50/80 px-2.5 py-1 rounded-full border border-amber-200/80">
             {coaching.googleRating ? (
               <span className="flex items-center gap-1">
                 <span className="font-extrabold text-blue-600 text-[10px]">G</span>
@@ -108,7 +112,7 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
               </span>
             )}
             {coaching.reviewCount > 0 && (
-              <span className="text-gray-400 font-normal text-[11px]">({coaching.reviewCount})</span>
+              <span className="text-neutral-400 font-normal text-[11px]">({coaching.reviewCount})</span>
             )}
           </div>
         </div>
@@ -119,28 +123,29 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
             coaching.subjectsOffered.slice(0, 4).map((sub, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100"
+                className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200/60"
               >
-                <BookOpen className="w-3 h-3 text-indigo-500" />
                 {sub}
               </span>
             ))
           ) : (
-            <span className="text-xs text-gray-400">All Core Subjects</span>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-500">
+              General Coaching
+            </span>
           )}
           {coaching.subjectsOffered && coaching.subjectsOffered.length > 4 && (
-            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-500">
               +{coaching.subjectsOffered.length - 4} more
             </span>
           )}
         </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="mt-auto p-4 bg-gray-50 border-t border-gray-100 rounded-b-2xl flex items-center gap-2">
+      {/* Action Footer */}
+      <div className="mt-5 pt-3.5 border-t border-neutral-100 flex items-center gap-2">
         <Link
           to={`/coaching/${coaching.slug}`}
-          className="flex-1 text-center px-4 py-2 text-xs font-semibold text-indigo-600 bg-white border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-colors shadow-2xs"
+          className="flex-1 text-center px-4 py-2.5 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 rounded-full transition-all hover:shadow-sm active:scale-95"
         >
           View Profile
         </Link>
@@ -150,10 +155,10 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-xl transition-colors"
+            className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-[#16a34a] bg-[#effdf4] hover:bg-[#dcfce7] border border-[#bbf7d0] rounded-full transition-colors"
             title="Chat on WhatsApp"
           >
-            <MessageCircle className="w-4 h-4 fill-emerald-600 text-emerald-100" />
+            <MessageCircle className="w-4 h-4 fill-[#16a34a] text-white" />
             <span className="hidden sm:inline">WhatsApp</span>
           </a>
         )}
@@ -161,10 +166,10 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
         {coaching.phone && (
           <a
             href={`tel:${coaching.phone}`}
-            className="p-2 text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+            className="p-2.5 text-neutral-700 bg-white border border-neutral-200/80 rounded-full hover:bg-neutral-100 transition-colors"
             title={`Call ${coaching.phone}`}
           >
-            <Phone className="w-4 h-4 text-indigo-600" />
+            <Phone className="w-4 h-4 text-neutral-700" />
           </a>
         )}
       </div>
