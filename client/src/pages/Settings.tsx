@@ -404,6 +404,7 @@ function RegistrationFormBuilder() {
     const [fields, setFields] = useState<any[]>(DEFAULT_FORM_FIELDS);
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isDirty, setIsDirty] = useState(false);
 
     const [showAddField, setShowAddField] = useState(false);
     const [newFieldLabel, setNewFieldLabel] = useState('');
@@ -413,6 +414,8 @@ function RegistrationFormBuilder() {
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
     const [editingFieldLabel, setEditingFieldLabel] = useState<string>('');
+    const [editingFieldType, setEditingFieldType] = useState<string>('text');
+    const [editingFieldRequired, setEditingFieldRequired] = useState<boolean>(false);
 
     useEffect(() => {
         api.get('/institute/me')
@@ -434,6 +437,7 @@ function RegistrationFormBuilder() {
                 ...currentConfig,
                 registrationForm: { fields } 
             });
+            setIsDirty(false);
             toast.success('Registration form updated successfully');
         } catch (error) {
             toast.error(getErrorMessage(error, 'Failed to update form config'));
@@ -444,26 +448,54 @@ function RegistrationFormBuilder() {
 
     const handleAddField = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newFieldLabel.trim()) return;
+        const trimmedLabel = newFieldLabel.trim();
+        if (!trimmedLabel) return;
 
-        const id = newFieldLabel.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now();
+        // Check for duplicate label (case-insensitive)
+        const isDuplicate = fields.some(
+            f => f.label.toLowerCase().trim() === trimmedLabel.toLowerCase()
+        );
+        if (isDuplicate) {
+            toast.error(`A field with label "${trimmedLabel}" already exists.`);
+            return;
+        }
+
+        const cleanSlug = trimmedLabel.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+        const id = (cleanSlug || 'field') + '_' + Date.now();
         const newField = {
             id,
-            label: newFieldLabel.trim(),
+            label: trimmedLabel,
             type: newFieldType,
             required: newFieldRequired,
             system: false
         };
 
         setFields([...fields, newField]);
+        setIsDirty(true);
         setNewFieldLabel('');
         setNewFieldType('text');
         setNewFieldRequired(false);
         setShowAddField(false);
+        toast.success('Field added! Click "Save Form" to publish changes.');
     };
 
     const removeField = (id: string) => {
         setFields(fields.filter(f => f.id !== id));
+        setIsDirty(true);
+    };
+
+    const toggleFieldRequired = (id: string) => {
+        setFields(fields.map(f => {
+            if (f.id === id) {
+                // Keep critical system fields mandatory
+                if (['studentName', 'parentName', 'parentWhatsapp'].includes(f.id)) {
+                    return f;
+                }
+                return { ...f, required: !f.required };
+            }
+            return f;
+        }));
+        setIsDirty(true);
     };
 
     const moveFieldUp = (index: number) => {
@@ -471,6 +503,7 @@ function RegistrationFormBuilder() {
         const newFields = [...fields];
         [newFields[index - 1], newFields[index]] = [newFields[index], newFields[index - 1]];
         setFields(newFields);
+        setIsDirty(true);
     };
 
     const moveFieldDown = (index: number) => {
@@ -478,20 +511,13 @@ function RegistrationFormBuilder() {
         const newFields = [...fields];
         [newFields[index + 1], newFields[index]] = [newFields[index], newFields[index + 1]];
         setFields(newFields);
+        setIsDirty(true);
     };
 
     const handleDragStart = (e: React.DragEvent, index: number) => {
         setDraggedIndex(index);
         e.dataTransfer.effectAllowed = 'move';
-        // Required for Firefox
         e.dataTransfer.setData('text/plain', index.toString());
-        
-        // Add a slight delay before making it transparent so the drag image looks right
-        setTimeout(() => {
-            if (e.target instanceof HTMLElement) {
-                e.target.style.opacity = '0.4';
-            }
-        }, 0);
     };
 
     const handleDragOver = (e: React.DragEvent, index: number) => {
@@ -505,18 +531,18 @@ function RegistrationFormBuilder() {
         
         setFields(newFields);
         setDraggedIndex(index);
+        setIsDirty(true);
     };
 
-    const handleDragEnd = (e: React.DragEvent) => {
+    const handleDragEnd = () => {
         setDraggedIndex(null);
-        if (e.target instanceof HTMLElement) {
-            e.target.style.opacity = '1';
-        }
     };
 
     const handleEditStart = (field: any) => {
         setEditingFieldId(field.id);
         setEditingFieldLabel(field.label);
+        setEditingFieldType(field.type || 'text');
+        setEditingFieldRequired(!!field.required);
     };
 
     const handleEditSave = () => {
@@ -524,8 +550,32 @@ function RegistrationFormBuilder() {
             setEditingFieldId(null);
             return;
         }
-        setFields(fields.map(f => f.id === editingFieldId ? { ...f, label: editingFieldLabel.trim() } : f));
+
+        const trimmed = editingFieldLabel.trim();
+        // Duplicate check excluding self
+        const isDuplicate = fields.some(
+            f => f.id !== editingFieldId && f.label.toLowerCase().trim() === trimmed.toLowerCase()
+        );
+        if (isDuplicate) {
+            toast.error(`Another field with label "${trimmed}" already exists.`);
+            return;
+        }
+
+        setFields(fields.map(f => {
+            if (f.id === editingFieldId) {
+                const isCriticalSystem = ['studentName', 'parentName', 'parentWhatsapp'].includes(f.id);
+                return {
+                    ...f,
+                    label: trimmed,
+                    type: f.system ? f.type : editingFieldType,
+                    required: isCriticalSystem ? true : editingFieldRequired
+                };
+            }
+            return f;
+        }));
+        setIsDirty(true);
         setEditingFieldId(null);
+        toast.success('Field updated!');
     };
 
     if (isLoading) return (
@@ -537,91 +587,148 @@ function RegistrationFormBuilder() {
 
     return (
         <div className="max-w-4xl mx-auto mb-12">
-            <h2 className="text-xl font-bold text-app-text mb-1 flex items-center gap-2">
-                Student Onboarding Form
-            </h2>
-            <p className="text-app-text-secondary text-sm mb-6">Configure the information you collect when students register.</p>
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h2 className="text-xl font-bold text-app-text mb-1 flex items-center gap-2">
+                        Student Onboarding Form
+                        {isDirty && (
+                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+                                Unsaved Changes
+                            </span>
+                        )}
+                    </h2>
+                    <p className="text-app-text-secondary text-sm">Configure the information you collect when students register.</p>
+                </div>
+            </div>
 
             <div className="bg-white border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 rounded-3xl relative overflow-hidden">
                 <div className="space-y-4 relative z-10">
                     
                     <div className="space-y-3">
-                        {fields.map((field, index) => (
-                            <div 
-                                key={field.id} 
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, index)}
-                                onDragOver={(e) => handleDragOver(e, index)}
-                                onDragEnd={handleDragEnd}
-                                className={`flex items-center justify-between bg-gray-50 border border-gray-200 p-4 rounded-xl cursor-move transition-all ${draggedIndex === index ? 'shadow-lg border-gray-300' : ''}`}
-                            >
-                                <div className="flex items-center gap-3 flex-1">
-                                    <div className="text-gray-400">
-                                        <GripVertical size={20} />
-                                    </div>
-                                    <div className="flex-1">
-                                        {editingFieldId === field.id ? (
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={editingFieldLabel}
-                                                    onChange={(e) => setEditingFieldLabel(e.target.value)}
-                                                    onKeyDown={(e) => e.key === 'Enter' && handleEditSave()}
-                                                    autoFocus
-                                                    className="bg-white border border-gray-300 rounded px-2 py-1 text-sm font-semibold outline-none focus:ring-1 focus:ring-black w-full max-w-[200px]"
-                                                />
-                                                <button onClick={handleEditSave} className="text-green-600 hover:bg-green-50 p-1 rounded">
-                                                    <Check size={16} />
-                                                </button>
-                                                <button onClick={() => setEditingFieldId(null)} className="text-gray-500 hover:bg-gray-200 p-1 rounded">
-                                                    <X size={16} />
-                                                </button>
+                        {fields.map((field, index) => {
+                            const isCriticalSystem = ['studentName', 'parentName', 'parentWhatsapp'].includes(field.id);
+                            return (
+                                <div 
+                                    key={field.id} 
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, index)}
+                                    onDragOver={(e) => handleDragOver(e, index)}
+                                    onDragEnd={handleDragEnd}
+                                    className={`bg-gray-50 border border-gray-200 p-4 rounded-xl transition-all ${draggedIndex === index ? 'opacity-40 border-gray-400' : ''}`}
+                                >
+                                    {editingFieldId === field.id ? (
+                                        <div className="space-y-3 p-2 bg-white rounded-lg border border-black/10 shadow-sm">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Field Label</label>
+                                                    <input
+                                                        type="text"
+                                                        value={editingFieldLabel}
+                                                        onChange={(e) => setEditingFieldLabel(e.target.value)}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleEditSave()}
+                                                        autoFocus
+                                                        className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-black"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Input Type</label>
+                                                    <select
+                                                        value={editingFieldType}
+                                                        onChange={(e) => setEditingFieldType(e.target.value)}
+                                                        disabled={field.system}
+                                                        className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-black disabled:opacity-50"
+                                                    >
+                                                        <option value="text">Short Text</option>
+                                                        <option value="tel">Phone Number</option>
+                                                        <option value="email">Email</option>
+                                                        <option value="number">Number</option>
+                                                    </select>
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <p className="font-semibold text-app-text text-sm flex items-center gap-2">
-                                                {field.label} {field.required && <span className="text-red-500">*</span>}
-                                                <button onClick={() => handleEditStart(field)} className="text-gray-400 hover:text-black transition-colors" title="Edit Field Name">
-                                                    <Pencil size={14} />
+                                            <div className="flex items-center justify-between pt-1">
+                                                <label className="flex items-center gap-2 text-sm text-app-text font-medium cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isCriticalSystem ? true : editingFieldRequired}
+                                                        disabled={isCriticalSystem}
+                                                        onChange={(e) => setEditingFieldRequired(e.target.checked)}
+                                                        className="w-4 h-4 text-black focus:ring-black rounded disabled:opacity-50"
+                                                    />
+                                                    <span>Make this field required {isCriticalSystem && '(Mandatory for registration)'}</span>
+                                                </label>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={handleEditSave} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-800 transition-colors">
+                                                        <Check size={14} /> Save
+                                                    </button>
+                                                    <button onClick={() => setEditingFieldId(null)} className="text-gray-500 hover:bg-gray-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3 flex-1">
+                                                <div className="text-gray-400 cursor-grab active:cursor-grabbing">
+                                                    <GripVertical size={20} />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="font-semibold text-app-text text-sm flex items-center gap-2">
+                                                        {field.label} {field.required && <span className="text-red-500">*</span>}
+                                                        <button onClick={() => handleEditStart(field)} className="text-gray-400 hover:text-black transition-colors" title="Edit Field">
+                                                            <Pencil size={14} />
+                                                        </button>
+                                                    </p>
+                                                    <p className="text-xs text-app-text-tertiary mt-0.5 capitalize">
+                                                        Type: {field.type} {field.system ? '• System Field' : '• Custom Field'} {!field.required && '• Optional'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {!isCriticalSystem && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleFieldRequired(field.id)}
+                                                        className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors ${field.required ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'}`}
+                                                        title="Toggle Required/Optional"
+                                                    >
+                                                        {field.required ? 'Required' : 'Optional'}
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveFieldUp(index)}
+                                                    disabled={index === 0}
+                                                    className="text-gray-400 hover:text-black hover:bg-gray-200 p-2 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                                                    title="Move Up"
+                                                >
+                                                    <ArrowUp size={16} />
                                                 </button>
-                                            </p>
-                                        )}
-                                        <p className="text-xs text-app-text-tertiary mt-0.5 capitalize">
-                                            Type: {field.type} {field.system && '• System Field'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => moveFieldUp(index)}
-                                        disabled={index === 0}
-                                        className="text-gray-400 hover:text-black hover:bg-gray-200 p-2 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400"
-                                        title="Move Up"
-                                    >
-                                        <ArrowUp size={16} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => moveFieldDown(index)}
-                                        disabled={index === fields.length - 1}
-                                        className="text-gray-400 hover:text-black hover:bg-gray-200 p-2 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400"
-                                        title="Move Down"
-                                    >
-                                        <ArrowDown size={16} />
-                                    </button>
-                                    {!field.system && (
-                                        <button
-                                            type="button"
-                                            onClick={() => removeField(field.id)}
-                                            className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors ml-1"
-                                            title="Remove Field"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveFieldDown(index)}
+                                                    disabled={index === fields.length - 1}
+                                                    className="text-gray-400 hover:text-black hover:bg-gray-200 p-2 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                                                    title="Move Down"
+                                                >
+                                                    <ArrowDown size={16} />
+                                                </button>
+                                                {!field.system && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeField(field.id)}
+                                                        className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors ml-1"
+                                                        title="Remove Field"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {!showAddField ? (
@@ -633,7 +740,7 @@ function RegistrationFormBuilder() {
                         </button>
                     ) : (
                         <form onSubmit={handleAddField} className="bg-gray-50 border border-gray-200 p-5 rounded-xl space-y-4 mt-4">
-                            <h4 className="font-semibold text-sm text-app-text">New Field</h4>
+                            <h4 className="font-semibold text-sm text-app-text">New Custom Field</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold uppercase text-gray-500 mb-1.5 ml-1 tracking-wider">Field Label</label>
@@ -643,6 +750,7 @@ function RegistrationFormBuilder() {
                                         onChange={(e) => setNewFieldLabel(e.target.value)}
                                         className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-black outline-none text-sm"
                                         placeholder="e.g., Father's Name"
+                                        autoFocus
                                         required
                                     />
                                 </div>
@@ -668,7 +776,7 @@ function RegistrationFormBuilder() {
                                     onChange={(e) => setNewFieldRequired(e.target.checked)}
                                     className="w-4 h-4 text-black focus:ring-black rounded"
                                 />
-                                <label htmlFor="reqCheck" className="text-sm text-app-text font-medium">Make this field required</label>
+                                <label htmlFor="reqCheck" className="text-sm text-app-text font-medium cursor-pointer">Make this field required</label>
                             </div>
                             <div className="flex gap-3 pt-2">
                                 <button

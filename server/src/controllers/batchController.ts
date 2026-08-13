@@ -582,6 +582,10 @@ export const deleteFeeInstallment = async (req: Request, res: Response) => {
 const publicBatchCache = new Map<string, { data: any, timestamp: number }>();
 const CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
+export const clearPublicBatchCache = () => {
+    publicBatchCache.clear();
+};
+
 export const getBatchPublicStatus = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
     const token = req.query.token as string | undefined;

@@ -265,6 +265,6 @@ function startServer() {
     });
 }
 
-if (require.main === module && process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test') {
     startServer();
 }

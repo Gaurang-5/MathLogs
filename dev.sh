@@ -5,6 +5,19 @@
 
 set -euo pipefail
 
+# ── Node version fix ──────────────────────────────────────────────────────────
+# This project requires Node 22. fnm has it installed; ensure it's on PATH.
+# (The default Homebrew node at /opt/homebrew/bin is Node 20 and causes a
+# silent startup hang in tsx.)
+NODE22="$HOME/.local/share/fnm/node-versions/v22.22.3/installation/bin"
+if [ -d "$NODE22" ]; then
+    export PATH="$NODE22:$PATH"
+    echo "✓ Using Node $(node --version) from fnm"
+else
+    echo "⚠️  Node 22 not found at $NODE22 — using system node ($(node --version))"
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$ROOT_DIR/server"
 CLIENT_DIR="$ROOT_DIR/client"

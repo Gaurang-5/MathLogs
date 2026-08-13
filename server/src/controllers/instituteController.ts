@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { secureLogger } from '../utils/secureLogger';
+import { clearPublicBatchCache } from './batchController';
 
 
 export const getGlobalAnalytics = async (req: Request, res: Response) => {
@@ -433,6 +434,9 @@ export const updateMyInstituteConfig = async (req: Request, res: Response) => {
             where: { id: admin.institute.id },
             data: { config }
         });
+
+        // Invalidate public batch cache so newly added fields immediately appear on public onboarding forms
+        clearPublicBatchCache();
 
         res.json({ success: true, message: "Coaching configuration updated successfully", config });
     } catch (error) {

@@ -44,9 +44,12 @@ export const processWhatsappQueue = async () => {
     }
 
     try {
-        // CRITICAL: Transactional claim with advisory locking — safe for horizontal scaling
-        const claimedJobs = await prisma.$transaction(async (tx) => {
-            // 1. Atomically select and lock rows nobody else is processing
+        // ── Step 1: Claim jobs with a short, tight transaction ────────────────
+        // We intentionally keep this transaction as short as possible (two queries)
+        // so it doesn't hold a pool connection while we fetch full job rows.
+        // maxWait: how long to wait for a free connection before giving up (P2028).
+        // timeout: max wall-clock time the transaction itself can run.
+        const ids: string[] = await prisma.$transaction(async (tx) => {
             const lockedIds: { id: string }[] = await tx.$queryRaw`
                 SELECT id FROM "WhatsappJob"
                 WHERE status = 'PENDING'
@@ -58,34 +61,43 @@ export const processWhatsappQueue = async () => {
 
             if (lockedIds.length === 0) return [];
 
-            const ids = lockedIds.map(row => row.id);
+            const claimedIds = lockedIds.map(row => row.id);
 
-            // 2. Mark as PROCESSING inside the same transaction
-            // This is committed atomically, so no other worker can grab these rows
             await tx.whatsappJob.updateMany({
-                where: { id: { in: ids } },
-                data: {
-                    status: 'PROCESSING',
-                    attempts: { increment: 1 }
-                }
+                where: { id: { in: claimedIds } },
+                data: { status: 'PROCESSING', attempts: { increment: 1 } }
             });
 
-            // 3. Return full job data for processing outside the transaction
-            return await tx.whatsappJob.findMany({
-                where: { id: { in: ids } }
-            });
+            return claimedIds;
+        }, {
+            maxWait: 10_000, // wait up to 10 s for a free pool connection
+            timeout: 15_000, // transaction must complete within 15 s
         });
 
-        if (claimedJobs.length === 0) return 0;
+        if (ids.length === 0) return 0;
 
-        secureLogger.info(`[WhatsApp Worker] Claimed ${claimedJobs.length} jobs (lock-safe).`);
+        // ── Step 2: Fetch full job rows outside the transaction ───────────────
+        // This read does NOT need a transaction; it releases the pool connection
+        // before we do any network I/O (sending to Meta).
+        const claimedJobs = await prisma.whatsappJob.findMany({
+            where: { id: { in: ids } }
+        });
 
-        // Process all claimed jobs concurrently (outside transaction to avoid long lock times)
-        await Promise.allSettled(claimedJobs.map(job => processJob(job)));
+        secureLogger.info(`[WhatsApp Worker] Claimed ${claimedJobs.length} jobs.`);
+
+        // ── Step 3: Process jobs with capped concurrency ──────────────────────
+        // Limit to CONCURRENCY_LIMIT simultaneous DB updates so the 3-connection
+        // pool is never fully saturated while the email worker is also running.
+        const CONCURRENCY_LIMIT = 5;
+        for (let i = 0; i < claimedJobs.length; i += CONCURRENCY_LIMIT) {
+            const batch = claimedJobs.slice(i, i + CONCURRENCY_LIMIT);
+            await Promise.allSettled(batch.map(job => processJob(job)));
+        }
 
         return claimedJobs.length;
     } catch (error) {
         console.error('[WhatsApp Worker] Queue processing error:', error);
+        return 0;
     }
 };
 

@@ -277,7 +277,7 @@ export const registerStudent = async (req: Request, res: Response) => {
 };
 
 export const addStudentManually = async (req: Request, res: Response) => {
-    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName } = req.body;
+    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, additionalData } = req.body;
 
     // Data Normalization
     if (typeof name === 'string') name = name.trim();
@@ -334,6 +334,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
                         parentWhatsapp,
                         parentEmail,
                         schoolName,
+                        additionalData,
                         status: 'APPROVED',
                         humanId,
                         instituteId: batch.instituteId
@@ -404,7 +405,7 @@ const autoAssignGlobalInstallments = async (studentId: string, batchId: string, 
 
 export const updateStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, parentName, parentWhatsapp, parentEmail, schoolName, humanId } = req.body;
+    const { name, parentName, parentWhatsapp, parentEmail, schoolName, humanId, additionalData } = req.body;
     const user = req.user;
 
     try {
@@ -429,7 +430,8 @@ export const updateStudent = async (req: Request, res: Response) => {
                 ...(cleanWhatsapp ? { parentWhatsapp: cleanWhatsapp } : {}),
                 parentEmail: cleanEmail,
                 schoolName: cleanSchool,
-                ...(cleanHumanId ? { humanId: cleanHumanId } : {})
+                ...(cleanHumanId ? { humanId: cleanHumanId } : {}),
+                ...(additionalData !== undefined ? { additionalData } : {})
             }
         });
         res.json(updated);

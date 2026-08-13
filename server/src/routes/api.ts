@@ -323,13 +323,14 @@ router.post('/billing/create', authenticateToken as any, createBillingSession as
 router.post('/billing/verify', authenticateToken as any, verifyBillingPayment as any);
 router.delete('/billing/cancel', authenticateToken as any, cancelSubscription as any);
 
-import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo } from '../controllers/instituteController';
+import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo, updateMyInstituteConfig } from '../controllers/instituteController';
 
 router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
 router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
 router.put('/institutes/:id/details', authenticateToken as any, updateInstituteDetails as any);
 router.put('/institutes/:id/plan', authenticateToken as any, updateInstitutePlan as any);
 router.get('/institute/me', authenticateToken as any, getMyInstitute as any);
+router.put('/institute/me/config', authenticateToken as any, updateMyInstituteConfig as any);
 router.put('/institute/me/logo', authenticateToken as any, uploadLogo as any);
 router.get('/institute/:id/details', authenticateToken as any, getInstituteDetails as any);
 router.put('/institutes/:id/suspend', authenticateToken as any, suspendInstitute as any);
