@@ -90,43 +90,64 @@ const loadScript = (src: string): Promise<boolean> => {
 
 const pricingPlans = [
     {
-        id: 'basic' as PlanId,
-        name: 'Basic Plan',
-        icon: Building,
-        price: 999,
-        tagline: 'Up to 100 Students',
-        period: '/ month',
-        description: 'Perfect for growing coaching centers managing up to 100 students.',
-        trialInfo: '14-Day Free Trial (No Card Required)',
+        id: 'listing' as PlanId,
+        name: 'Marketplace Listing',
+        icon: Store,
+        price: 0,
+        tagline: 'Free Forever',
+        period: 'free',
+        description: 'Get your coaching center listed on MathLogs city directory to receive direct student inquiries.',
+        trialInfo: 'Free Forever · No Card Required',
         features: [
-            '14-Day Free Trial Included',
-            'Up to 100 Active Students',
-            'Full Batch & Attendance Tracking',
-            'Fee Dues & Collection Records',
-            'Automated WhatsApp Fee Reminders',
-            'Public Directory Marketplace Listing'
+            'Verified Coaching Profile Page',
+            'Public Directory Search Listing',
+            'Student & Parent Direct WhatsApp Leads',
+            'Google Business Reviews Sync',
+            'Subject & Batch Tagging'
         ],
         popular: false,
-        badge: '100 STUDENTS',
+        badge: 'FREE LISTING',
+        isOneTime: false,
+        hasTrial: false,
+    },
+    {
+        id: 'quiz' as PlanId,
+        name: 'Quiz Starter',
+        icon: Sparkles,
+        price: 250,
+        tagline: '5 Quiz Credits / Month',
+        period: '/ month',
+        description: 'AI quiz creation, automatic question generation, proctored online exams & instant analysis.',
+        trialInfo: '14-Day Free Trial Included',
+        features: [
+            '5 AI Quiz Credits Included / Month',
+            'AI Question Paper & Quiz Generator',
+            'Anti-Cheating Proctoring Suite',
+            'Instant Auto-Grading & Analytics',
+            'Student Performance WhatsApp Reports',
+            'Coaching Directory Profile Page'
+        ],
+        popular: false,
+        badge: 'AI QUIZZES',
         isOneTime: false,
         hasTrial: true,
     },
     {
-        id: 'pro' as PlanId,
-        name: 'Pro Plan',
-        icon: Crown,
-        price: 1999,
-        tagline: 'Up to 250 Students',
+        id: 'all_inclusive' as PlanId,
+        name: 'All Inclusive ERP',
+        icon: Building,
+        price: 500,
+        tagline: 'Complete Coaching ERP',
         period: '/ month',
-        description: 'Complete ERP suite for large coaching institutes managing up to 250 students.',
+        description: 'Full coaching ERP — student records, attendance, fee collection, tests & directory listing.',
         trialInfo: '14-Day Free Trial Included',
         features: [
-            'Up to 250 Active Students',
-            'Everything in Basic Plan',
-            'AI Test & Quiz Generator',
-            'OMR Sheet Scanner',
-            'Custom Payment Receipts & Invoices',
-            'Priority 24/7 Dedicated Support'
+            'Full Student Management & Batches',
+            'Fee Collection & WhatsApp Dues Alerts',
+            '5 Quiz Credits Included / Month',
+            'Parent & Student Web Portals',
+            'Coaching Directory Profile Page',
+            '24/7 Dedicated Support'
         ],
         popular: true,
         badge: 'MOST POPULAR',
@@ -134,6 +155,7 @@ const pricingPlans = [
         hasTrial: true,
     }
 ];
+
 
 // ─── Animated Background (Signature MathLogs Grid) ─────────────────────────
 
