@@ -34,9 +34,10 @@ export const createBillingSession = async (req: Request, res: Response) => {
 
         if (planId.startsWith('quiz_credits_')) {
             let amountInINR = 0;
-            if (planId === 'quiz_credits_10') amountInINR = 1000;
-            else if (planId === 'quiz_credits_25') amountInINR = 2000;
-            else if (planId === 'quiz_credits_40') amountInINR = 3000;
+            if (planId === 'quiz_credits_5') amountInINR = 250;
+            else if (planId === 'quiz_credits_10') amountInINR = 500;
+            else if (planId === 'quiz_credits_25') amountInINR = 1000;
+            else if (planId === 'quiz_credits_40') amountInINR = 1500;
             else {
                 return res.status(400).json({ error: 'Invalid plan selected' });
             }
@@ -68,16 +69,21 @@ export const createBillingSession = async (req: Request, res: Response) => {
         if (planId === 'custom') {
             monthlyAmountInINR = instituteConfig.customPriceMonthly || 0;
             yearlyAmountInINR = instituteConfig.customPriceYearly || 0;
+        } else if (planId === 'listing') {
+            monthlyAmountInINR = 0;
+            yearlyAmountInINR = 0;
+        } else if (planId === 'quiz') {
+            monthlyAmountInINR = 250;
+            yearlyAmountInINR = 2500;
         } else {
-            monthlyAmountInINR = planId === 'pro' ? 1999 : 999;
-            yearlyAmountInINR = planId === 'pro' ? 19999 : 9999;
+            // all_inclusive ERP plan (or fallback pro/basic)
+            monthlyAmountInINR = 500;
+            yearlyAmountInINR = 5000;
         }
         
-        if (billingCycle === 'yearly') {
-            if (yearlyAmountInINR <= 0) {
-                return res.status(400).json({ error: 'Yearly pricing is not configured for this plan.' });
-            }
-            const amountInPaise = yearlyAmountInINR * 100;
+        if (billingCycle === 'yearly' || planId === 'listing') {
+            const chargeAmount = planId === 'listing' ? 0 : yearlyAmountInINR;
+            const amountInPaise = chargeAmount * 100;
 
             const order = await razorpay.orders.create({
                 amount: amountInPaise,
@@ -114,7 +120,7 @@ export const createBillingSession = async (req: Request, res: Response) => {
                     period: 'monthly',
                     interval: 1,
                     item: {
-                        name: `MathLogs ${planId === 'pro' ? 'Pro' : 'Basic'} Monthly`,
+                        name: `MathLogs ${planId.toUpperCase()} Monthly`,
                         amount: monthlyAmountInINR * 100,
                         currency: 'INR',
                         description: 'Monthly Subscription for MathLogs'
@@ -188,7 +194,8 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
 
         if (planId.startsWith('quiz_credits_')) {
             let addedCredits = 0;
-            if (planId === 'quiz_credits_10') addedCredits = 10;
+            if (planId === 'quiz_credits_5') addedCredits = 5;
+            else if (planId === 'quiz_credits_10') addedCredits = 10;
             else if (planId === 'quiz_credits_25') addedCredits = 25;
             else if (planId === 'quiz_credits_40') addedCredits = 40;
             else {
@@ -202,20 +209,26 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
             });
         }
 
-        // Extend their plan
+        // Extend or switch their plan
         const currentConfig = (admin.institute.config as any) || {};
         let tier: Tier;
         let maxStudents: number;
 
         if (planId === 'custom') {
             tier = (admin.institute.plan as Tier) || Tier.PRO;
-            maxStudents = currentConfig.maxStudents || 250;
-        } else if (planId === 'pro') {
+            maxStudents = currentConfig.maxStudents || 500;
+        } else if (planId === 'all_inclusive' || planId === 'pro') {
             tier = Tier.PRO;
-            maxStudents = 250;
-        } else {
+            maxStudents = 500;
+        } else if (planId === 'quiz') {
             tier = Tier.BASIC;
             maxStudents = 100;
+        } else if (planId === 'listing') {
+            tier = admin.institute.plan && admin.institute.plan !== Tier.NO_PLAN ? admin.institute.plan : Tier.FREE;
+            maxStudents = currentConfig.maxStudents || 500;
+        } else {
+            tier = Tier.PRO;
+            maxStudents = 500;
         }
 
         const daysToAdd = billingCycle === 'yearly' ? 365 : 30;
@@ -228,16 +241,29 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
         
         newExpiryDate.setDate(newExpiryDate.getDate() + daysToAdd);
 
+        const currentCredits = admin.institute.quizCredits || 0;
+        const updatedCredits = (planId === 'all_inclusive' || planId === 'pro' || planId === 'quiz')
+            ? Math.max(currentCredits, 5)
+            : currentCredits;
+
+        const updateData: any = {
+            plan: tier,
+            planExpiryDate: newExpiryDate,
+            quizCredits: updatedCredits,
+            razorpaySubscriptionId: razorpay_subscription_id || null,
+            razorpayOrderId: razorpay_order_id || null,
+            config: { ...currentConfig, maxStudents },
+            areRegistrationsPaused: false
+        };
+
+        if (planId === 'listing') {
+            updateData.isPubliclyListed = true;
+            updateData.isVerified = true;
+        }
+
         await prisma.institute.update({
             where: { id: admin.institute.id },
-            data: {
-                plan: tier,
-                planExpiryDate: newExpiryDate,
-                razorpaySubscriptionId: razorpay_subscription_id || null,
-                razorpayOrderId: razorpay_order_id || null,
-                config: { ...currentConfig, maxStudents },
-                areRegistrationsPaused: false
-            }
+            data: updateData
         });
 
         res.json({

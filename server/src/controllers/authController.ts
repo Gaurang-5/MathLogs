@@ -96,7 +96,7 @@ export const loginAdmin = async (req: Request, res: Response) => {
         }
 
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
-        const isPageOnly = admin.institute?.plan === 'FREE' && !isQuizOnly && !admin.institute?.isExclusive;
+        const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
 
         res.json({
             success: true,
@@ -484,7 +484,7 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
         const tokens = await generateAuthTokens(admin);
 
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
-        const isPageOnly = admin.institute?.plan === 'FREE' && !isQuizOnly && !admin.institute?.isExclusive;
+        const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
         const quizCredits = admin.institute?.quizCredits || 0;
 
         return res.json({
@@ -552,7 +552,7 @@ export const selectMobileAccount = async (req: Request, res: Response) => {
         const tokens = await generateAuthTokens(admin);
 
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
-        const isPageOnly = admin.institute?.plan === 'FREE' && !isQuizOnly && !admin.institute?.isExclusive;
+        const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
         const quizCredits = admin.institute?.quizCredits || 0;
 
         return res.json({

@@ -1,4 +1,4 @@
-import { Transition, Variants } from 'framer-motion';
+import type { Transition, Variants } from 'framer-motion';
 
 // Apple Physics Spring Constants
 // Damping Ratio = 1.0 (Critically Damped - smooth settle, zero unwanted wobble)

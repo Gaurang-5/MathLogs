@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
@@ -7,6 +8,7 @@ import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineCh
 import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee, Sparkles } from 'lucide-react';
 import CountUp from 'react-countup';
 import StudentSearch from '../components/StudentSearch';
+import { cn } from '../utils/cn';
 
 interface ClassAveragePoint {
     name: string;
@@ -73,9 +75,9 @@ export default function Dashboard() {
         staleTime: 30000,
     });
 
-    const { data: financeGrowthData = [], isLoading: financeGrowthLoading } = useQuery({
-        queryKey: ['financeGrowth'],
-        queryFn: () => api.get<FinanceGrowthPoint[]>('/stats/finance-growth'),
+    const { data: installmentStatsData = [], isLoading: installmentStatsLoading } = useQuery({
+        queryKey: ['installmentStats'],
+        queryFn: () => api.get<FinanceGrowthPoint[]>('/dashboard/installment-stats'),
         staleTime: 30000,
     });
 
@@ -86,7 +88,7 @@ export default function Dashboard() {
     const loading = {
         summary: summaryLoading,
         growth: growthLoading,
-        financeGrowth: financeGrowthLoading
+        financeGrowth: installmentStatsLoading
     };
 
     const toggleFeePrivacy = () => {
@@ -97,27 +99,16 @@ export default function Dashboard() {
         });
     };
 
-
     // Collection rate based on total collected (all-time), not monthly
     const collectionRate = finances.totalCollected + finances.pending > 0
         ? Math.min(100, Math.round((finances.totalCollected / (finances.totalCollected + finances.pending)) * 100))
         : 0;
 
-    // Synchronize the raw graph's remaining calculations with the exact clamped system pending dues 
-    // to absorb edge-cases like overpayments overriding unallocated totals
-    const adjustedFinanceGrowthData = useMemo(() => {
-        if (!financeGrowthData.length) return [];
-        const lastBar = financeGrowthData[financeGrowthData.length - 1];
-        if (!lastBar || finances.pending <= 0) return financeGrowthData;
-
-        const diff = finances.pending - lastBar.remaining;
-        if (diff === 0) return financeGrowthData;
-
-        return financeGrowthData.map(d => ({
-            ...d,
-            remaining: Math.max(0, d.remaining + diff)
-        }));
-    }, [financeGrowthData, finances.pending]);
+    const chartTotals = useMemo(() => {
+        const collected = installmentStatsData.reduce((sum, d) => sum + (d.collected || 0), 0);
+        const remaining = installmentStatsData.reduce((sum, d) => sum + (d.remaining || 0), 0);
+        return { collected, remaining };
+    }, [installmentStatsData]);
 
     const getGreeting = () => {
         return 'Hello';
@@ -212,11 +203,11 @@ export default function Dashboard() {
                 {loading.summary ? (
                     <div className="h-[100px] sm:h-[110px] rounded-2xl sm:rounded-[24px] bg-neutral-50/80 border border-black/5 animate-pulse" />
                 ) : (
-                    <div
-                        style={{ animationDelay: '250ms' }}
-                        className="animate-fade-in-up group bg-app-surface-opaque border-[1.5px] border-black/5 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-300 cursor-pointer relative overflow-hidden hover:-translate-y-0.5"
+                    <motion.div
+                        whileHover={{ scale: 1.015, y: -2 }}
+                        transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                        className="group bg-white/80 backdrop-blur-2xl border border-white/60 px-4 sm:px-5 py-4 sm:py-5 rounded-2xl sm:rounded-[24px] shadow-sm hover:shadow-xl transition-all cursor-pointer relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-accent-primary/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/3" />
                         <div className="flex items-center gap-2 min-[375px]:gap-3 sm:gap-4 relative z-10">
                             <div className="relative w-8 h-8 min-[375px]:w-10 min-[375px]:h-10 sm:w-11 sm:h-11 shrink-0">
                                 <svg className="w-full h-full transform -rotate-90">
@@ -240,13 +231,13 @@ export default function Dashboard() {
                                 </div>
                             </div>
                             <div className="min-w-0">
-                                <p className="text-[10px] sm:text-xs text-app-text-tertiary font-bold uppercase tracking-widest mb-0.5">Collection</p>
+                                <p className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase tracking-widest mb-0.5">Collection</p>
                                 <p className="text-xl min-[375px]:text-2xl sm:text-3xl font-extrabold text-black tracking-tighter truncate">
                                     <CountUp end={collectionRate} duration={2} suffix="%" />
                                 </p>
                             </div>
                         </div>
-                    </div>
+                    </motion.div>
                 )}
 
                 {/* Monthly Revenue - with Privacy Toggle */}
@@ -364,22 +355,25 @@ export default function Dashboard() {
                     style={{ animationDelay: '500ms' }}
                     className="animate-fade-in-up bg-app-surface-opaque border-[1.5px] border-black/5 p-5 sm:p-6 rounded-2xl sm:rounded-[28px] shadow-sm flex flex-col justify-between"
                 >
-                    <h3 className="text-sm font-bold text-app-text mb-5 flex items-center gap-2.5 uppercase tracking-widest">
-                        <div className="w-7 h-7 bg-black text-white rounded-lg flex items-center justify-center">
-                            <Wallet className="w-4 h-4" />
-                        </div>
-                        Fee Overview
-                    </h3>
+                    <div className="flex items-center justify-between mb-5">
+                        <h3 className="text-sm font-bold text-app-text flex items-center gap-2.5 uppercase tracking-widest">
+                            <div className="w-7 h-7 bg-black text-white rounded-lg flex items-center justify-center">
+                                <Wallet className="w-4 h-4" />
+                            </div>
+                            Fee Overview
+                        </h3>
+                    </div>
+
                     {loading.financeGrowth ? (
                         <div className="h-[260px] flex items-center justify-center">
                             <div className="w-7 h-7 border-2 border-black border-t-transparent rounded-full animate-spin" />
                         </div>
-                    ) : financeGrowthData.length > 0 ? (
+                    ) : installmentStatsData.length > 0 ? (
                         <>
                             <div style={{ width: '100%', height: 260 }}>
                                 <ResponsiveContainer width="100%" height={260}>
                                     <BarChart
-                                        data={adjustedFinanceGrowthData}
+                                        data={installmentStatsData}
                                         margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                                         barGap={4}
                                     >
@@ -418,11 +412,11 @@ export default function Dashboard() {
                             <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-black/5">
                                 <div className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-md bg-black" />
-                                    <span className="text-xs text-app-text-secondary font-bold">Collected · {showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(finances.totalCollected)}` : '₹••••••'}</span>
+                                    <span className="text-xs text-app-text-secondary font-bold">Collected · {showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(chartTotals.collected)}` : '₹••••••'}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-md bg-neutral-200" />
-                                    <span className="text-xs text-app-text-secondary font-bold">Remaining · {showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(finances.pending)}` : '₹••••••'}</span>
+                                    <span className="text-xs text-app-text-secondary font-bold">Remaining · {showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(chartTotals.remaining)}` : '₹••••••'}</span>
                                 </div>
                             </div>
                         </>

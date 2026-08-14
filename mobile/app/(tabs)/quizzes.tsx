@@ -2,13 +2,14 @@ import React, { useState, useMemo } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TextInput,
   RefreshControl, Dimensions, Platform, TouchableOpacity,
+  Modal, Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SkeletonLoader } from '../../components/ui';
-import { Search, Brain, Calendar, ChevronRight, Plus, Sparkles, Timer } from 'lucide-react-native';
+import { Search, Brain, Calendar, ChevronRight, Plus, Sparkles, Timer, ShoppingCart, X, Check } from 'lucide-react-native';
 import api from '../../services/api';
 import * as Haptics from 'expo-haptics';
 
@@ -17,7 +18,7 @@ const { width } = Dimensions.get('window');
 const T = {
   bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
   textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', amber: '#f59e0b', red: '#ef4444',
+  emerald: '#10b981', amber: '#f59e0b', red: '#ef4444', blue: '#2563eb',
   border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
 };
 
@@ -99,12 +100,21 @@ function QuizCard({ item, index }: { item: OnlineQuiz; index: number }) {
 
 export default function QuizzesScreen() {
   const [search, setSearch] = useState('');
+  const [showBuyModal, setShowBuyModal] = useState(false);
   const router = useRouter();
 
   const { data: quizzes, isLoading, refetch, isRefetching } = useQuery<OnlineQuiz[]>({
     queryKey: ['quizzes'],
     queryFn: async () => {
       const res = await api.get('/tests/online');
+      return res.data;
+    },
+  });
+
+  const { data: institute, refetch: refetchInstitute } = useQuery<{ quizCredits?: number }>({
+    queryKey: ['institute-me'],
+    queryFn: async () => {
+      const res = await api.get('/institute/me');
       return res.data;
     },
   });
@@ -123,6 +133,14 @@ export default function QuizzesScreen() {
     (quizzes || []).filter(t => !t.isFinalized).length, [quizzes]);
   const finalizedCount = useMemo(() =>
     (quizzes || []).filter(t => t.isFinalized).length, [quizzes]);
+
+  const handleOpenBilling = () => {
+    setShowBuyModal(false);
+    const webUrl = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/api\/?$/, '/billing') : 'https://mathlogs.in/billing';
+    Linking.openURL(webUrl).catch(() => {
+      Linking.openURL('https://mathlogs.in/billing');
+    });
+  };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -143,6 +161,35 @@ export default function QuizzesScreen() {
             <Text style={s.createBtnText}>Generate</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Quiz Credits Banner Card */}
+        <Animated.View entering={FadeInDown.duration(400).delay(100)} style={s.creditsCard}>
+          <View style={s.creditsLeft}>
+            <View style={s.creditsIconBox}>
+              <Sparkles size={18} color="#2563eb" />
+            </View>
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={s.creditsVal}>{institute?.quizCredits ?? 0}</Text>
+                <Text style={s.creditsTitle}>Quiz Credits</Text>
+              </View>
+              <Text style={s.creditsSub}>1 credit = 1 AI quiz generation</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={s.buyBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setShowBuyModal(true);
+            }}
+          >
+            <ShoppingCart size={13} color={T.white} />
+            <Text style={s.buyBtnText}>Buy More</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
         <View style={s.searchWrap}>
           <Search size={18} color={T.textMuted} />
           <TextInput
@@ -174,7 +221,7 @@ export default function QuizzesScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={T.accent} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); refetchInstitute(); }} tintColor={T.accent} />}
         ListEmptyComponent={
           isLoading ? (
             <View style={{ gap: 12 }}>
@@ -189,6 +236,65 @@ export default function QuizzesScreen() {
           )
         }
       />
+
+      {/* Buy Quiz Credits Bottom Sheet Modal */}
+      <Modal
+        visible={showBuyModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBuyModal(false)}
+      >
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <View style={s.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={s.modalIconBox}>
+                  <Sparkles size={20} color="#2563eb" />
+                </View>
+                <View>
+                  <Text style={s.modalTitle}>Purchase Quiz Credits</Text>
+                  <Text style={s.modalSub}>1 Credit = 1 AI Quiz Generation</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowBuyModal(false)} style={s.closeBtn}>
+                <X size={20} color={T.textSec} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={s.packsGrid}>
+              {[
+                { credits: 5, price: '₹250', tagline: '₹50 / credit' },
+                { credits: 10, price: '₹500', tagline: '₹50 / credit' },
+                { credits: 25, price: '₹1,000', tagline: '₹40 / credit', popular: true },
+                { credits: 40, price: '₹1,500', tagline: '₹37.5 / credit' },
+              ].map((pack, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  activeOpacity={0.8}
+                  style={[s.packCard, pack.popular && s.packCardPopular]}
+                  onPress={handleOpenBilling}
+                >
+                  {pack.popular && (
+                    <View style={s.popularBadge}>
+                      <Text style={s.popularBadgeText}>MOST POPULAR</Text>
+                    </View>
+                  )}
+                  <Text style={s.packCredits}>{pack.credits} Credits</Text>
+                  <Text style={s.packPrice}>{pack.price}</Text>
+                  <Text style={s.packTagline}>{pack.tagline}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={s.proceedBtn} onPress={handleOpenBilling}>
+              <ShoppingCart size={16} color={T.white} />
+              <Text style={s.proceedBtnText}>Proceed to Secure Payment</Text>
+            </TouchableOpacity>
+
+            <Text style={s.creditsDisclaimer}>Credits never expire and roll over automatically.</Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -197,12 +303,37 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.bg },
   headerArea: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   title: { color: T.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { color: T.textSec, fontSize: 14, fontWeight: '500', marginTop: 4, marginBottom: 16 },
+  subtitle: { color: T.textSec, fontSize: 14, fontWeight: '500', marginTop: 4, marginBottom: 12 },
   createBtn: {
-    backgroundColor: T.accent, paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: T.accent, paddingHorizontal: 14, paddingVertical: 9,
     borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6,
   },
   createBtnText: { color: T.white, fontWeight: '600', fontSize: 13 },
+
+  /* Credits Card */
+  creditsCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE',
+    borderRadius: 18, padding: 14, marginBottom: 14,
+    ...Platform.select({
+      ios: { shadowColor: '#2563eb', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 },
+      android: { elevation: 1 },
+    }),
+  },
+  creditsLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  creditsIconBox: {
+    width: 38, height: 38, borderRadius: 12, backgroundColor: '#DBEAFE',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  creditsVal: { color: '#1E3A8A', fontSize: 20, fontWeight: '800' },
+  creditsTitle: { color: '#1E40AF', fontSize: 14, fontWeight: '700' },
+  creditsSub: { color: '#3B82F6', fontSize: 11, fontWeight: '500', marginTop: 1 },
+  buyBtn: {
+    backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 5,
+  },
+  buyBtnText: { color: T.white, fontWeight: '700', fontSize: 12 },
+
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
     borderRadius: 14, paddingHorizontal: 14, height: 46,
@@ -239,4 +370,47 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyTitle: { color: T.text, fontSize: 18, fontWeight: '600', marginTop: 16 },
   emptyDesc: { color: T.textSec, fontSize: 14, marginTop: 6, textAlign: 'center' },
+
+  /* Purchase Modal Styles */
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: T.white, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 24, paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalIconBox: {
+    width: 42, height: 42, borderRadius: 14, backgroundColor: '#EFF6FF',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modalTitle: { color: T.text, fontSize: 18, fontWeight: '700' },
+  modalSub: { color: T.textSec, fontSize: 12, marginTop: 1 },
+  closeBtn: { padding: 8, borderRadius: 999, backgroundColor: T.bg },
+  packsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
+  packCard: {
+    width: (width - 60) / 2, backgroundColor: '#FAFAFA', borderWidth: 1,
+    borderColor: '#E5E7EB', borderRadius: 18, padding: 16, position: 'relative',
+  },
+  packCardPopular: {
+    borderColor: '#2563eb', backgroundColor: '#EFF6FF',
+  },
+  popularBadge: {
+    position: 'absolute', top: -10, right: 12, backgroundColor: '#2563eb',
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999,
+  },
+  popularBadgeText: { color: T.white, fontSize: 8, fontWeight: '800' },
+  packCredits: { fontSize: 16, fontWeight: '800', color: T.text },
+  packPrice: { fontSize: 20, fontWeight: '900', color: '#2563eb', marginTop: 4 },
+  packTagline: { fontSize: 11, color: T.textSec, marginTop: 2, fontWeight: '500' },
+  proceedBtn: {
+    backgroundColor: T.accent, borderRadius: 16, height: 52,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    marginBottom: 12,
+  },
+  proceedBtnText: { color: T.white, fontWeight: '700', fontSize: 15 },
+  creditsDisclaimer: { textAlign: 'center', color: T.textSec, fontSize: 12, fontWeight: '500' },
 });

@@ -91,7 +91,6 @@ export default function BatchesScreen() {
   const [showForm, setShowForm] = useState(false);
   
   // Form State
-  const [batchNumber, setBatchNumber] = useState('');
   const [customName, setCustomName] = useState('');
   const [subject, setSubject] = useState('Mathematics');
   const [allowedSubjects, setAllowedSubjects] = useState<string[]>([]);
@@ -145,14 +144,13 @@ export default function BatchesScreen() {
     (batches || []).reduce((sum, b) => sum + b._count.students, 0), [batches]);
 
   const handleCreate = async () => {
-    if (!batchNumber || !timeSlot || (!className && requiresGrades) || !subject) {
-      Alert.alert('Missing Fields', 'Please fill in all required fields.');
+    if (!customName.trim() || !timeSlot || (!className && requiresGrades) || !subject) {
+      Alert.alert('Missing Fields', 'Please fill in all required fields including Batch Name.');
       return;
     }
 
     try {
       await api.post('/batches', {
-        batchNumber,
         customName,
         subject,
         timeSlot,
@@ -161,7 +159,7 @@ export default function BatchesScreen() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowForm(false);
-      setBatchNumber(''); setCustomName(''); setTimeSlot(''); setClassName('');
+      setCustomName(''); setTimeSlot(''); setClassName('');
       refetch();
     } catch (e: any) {
       Alert.alert('Error', e.response?.data?.error || 'Failed to create batch');
@@ -243,21 +241,7 @@ export default function BatchesScreen() {
             )}
 
             <View style={s.inputGroup}>
-              <Text style={s.label}>Batch Number</Text>
-              <View style={s.inputWrap}>
-                <Hash size={18} color={T.textMuted} style={s.inputIcon} />
-                <TextInput 
-                  style={s.input} 
-                  placeholder="e.g. 1" 
-                  keyboardType="number-pad"
-                  value={batchNumber} 
-                  onChangeText={setBatchNumber} 
-                />
-              </View>
-            </View>
-
-            <View style={s.inputGroup}>
-              <Text style={s.label}>Batch Name (Optional)</Text>
+              <Text style={s.label}>Batch Name *</Text>
               <View style={s.inputWrap}>
                 <Type size={18} color={T.textMuted} style={s.inputIcon} />
                 <TextInput 

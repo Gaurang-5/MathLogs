@@ -21,7 +21,7 @@ export default function TeacherRegistration() {
   const [coachingName, setCoachingName] = useState('');
   const [teacherName, setTeacherName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [city, setCity] = useState('');
+  const [city, setCity] = useState('Muzaffarnagar');
   const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
@@ -370,14 +370,13 @@ export default function TeacherRegistration() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-neutral-700 mb-1.5">City *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Jaipur"
+                  <select
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
-                  />
+                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 cursor-pointer"
+                  >
+                    <option value="Muzaffarnagar">Muzaffarnagar</option>
+                  </select>
                 </div>
 
                 <div>

@@ -221,3 +221,17 @@ h6 {
     animation: fade-in-left 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     opacity: 0;
 }
+
+/* Mobile Virtual Keyboard Scroll Margin Fix */
+html {
+    scroll-behavior: smooth;
+}
+
+@media (max-width: 1024px) {
+    input:focus,
+    textarea:focus,
+    select:focus {
+        scroll-margin-bottom: 25vh;
+        scroll-margin-top: 15vh;
+    }
+}

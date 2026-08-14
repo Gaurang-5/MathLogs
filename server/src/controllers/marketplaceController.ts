@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -25,12 +26,17 @@ export async function searchMarketplace(req: Request, res: Response) {
     const {
       q,
       subject,
+      classGrade,
+      class: classParam,
+      className,
       city,
       area,
       sortBy = 'rating',
       page = '1',
       limit = '12'
     } = req.query;
+
+    const targetClassParam = (classGrade || classParam || className) as string | undefined;
 
     const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit as string, 10) || 12));
@@ -56,7 +62,12 @@ export async function searchMarketplace(req: Request, res: Response) {
     }
 
     if (city) {
-      where.city = { equals: (city as string).trim(), mode: 'insensitive' };
+      const c = (city as string).trim().toLowerCase();
+      if (c.includes('muzaffarnagar') || c.includes('muaffarnagar')) {
+        where.city = { in: ['Muzaffarnagar', 'Muaffarnagar', 'muzaffarnagar', 'muaffarnagar'], mode: 'insensitive' };
+      } else {
+        where.city = { equals: (city as string).trim(), mode: 'insensitive' };
+      }
     }
 
     if (area) {
@@ -100,10 +111,32 @@ export async function searchMarketplace(req: Request, res: Response) {
     let filtered = institutes;
     if (subject) {
       const targetSubject = (subject as string).toLowerCase().trim();
-      filtered = institutes.filter(inst => {
+      filtered = filtered.filter(inst => {
         const subjects = inst.subjectsOffered as string[] | null;
         if (!subjects || !Array.isArray(subjects)) return false;
         return subjects.some(s => typeof s === 'string' && s.toLowerCase().includes(targetSubject));
+      });
+    }
+
+    // Filter by classGrade if specified (in memory since classesOffered is Json)
+    if (targetClassParam) {
+      const targetClass = targetClassParam.toLowerCase().trim();
+      filtered = filtered.filter(inst => {
+        const classes = inst.classesOffered as string[] | null;
+        if (!classes || !Array.isArray(classes)) return false;
+        return classes.some(c => {
+          if (typeof c !== 'string') return false;
+          const cLower = c.toLowerCase().trim();
+          if (cLower === targetClass) return true;
+          if (targetClass.includes('jee') || targetClass.includes('neet')) {
+            return cLower.includes('jee') || cLower.includes('neet');
+          }
+          const digits = targetClass.match(/\d+/);
+          if (digits && digits[0]) {
+            return cLower.includes(digits[0]);
+          }
+          return cLower.includes(targetClass);
+        });
       });
     }
 
@@ -123,6 +156,11 @@ export async function searchMarketplace(req: Request, res: Response) {
       const phone = inst.publicPhone || inst.phoneNumber || null;
       const whatsapp = inst.whatsappPhone || inst.publicPhone || inst.phoneNumber || null;
 
+      const rawCity = inst.city || 'Local';
+      const normalizedCity = (rawCity.toLowerCase().includes('muzaffarnagar') || rawCity.toLowerCase().includes('muaffarnagar'))
+        ? 'Muzaffarnagar'
+        : rawCity;
+
       return {
         id: inst.id,
         name: inst.name,
@@ -130,7 +168,7 @@ export async function searchMarketplace(req: Request, res: Response) {
         teacherName: inst.teacherName || 'Faculty',
         phone,
         whatsappPhone: whatsapp,
-        city: inst.city || 'Local',
+        city: normalizedCity,
         area: inst.area || '',
         address: inst.address || '',
         tagline: inst.tagline || '',
@@ -158,13 +196,24 @@ export async function searchMarketplace(req: Request, res: Response) {
     const total = mapped.length;
     const paginatedItems = mapped.slice(skip, skip + limitNum);
 
-    // Extract unique cities & subjects for filter option dropdowns
-    const allCities = Array.from(new Set(institutes.map(i => i.city).filter(Boolean)));
+    // Extract unique cities, subjects & classes for filter option dropdowns
+    const normalizeCityName = (cityStr: string) => {
+      const lower = cityStr.trim().toLowerCase();
+      if (lower.includes('muzaffarnagar') || lower.includes('muaffarnagar')) return 'Muzaffarnagar';
+      return cityStr.trim();
+    };
+    const allCities = Array.from(new Set(institutes.map(i => i.city).filter((c): c is string => Boolean(c)).map(normalizeCityName)));
     const allSubjectsSet = new Set<string>();
+    const allClassesSet = new Set<string>();
+
     institutes.forEach(i => {
       const subs = i.subjectsOffered as string[] | null;
       if (Array.isArray(subs)) {
         subs.forEach(s => typeof s === 'string' && allSubjectsSet.add(s));
+      }
+      const cls = i.classesOffered as string[] | null;
+      if (Array.isArray(cls)) {
+        cls.forEach(c => typeof c === 'string' && allClassesSet.add(c));
       }
     });
 
@@ -179,7 +228,8 @@ export async function searchMarketplace(req: Request, res: Response) {
       },
       availableFilters: {
         cities: allCities,
-        subjects: Array.from(allSubjectsSet)
+        subjects: Array.from(allSubjectsSet),
+        classes: Array.from(allClassesSet)
       }
     });
   } catch (error: any) {
@@ -728,12 +778,15 @@ export async function syncGooglePlaceHandler(req: any, res: Response) {
     }
 
     const details = await fetchGooglePlaceDetails(placeId);
+    if (!details) {
+      return res.status(404).json({ success: false, message: 'Google Place details not found' });
+    }
 
     const updated = await prisma.institute.update({
       where: { id },
       data: {
         googlePlaceId: details.placeId,
-        googleMapsUrl: details.mapsUrl,
+        googleMapsUrl: details.mapsUrl || details.url,
         googleRating: details.rating,
         googleReviewCount: details.userRatingsTotal,
         googleReviews: details.reviews as any,
@@ -786,8 +839,8 @@ export async function unlinkGooglePlaceHandler(req: any, res: Response) {
         googleMapsUrl: null,
         googleRating: null,
         googleReviewCount: null,
-        googleReviews: null,
-        googlePhotos: null,
+        googleReviews: Prisma.DbNull,
+        googlePhotos: Prisma.DbNull,
         googleLastSyncedAt: null
       }
     });
@@ -802,4 +855,44 @@ export async function unlinkGooglePlaceHandler(req: any, res: Response) {
     return res.status(500).json({ success: false, message: 'Failed to unlink Google Place', error: error.message });
   }
 }
+
+/**
+ * Submit Claim Request for an unverified institute
+ * POST /api/marketplace/coaching/:id/claim
+ */
+export async function submitClaimRequest(req: Request, res: Response) {
+  try {
+    const instId = String(req.params.id);
+    const { claimantName, phone, email, proofNote } = req.body;
+
+    if (!claimantName || !phone) {
+      return res.status(400).json({ success: false, message: 'Claimant name and phone number are required.' });
+    }
+
+    const institute = await prisma.institute.findUnique({ where: { id: instId } });
+    if (!institute) {
+      return res.status(404).json({ success: false, message: 'Institute not found.' });
+    }
+
+    const claimInquiry = await prisma.leadInquiry.create({
+      data: {
+        instituteId: instId,
+        studentName: `[CLAIM REQUEST] ${claimantName.trim()}`,
+        phone: phone.trim(),
+        message: `Claim Request submitted for ${institute.name}.\nContact Email: ${email || 'Not provided'}\nProof/Note: ${proofNote || 'None provided'}`,
+        status: 'NEW'
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: 'Claim request submitted! Our verification team will review your request and get in touch with you.',
+      data: claimInquiry
+    });
+  } catch (error: any) {
+    console.error('Error submitting claim request:', error);
+    return res.status(500).json({ success: false, message: 'Failed to submit claim request.' });
+  }
+}
+
 

@@ -4,6 +4,7 @@ import {
   getCoachingPublicProfile,
   submitReview,
   submitInquiry,
+  submitClaimRequest,
   registerExternalTeacher,
   getMarketplaceProfile,
   updateMarketplaceProfile,
@@ -22,6 +23,7 @@ router.get('/google-place/search', searchGooglePlacesHandler);
 router.get('/coaching/:slug', getCoachingPublicProfile);
 router.post('/coaching/:id/reviews', submitReview);
 router.post('/coaching/:id/inquire', submitInquiry);
+router.post('/coaching/:id/claim', submitClaimRequest);
 router.post('/register-teacher', registerExternalTeacher);
 
 // Authenticated Teacher / Institute Admin Endpoints

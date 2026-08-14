@@ -4,11 +4,6 @@ import { api } from '../utils/api';
 import { Lock, ImagePlus, Loader2, Plus, X, Trash2, ArrowUp, ArrowDown, GripVertical, Pencil, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-interface ChangePasswordResponse {
-    token?: string;
-    refreshToken?: string;
-}
-
 interface Profile {
     username: string;
     email?: string;
@@ -17,111 +12,6 @@ interface Profile {
     maxStudents?: number;
     logo?: string | null;
 }
-
-const getErrorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
-
-function ChangePasswordForm() {
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (newPassword !== confirmPassword) {
-            toast.error('New passwords do not match');
-            return;
-        }
-
-        if (newPassword.length < 6) {
-            toast.error('Password must be at least 6 characters');
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const res = await api.post<ChangePasswordResponse>('/auth/change-password', {
-                currentPassword,
-                newPassword
-            });
-
-            if (res.token) {
-                localStorage.setItem('token', res.token);
-            }
-            if (res.refreshToken) {
-                localStorage.setItem('refreshToken', res.refreshToken);
-            }
-
-            toast.success('Password changed successfully');
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmPassword('');
-        } catch (error: unknown) {
-            console.error(error);
-            toast.error(getErrorMessage(error, 'Failed to change password'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 mb-1.5 ml-1 tracking-wider">Current Password</label>
-                <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none font-medium placeholder:text-gray-400"
-                    placeholder="Enter current password"
-                    required
-                />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold uppercase text-gray-500 mb-1.5 ml-1 tracking-wider">New Password</label>
-                    <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none font-medium placeholder:text-gray-400"
-                        placeholder="Min 6 chars"
-                        required
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-bold uppercase text-gray-500 mb-1.5 ml-1 tracking-wider">Confirm New</label>
-                    <input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-black focus:border-black outline-none font-medium placeholder:text-gray-400"
-                        placeholder="Re-enter new"
-                        required
-                    />
-                </div>
-            </div>
-
-            <div className="flex justify-end pt-4">
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex items-center justify-center gap-2 bg-black text-white px-8 py-3.5 rounded-xl font-bold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-black/10 active:scale-[0.98]"
-                >
-                    {loading ? 'Updating...' : (
-                        <>
-                            <Lock size={16} />
-                            <span>Update Password</span>
-                        </>
-                    )}
-                </button>
-            </div>
-        </form>
-    );
-}
-
 
 function ProfileSection() {
     const [profile, setProfile] = useState<Profile | null>(null);
@@ -717,18 +607,6 @@ export default function Settings() {
                         <RegistrationFormBuilder />
                     </>
                 )}
-
-                {/* Security Section */}
-                <div className="max-w-2xl mb-12 mt-12">
-                    <div className="mb-6">
-                        <h2 className="text-xl font-bold text-app-text">Security</h2>
-                        <p className="text-app-text-secondary text-sm mt-1">Update your login credentials securely.</p>
-                    </div>
-
-                    <div className="bg-white border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 rounded-3xl">
-                        <ChangePasswordForm />
-                    </div>
-                </div>
             </div>
         </Layout>
     );

@@ -11,7 +11,7 @@ const SUBJECT_OPTIONS = [
     'Economics', 'Computer Science'
 ];
 
-type PlanId = 'listing' | 'quiz' | 'all_inclusive';
+type PlanId = 'basic' | 'pro' | 'listing' | 'quiz' | 'all_inclusive';
 
 interface TrialResponse {
     success: boolean;
@@ -90,68 +90,49 @@ const loadScript = (src: string): Promise<boolean> => {
 
 const pricingPlans = [
     {
-        id: 'listing' as PlanId,
-        name: 'Listing Only',
-        icon: Store,
-        price: 0,
-        tagline: 'Limited Time Offer',
-        period: 'free',
-        description: 'Get listed on the MathLogs marketplace directory for free during our limited time offer!',
-        trialInfo: '100% Free Limited Time Offer',
-        features: [
-            'Public Marketplace Profile Page',
-            'Direct Student Lead Enquiries',
-            'Google Maps Directions Link',
-            '100% Free — No Credit Card Needed'
-        ],
-        popular: true,
-        badge: 'FREE (LIMITED TIME)',
-        isOneTime: true,
-        hasTrial: true,
-    },
-    {
-        id: 'quiz' as PlanId,
-        name: 'Quiz Starter',
-        icon: Sparkles,
-        price: 250,
-        tagline: '5 quiz credits / month',
+        id: 'basic' as PlanId,
+        name: 'Basic Plan',
+        icon: Building,
+        price: 999,
+        tagline: 'Up to 100 Students',
         period: '/ month',
-        description: 'Create & evaluate digital tests with automated grading and instant scorecards.',
-        trialInfo: '5 Free Quiz Credits / Month',
+        description: 'Perfect for growing coaching centers managing up to 100 students.',
+        trialInfo: '14-Day Free Trial (No Card Required)',
         features: [
-            '5 Quiz Credits Included / Month (Reset Monthly)',
-            'Buy Extra Credits Valid for Lifetime',
-            'Automated AI & Manual Test Builder',
-            'Instant WhatsApp Scorecards',
-            'Marketplace Profile Listing Included'
+            '14-Day Free Trial Included',
+            'Up to 100 Active Students',
+            'Full Batch & Attendance Tracking',
+            'Fee Dues & Collection Records',
+            'Automated WhatsApp Fee Reminders',
+            'Public Directory Marketplace Listing'
         ],
         popular: false,
-        badge: '5 CREDITS/MO',
+        badge: '100 STUDENTS',
         isOneTime: false,
         hasTrial: true,
     },
     {
-        id: 'all_inclusive' as PlanId,
-        name: 'All Inclusive ERP',
-        icon: Building,
-        price: 500,
-        tagline: 'Complete Coaching Solution',
+        id: 'pro' as PlanId,
+        name: 'Pro Plan',
+        icon: Crown,
+        price: 1999,
+        tagline: 'Up to 250 Students',
         period: '/ month',
-        description: 'Full coaching ERP — student records, attendance, fee collection, tests & directory listing.',
-        trialInfo: '14-Day Free Trial (5 Quiz Credits/Mo)',
+        description: 'Complete ERP suite for large coaching institutes managing up to 250 students.',
+        trialInfo: '14-Day Free Trial Included',
         features: [
-            '14-Day Free Trial (No Card Needed)',
-            '5 Quiz Credits Included / Month (Reset Monthly)',
-            'Full Student Management & Batches',
-            'Fee Tracking & Automated WhatsApp Alerts',
-            'Student & Parent Web Portals',
-            'Marketplace Profile Listing Included'
+            'Up to 250 Active Students',
+            'Everything in Basic Plan',
+            'AI Test & Quiz Generator',
+            'OMR Sheet Scanner',
+            'Custom Payment Receipts & Invoices',
+            'Priority 24/7 Dedicated Support'
         ],
         popular: true,
-        badge: 'BEST VALUE',
+        badge: 'MOST POPULAR',
         isOneTime: false,
         hasTrial: true,
-    },
+    }
 ];
 
 // ─── Animated Background (Signature MathLogs Grid) ─────────────────────────
@@ -199,7 +180,7 @@ export default function Onboarding() {
 
     // Step 3: Marketplace & Checkout Options
     const [listOnMarketplace, setListOnMarketplace] = useState(true);
-    const [city, setCity] = useState('');
+    const [city, setCity] = useState('Muzaffarnagar');
     const [area, setArea] = useState('');
     const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
     const [googleMapsUrl, setGoogleMapsUrl] = useState('');
@@ -509,7 +490,7 @@ export default function Onboarding() {
             <div className="w-full max-w-5xl mx-auto z-10 flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
                 <Link to="/" className="flex items-center gap-3 group">
                     <img src="/icon-512x512.png" alt="MathLogs" className="w-10 h-10 rounded-xl drop-shadow-sm" />
-                    <span className="text-2xl font-black tracking-tighter">MathLogs.</span>
+                    <span className="text-2xl font-black tracking-tighter">MathLogs</span>
                 </Link>
 
                 {/* Step indicator pills */}
@@ -611,28 +592,30 @@ export default function Onboarding() {
                                     <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">
                                         WhatsApp Mobile Number
                                     </label>
-                                    <div className={`flex items-end border-b-2 transition-all pb-3 ${isPhoneVerified ? 'border-green-500' : 'border-neutral-200 focus-within:border-black'}`}>
-                                        <span className="text-xl sm:text-2xl font-medium text-neutral-400 mr-3 shrink-0">
-                                            +91
-                                        </span>
-                                        <input
-                                            type="tel"
-                                            required
-                                            inputMode="numeric"
-                                            maxLength={10}
-                                            value={phone}
-                                            onChange={e => {
-                                                setPhone(formatPhone(e.target.value));
-                                                setIsPhoneVerified(false);
-                                                setPhoneOtpSent(false);
-                                                setOtpError('');
-                                            }}
-                                            placeholder="98765 43210"
-                                            disabled={isPhoneVerified}
-                                            className="w-full bg-transparent text-black text-xl sm:text-2xl outline-none font-medium tracking-widest placeholder:text-neutral-300 disabled:opacity-70"
-                                        />
+                                    <div className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b-2 transition-all pb-3 ${isPhoneVerified ? 'border-green-500' : 'border-neutral-200 focus-within:border-black'}`}>
+                                        <div className="flex items-center flex-1 min-w-0">
+                                            <span className="text-xl sm:text-2xl font-medium text-neutral-400 mr-2.5 shrink-0">
+                                                +91
+                                            </span>
+                                            <input
+                                                type="tel"
+                                                required
+                                                inputMode="numeric"
+                                                maxLength={10}
+                                                value={phone}
+                                                onChange={e => {
+                                                    setPhone(formatPhone(e.target.value));
+                                                    setIsPhoneVerified(false);
+                                                    setPhoneOtpSent(false);
+                                                    setOtpError('');
+                                                }}
+                                                placeholder="98765 43210"
+                                                disabled={isPhoneVerified}
+                                                className="w-full bg-transparent text-black text-xl sm:text-2xl outline-none font-medium tracking-wider placeholder:text-neutral-300 disabled:opacity-70"
+                                            />
+                                        </div>
                                         {isPhoneVerified ? (
-                                            <div className="flex items-center gap-2 ml-2 shrink-0">
+                                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                                                 <CheckCircle2 className="w-6 h-6 text-green-500" />
                                                 <button
                                                     type="button"
@@ -647,7 +630,7 @@ export default function Onboarding() {
                                                 type="button"
                                                 disabled={formatPhone(phone).length < 10 || otpSending}
                                                 onClick={handleSendPhoneOtp}
-                                                className="ml-3 shrink-0 flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-neutral-200 disabled:text-neutral-400 text-white text-xs font-bold rounded-full transition-all whitespace-nowrap"
+                                                className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-neutral-200 disabled:text-neutral-400 text-white text-xs font-bold rounded-full transition-all whitespace-nowrap shadow-xs cursor-pointer"
                                             >
                                                 {otpSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
                                                 {phoneOtpSent ? 'Resend OTP' : 'Verify via WhatsApp'}
@@ -896,15 +879,15 @@ export default function Onboarding() {
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                                                    City
+                                                    City *
                                                 </label>
-                                                <input
-                                                    type="text"
+                                                <select
                                                     value={city}
                                                     onChange={e => setCity(e.target.value)}
-                                                    placeholder="e.g. Pune"
-                                                    className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-medium outline-none focus:border-black transition-all"
-                                                />
+                                                    className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-bold outline-none focus:border-black transition-all cursor-pointer"
+                                                >
+                                                    <option value="Muzaffarnagar">Muzaffarnagar</option>
+                                                </select>
                                             </div>
 
                                             <div>

@@ -338,3 +338,131 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to fetch financial stats' });
     }
 };
+
+export const getInstallmentGrowthStats = async (req: Request, res: Response) => {
+    try {
+        const user = req.user;
+        const teacherId = user?.id;
+        const instituteId = user?.instituteId;
+        const role = user?.role;
+
+        if (!teacherId) {
+            return res.status(400).json({ error: 'Missing context' });
+        }
+
+        const whereClause: any = {
+            status: 'APPROVED',
+        };
+
+        if (instituteId) {
+            whereClause.instituteId = instituteId;
+        }
+
+        if (role !== 'SUPER_ADMIN') {
+            whereClause.batch = { teacherId };
+        }
+
+        const students = await prisma.student.findMany({
+            where: whereClause,
+            select: {
+                id: true,
+                createdAt: true,
+                batch: {
+                    select: {
+                        feeInstallments: {
+                            select: {
+                                id: true,
+                                name: true,
+                                amount: true,
+                                studentId: true,
+                                createdAt: true
+                            },
+                            orderBy: { createdAt: 'asc' }
+                        }
+                    }
+                },
+                fees: {
+                    select: {
+                        amount: true,
+                        status: true
+                    }
+                },
+                feePayments: {
+                    select: {
+                        amountPaid: true,
+                        installmentId: true
+                    }
+                },
+                feeAssignments: {
+                    select: {
+                        installmentId: true
+                    }
+                }
+            }
+        });
+
+        const installmentMap = new Map<string, { name: string; collected: number; generated: number }>();
+
+        students.forEach((student: any) => {
+            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
+            const allBatchInstallments = student.batch?.feeInstallments || [];
+
+            const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
+            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+
+            const validInstallments = allBatchInstallments.filter((inst: any) => {
+                if (inst.studentId) {
+                    return inst.studentId === student.id;
+                }
+                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
+                const hasPayment = paidInstallmentIds.has(inst.id);
+                const isAssigned = assignedIds.has(inst.id);
+                return isAfterJoin || hasPayment || isAssigned;
+            });
+
+            const validInstallmentIds = new Set(validInstallments.map((inst: any) => inst.id));
+            const paidSimple = student.fees
+                .filter((f: any) => f.status === 'PAID')
+                .reduce((sum: number, fee: any) => sum + fee.amount, 0);
+
+            let unallocatedCash = paidSimple;
+            const validFeePayments = student.feePayments.filter((p: any) => validInstallmentIds.has(p.installmentId));
+
+            validInstallments.forEach((inst: any) => {
+                const name = inst.name.trim();
+                if (!installmentMap.has(name)) {
+                    installmentMap.set(name, { name, collected: 0, generated: 0 });
+                }
+                const entry = installmentMap.get(name)!;
+
+                entry.generated += inst.amount;
+
+                const paymentsForThis = validFeePayments.filter((p: any) => p.installmentId === inst.id);
+                const paidDirectly = paymentsForThis.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
+
+                let due = inst.amount - paidDirectly;
+                let allocatedPaid = paidDirectly;
+
+                if (due > 0 && unallocatedCash > 0) {
+                    const coverage = Math.min(due, unallocatedCash);
+                    due -= coverage;
+                    allocatedPaid += coverage;
+                    unallocatedCash -= coverage;
+                }
+
+                entry.collected += Math.min(inst.amount, allocatedPaid);
+            });
+        });
+
+        const result = Array.from(installmentMap.values()).map(g => ({
+            name: g.name,
+            collected: g.collected,
+            remaining: Math.max(0, g.generated - g.collected)
+        }));
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error fetching installment growth stats:', error);
+        res.status(500).json({ error: 'Failed to fetch installment stats' });
+    }
+};

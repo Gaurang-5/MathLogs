@@ -5,6 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import CountUp from 'react-countup';
+import { useMetaTags } from '../../hooks/useMetaTags';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -161,6 +162,11 @@ const ConfettiBurst = () => {
 export default function TakeQuiz() {
     const { instituteSlug, quizId } = useParams<{ instituteSlug: string; quizId: string }>();
     const navigate = useNavigate();
+
+    useMetaTags({
+        title: quiz?.title ? `${quiz.title} - Online Quiz | MathLogs` : 'Online Quiz & Test - MathLogs',
+        description: 'Attempt your assigned online quiz, submit answers, and receive instant score analytics on MathLogs.'
+    });
 
     const [phase, setPhase] = useState<'loading' | 'instructions' | 'quiz' | 'result' | 'public_registration'>('loading');
     const [submitting, setSubmitting] = useState(false);

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useMetaTags } from '../hooks/useMetaTags';
 import {
     Wallet, LogOut, TrendingUp, BookOpen, Receipt,
     User, Phone, Mail, GraduationCap, School, X,
@@ -47,6 +48,11 @@ interface OnlineQuiz {
 export default function StudentPortalDashboard() {
     const { instituteSlug } = useParams<{ instituteSlug: string }>();
     const navigate = useNavigate();
+
+    useMetaTags({
+        title: data?.student?.instituteName ? `${data.student.instituteName} - Student Portal | MathLogs` : 'Student Dashboard - MathLogs',
+        description: 'View your batch updates, test performance, fee receipts, and assigned quizzes on MathLogs.'
+    });
 
     const [loading, setLoading] = useState(!sessionStorage.getItem(`student_dash_${instituteSlug}`));
     const [data, setData] = useState<any>(() => {

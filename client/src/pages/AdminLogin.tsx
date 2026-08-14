@@ -290,7 +290,7 @@ export default function AdminLogin() {
                         className="w-16 h-16 sm:w-20 sm:h-20 mb-6 drop-shadow-sm rounded-2xl"
                     />
                     <h1 className="text-[14vw] sm:text-[100px] font-black tracking-tighter leading-none mb-6">
-                        MathLogs.
+                        MathLogs
                     </h1>
                     <p className="text-lg sm:text-2xl text-neutral-400 font-medium tracking-tight mb-12 sm:mb-20 max-w-md">
                         {step === 'phone'
@@ -364,25 +364,27 @@ export default function AdminLogin() {
                                 </p>
                             </motion.div>
 
-                            {/* Submit button — identical brutal black style */}
+                            {/* Submit button — Apple Spring Touch Feedback */}
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                                transition={{ type: 'spring', stiffness: 350, damping: 30, delay: 0.2 }}
                                 className="pt-8"
                             >
-                                <button
+                                <motion.button
                                     type="submit"
+                                    whileTap={{ scale: 0.95 }}
+                                    transition={{ type: 'spring', stiffness: 450, damping: 30 }}
                                     disabled={loading || formatPhone(phone).length < 10}
-                                    className="w-full bg-black text-white font-black py-7 sm:py-8 text-lg sm:text-xl uppercase tracking-widest rounded-none relative overflow-hidden transition-all duration-500 group disabled:bg-neutral-900 disabled:cursor-not-allowed hover:bg-neutral-900 active:scale-[0.98] flex items-center justify-center"
+                                    className="w-full bg-neutral-900 text-white font-black py-6 sm:py-7 text-lg sm:text-xl uppercase tracking-widest rounded-2xl relative overflow-hidden transition-all duration-300 group disabled:bg-neutral-300 disabled:cursor-not-allowed hover:bg-black active:scale-[0.98] flex items-center justify-center cursor-pointer shadow-md"
                                 >
-                                    <span className={cn('transition-transform duration-500', loading ? 'translate-y-[-300%] opacity-0' : 'translate-y-0 opacity-100')}>
+                                    <span className={cn('transition-transform duration-300', loading ? 'translate-y-[-300%] opacity-0' : 'translate-y-0 opacity-100')}>
                                         Send WhatsApp OTP
                                     </span>
                                     {!loading && (
                                         <ArrowRight className="absolute right-8 w-6 h-6 opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 hidden sm:block" />
                                     )}
-                                    <div className={cn('absolute inset-0 flex items-center justify-center transition-all duration-500', loading ? 'translate-y-0 opacity-100' : 'translate-y-[200%] opacity-0')}>
+                                    <div className={cn('absolute inset-0 flex items-center justify-center transition-all duration-300', loading ? 'translate-y-0 opacity-100' : 'translate-y-[200%] opacity-0')}>
                                         <div className="flex flex-col items-center gap-1.5 mt-1">
                                             <div className="flex items-end gap-1 h-4 mb-0.5">
                                                 <motion.div animate={{ height: ['40%', '100%', '40%'] }} transition={{ duration: 1, repeat: Infinity, delay: 0, ease: 'easeInOut' }} className="w-[3px] bg-white rounded-full" />
@@ -392,7 +394,7 @@ export default function AdminLogin() {
                                             <span className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-white/90 font-bold">{loadingText}</span>
                                         </div>
                                     </div>
-                                </button>
+                                </motion.button>
 
                                 <p className="text-center mt-6 text-sm text-neutral-400 font-medium">
                                     New coaching?{' '}

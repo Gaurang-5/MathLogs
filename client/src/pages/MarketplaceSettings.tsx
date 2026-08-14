@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { Store, Sparkles, MapPin, Phone, MessageCircle, Save, Loader2, Globe, CheckCircle2, User, Building2, BookOpen, ExternalLink, GraduationCap, ArrowRight, Plus } from 'lucide-react';
+import { Store, Sparkles, MapPin, Phone, MessageCircle, Save, Loader2, Globe, CheckCircle2, User, Building2, BookOpen, ExternalLink, GraduationCap, ArrowRight, Plus, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { GooglePlaceConnectModal } from '../components/GooglePlaceConnectModal';
 
 interface MarketplaceProfileData {
   id: string;
@@ -54,13 +55,14 @@ export default function MarketplaceSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'leads'>('profile');
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
 
   // Form Fields
   const [name, setName] = useState('');
   const [teacherName, setTeacherName] = useState('');
   const [publicPhone, setPublicPhone] = useState('');
   const [whatsappPhone, setWhatsappPhone] = useState('');
-  const [city, setCity] = useState('');
+  const [city, setCity] = useState('Muzaffarnagar');
   const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
@@ -246,16 +248,27 @@ export default function MarketplaceSettings() {
             </div>
           </div>
 
-          {profile?.slug && (
-            <Link
-              to={`/coaching/${profile.slug}`}
-              target="_blank"
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold rounded-full transition-colors border border-neutral-200/80"
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <button
+              type="button"
+              onClick={() => setShowGoogleModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-full transition-colors border border-amber-200 shadow-2xs"
             >
-              <span>View Public Page</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
-          )}
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+              <span>Connect Google Reviews</span>
+            </button>
+
+            {profile?.slug && (
+              <Link
+                to={`/coaching/${profile.slug}`}
+                target="_blank"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold rounded-full transition-colors border border-neutral-200/80"
+              >
+                <span>View Public Page</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Navigation Tabs */}
@@ -402,13 +415,13 @@ export default function MarketplaceSettings() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-neutral-700 mb-1.5">City *</label>
-                  <input
-                    type="text"
-                    required
-                    value={city}
+                  <select
+                    value={city || 'Muzaffarnagar'}
                     onChange={(e) => setCity(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
-                  />
+                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 cursor-pointer"
+                  >
+                    <option value="Muzaffarnagar">Muzaffarnagar</option>
+                  </select>
                 </div>
 
                 <div>
@@ -618,6 +631,17 @@ export default function MarketplaceSettings() {
           </div>
         )}
       </div>
+
+      {profile && (
+        <GooglePlaceConnectModal
+          isOpen={showGoogleModal}
+          onClose={() => setShowGoogleModal(false)}
+          instituteId={profile.id}
+          onSyncSuccess={() => {
+            fetchProfileAndLeads();
+          }}
+        />
+      )}
     </Layout>
   );
 }

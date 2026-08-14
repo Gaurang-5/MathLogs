@@ -5,10 +5,15 @@ import {
   ArrowRight, Loader2, BookOpen, ChevronRight, X, Filter, Phone, MessageCircle
 } from 'lucide-react';
 import CoachingCard, { type CoachingItem } from '../components/CoachingCard';
+import { useMetaTags } from '../hooks/useMetaTags';
 
 const FEATURED_SUBJECTS = [
   'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Science',
   'English', 'Hindi', 'Commerce', 'Computer Science'
+];
+
+const FEATURED_CLASSES = [
+  'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12', 'JEE / NEET', 'Dropper'
 ];
 
 const SORT_OPTIONS = [
@@ -18,11 +23,16 @@ const SORT_OPTIONS = [
 ];
 
 export default function MarketplaceHome() {
+  useMetaTags({
+    title: 'Find Top Coaching Institutes & Tutors - MathLogs Marketplace',
+    description: 'Explore top verified coaching centers, courses offered, fee structures, reviews, and direct WhatsApp contact in your city.'
+  });
   const [coachings, setCoachings] = useState<CoachingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedCity, setSelectedCity] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedCity, setSelectedCity] = useState('Muzaffarnagar');
   const [sortBy, setSortBy] = useState('rating');
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -34,6 +44,7 @@ export default function MarketplaceHome() {
       const queryParams = new URLSearchParams();
       if (searchTerm) queryParams.append('q', searchTerm);
       if (selectedSubject) queryParams.append('subject', selectedSubject);
+      if (selectedClass) queryParams.append('classGrade', selectedClass);
       if (selectedCity) queryParams.append('city', selectedCity);
       if (sortBy) queryParams.append('sortBy', sortBy);
 
@@ -51,7 +62,7 @@ export default function MarketplaceHome() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, selectedSubject, selectedCity, sortBy]);
+  }, [searchTerm, selectedSubject, selectedClass, selectedCity, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -76,14 +87,30 @@ export default function MarketplaceHome() {
     setFilterOpen(false);
   };
 
-  const hasActiveFilters = selectedSubject || selectedCity;
+  const handleClassClick = (cls: string) => {
+    setSelectedClass(prev => (prev === cls ? '' : cls));
+    setFilterOpen(false);
+  };
+
+  const hasActiveFilters = selectedSubject || selectedClass || selectedCity;
 
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedSubject('');
+    setSelectedClass('');
     setSelectedCity('');
     setSortBy('rating');
   };
+
+  const displayCities = Array.from(
+    new Set(
+      (availableCities.length > 0 ? availableCities : ['Muzaffarnagar']).map(c => {
+        const l = c.trim().toLowerCase();
+        if (l.includes('muzaffarnagar') || l.includes('muaffarnagar')) return 'Muzaffarnagar';
+        return c.trim();
+      })
+    )
+  );
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col font-sans text-neutral-900 selection:bg-neutral-900 selection:text-white relative overflow-x-hidden">
@@ -98,73 +125,56 @@ export default function MarketplaceHome() {
 
           {/* Center: Mobile search pill */}
           <div className="flex-1 max-w-md">
-            <div className="flex items-center gap-2 bg-neutral-100 rounded-full px-4 py-2 border border-neutral-200/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-neutral-900 transition-all">
-              <Search className="w-4 h-4 text-neutral-400 shrink-0" />
+            <div className="relative">
+              <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-neutral-400" />
               <input
                 type="text"
-                placeholder="Search coachings, teachers..."
+                placeholder="Search coaching by name or teacher..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-transparent text-sm text-neutral-900 font-medium outline-none placeholder:text-neutral-400"
+                className="w-full bg-neutral-100/80 border border-neutral-200/60 text-xs sm:text-sm text-neutral-900 pl-9 pr-4 py-2 rounded-full outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 transition-all font-medium"
               />
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="shrink-0 text-neutral-400 hover:text-neutral-700">
-                  <X className="w-3.5 h-3.5" />
+                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-2.5 text-neutral-400 hover:text-neutral-600">
+                  <X className="w-4 h-4" />
                 </button>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Filter button (mobile) */}
-            <button
-              onClick={() => setFilterOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-bold transition-all sm:hidden ${hasActiveFilters ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200/80 hover:border-neutral-400'}`}
-            >
-              <Filter className="w-3.5 h-3.5" />
-              {hasActiveFilters ? 'Filtered' : 'Filter'}
-            </button>
-
+          <div className="flex items-center gap-2">
             <Link
               to="/onboarding"
-              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 rounded-full transition-all hover:shadow-md active:scale-95"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-bold rounded-full transition-all shadow-sm active:scale-95"
             >
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>List Coaching Free</span>
-            </Link>
-            <Link
-              to="/login"
-              className="text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition-colors px-2 py-2 hidden sm:block"
-            >
-              Sign In
+              <span>List Your Coaching</span>
             </Link>
           </div>
         </div>
       </header>
 
-      {/* ── Hero Section ───────────────────────────────────────────────────── */}
-      <section className="relative z-10 pt-10 pb-8 px-4 sm:px-6 bg-white border-b border-neutral-200/60">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold mb-5 shadow-xs">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-            <span>Find Verified Local Teachers &amp; Coaching Classes</span>
+      {/* ── Hero / Search Bar Section ──────────────────────────────────────── */}
+      <section className="bg-white border-b border-neutral-200/60 py-8 sm:py-12 px-4 sm:px-6 relative overflow-hidden">
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-50 text-amber-800 border border-amber-200/80 text-xs font-bold rounded-full mb-4 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span>Find Best Coaching Institutes</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tighter text-[#1A1F36] leading-tight">
-            Discover Top Coaching Classes<br className="hidden sm:block" />
-            &amp; Teachers Near You
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-neutral-900 tracking-tight leading-tight mb-3">
+            Discover Top Coaching Centers & Faculty
           </h1>
-          <p className="mt-3 text-sm sm:text-base text-neutral-500 font-medium max-w-xl mx-auto">
-            Search by subject, teacher name, or city. Connect directly via WhatsApp or phone call.
+          <p className="text-sm sm:text-base text-neutral-500 font-medium max-w-xl mx-auto mb-8">
+            Compare verified coaching profiles, student reviews, offered subjects, and contact teachers directly.
           </p>
 
-          {/* Desktop Search Bar */}
-          <div className="mt-7 hidden md:flex bg-white p-2.5 rounded-[2rem] shadow-md border border-neutral-200/80 gap-2 max-w-3xl mx-auto">
-            <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-neutral-50 rounded-[1.5rem] border border-neutral-200/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-neutral-900 transition-all">
+          {/* Desktop Search Box */}
+          <div className="hidden sm:flex items-center gap-2 p-2 bg-white rounded-[2rem] border border-neutral-300 shadow-xl max-w-3xl mx-auto">
+            <div className="flex-1 flex items-center gap-2.5 px-4">
               <Search className="w-5 h-5 text-neutral-400 shrink-0" />
               <input
                 type="text"
-                placeholder="Search by subject, teacher name, coaching name or area..."
+                placeholder="Search coaching name, teacher, subject, or location..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-transparent text-sm text-neutral-900 font-medium outline-none placeholder:text-neutral-400"
@@ -178,7 +188,7 @@ export default function MarketplaceHome() {
                 className="w-full bg-transparent text-sm font-semibold text-neutral-800 outline-none cursor-pointer"
               >
                 <option value="">All Cities</option>
-                {availableCities.map((city) => (
+                {displayCities.map((city) => (
                   <option key={city} value={city}>{city}</option>
                 ))}
               </select>
@@ -192,9 +202,29 @@ export default function MarketplaceHome() {
             </button>
           </div>
 
+          {/* Class-by-Class Filter Pills */}
+          <div className="mt-5 flex gap-2 items-center overflow-x-auto pb-1 scrollbar-hide justify-start sm:justify-center">
+            <span className="text-xs text-neutral-400 font-bold uppercase tracking-wider shrink-0 mr-1">Class:</span>
+            {FEATURED_CLASSES.map((cls) => {
+              const active = selectedClass === cls;
+              return (
+                <button
+                  key={cls}
+                  onClick={() => handleClassClick(cls)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all border ${active
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-sm scale-105'
+                    : 'bg-amber-50/60 text-amber-900 hover:bg-amber-100/80 border-amber-200/80'
+                  }`}
+                >
+                  {cls}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Subject Pills */}
-          <div className="mt-6 flex gap-2 items-center overflow-x-auto pb-1 scrollbar-hide justify-start sm:justify-center">
-            <span className="text-xs text-neutral-400 font-bold uppercase tracking-wider shrink-0 mr-1">Subjects:</span>
+          <div className="mt-3 flex gap-2 items-center overflow-x-auto pb-1 scrollbar-hide justify-start sm:justify-center">
+            <span className="text-xs text-neutral-400 font-bold uppercase tracking-wider shrink-0 mr-1">Subject:</span>
             {FEATURED_SUBJECTS.map((subj) => {
               const active = selectedSubject === subj;
               return (
@@ -227,6 +257,12 @@ export default function MarketplaceHome() {
             </h2>
             {hasActiveFilters && (
               <div className="flex items-center gap-2 mt-1">
+                {selectedClass && (
+                  <span className="text-[11px] bg-amber-600 text-white font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    {selectedClass}
+                    <button onClick={() => setSelectedClass('')}><X className="w-3 h-3" /></button>
+                  </span>
+                )}
                 {selectedSubject && (
                   <span className="text-[11px] bg-neutral-900 text-white font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                     {selectedSubject}
@@ -333,7 +369,7 @@ export default function MarketplaceHome() {
                   >
                     All Cities
                   </button>
-                  {availableCities.map(city => (
+                  {displayCities.map(city => (
                     <button
                       key={city}
                       onClick={() => setSelectedCity(city)}
@@ -422,6 +458,33 @@ export default function MarketplaceHome() {
           </Link>
         </div>
       </footer>
+
+      {/* ── Public Mobile Floating Bottom Navigation ──────────────────────────── */}
+      <div className="fixed bottom-4 left-4 right-4 z-40 bg-white/95 backdrop-blur-2xl border border-neutral-200/90 shadow-[0_16px_36px_rgba(0,0,0,0.12)] rounded-full h-14 px-4 flex items-center justify-between sm:hidden">
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="flex flex-col items-center justify-center flex-1 text-neutral-900 active:scale-95 transition-transform"
+        >
+          <Search className="w-4 h-4 text-neutral-900" />
+          <span className="text-[10px] font-extrabold mt-0.5">Explore</span>
+        </button>
+
+        <button
+          onClick={() => setFilterOpen(true)}
+          className={`flex flex-col items-center justify-center flex-1 active:scale-95 transition-transform ${hasActiveFilters ? 'text-amber-600' : 'text-neutral-600'}`}
+        >
+          <Filter className="w-4 h-4" />
+          <span className="text-[10px] font-extrabold mt-0.5">{hasActiveFilters ? 'Filtered' : 'Filter'}</span>
+        </button>
+
+        <Link
+          to="/onboarding"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-900 text-white rounded-full text-xs font-extrabold shadow-sm active:scale-95 transition-transform shrink-0"
+        >
+          <GraduationCap className="w-3.5 h-3.5 text-amber-400" />
+          <span>List Free</span>
+        </Link>
+      </div>
     </div>
   );
 }

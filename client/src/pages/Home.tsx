@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ChevronRight, MessageSquare, Shield,
-    CheckCircle, ArrowRight, Database, LineChart,
+    CheckCircle, CheckCircle2, ArrowRight, Database, LineChart,
     Camera, X, Maximize2, Settings,
     Download, FileText, Printer, Wallet, Plus, Minus,
     Sparkles
@@ -192,6 +192,7 @@ function FloatingPaths({ position }: { position: number }) {
 export default function Home() {
     const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [activePricingTab, setActivePricingTab] = useState<'all' | 'listing' | 'quiz' | 'erp'>('all');
     const carouselRef = useRef<HTMLDivElement>(null);
     
     const isFreeTrial = true;
@@ -231,8 +232,42 @@ export default function Home() {
 
             {/* SOFT AMBIENT ANIMATED BACKGROUND */}
             <div className="absolute top-0 left-0 w-full min-h-[180vh] md:min-h-[130vh] pointer-events-none overflow-hidden z-0 bg-neutral-50">
-                {/* Ambient Glowing Orbs — mix-blend-multiply removed for Safari/mobile compat */}
-                <div className="absolute inset-0 w-full h-full">
+                {/* Mobile Specific Theme-Matched Ambient Glowing Orbs */}
+                <div className="md:hidden absolute inset-0 w-full h-full">
+                    {/* Top Right Mobile Floating Indigo/Slate Glow */}
+                    <motion.div
+                        animate={{
+                            x: [0, -30, 20, 0],
+                            y: [0, 40, -20, 0],
+                            scale: [1, 1.2, 0.95, 1],
+                            rotate: [0, 60, 120, 0],
+                        }}
+                        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute -top-12 -right-12 w-[85vw] h-[85vw] bg-gradient-to-bl from-indigo-500/20 via-slate-400/15 to-indigo-300/10 rounded-full blur-[55px] opacity-80 will-change-transform"
+                    />
+                    {/* Center Left Mobile Floating Slate/Blue Glow */}
+                    <motion.div
+                        animate={{
+                            x: [0, 35, -25, 0],
+                            y: [0, -25, 25, 0],
+                            scale: [0.95, 1.15, 1, 0.95],
+                        }}
+                        transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute top-[22%] -left-16 w-[80vw] h-[80vw] bg-gradient-to-tr from-slate-400/18 via-indigo-300/12 to-neutral-200/10 rounded-full blur-[60px] opacity-75 will-change-transform"
+                    />
+                    {/* Center Deep Indigo Ambient Pulse Accent */}
+                    <motion.div
+                        animate={{
+                            opacity: [0.3, 0.7, 0.3],
+                            scale: [0.9, 1.1, 0.9],
+                        }}
+                        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute top-[12%] right-[10%] w-40 h-40 bg-indigo-500/15 rounded-full blur-[40px]"
+                    />
+                </div>
+
+                {/* Desktop Ambient Glowing Orbs */}
+                <div className="hidden md:block absolute inset-0 w-full h-full">
                     {/* Center Right - Main Indigo/Teal Glow */}
                     <motion.div
                         animate={{
@@ -241,7 +276,7 @@ export default function Home() {
                             scale: [1, 1.1, 1],
                         }}
                         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[-5%] right-[-10%] w-[80vw] h-[80vw] md:w-[65vw] md:h-[65vw] bg-gradient-to-bl from-neutral-300 via-neutral-200 to-transparent rounded-full blur-[80px] md:blur-[120px] opacity-50 will-change-transform"
+                        className="absolute top-[-5%] right-[-10%] w-[65vw] h-[65vw] bg-gradient-to-bl from-neutral-300 via-neutral-200 to-transparent rounded-full blur-[120px] opacity-50 will-change-transform"
                     />
                     {/* Bottom Right - Blue Glow */}
                     <motion.div
@@ -251,7 +286,7 @@ export default function Home() {
                             scale: [1.1, 1, 1.1],
                         }}
                         transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[30%] right-[10%] w-[70vw] h-[70vw] md:w-[50vw] md:h-[50vw] bg-gradient-to-tr from-neutral-300 via-neutral-100 to-transparent rounded-full blur-[80px] md:blur-[140px] opacity-45 will-change-transform"
+                        className="absolute top-[30%] right-[10%] w-[50vw] h-[50vw] bg-gradient-to-tr from-neutral-300 via-neutral-100 to-transparent rounded-full blur-[140px] opacity-45 will-change-transform"
                     />
                     {/* Left - Soft Pink/Peach Glow */}
                     <motion.div
@@ -261,7 +296,7 @@ export default function Home() {
                             scale: [1, 1.05, 1],
                         }}
                         transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[10%] left-[-20%] w-[75vw] h-[75vw] md:w-[60vw] md:h-[60vw] bg-gradient-to-br from-neutral-200 via-neutral-100 to-transparent rounded-full blur-[80px] md:blur-[140px] opacity-50 will-change-transform"
+                        className="absolute top-[10%] left-[-20%] w-[60vw] h-[60vw] bg-gradient-to-br from-neutral-200 via-neutral-100 to-transparent rounded-full blur-[140px] opacity-50 will-change-transform"
                     />
                     {/* Center - Deep Blue Accent */}
                     <motion.div
@@ -270,11 +305,11 @@ export default function Home() {
                             y: [0, -20, 30, 0],
                         }}
                         transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[20%] left-[20%] w-[55vw] h-[55vw] md:w-[40vw] md:h-[40vw] bg-neutral-200 rounded-full blur-[80px] md:blur-[150px] opacity-35 will-change-transform"
+                        className="absolute top-[20%] left-[20%] w-[40vw] h-[40vw] bg-neutral-200 rounded-full blur-[150px] opacity-35 will-change-transform"
                     />
                 </div>
-                {/* Glassmorphism overlay — lighter blur on mobile */}
-                <div className="absolute inset-0 bg-white/30 backdrop-blur-[40px] md:backdrop-blur-[100px] z-0 [mask-image:linear-gradient(to_bottom,white_40%,transparent_100%)]" />
+                {/* Glassmorphism overlay */}
+                <div className="absolute inset-0 bg-white/20 backdrop-blur-[20px] md:backdrop-blur-[100px] z-0 [mask-image:linear-gradient(to_bottom,white_40%,transparent_100%)]" />
 
                 {/* Floating path lines */}
                 <div className="absolute inset-0 z-[1] opacity-30 md:opacity-40 text-slate-900">
@@ -283,56 +318,73 @@ export default function Home() {
                 </div>
             </div>
 
-            {/* NAV BAR */}
-            <nav role="navigation" aria-label="Main navigation" className="relative z-50 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
-                <div className="flex items-center gap-2.5">
-                    <img src="/logo-64.webp" alt="MathLogs Logo" width={36} height={36} fetchPriority="high" className="w-9 h-9 rounded-xl shadow-md border border-neutral-100 object-cover" />
-                    <span className="text-[22px] font-extrabold tracking-tight text-neutral-900">MathLogs</span>
-                </div>
+            {/* APPLE TRANSLUCENT GLASS NAV BAR */}
+            <nav role="navigation" aria-label="Main navigation" className="sticky top-0 z-50 bg-white/70 backdrop-blur-2xl saturate-180 border-b border-white/40 shadow-xs px-6 py-4">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <Link to="/" className="flex items-center gap-2.5">
+                        <motion.img
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            src="/logo-64.webp"
+                            alt="MathLogs Logo"
+                            width={36}
+                            height={36}
+                            fetchPriority="high"
+                            className="w-9 h-9 rounded-xl shadow-xs border border-white/60 object-cover"
+                        />
+                        <span className="text-[22px] font-extrabold tracking-[-0.025em] text-neutral-900">MathLogs</span>
+                    </Link>
 
-                {/* Desktop links */}
-                <div className="hidden md:flex items-center gap-8 font-medium text-sm text-neutral-600">
-                    <Link to="/coaching" className="text-indigo-600 font-bold hover:text-indigo-800 transition-colors flex items-center gap-1">
-                        <span>Find Coaching</span>
-                        <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-extrabold">NEW</span>
-                    </Link>
-                    <a href="#features" className="hover:text-neutral-900 transition-colors">Features</a>
-                    <a href="#pricing" className="hover:text-neutral-900 transition-colors">Pricing</a>
-                    <a href="#contact" className="hover:text-neutral-900 transition-colors">Contact Us</a>
-                </div>
+                    {/* Desktop links */}
+                    <div className="hidden md:flex items-center gap-8 font-semibold text-sm text-neutral-600">
+                        <Link to="/coaching" className="text-indigo-600 font-bold hover:text-indigo-800 transition-colors flex items-center gap-1">
+                            <span>Find Coaching</span>
+                            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-extrabold">NEW</span>
+                        </Link>
+                        <a href="#features" className="hover:text-neutral-900 transition-colors">Features</a>
+                        <a href="#pricing" className="hover:text-neutral-900 transition-colors">Pricing</a>
+                        <a href="https://wa.me/919557940807?text=Hi%20MathLogs%2C%20I%20would%20like%20to%20inquire%20about%20your%20coaching%20management%20platform." target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 transition-colors">Contact Us</a>
+                    </div>
 
-                {/* Desktop CTA */}
-                <div className="hidden md:flex items-center gap-4">
-                    <Link to="/login" className="text-sm font-semibold text-neutral-700 hover:text-neutral-900 transition-colors">
-                        Sign in
-                    </Link>
-                    <Link
-                        to="/onboarding"
-                        className="group relative inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 text-white text-sm font-semibold rounded-full overflow-hidden transition-all hover:bg-neutral-800 hover:shadow-lg hover:shadow-black/10 active:scale-95"
-                    >
-                        <span>Sign Up</span>
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                </div>
+                    {/* Desktop CTA */}
+                    <div className="hidden md:flex items-center gap-4">
+                        <Link to="/login" className="text-sm font-semibold text-neutral-700 hover:text-neutral-900 transition-colors px-3 py-2">
+                            Sign in
+                        </Link>
+                        <Link to="/onboarding">
+                            <motion.button
+                                whileTap={{ scale: 0.95 }}
+                                whileHover={{ scale: 1.02 }}
+                                className="group relative inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 text-white text-sm font-bold rounded-full overflow-hidden transition-colors shadow-xs cursor-pointer"
+                            >
+                                <span>Sign Up</span>
+                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            </motion.button>
+                        </Link>
+                    </div>
 
-                {/* Mobile: Sign Up + Hamburger */}
-                <div className="flex md:hidden items-center gap-3">
-                    <Link
-                        to="/onboarding"
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-neutral-900 text-white text-sm font-semibold rounded-full"
-                    >
-                        Sign Up
-                    </Link>
-                    <button
-                        onClick={() => setMobileMenuOpen(o => !o)}
-                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        aria-expanded={mobileMenuOpen}
-                        className="w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl bg-white border border-neutral-200 shadow-sm"
-                    >
-                        <span className={`block w-5 h-0.5 bg-neutral-800 transition-all duration-300 ${mobileMenuOpen ? 'rotate-45 translate-y-2' : ''}`} />
-                        <span className={`block w-5 h-0.5 bg-neutral-800 transition-all duration-300 ${mobileMenuOpen ? 'opacity-0' : ''}`} />
-                        <span className={`block w-5 h-0.5 bg-neutral-800 transition-all duration-300 ${mobileMenuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
-                    </button>
+                    {/* Mobile: Find Coaching + Hamburger */}
+                    <div className="flex md:hidden items-center gap-2">
+                        <Link to="/coaching">
+                            <motion.button
+                                whileTap={{ scale: 0.95 }}
+                                className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-extrabold rounded-full shadow-2xs cursor-pointer"
+                            >
+                                <span>Find Coaching</span>
+                            </motion.button>
+                        </Link>
+                        <motion.button
+                            whileTap={{ scale: 0.92 }}
+                            onClick={() => setMobileMenuOpen(o => !o)}
+                            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                            aria-expanded={mobileMenuOpen}
+                            className="w-9 h-9 flex flex-col items-center justify-center gap-1 rounded-xl bg-white/80 backdrop-blur-md border border-neutral-200 shadow-2xs cursor-pointer shrink-0"
+                        >
+                            <span className={`block w-4 h-0.5 bg-neutral-800 transition-all duration-300 ${mobileMenuOpen ? 'rotate-45 translate-y-1.5' : ''}`} />
+                            <span className={`block w-4 h-0.5 bg-neutral-800 transition-all duration-300 ${mobileMenuOpen ? 'opacity-0' : ''}`} />
+                            <span className={`block w-4 h-0.5 bg-neutral-800 transition-all duration-300 ${mobileMenuOpen ? '-rotate-45 -translate-y-1.5' : ''}`} />
+                        </motion.button>
+                    </div>
                 </div>
             </nav>
 
@@ -344,12 +396,16 @@ export default function Home() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
                         transition={{ duration: 0.2 }}
-                        className="relative z-40 md:hidden mx-4 mb-2 bg-white/90 backdrop-blur-xl rounded-2xl border border-neutral-200/80 shadow-lg overflow-hidden"
+                        className="relative z-40 md:hidden mx-4 mb-2 bg-white/95 backdrop-blur-2xl rounded-2xl border border-neutral-200 shadow-xl overflow-hidden"
                     >
                         <div className="flex flex-col py-2">
-                            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="px-6 py-4 text-base font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors">Features</a>
+                            <Link to="/coaching" onClick={() => setMobileMenuOpen(false)} className="px-6 py-3.5 text-base font-extrabold text-indigo-600 bg-indigo-50/70 hover:bg-indigo-100 flex items-center justify-between transition-colors">
+                                <span>Find Coaching Marketplace</span>
+                                <span className="text-[10px] bg-indigo-600 text-white font-extrabold px-2.5 py-0.5 rounded-full">EXPLORE</span>
+                            </Link>
+                            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="px-6 py-3.5 text-base font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors">Features</a>
                             <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="px-6 py-4 text-base font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors">Pricing</a>
-                            <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="px-6 py-4 text-base font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors">Contact Us</a>
+                            <a href="https://wa.me/919557940807?text=Hi%20MathLogs%2C%20I%20would%20like%20to%20inquire%20about%20your%20coaching%20management%20platform." target="_blank" rel="noopener noreferrer" onClick={() => setMobileMenuOpen(false)} className="px-6 py-4 text-base font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors">Contact Us</a>
                             <div className="mx-4 my-2 h-px bg-neutral-100" />
                             <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="px-6 py-4 text-base font-semibold text-neutral-500 hover:bg-neutral-50 transition-colors">Sign in</Link>
                         </div>
@@ -381,12 +437,23 @@ export default function Home() {
                 <div className="max-w-7xl mx-auto lg:flex-none lg:block flex-1 flex flex-col">
                     <div className="grid lg:grid-cols-2 gap-8 items-center">
 
-                        {/* HERO TEXT (LEFT) */}
-                        <div className="relative z-20 max-w-2xl">
-                            <h1 className="text-[2.75rem] sm:text-[3.5rem] md:text-[5rem] font-extrabold tracking-tighter leading-[1.05] mb-5 text-[#1A1F36]">
+                        {/* HERO TEXT (LEFT ON DESKTOP, CENTERED ON MOBILE) */}
+                        <div className="relative z-20 max-w-2xl text-center md:text-left mx-auto md:mx-0 flex flex-col items-center md:items-start">
+                            {/* Glass Badge */}
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neutral-900/5 border border-neutral-900/10 text-neutral-800 text-xs font-semibold mb-6 shadow-2xs backdrop-blur-md"
+                            >
+                                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <span>MathLogs • Unified Coaching Operating System</span>
+                            </motion.div>
+
+                            <h1 className="text-[2.25rem] sm:text-[3.5rem] md:text-[4.75rem] font-black tracking-[-0.04em] leading-[1.08] mb-6 text-neutral-900">
                                 Everything you need for
                                 {/* Fixed-height block prevents layout shift when typed text changes line count */}
-                                <span className="block min-h-[2.2em] sm:min-h-[1.15em]">
+                                <span className="block min-h-[2em] sm:min-h-[1.15em] text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-indigo-950 to-neutral-700">
                                     <TypewriterText texts={[
                                         "modern coaching.",
                                         "online quizzes.",
@@ -396,10 +463,10 @@ export default function Home() {
                                 </span>
                             </h1>
 
-                            <p className="text-lg md:text-2xl text-neutral-500 font-medium leading-relaxed mb-8 max-w-lg">
+                            <p className="text-base sm:text-lg md:text-xl text-neutral-600 font-medium leading-relaxed mb-8 max-w-xl text-center md:text-left">
                                 Spend less time on paperwork.{' '}
                                 {/* Fixed height prevents jump between subtitle phrases */}
-                                <span className="block min-h-[1.6em] text-neutral-700 font-semibold">
+                                <span className="inline-block font-semibold text-neutral-900">
                                     <TypewriterText texts={[
                                         "More time teaching.",
                                         "More time with students.",
@@ -408,22 +475,41 @@ export default function Home() {
                                 </span>
                             </p>
 
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                            <div className="w-full max-w-xs sm:max-w-none flex flex-col sm:flex-row items-center justify-center md:justify-start gap-3 sm:gap-4 mx-auto md:mx-0">
                                 <Link
                                     to="/onboarding"
-                                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-neutral-900 text-white font-bold rounded-full transition-all hover:bg-neutral-800 hover:shadow-lg hover:shadow-neutral-500/25 active:scale-95 group"
+                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-4 bg-neutral-900 hover:bg-black text-white text-sm font-extrabold rounded-full transition-all shadow-md shadow-neutral-950/15 hover:shadow-xl hover:shadow-neutral-950/25 active:scale-95 group"
                                 >
-                                    Get Started
-                                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                    <span>Get Started Free</span>
+                                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
+                                        <ChevronRight className="w-4 h-4 text-white" />
+                                    </div>
                                 </Link>
                                 <a
-                                    href="https://docs.google.com/forms/d/e/1FAIpQLSf_iZpFA8pDCv5ESQ8OwESB7YzlMjWETwwRirk-MV6LddQBeQ/viewform"
+                                    href="https://wa.me/919557940807?text=Hi%20MathLogs%2C%20I%20would%20like%20to%20inquire%20about%20your%20coaching%20management%20platform."
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center px-8 py-4 font-bold text-neutral-700 border border-neutral-200 rounded-full hover:bg-neutral-100 transition-colors bg-white/60"
+                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-4 bg-emerald-50/90 hover:bg-emerald-100/90 border border-emerald-200/80 text-emerald-900 text-sm font-extrabold rounded-full transition-all shadow-2xs active:scale-95 group"
                                 >
-                                    Request Demo
+                                    <MessageSquare className="w-4 h-4 text-emerald-600 fill-emerald-600 group-hover:scale-110 transition-transform" />
+                                    <span>Contact Us</span>
                                 </a>
+                            </div>
+
+                            {/* Trust Badges */}
+                            <div className="mt-8 pt-4 flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2.5 text-xs font-semibold text-neutral-500 border-t border-neutral-200/40 w-full">
+                                <div className="flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                    <span>No Credit Card Required</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                    <span>14-Day Free Trial</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                    <span>Instant Setup</span>
+                                </div>
                             </div>
                         </div>
 
@@ -492,20 +578,23 @@ export default function Home() {
 
             {/* STRIPE-LIKE "UNIFIED PLATFORM" FEATURE GRID */}
             <section id="features" className="py-24 md:py-32 bg-neutral-50 relative z-20">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center max-w-3xl mx-auto mb-20">
-                        <h2 className="text-neutral-500 font-bold tracking-wider uppercase text-sm mb-4">A unified solution</h2>
-                        <h3 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-6">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                    <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-20">
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-neutral-900/5 border border-neutral-900/10 text-neutral-800 text-xs font-extrabold mb-4 uppercase tracking-wider">
+                            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>A Unified Solution</span>
+                        </div>
+                        <h3 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight mb-4 sm:mb-6 text-neutral-900 leading-tight">
                             Everything you need to run your center, built into one platform.
                         </h3>
-                        <p className="text-neutral-500 text-lg md:text-xl font-medium">
+                        <p className="text-neutral-500 text-sm sm:text-lg md:text-xl font-medium leading-relaxed max-w-2xl mx-auto">
                             Stop switching between WhatsApp web, Excel sheets, and paper registers.
                             MathLogs merges grading, communication, and fee tracking.
                         </p>
                     </div>
 
                     {/* Bento Grid layout */}
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
 
                         {/* Large Feature 1 - Intelligent Batch Management */}
                         <motion.div
@@ -513,25 +602,25 @@ export default function Home() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                            className="md:col-span-2 bg-white rounded-3xl md:rounded-[2.5rem] border border-neutral-100 shadow-sm hover:shadow-md transition-all group relative overflow-hidden flex flex-col pt-7 px-8 md:pt-8 md:px-12"
+                            className="md:col-span-2 bg-white rounded-2xl sm:rounded-3xl md:rounded-[2.5rem] border border-neutral-200/80 shadow-xs hover:shadow-md transition-all group relative overflow-hidden flex flex-col p-6 sm:p-8 md:pt-8 md:px-12"
                         >
                             {/* Icon + badge — same as other cards */}
-                            <div className="flex items-center gap-3 mb-5 z-20 relative">
-                                <div className="w-11 h-11 rounded-2xl bg-neutral-100 border border-neutral-200/60 flex items-center justify-center text-neutral-900 group-hover:scale-110 transition-transform shrink-0">
+                            <div className="flex items-center gap-3 mb-4 sm:mb-5 z-20 relative">
+                                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-neutral-100 border border-neutral-200/60 flex items-center justify-center text-neutral-900 group-hover:scale-110 transition-transform shrink-0">
                                     <Database className="w-5 h-5" />
                                 </div>
-                                <span className="text-[11px] font-bold text-neutral-700 bg-neutral-100 border border-neutral-200 px-3 py-1 rounded-full tracking-wide">Batch Management</span>
+                                <span className="text-[11px] font-extrabold text-neutral-700 bg-neutral-100 border border-neutral-200 px-3 py-1 rounded-full tracking-wide">Batch Management</span>
                             </div>
 
                             {/* Top row: Title and Expand Button */}
-                            <div className="flex justify-between items-start mb-6 z-20 relative w-full">
-                                <h4 className="text-[32px] md:text-[40px] font-bold tracking-[-0.03em] text-[#1a1f36] max-w-full max-w-[420px] leading-[1.1]">
+                            <div className="flex justify-between items-start mb-4 sm:mb-6 z-20 relative w-full gap-3">
+                                <h4 className="text-2xl sm:text-3xl md:text-[40px] font-bold tracking-[-0.03em] text-[#1a1f36] max-w-[420px] leading-[1.15]">
                                     Intelligent batch & student tracking
                                 </h4>
                                 <button
                                     onClick={() => setExpandedFeature('batch')}
                                     aria-label="Expand batch management details"
-                                    className="w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-neutral-700 hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-sm relative z-50 border border-neutral-200/50"
+                                    className="w-10 h-10 rounded-xl bg-[#f7f9fa] flex items-center justify-center text-neutral-700 hover:bg-[#f0f2f5] transition-colors shrink-0 cursor-pointer shadow-2xs relative z-50 border border-neutral-200/50"
                                 >
                                     <Maximize2 className="w-4 h-4" />
                                 </button>
@@ -945,125 +1034,172 @@ export default function Home() {
             </section>
 
             {/* PRICING SECTION */}
-            <section id="pricing" className="py-24 md:py-32 bg-neutral-50 relative z-20 border-t border-neutral-100">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-12 md:mb-16">
-                        <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-neutral-900 mb-6">
-                            Simple, transparent pricing
+            <section id="pricing" className="py-20 sm:py-28 md:py-32 bg-neutral-50 relative z-20 border-t border-neutral-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                    <div className="text-center mb-10 sm:mb-16">
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-extrabold mb-4 uppercase tracking-wider">
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Transparent Pricing</span>
+                        </div>
+                        <h2 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-neutral-900 mb-4 sm:mb-6">
+                            Simple, transparent plans for every center
                         </h2>
-                        <p className="text-xl text-neutral-500 max-w-2xl mx-auto mb-10">
+                        <p className="text-sm sm:text-lg text-neutral-500 max-w-xl mx-auto font-medium">
                             Choose the plan that fits your coaching center. Every plan includes 5 free monthly quiz credits.
                         </p>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
+                    {/* Mobile Interactive Plan Switcher */}
+                    <div className="flex md:hidden items-center justify-center p-1.5 bg-neutral-200/60 backdrop-blur-md rounded-2xl mb-8 max-w-sm mx-auto shadow-inner border border-neutral-200/80">
+                        <button
+                            onClick={() => setActivePricingTab('all')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activePricingTab === 'all' ? 'bg-white text-neutral-900 shadow-xs' : 'text-neutral-600'}`}
+                        >
+                            All Plans
+                        </button>
+                        <button
+                            onClick={() => setActivePricingTab('listing')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activePricingTab === 'listing' ? 'bg-emerald-600 text-white shadow-xs' : 'text-neutral-600'}`}
+                        >
+                            Free
+                        </button>
+                        <button
+                            onClick={() => setActivePricingTab('quiz')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activePricingTab === 'quiz' ? 'bg-neutral-900 text-white shadow-xs' : 'text-neutral-600'}`}
+                        >
+                            Quiz
+                        </button>
+                        <button
+                            onClick={() => setActivePricingTab('erp')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activePricingTab === 'erp' ? 'bg-neutral-900 text-white shadow-xs' : 'text-neutral-600'}`}
+                        >
+                            Full ERP
+                        </button>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto items-stretch">
                         {/* Listing Tier */}
-                        <div className="bg-white rounded-3xl p-8 border-2 border-emerald-500 shadow-md transition-transform hover:-translate-y-1 hover:shadow-lg flex flex-col justify-between relative">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-600 text-white text-[11px] font-bold uppercase tracking-wider py-1 px-3 rounded-full flex items-center gap-1 shadow-sm">
-                                <Sparkles className="w-3 h-3 fill-emerald-300" /> Limited Time Offer
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Marketplace Listing</h3>
-                                <p className="text-neutral-500 text-sm mb-4 h-10">Get discovered by local students in your city for free.</p>
-                                <div className="mb-6 flex flex-col">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xl font-bold text-neutral-400 line-through">₹99</span>
-                                        <span className="text-4xl font-extrabold text-neutral-900">FREE</span>
-                                    </div>
-                                    <span className="text-emerald-600 font-bold text-xs mt-1">100% Free Limited Time Offer</span>
+                        {(activePricingTab === 'all' || activePricingTab === 'listing') && (
+                            <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-emerald-500 shadow-md transition-all hover:shadow-xl flex flex-col justify-between relative mt-4 md:mt-0">
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-600 text-white text-[11px] font-extrabold uppercase tracking-wider py-1 px-3.5 rounded-full flex items-center gap-1 shadow-sm whitespace-nowrap">
+                                    <Sparkles className="w-3 h-3 fill-emerald-300" /> Limited Time Offer
                                 </div>
-                                <Link to="/onboarding?plan=listing" className="block w-full text-center py-3 px-4 rounded-full bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors mb-8 shadow-sm">
-                                    List Coaching Free
-                                </Link>
-                                <ul className="space-y-4">
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Marketplace Directory Listing</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Public Profile & Page Management</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Student Lead Enquiries & WhatsApp</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Google Maps Location Link</span>
-                                    </li>
-                                </ul>
+                                <div>
+                                    <h3 className="text-xl font-black text-neutral-900 mb-1">Marketplace Listing</h3>
+                                    <p className="text-neutral-500 text-xs sm:text-sm mb-4">Get discovered by local students in your city for free.</p>
+                                    <div className="mb-6 flex flex-col">
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-lg font-bold text-neutral-400 line-through">₹99</span>
+                                            <span className="text-3xl sm:text-4xl font-black text-neutral-900">FREE</span>
+                                        </div>
+                                        <span className="text-emerald-600 font-bold text-xs mt-1">100% Free Limited Time Offer</span>
+                                    </div>
+                                    <Link to="/onboarding?plan=listing" className="block w-full text-center py-3.5 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm transition-all mb-6 shadow-sm active:scale-95">
+                                        List Coaching Free
+                                    </Link>
+                                    <ul className="space-y-3.5 text-xs sm:text-sm">
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-700 font-medium">Marketplace Directory Listing</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-700 font-medium">Public Profile & Page Management</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-700 font-medium">Student Lead Enquiries & WhatsApp</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-700 font-medium">Google Maps Location Link</span>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Quiz Tier */}
-                        <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md flex flex-col justify-between">
-                            <div>
-                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Quiz Starter</h3>
-                                <p className="text-neutral-500 text-sm mb-6 h-10">Regular student testing and AI question generation.</p>
-                                <div className="mb-8">
-                                    <span className="text-4xl font-extrabold text-neutral-900">₹250</span>
-                                    <span className="text-neutral-500"> /mo</span>
+                        {(activePricingTab === 'all' || activePricingTab === 'quiz') && (
+                            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs transition-all hover:shadow-md flex flex-col justify-between mt-4 md:mt-0">
+                                <div>
+                                    <h3 className="text-xl font-black text-neutral-900 mb-1">Quiz Starter</h3>
+                                    <p className="text-neutral-500 text-xs sm:text-sm mb-4">Regular student testing and AI question generation.</p>
+                                    <div className="mb-6 flex items-baseline gap-1">
+                                        <span className="text-3xl sm:text-4xl font-black text-neutral-900">₹250</span>
+                                        <span className="text-neutral-500 text-xs font-semibold">/month</span>
+                                    </div>
+                                    <Link to="/onboarding" className="block w-full text-center py-3.5 px-4 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-900 font-extrabold text-sm transition-all mb-6 active:scale-95">
+                                        Get Started
+                                    </Link>
+                                    <ul className="space-y-3.5 text-xs sm:text-sm">
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-900 font-bold">5 Quiz Credits / Month (Reset Monthly)</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-700 font-medium">Quiz Builder & Auto-Grading</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-700 font-medium">Performance Analytics</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-700 font-medium">Buy Extra Credits Valid for Lifetime</span>
+                                        </li>
+                                    </ul>
                                 </div>
-                                <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-100 text-neutral-900 font-bold hover:bg-neutral-200 transition-colors mb-8">
-                                    Get Started
-                                </Link>
-                                <ul className="space-y-4">
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-900 font-medium">5 Quiz Credits / Month (Reset Monthly)</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Quiz Builder & Auto-Grading</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Performance Analytics</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Buy Extra Credits Valid for Lifetime</span>
-                                    </li>
-                                </ul>
                             </div>
-                        </div>
+                        )}
 
                         {/* All Inclusive Tier (Most Popular) */}
-                        <div className="bg-white rounded-3xl p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200 relative transform md:-translate-y-4 flex flex-col justify-between">
-                            <div>
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider py-1.5 px-3 rounded-full">
-                                    Most Popular
+                        {(activePricingTab === 'all' || activePricingTab === 'erp') && (
+                            <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200/50 relative transform md:-translate-y-4 flex flex-col justify-between mt-4 md:mt-0">
+                                <div>
+                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-neutral-900 text-white text-[11px] font-extrabold uppercase tracking-wider py-1 px-3.5 rounded-full whitespace-nowrap shadow-xs">
+                                        👑 Most Popular
+                                    </div>
+                                    <h3 className="text-xl font-black text-neutral-900 mb-1">All Inclusive</h3>
+                                    <p className="text-neutral-500 text-xs sm:text-sm mb-4">Complete ERP suite for coaching institutes.</p>
+                                    <div className="mb-6 flex items-baseline gap-1">
+                                        <span className="text-3xl sm:text-4xl font-black text-neutral-900">₹500</span>
+                                        <span className="text-neutral-500 text-xs font-semibold">/month</span>
+                                    </div>
+                                    <Link to="/onboarding" className="block w-full text-center py-3.5 px-4 rounded-full bg-neutral-900 hover:bg-black text-white font-extrabold text-sm transition-all mb-6 shadow-md active:scale-95">
+                                        Start 14-Day Free Trial
+                                    </Link>
+                                    <ul className="space-y-3.5 text-xs sm:text-sm">
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-900 font-bold">Full Student Management ERP</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-700 font-medium">Unlimited Batches & Fee Alerts</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-900 font-bold">5 Quiz Credits / Month (Reset Monthly)</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                            <span className="text-neutral-700 font-medium">Buy Extra Credits Valid for Lifetime</span>
+                                        </li>
+                                    </ul>
                                 </div>
-                                <h3 className="text-xl font-bold text-neutral-900 mb-2">All Inclusive</h3>
-                                <p className="text-neutral-500 text-sm mb-6 h-10">Complete ERP suite for coaching institutes.</p>
-                                <div className="mb-8">
-                                    <span className="text-4xl font-extrabold text-neutral-900">₹500</span>
-                                    <span className="text-neutral-500"> /mo</span>
-                                </div>
-                                <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-900 text-white font-bold hover:bg-neutral-800 transition-colors mb-8 shadow-md">
-                                    Start Free Trial
-                                </Link>
-                                <ul className="space-y-4">
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-900 font-medium">Full Student Management ERP</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Unlimited Batches & Fee Alerts</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-900 font-medium">5 Quiz Credits / Month (Reset Monthly)</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Buy Extra Credits Valid for Lifetime</span>
-                                    </li>
-                                </ul>
                             </div>
-                        </div>
+                        )}
+                    </div>
+
+                    {/* Guarantee Bar */}
+                    <div className="mt-12 text-center text-xs font-bold text-neutral-500 flex items-center justify-center gap-2 flex-wrap">
+                        <span>🔒 14-Day Free Trial</span>
+                        <span>•</span>
+                        <span>No Credit Card Required</span>
+                        <span>•</span>
+                        <span>Cancel Anytime</span>
                     </div>
                 </div>
             </section>
@@ -1123,12 +1259,13 @@ export default function Home() {
                             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </Link>
                         <a
-                            href="https://docs.google.com/forms/d/e/1FAIpQLSf_iZpFA8pDCv5ESQ8OwESB7YzlMjWETwwRirk-MV6LddQBeQ/viewform"
+                            href="https://wa.me/919557940807?text=Hi%20MathLogs%2C%20I%20would%20like%20to%20inquire%20about%20your%20coaching%20management%20platform."
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center px-6 py-3 bg-[#f3f4f6] text-neutral-900 text-xs md:text-sm font-bold tracking-wide rounded-full transition-colors hover:bg-neutral-200"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#f3f4f6] text-neutral-900 text-xs md:text-sm font-bold tracking-wide rounded-full transition-colors hover:bg-neutral-200"
                         >
-                            Request Demo
+                            <MessageSquare className="w-4 h-4 text-emerald-600 fill-emerald-600" />
+                            <span>Contact Us</span>
                         </a>
                     </div>
                 </div>

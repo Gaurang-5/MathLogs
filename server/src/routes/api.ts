@@ -10,14 +10,10 @@ import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
 import { getOnlineQuizAnalytics, getLiveQuizStatus, unlockQuizSubmission } from '../controllers/analyticsController';
-import { assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt } from '../controllers/feeController';
-
-
-
-import { getDashboardSummary, getFinancialGrowthStats } from '../controllers/dashboardController';
+import { assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt, getFeeInstallmentsList, getPaymentHistory } from '../controllers/feeController';
+import { getDashboardSummary, getFinancialGrowthStats, getInstallmentGrowthStats } from '../controllers/dashboardController';
 import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
 import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } from '../controllers/onboardingController';
-import { getPaymentHistory } from '../controllers/feeController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
 import { processOCRTextract } from '../utils/ocrTextract';
@@ -219,6 +215,7 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
 
 // Dashboard (Optimized endpoint)
 router.get('/dashboard/summary', authenticateToken as any, getDashboardSummary as any);
+router.get('/dashboard/installment-stats', authenticateToken as any, getInstallmentGrowthStats as any);
 
 // Auth
 router.post('/auth/login', authLimiter, validateRequest(loginSchema), loginAdmin as any);
@@ -299,6 +296,7 @@ router.post('/marks', authenticateToken as any, validateRequest(submitMarkSchema
 // Fees
 router.get('/fees', authenticateToken as any, getFeeSummary as any);
 router.get('/fees/summary', authenticateToken as any, getFeeSummary as any);
+router.get('/fees/installments-list', authenticateToken as any, getFeeInstallmentsList as any);
 router.get('/fees/download-pending', authenticateToken as any, downloadPendingFeesReport as any);
 // ✅ HIGH-2 FIX: Rate limiting on payment endpoints
 router.post('/fees/pay', authenticateToken as any, paymentLimiter, validateRequest(paymentSchema), recordPayment as any);
@@ -328,9 +326,11 @@ router.post('/billing/create', authenticateToken as any, createBillingSession as
 router.post('/billing/verify', authenticateToken as any, verifyBillingPayment as any);
 router.delete('/billing/cancel', authenticateToken as any, cancelSubscription as any);
 
-import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo } from '../controllers/instituteController';
+import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, deleteInstitute, getMyInstitute, uploadLogo, bulkImportInstitutes, toggleInstituteStatus } from '../controllers/instituteController';
 
 router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
+router.post('/institutes/bulk-import', authenticateToken as any, bulkImportInstitutes as any);
+router.patch('/institutes/:id/toggle-listing', authenticateToken as any, toggleInstituteStatus as any);
 router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
 router.put('/institutes/:id/details', authenticateToken as any, updateInstituteDetails as any);
 router.put('/institutes/:id/plan', authenticateToken as any, updateInstitutePlan as any);

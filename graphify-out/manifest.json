@@ -1,0 +1,1872 @@
+{
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/.github/java-upgrade/hooks/scripts/recordToolUse.ps1": {
+    "mtime": 1779707059.446974,
+    "ast_hash": "a76b05925b01d5e7a642eda1824e8fa7",
+    "semantic_hash": "a76b05925b01d5e7a642eda1824e8fa7"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/.github/java-upgrade/hooks/scripts/recordToolUse.sh": {
+    "mtime": 1779707059.4461803,
+    "ast_hash": "392b480c0ee4898af9652e8fc429f7cd",
+    "semantic_hash": "392b480c0ee4898af9652e8fc429f7cd"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/.github/modernize/java-upgrade/hooks/scripts/recordToolUse.ps1": {
+    "mtime": 1779978314.3418312,
+    "ast_hash": "9ecf230451dfd20ff4e0a2a01e80a4e6",
+    "semantic_hash": "9ecf230451dfd20ff4e0a2a01e80a4e6"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/.github/modernize/java-upgrade/hooks/scripts/recordToolUse.sh": {
+    "mtime": 1779978314.3412998,
+    "ast_hash": "e25ae501603ce6bf738198f5ce32ba83",
+    "semantic_hash": "e25ae501603ce6bf738198f5ce32ba83"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/app.json": {
+    "mtime": 1782266578.7770996,
+    "ast_hash": "0e11af69eb3b80e73751097710824db9",
+    "semantic_hash": "0e11af69eb3b80e73751097710824db9"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/build.gradle": {
+    "mtime": 1782266578.778772,
+    "ast_hash": "fe0f08f16b5282954cfdfff0d140588a",
+    "semantic_hash": "fe0f08f16b5282954cfdfff0d140588a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/capacitor.build.gradle": {
+    "mtime": 1782266578.779092,
+    "ast_hash": "b863e425fbde80251bd3c68ac8ccba02",
+    "semantic_hash": "b863e425fbde80251bd3c68ac8ccba02"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java": {
+    "mtime": 1782266578.7796974,
+    "ast_hash": "fbaf7cc870c663eb52dcf218531c439d",
+    "semantic_hash": "fbaf7cc870c663eb52dcf218531c439d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/assets/capacitor.config.json": {
+    "mtime": 1772051081.6392078,
+    "ast_hash": "c08fc3bd614ca81d251af95bd21101d0",
+    "semantic_hash": "c08fc3bd614ca81d251af95bd21101d0"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/assets/capacitor.plugins.json": {
+    "mtime": 1772051081.6493416,
+    "ast_hash": "58e0494c51d30eb3494f7c9198986bb9",
+    "semantic_hash": "58e0494c51d30eb3494f7c9198986bb9"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/java/com/mathlogs/app/MainActivity.java": {
+    "mtime": 1782266578.7802145,
+    "ast_hash": "6d758b835b02f2cbc49a689eb1331ce2",
+    "semantic_hash": "6d758b835b02f2cbc49a689eb1331ce2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java": {
+    "mtime": 1782266578.79296,
+    "ast_hash": "e91b4501c14da821682fa5c26a16d616",
+    "semantic_hash": "e91b4501c14da821682fa5c26a16d616"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/build.gradle": {
+    "mtime": 1782266578.7935126,
+    "ast_hash": "682315a426653617c6a74fc12bef55b6",
+    "semantic_hash": "682315a426653617c6a74fc12bef55b6"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/capacitor-cordova-android-plugins/build.gradle": {
+    "mtime": 1772051081.6555004,
+    "ast_hash": "2af61653d70c95d20802c8b5c433ba90",
+    "semantic_hash": "2af61653d70c95d20802c8b5c433ba90"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/capacitor-cordova-android-plugins/cordova.variables.gradle": {
+    "mtime": 1772051081.6556304,
+    "ast_hash": "d2372a0ae9aa60abb8d03e7f06bf9194",
+    "semantic_hash": "d2372a0ae9aa60abb8d03e7f06bf9194"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/capacitor.settings.gradle": {
+    "mtime": 1782266578.799398,
+    "ast_hash": "455ebb7f9fe84a6974da6bdae43097c2",
+    "semantic_hash": "455ebb7f9fe84a6974da6bdae43097c2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/gradlew": {
+    "mtime": 1782266578.8016582,
+    "ast_hash": "794669d78aef1dd5c7d889ef618b311a",
+    "semantic_hash": "794669d78aef1dd5c7d889ef618b311a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/settings.gradle": {
+    "mtime": 1782266578.803916,
+    "ast_hash": "f6cd925b3f859e23c3d819fe2459e0e4",
+    "semantic_hash": "f6cd925b3f859e23c3d819fe2459e0e4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/variables.gradle": {
+    "mtime": 1782266578.8045166,
+    "ast_hash": "4b3fce8ea2a515a9d2e47e74757172ec",
+    "semantic_hash": "4b3fce8ea2a515a9d2e47e74757172ec"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/capacitor.config.ts": {
+    "mtime": 1782266578.807057,
+    "ast_hash": "585ad76c542b5e67a7f6c29a3892a92e",
+    "semantic_hash": "585ad76c542b5e67a7f6c29a3892a92e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/eslint.config.js": {
+    "mtime": 1783875061.083028,
+    "ast_hash": "4957f5ea029105f7b60f2f8f95431b5d",
+    "semantic_hash": "4957f5ea029105f7b60f2f8f95431b5d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/App/AppDelegate.swift": {
+    "mtime": 1782266578.812832,
+    "ast_hash": "b2865a48d0e54c1613fa58272418bf98",
+    "semantic_hash": "b2865a48d0e54c1613fa58272418bf98"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json": {
+    "mtime": 1782266578.8147426,
+    "ast_hash": "7453c3002126811a57c38b2740f990cf",
+    "semantic_hash": "7453c3002126811a57c38b2740f990cf"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/App/Assets.xcassets/Contents.json": {
+    "mtime": 1782266578.8158262,
+    "ast_hash": "31cc68f34934a99c0b0c1bebde56309c",
+    "semantic_hash": "31cc68f34934a99c0b0c1bebde56309c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/App/Assets.xcassets/Splash.imageset/Contents.json": {
+    "mtime": 1782266578.8165522,
+    "ast_hash": "1162e1cddd7ea769bcacdd1aa7b4ac72",
+    "semantic_hash": "1162e1cddd7ea769bcacdd1aa7b4ac72"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/App/capacitor.config.json": {
+    "mtime": 1772051081.7024632,
+    "ast_hash": "d7634fcb48712e481c40b659b2790aac",
+    "semantic_hash": "d7634fcb48712e481c40b659b2790aac"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/CapApp-SPM/Package.swift": {
+    "mtime": 1782266578.8201964,
+    "ast_hash": "0c1f8d912696fa14f2912540962adace",
+    "semantic_hash": "0c1f8d912696fa14f2912540962adace"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/CapApp-SPM/Sources/CapApp-SPM/CapApp-SPM.swift": {
+    "mtime": 1782266578.8233087,
+    "ast_hash": "0d92cb44a62bc3f2d73464a2e4f9a890",
+    "semantic_hash": "0d92cb44a62bc3f2d73464a2e4f9a890"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/package.json": {
+    "mtime": 1783875061.084198,
+    "ast_hash": "f1d504c24d2353006821b013e4cee5bc",
+    "semantic_hash": "f1d504c24d2353006821b013e4cee5bc"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/postcss.config.js": {
+    "mtime": 1782266578.8316493,
+    "ast_hash": "4bf27959249b059f32e1f49202336ee5",
+    "semantic_hash": "4bf27959249b059f32e1f49202336ee5"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/App.tsx": {
+    "mtime": 1786036550.6318002,
+    "ast_hash": "95647ab4e40457d8c3473729c524011f",
+    "semantic_hash": "95647ab4e40457d8c3473729c524011f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/AITestGeneratorModal.tsx": {
+    "mtime": 1786038264.5449784,
+    "ast_hash": "c11eefb38b53fb49fd672bc58b2844cc",
+    "semantic_hash": "c11eefb38b53fb49fd672bc58b2844cc"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/ChunkErrorBoundary.tsx": {
+    "mtime": 1782266578.860725,
+    "ast_hash": "23300c12e2f50d6fe5270509b17db9f0",
+    "semantic_hash": "23300c12e2f50d6fe5270509b17db9f0"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/CoachingCard.tsx": {
+    "mtime": 1786030749.426597,
+    "ast_hash": "35c7cc8304d5d2aa4eba23a35046a173",
+    "semantic_hash": "35c7cc8304d5d2aa4eba23a35046a173"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/Dropdown.tsx": {
+    "mtime": 1782266578.8609436,
+    "ast_hash": "0c6546b7522106dbbb191a0ce14d38e7",
+    "semantic_hash": "0c6546b7522106dbbb191a0ce14d38e7"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/Layout.tsx": {
+    "mtime": 1786031132.0676732,
+    "ast_hash": "dafc8bc315becbfd06a804496808460a",
+    "semantic_hash": "dafc8bc315becbfd06a804496808460a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/ManualQuizModal.tsx": {
+    "mtime": 1786038246.8248482,
+    "ast_hash": "eeaee22708d0f748e4d25c793244862c",
+    "semantic_hash": "eeaee22708d0f748e4d25c793244862c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/PWAInstallPrompt.tsx": {
+    "mtime": 1782266578.8614876,
+    "ast_hash": "aa794701685d6cbba0ba57ff2deffb2f",
+    "semantic_hash": "aa794701685d6cbba0ba57ff2deffb2f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/QuickFeeModal.tsx": {
+    "mtime": 1782266578.8631613,
+    "ast_hash": "1dcf879991b6c2a6d4cc1239b35eb72c",
+    "semantic_hash": "1dcf879991b6c2a6d4cc1239b35eb72c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/QuizAnalytics.tsx": {
+    "mtime": 1782266578.8634799,
+    "ast_hash": "65986dd3f103511d2a4074de159b650f",
+    "semantic_hash": "65986dd3f103511d2a4074de159b650f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/QuizLiveMonitor.tsx": {
+    "mtime": 1785657433.0468347,
+    "ast_hash": "38d11a966642beb99b36fec11210f883",
+    "semantic_hash": "38d11a966642beb99b36fec11210f883"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/StudentProfileDrawer.tsx": {
+    "mtime": 1785678484.854775,
+    "ast_hash": "08a248b77fa31514f7f5afd7d81c23a2",
+    "semantic_hash": "08a248b77fa31514f7f5afd7d81c23a2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/StudentSearch.tsx": {
+    "mtime": 1785678369.3061302,
+    "ast_hash": "0a2485a4beb716afd8f11d6c5508ddf6",
+    "semantic_hash": "0a2485a4beb716afd8f11d6c5508ddf6"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/ToastProvider.tsx": {
+    "mtime": 1782266578.8642685,
+    "ast_hash": "64768129774e51cb78353c5d0651f5fb",
+    "semantic_hash": "64768129774e51cb78353c5d0651f5fb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/components/UpiVerificationList.tsx": {
+    "mtime": 1785657433.0478675,
+    "ast_hash": "ae091b8e0a2d5b8ad0f55983b9c91536",
+    "semantic_hash": "ae091b8e0a2d5b8ad0f55983b9c91536"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/main.tsx": {
+    "mtime": 1783875061.085319,
+    "ast_hash": "9bfc7cb44af81d61439f3b375e93c85f",
+    "semantic_hash": "9bfc7cb44af81d61439f3b375e93c85f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/monitoring/sentry.ts": {
+    "mtime": 1782266578.8652747,
+    "ast_hash": "a4d03b1e43a7ef565f584e053c74e01a",
+    "semantic_hash": "a4d03b1e43a7ef565f584e053c74e01a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/AboutUs.tsx": {
+    "mtime": 1782266578.866123,
+    "ast_hash": "e55792622e2be604a06fa4f2412b37fb",
+    "semantic_hash": "e55792622e2be604a06fa4f2412b37fb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/AdminLogin.tsx": {
+    "mtime": 1786035965.8895712,
+    "ast_hash": "a61158d8f74dfe8f21dadef70109f31c",
+    "semantic_hash": "a61158d8f74dfe8f21dadef70109f31c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/Approvals.tsx": {
+    "mtime": 1782266578.8666089,
+    "ast_hash": "b0b709ab985345ec0cb594cbb39b4203",
+    "semantic_hash": "b0b709ab985345ec0cb594cbb39b4203"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/BatchDetails.tsx": {
+    "mtime": 1785871112.3411448,
+    "ast_hash": "477d22b54af5dfea81b3ff242c44e330",
+    "semantic_hash": "477d22b54af5dfea81b3ff242c44e330"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/BatchList.tsx": {
+    "mtime": 1783875061.0863838,
+    "ast_hash": "0c96c489a15298edaf28d1b991e6d41b",
+    "semantic_hash": "0c96c489a15298edaf28d1b991e6d41b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/Billing.tsx": {
+    "mtime": 1786034828.8646398,
+    "ast_hash": "5777f8dd3cabdd237b408b0bec91dd85",
+    "semantic_hash": "5777f8dd3cabdd237b408b0bec91dd85"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/CheckStatus.tsx": {
+    "mtime": 1782266578.8681846,
+    "ast_hash": "1df62372b3940443225d38c33f40e1f9",
+    "semantic_hash": "1df62372b3940443225d38c33f40e1f9"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/CoachingProfile.tsx": {
+    "mtime": 1786030762.2530136,
+    "ast_hash": "f90390462e52b7aeadaa72ed4a8154ee",
+    "semantic_hash": "f90390462e52b7aeadaa72ed4a8154ee"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/Dashboard.tsx": {
+    "mtime": 1786031152.9567723,
+    "ast_hash": "cb52362d51bc803ed3fc66993be394e2",
+    "semantic_hash": "cb52362d51bc803ed3fc66993be394e2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/Fees.tsx": {
+    "mtime": 1785657433.0522873,
+    "ast_hash": "58f0de693f018d3e72bef7a9beef7894",
+    "semantic_hash": "58f0de693f018d3e72bef7a9beef7894"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/Home.tsx": {
+    "mtime": 1786034934.0242507,
+    "ast_hash": "b8f896d2649adfaaab3e5d6f4d2f091b",
+    "semantic_hash": "b8f896d2649adfaaab3e5d6f4d2f091b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/JoinOnboarding.tsx": {
+    "mtime": 1785657433.056071,
+    "ast_hash": "3463e0735a0f7e85ea449ec6c9e5fa92",
+    "semantic_hash": "3463e0735a0f7e85ea449ec6c9e5fa92"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/MarketplaceHome.tsx": {
+    "mtime": 1786036545.6601756,
+    "ast_hash": "c3cdeb548a5bbde5935f31a0155d263f",
+    "semantic_hash": "c3cdeb548a5bbde5935f31a0155d263f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/MarketplaceSettings.tsx": {
+    "mtime": 1786031102.4804184,
+    "ast_hash": "e08546cf806e04949da8ef332571d1fb",
+    "semantic_hash": "e08546cf806e04949da8ef332571d1fb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/Onboarding.tsx": {
+    "mtime": 1786036437.3579168,
+    "ast_hash": "a7edc16820a542bb8fca2a0068e3e2f5",
+    "semantic_hash": "a7edc16820a542bb8fca2a0068e3e2f5"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/PrivacyPolicy.tsx": {
+    "mtime": 1785657433.0577493,
+    "ast_hash": "9d2f40a2b2bae9dd7181e1370229bde9",
+    "semantic_hash": "9d2f40a2b2bae9dd7181e1370229bde9"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/QuizBilling.tsx": {
+    "mtime": 1785657433.0581706,
+    "ast_hash": "c137ef744e578c3f177b22a34281484b",
+    "semantic_hash": "c137ef744e578c3f177b22a34281484b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/QuizList.tsx": {
+    "mtime": 1786433627.0979986,
+    "ast_hash": "d2621f344efa3ce705193dece9443317",
+    "semantic_hash": "d2621f344efa3ce705193dece9443317"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/Register.tsx": {
+    "mtime": 1785657433.0618129,
+    "ast_hash": "cf3401fda9991a871e61badaa965c5ac",
+    "semantic_hash": "cf3401fda9991a871e61badaa965c5ac"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/ScanMarks.tsx": {
+    "mtime": 1782266578.8721676,
+    "ast_hash": "37169af52dc0c51d8a64149f924c4636",
+    "semantic_hash": "37169af52dc0c51d8a64149f924c4636"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/Settings.tsx": {
+    "mtime": 1785657433.0625744,
+    "ast_hash": "19fd8bb50d08896085f75d2d9125551e",
+    "semantic_hash": "19fd8bb50d08896085f75d2d9125551e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/SetupAccount.tsx": {
+    "mtime": 1785657433.0634344,
+    "ast_hash": "90ea36944da3ca98bbb248488617a651",
+    "semantic_hash": "90ea36944da3ca98bbb248488617a651"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/StudentPaymentPortal.tsx": {
+    "mtime": 1785657433.0641336,
+    "ast_hash": "52ae48af7b4a872b1f78b34d6a378b2f",
+    "semantic_hash": "52ae48af7b4a872b1f78b34d6a378b2f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/StudentPortalDashboard.tsx": {
+    "mtime": 1785657433.064755,
+    "ast_hash": "f2aa56e0b9e6e3396a653caada005fb7",
+    "semantic_hash": "f2aa56e0b9e6e3396a653caada005fb7"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/StudentPortalLogin.tsx": {
+    "mtime": 1785872328.7981884,
+    "ast_hash": "161ed74c7318aff637bb22bdb9690b92",
+    "semantic_hash": "161ed74c7318aff637bb22bdb9690b92"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/StudentProfile.tsx": {
+    "mtime": 1785678484.8547537,
+    "ast_hash": "6b32a098ad13c446d8cb3b9f315c3f4e",
+    "semantic_hash": "6b32a098ad13c446d8cb3b9f315c3f4e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/SuperAdminDashboard.tsx": {
+    "mtime": 1785657433.066919,
+    "ast_hash": "b95123092c5aecc87d4dc0413aa3fb64",
+    "semantic_hash": "b95123092c5aecc87d4dc0413aa3fb64"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/TeacherRegistration.tsx": {
+    "mtime": 1786030770.2080214,
+    "ast_hash": "2eb72e67c194dace5ceca31c23a83ac5",
+    "semantic_hash": "2eb72e67c194dace5ceca31c23a83ac5"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/TermsAndConditions.tsx": {
+    "mtime": 1785657433.068177,
+    "ast_hash": "4680a0ee14d536fd20f365278a8ee058",
+    "semantic_hash": "4680a0ee14d536fd20f365278a8ee058"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/TestDetails.tsx": {
+    "mtime": 1785657433.069567,
+    "ast_hash": "82ebac9f56d82e1063a67cfda0530b76",
+    "semantic_hash": "82ebac9f56d82e1063a67cfda0530b76"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/TestList.tsx": {
+    "mtime": 1783875061.092643,
+    "ast_hash": "d65a00d19d416be5e313149e3d0d2538",
+    "semantic_hash": "d65a00d19d416be5e313149e3d0d2538"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/pages/student/TakeQuiz.tsx": {
+    "mtime": 1786038312.775326,
+    "ast_hash": "2f85177f451510b2a056b0d5a2ca60f4",
+    "semantic_hash": "2f85177f451510b2a056b0d5a2ca60f4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/test/setup.ts": {
+    "mtime": 1782266578.876817,
+    "ast_hash": "6a77b4eda304b5f1eebf200143270f1c",
+    "semantic_hash": "6a77b4eda304b5f1eebf200143270f1c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/api.test.ts": {
+    "mtime": 1782266578.8770988,
+    "ast_hash": "cc281e47fbd22a00714c759da6acb18f",
+    "semantic_hash": "cc281e47fbd22a00714c759da6acb18f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/api.ts": {
+    "mtime": 1785657433.073221,
+    "ast_hash": "ba8c96050ae44a11100998127d20fe6f",
+    "semantic_hash": "ba8c96050ae44a11100998127d20fe6f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/auth.test.ts": {
+    "mtime": 1782266578.8776884,
+    "ast_hash": "2bc53c37a83a6105175ac08b46d997c8",
+    "semantic_hash": "2bc53c37a83a6105175ac08b46d997c8"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/auth.ts": {
+    "mtime": 1782266578.878362,
+    "ast_hash": "3979904edea21766361c1c7a82e2c6ef",
+    "semantic_hash": "3979904edea21766361c1c7a82e2c6ef"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/cn.ts": {
+    "mtime": 1782266578.8786352,
+    "ast_hash": "cc64ac7319520f14d7c1f4aadcac33b3",
+    "semantic_hash": "cc64ac7319520f14d7c1f4aadcac33b3"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/cv.ts": {
+    "mtime": 1782266578.8788526,
+    "ast_hash": "9116a9360a6ce6f0ca9e1bc96476e4d9",
+    "semantic_hash": "9116a9360a6ce6f0ca9e1bc96476e4d9"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/fees.test.ts": {
+    "mtime": 1782266578.8791904,
+    "ast_hash": "07424c5f3d0c22e598900b5e8a75a99a",
+    "semantic_hash": "07424c5f3d0c22e598900b5e8a75a99a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/fees.ts": {
+    "mtime": 1782266578.8798833,
+    "ast_hash": "98c691962d034b93bfc61de372c1398e",
+    "semantic_hash": "98c691962d034b93bfc61de372c1398e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/ocr.ts": {
+    "mtime": 1782266578.8801146,
+    "ast_hash": "5e043c98d53474cf0f0d49482618d498",
+    "semantic_hash": "5e043c98d53474cf0f0d49482618d498"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/registration.test.ts": {
+    "mtime": 1782266578.8803563,
+    "ast_hash": "219b03b72f7588f4b2e223ebf639188e",
+    "semantic_hash": "219b03b72f7588f4b2e223ebf639188e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/utils/registration.ts": {
+    "mtime": 1782266578.8806143,
+    "ast_hash": "6c8cb5a8351bee508b0a83f48d10b8f5",
+    "semantic_hash": "6c8cb5a8351bee508b0a83f48d10b8f5"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/workers/cv.worker.ts": {
+    "mtime": 1782266578.8809154,
+    "ast_hash": "9cd32312064e8dcfa250ea5bc532edce",
+    "semantic_hash": "9cd32312064e8dcfa250ea5bc532edce"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/tailwind.config.js": {
+    "mtime": 1782266578.8811672,
+    "ast_hash": "fc3c3f29accfbb7b138b5f54830e02b2",
+    "semantic_hash": "fc3c3f29accfbb7b138b5f54830e02b2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/test_api.js": {
+    "mtime": 1783875061.0936599,
+    "ast_hash": "cc67ada86b490e791e4d7f6a3c89685b",
+    "semantic_hash": "cc67ada86b490e791e4d7f6a3c89685b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/tsconfig.app.json": {
+    "mtime": 1782266578.8821537,
+    "ast_hash": "06fed9d2d293837c0571529eaae7204a",
+    "semantic_hash": "06fed9d2d293837c0571529eaae7204a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/tsconfig.json": {
+    "mtime": 1782266578.8823245,
+    "ast_hash": "a3d39fa780ebff65444de257f291ce6c",
+    "semantic_hash": "a3d39fa780ebff65444de257f291ce6c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/tsconfig.node.json": {
+    "mtime": 1782266578.8825624,
+    "ast_hash": "eec85c9d7c6b599801557f1afd86672c",
+    "semantic_hash": "eec85c9d7c6b599801557f1afd86672c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/vite.config.ts": {
+    "mtime": 1785874292.253514,
+    "ast_hash": "6eeae1db8f4cd62e35c292b8932a51eb",
+    "semantic_hash": "6eeae1db8f4cd62e35c292b8932a51eb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/computed_config.json": {
+    "mtime": 1783875061.0942779,
+    "ast_hash": "0f51d95eb7239cae5dbeced5fc03eef2",
+    "semantic_hash": "0f51d95eb7239cae5dbeced5fc03eef2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/dev.sh": {
+    "mtime": 1782266578.8835602,
+    "ast_hash": "7e5ba7ddf979f45eddfdc7e74866b5c8",
+    "semantic_hash": "7e5ba7ddf979f45eddfdc7e74866b5c8"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/eas.json": {
+    "mtime": 1782266578.887291,
+    "ast_hash": "35a82eeada6f5a9bf5b310565cfa2acf",
+    "semantic_hash": "35a82eeada6f5a9bf5b310565cfa2acf"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app.json": {
+    "mtime": 1782266580.64434,
+    "ast_hash": "a76fd7dc3808deb14441fc1b54e85e61",
+    "semantic_hash": "a76fd7dc3808deb14441fc1b54e85e61"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/(tabs)/_layout.tsx": {
+    "mtime": 1782266582.7779765,
+    "ast_hash": "4defb9079a5de3574c3855b00fd97bcb",
+    "semantic_hash": "4defb9079a5de3574c3855b00fd97bcb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/(tabs)/batches.tsx": {
+    "mtime": 1782266585.269584,
+    "ast_hash": "927cd56a60c4a0097d65dffb8283f685",
+    "semantic_hash": "927cd56a60c4a0097d65dffb8283f685"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/(tabs)/fees.tsx": {
+    "mtime": 1782266586.9337876,
+    "ast_hash": "461a2b8298af0ad5c6280c28e51b5add",
+    "semantic_hash": "461a2b8298af0ad5c6280c28e51b5add"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/(tabs)/index.tsx": {
+    "mtime": 1782266589.2590795,
+    "ast_hash": "07ca3c8687dd680a3ddb5d851b3e0ccc",
+    "semantic_hash": "07ca3c8687dd680a3ddb5d851b3e0ccc"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/(tabs)/quick-fee.tsx": {
+    "mtime": 1782266591.4642744,
+    "ast_hash": "7d16c9e6d1dc4648fd360981f190ae3d",
+    "semantic_hash": "7d16c9e6d1dc4648fd360981f190ae3d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/(tabs)/quizzes.tsx": {
+    "mtime": 1782266592.71881,
+    "ast_hash": "9c8174645e84768cf0f3c748e23d0e5c",
+    "semantic_hash": "9c8174645e84768cf0f3c748e23d0e5c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/(tabs)/settings.tsx": {
+    "mtime": 1782266593.8841708,
+    "ast_hash": "1d73f7208bf5c4312bd8365bd0c8f4e6",
+    "semantic_hash": "1d73f7208bf5c4312bd8365bd0c8f4e6"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/(tabs)/tests.tsx": {
+    "mtime": 1782266596.1765618,
+    "ast_hash": "9609a36ba23e9de98062fdd12b3bbe36",
+    "semantic_hash": "9609a36ba23e9de98062fdd12b3bbe36"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/+html.tsx": {
+    "mtime": 1782266597.458545,
+    "ast_hash": "56b602b5b9492c68c88388d86508e841",
+    "semantic_hash": "56b602b5b9492c68c88388d86508e841"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/+not-found.tsx": {
+    "mtime": 1782266599.763983,
+    "ast_hash": "38550dbc30757ea8dc43a4601c2b1d4f",
+    "semantic_hash": "38550dbc30757ea8dc43a4601c2b1d4f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/_layout.tsx": {
+    "mtime": 1785678369.310718,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/batch/[id].tsx": {
+    "mtime": 1785657433.075419,
+    "ast_hash": "1bb9a0271934e3b1c440979e1d2fd06a",
+    "semantic_hash": "1bb9a0271934e3b1c440979e1d2fd06a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/login.tsx": {
+    "mtime": 1783875061.097299,
+    "ast_hash": "e088e6aa1e8d5700273adc2070e34ae4",
+    "semantic_hash": "e088e6aa1e8d5700273adc2070e34ae4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/modal.tsx": {
+    "mtime": 1778977371.6250312,
+    "ast_hash": "e621c49637832d1848fe4b8fc7007ad0",
+    "semantic_hash": "e621c49637832d1848fe4b8fc7007ad0"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/quick-fee-modal.tsx": {
+    "mtime": 1778983002.488092,
+    "ast_hash": "1cb5ceef4f875a13498447630d98dffa",
+    "semantic_hash": "1cb5ceef4f875a13498447630d98dffa"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/quiz-generator.tsx": {
+    "mtime": 1783875752.0166655,
+    "ast_hash": "ae44959df79c09eb682da6f7596cd59a",
+    "semantic_hash": "ae44959df79c09eb682da6f7596cd59a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/quiz/[id].tsx": {
+    "mtime": 1785657433.0763166,
+    "ast_hash": "86abc6c3d1a6db6291647eab6cc3011d",
+    "semantic_hash": "86abc6c3d1a6db6291647eab6cc3011d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/scan.tsx": {
+    "mtime": 1780542407.5629492,
+    "ast_hash": "138e1d746d96564dc90715724187ffad",
+    "semantic_hash": "138e1d746d96564dc90715724187ffad"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/test/[id].tsx": {
+    "mtime": 1778983157.4104228,
+    "ast_hash": "8dffa73af58a8019c5ff971d697aa3b7",
+    "semantic_hash": "8dffa73af58a8019c5ff971d697aa3b7"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/test/scan.tsx": {
+    "mtime": 1780542407.5639498,
+    "ast_hash": "1a7645c965ff66d8311b92e547f2888d",
+    "semantic_hash": "1a7645c965ff66d8311b92e547f2888d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/app/welcome.tsx": {
+    "mtime": 1783875067.1047423,
+    "ast_hash": "026499a45f106e6e2e1f1b7603fc75e3",
+    "semantic_hash": "026499a45f106e6e2e1f1b7603fc75e3"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/babel.config.js": {
+    "mtime": 1780542407.5759249,
+    "ast_hash": "39626410bf17113d7391598a3d40b764",
+    "semantic_hash": "39626410bf17113d7391598a3d40b764"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/EditScreenInfo.tsx": {
+    "mtime": 1775959471.1516595,
+    "ast_hash": "76cdebe72bb7987a876a19cfafbe2f55",
+    "semantic_hash": "76cdebe72bb7987a876a19cfafbe2f55"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/ExternalLink.tsx": {
+    "mtime": 1778983305.4619691,
+    "ast_hash": "570f6fb1bb2ca27eb3a0244d6b895c42",
+    "semantic_hash": "570f6fb1bb2ca27eb3a0244d6b895c42"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/StyledText.tsx": {
+    "mtime": 1775959471.1559627,
+    "ast_hash": "c50b6e360fa81e992b0edb46473bfbb4",
+    "semantic_hash": "c50b6e360fa81e992b0edb46473bfbb4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/Themed.tsx": {
+    "mtime": 1778983312.8717456,
+    "ast_hash": "8f260bac281f7e132b700da4e037f655",
+    "semantic_hash": "8f260bac281f7e132b700da4e037f655"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/quiz/QuizAnalytics.tsx": {
+    "mtime": 1783873994.2755177,
+    "ast_hash": "2802f5ebadd560da0a115762ed546c41",
+    "semantic_hash": "2802f5ebadd560da0a115762ed546c41"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/quiz/QuizLiveMonitor.tsx": {
+    "mtime": 1780542407.5790606,
+    "ast_hash": "bfe68c14a2cc47ef1ca0f022cb51af76",
+    "semantic_hash": "bfe68c14a2cc47ef1ca0f022cb51af76"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/quiz/QuizSubmissionInspector.tsx": {
+    "mtime": 1780542407.57963,
+    "ast_hash": "899fcae94eee8bbe7844e075e20969dc",
+    "semantic_hash": "899fcae94eee8bbe7844e075e20969dc"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/ui/index.tsx": {
+    "mtime": 1778977767.1039603,
+    "ast_hash": "5e8684a6f2a48f47130ec8098e059093",
+    "semantic_hash": "5e8684a6f2a48f47130ec8098e059093"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/useClientOnlyValue.ts": {
+    "mtime": 1775959471.1629431,
+    "ast_hash": "1cac2ad5842f4258c04fde5f72d99a06",
+    "semantic_hash": "1cac2ad5842f4258c04fde5f72d99a06"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/useClientOnlyValue.web.ts": {
+    "mtime": 1775959471.1635199,
+    "ast_hash": "89b7d949967750bf9187d0a2c68dd525",
+    "semantic_hash": "89b7d949967750bf9187d0a2c68dd525"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/useColorScheme.ts": {
+    "mtime": 1778983319.037418,
+    "ast_hash": "50cf48bd8fc67c60db425d8ecffdf592",
+    "semantic_hash": "50cf48bd8fc67c60db425d8ecffdf592"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/components/useColorScheme.web.ts": {
+    "mtime": 1775959471.165806,
+    "ast_hash": "114ae1ab68038f77c94c9353ba8f706f",
+    "semantic_hash": "114ae1ab68038f77c94c9353ba8f706f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/constants/Colors.ts": {
+    "mtime": 1776272258.5176804,
+    "ast_hash": "ddcdf7a328bf16f1d8b6302dd4719716",
+    "semantic_hash": "ddcdf7a328bf16f1d8b6302dd4719716"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/constants/theme.ts": {
+    "mtime": 1778976722.3810217,
+    "ast_hash": "58ff791fff91a777dfb013a01cd7f912",
+    "semantic_hash": "58ff791fff91a777dfb013a01cd7f912"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/contexts/AuthContext.tsx": {
+    "mtime": 1785657433.0779183,
+    "ast_hash": "4f43c81465087547259aaa4222b45b45",
+    "semantic_hash": "4f43c81465087547259aaa4222b45b45"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/eas.json": {
+    "mtime": 1779019150.306302,
+    "ast_hash": "529baa16bec0c9b84db6ceee7f2362d4",
+    "semantic_hash": "529baa16bec0c9b84db6ceee7f2362d4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/expo-env.d.ts": {
+    "mtime": 1780462832.4631524,
+    "ast_hash": "0dd9dccdb4b08595bc83df70d6a154d3",
+    "semantic_hash": "0dd9dccdb4b08595bc83df70d6a154d3"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/metro.config.js": {
+    "mtime": 1780542407.5809357,
+    "ast_hash": "7b5b5b15e7d735cd66c9777d522847f4",
+    "semantic_hash": "7b5b5b15e7d735cd66c9777d522847f4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/nativewind-env.d.ts": {
+    "mtime": 1775959471.1743996,
+    "ast_hash": "e3064341eeb31cf4df5b5219396ac00d",
+    "semantic_hash": "e3064341eeb31cf4df5b5219396ac00d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/package.json": {
+    "mtime": 1780542407.5825891,
+    "ast_hash": "89e97b6e8ebe40bbbf50cb32f8852a7c",
+    "semantic_hash": "89e97b6e8ebe40bbbf50cb32f8852a7c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/services/api.ts": {
+    "mtime": 1785657433.0787082,
+    "ast_hash": "6eb65949825fde763d48bb346ce8725f",
+    "semantic_hash": "6eb65949825fde763d48bb346ce8725f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/services/offlineSync.ts": {
+    "mtime": 1775959471.1801705,
+    "ast_hash": "84ac4f55efe96bb8c5ef5d8be5d19651",
+    "semantic_hash": "84ac4f55efe96bb8c5ef5d8be5d19651"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/services/storage.ts": {
+    "mtime": 1775959471.1809878,
+    "ast_hash": "51290c0162fa2074232829849fcfbc66",
+    "semantic_hash": "51290c0162fa2074232829849fcfbc66"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/tailwind.config.js": {
+    "mtime": 1778976729.5262961,
+    "ast_hash": "21ed75ac3a2ff9e0154f5f2ca6809e8e",
+    "semantic_hash": "21ed75ac3a2ff9e0154f5f2ca6809e8e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/tsconfig.json": {
+    "mtime": 1776272258.5231278,
+    "ast_hash": "83464c12d4949f2075566290fc61ce64",
+    "semantic_hash": "83464c12d4949f2075566290fc61ce64"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/package.json": {
+    "mtime": 1783875088.887734,
+    "ast_hash": "eae50ed277d561b4d53a86c60bbcab53",
+    "semantic_hash": "eae50ed277d561b4d53a86c60bbcab53"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/.eslintrc.json": {
+    "mtime": 1783875090.1804976,
+    "ast_hash": "eea75b4e573c2570f18dc8a9d51dbfd9",
+    "semantic_hash": "eea75b4e573c2570f18dc8a9d51dbfd9"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/check-db.js": {
+    "mtime": 1775959471.1911392,
+    "ast_hash": "2a5c2828e6684a681ff77caaf6063fa2",
+    "semantic_hash": "2a5c2828e6684a681ff77caaf6063fa2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/check_constraint.ts": {
+    "mtime": 1785657433.0793703,
+    "ast_hash": "759fe0c7114bf5092220b88d1a3fe360",
+    "semantic_hash": "759fe0c7114bf5092220b88d1a3fe360"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/check_trigger.ts": {
+    "mtime": 1783875091.866372,
+    "ast_hash": "d0f7da45f1d24c6a6b66fa2ee1de21d6",
+    "semantic_hash": "d0f7da45f1d24c6a6b66fa2ee1de21d6"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/debug-fees.ts": {
+    "mtime": 1785657433.0802894,
+    "ast_hash": "9f92fb314dfa6c4910c25bf4f41b9644",
+    "semantic_hash": "9f92fb314dfa6c4910c25bf4f41b9644"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/debug-imports.js": {
+    "mtime": 1785657433.081132,
+    "ast_hash": "0a2fd56fbf469d5109a65585f5e77163",
+    "semantic_hash": "0a2fd56fbf469d5109a65585f5e77163"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/debug-imports.ts": {
+    "mtime": 1785657433.0818832,
+    "ast_hash": "0a2fd56fbf469d5109a65585f5e77163",
+    "semantic_hash": "0a2fd56fbf469d5109a65585f5e77163"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/find-goel.ts": {
+    "mtime": 1785657433.083007,
+    "ast_hash": "a63a165cd6efa982820bb3105e722ea4",
+    "semantic_hash": "a63a165cd6efa982820bb3105e722ea4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/find-rachit.ts": {
+    "mtime": 1785657433.0843017,
+    "ast_hash": "32f5afe9ebe24ad9569e5cfb969641dc",
+    "semantic_hash": "32f5afe9ebe24ad9569e5cfb969641dc"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/find-students.ts": {
+    "mtime": 1785657433.0851905,
+    "ast_hash": "829906f839f0cf34020dda5d1a5208d4",
+    "semantic_hash": "829906f839f0cf34020dda5d1a5208d4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/fix_imports.py": {
+    "mtime": 1783875099.5230243,
+    "ast_hash": "bfe1531f4110cbef5f40b5badf77eafb",
+    "semantic_hash": "bfe1531f4110cbef5f40b5badf77eafb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/force_reschedule.ts": {
+    "mtime": 1779507980.1402953,
+    "ast_hash": "ae7485f2f6e32d411e8b6b6f85d10093",
+    "semantic_hash": "ae7485f2f6e32d411e8b6b6f85d10093"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/academicYear.json": {
+    "mtime": 1769893861.040205,
+    "ast_hash": "b91561ed5b67cfea744af7e5a340a96e",
+    "semantic_hash": "b91561ed5b67cfea744af7e5a340a96e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/admin.json": {
+    "mtime": 1769893861.0396392,
+    "ast_hash": "d47bd6ec109122a31fce25f75bda83e1",
+    "semantic_hash": "d47bd6ec109122a31fce25f75bda83e1"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/batch.json": {
+    "mtime": 1769893861.0407662,
+    "ast_hash": "4071dae5b9416fb4fb781f5acded1b0b",
+    "semantic_hash": "4071dae5b9416fb4fb781f5acded1b0b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/feeInstallment.json": {
+    "mtime": 1769893861.0424342,
+    "ast_hash": "c74c47ceb87a425e3ef4da516fe0c35a",
+    "semantic_hash": "c74c47ceb87a425e3ef4da516fe0c35a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/feePayment.json": {
+    "mtime": 1769893861.0431805,
+    "ast_hash": "6b18f0557541aa218524527906a05c98",
+    "semantic_hash": "6b18f0557541aa218524527906a05c98"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/feeRecord.json": {
+    "mtime": 1769893861.04364,
+    "ast_hash": "d751713988987e9331980363e24189ce",
+    "semantic_hash": "d751713988987e9331980363e24189ce"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/idCounter.json": {
+    "mtime": 1769893861.0439477,
+    "ast_hash": "4f3f9562ad2a78cd3c80668d74a1ec9f",
+    "semantic_hash": "4f3f9562ad2a78cd3c80668d74a1ec9f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/manifest.json": {
+    "mtime": 1769893861.0440176,
+    "ast_hash": "80d9e928e5f9cfee2002a566bb31f05b",
+    "semantic_hash": "80d9e928e5f9cfee2002a566bb31f05b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/mark.json": {
+    "mtime": 1769893861.0426807,
+    "ast_hash": "92fdfd0ac2bc4e9f3d8e11a8449ae0ad",
+    "semantic_hash": "92fdfd0ac2bc4e9f3d8e11a8449ae0ad"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/student.json": {
+    "mtime": 1769893861.0412493,
+    "ast_hash": "e4fc7849afcc085c4b10b5855473b41c",
+    "semantic_hash": "e4fc7849afcc085c4b10b5855473b41c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/migration-data/test.json": {
+    "mtime": 1769893861.0420117,
+    "ast_hash": "8c2f52ad40af62a4c62c944b388f5286",
+    "semantic_hash": "8c2f52ad40af62a4c62c944b388f5286"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/package.json": {
+    "mtime": 1785657433.0894768,
+    "ast_hash": "0cb107e28cf85a17e7926c46077037ca",
+    "semantic_hash": "0cb107e28cf85a17e7926c46077037ca"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260208151504_add_cascade_delete_to_marks/migration.sql": {
+    "mtime": 1770543921.3315551,
+    "ast_hash": "7485c28421f9d8217b7173af29be8efd",
+    "semantic_hash": "7485c28421f9d8217b7173af29be8efd"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260226_add_ocr_scan_cache/migration.sql": {
+    "mtime": 1772115821.1390553,
+    "ast_hash": "e1bef7a80630959a8770355ced413e5c",
+    "semantic_hash": "e1bef7a80630959a8770355ced413e5c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260322232248_update_balance_function/migration.sql": {
+    "mtime": 1775959471.196952,
+    "ast_hash": "4017076ee8cac2ecfd69ca6fcef7a88c",
+    "semantic_hash": "4017076ee8cac2ecfd69ca6fcef7a88c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260413010000_custom_student_invoices/migration.sql": {
+    "mtime": 1776272258.6173234,
+    "ast_hash": "f28662d25ca122812b51a9d623533a35",
+    "semantic_hash": "f28662d25ca122812b51a9d623533a35"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260521050000_add_online_quizzes/migration.sql": {
+    "mtime": 1779507980.1434193,
+    "ast_hash": "666ee0d6d73026b50f196a8fdf3da6ff",
+    "semantic_hash": "666ee0d6d73026b50f196a8fdf3da6ff"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260604020000_monthly_collection_index/migration.sql": {
+    "mtime": 1783875103.4111683,
+    "ast_hash": "0be959f94fd942f37eb717a74f4b8be5",
+    "semantic_hash": "0be959f94fd942f37eb717a74f4b8be5"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260604022400_missing_composite_indexes/migration.sql": {
+    "mtime": 1783875104.7142296,
+    "ast_hash": "97e562dabe0e7567f08fd7684c4b8814",
+    "semantic_hash": "97e562dabe0e7567f08fd7684c4b8814"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260604030000_whatsapp_notify_trigger/migration.sql": {
+    "mtime": 1783875105.6368618,
+    "ast_hash": "7298a0cafba32c0ef26b09d87cf29e84",
+    "semantic_hash": "7298a0cafba32c0ef26b09d87cf29e84"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260604080000_atomic_balance_trigger/migration.sql": {
+    "mtime": 1783875107.051746,
+    "ast_hash": "eb142c28e34040c5d9b3859aa36a1542",
+    "semantic_hash": "eb142c28e34040c5d9b3859aa36a1542"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260705000000_fee_assignment/migration.sql": {
+    "mtime": 1785657433.0909708,
+    "ast_hash": "cbbf1fde85a6f7fc39c2d9e02c79e561",
+    "semantic_hash": "cbbf1fde85a6f7fc39c2d9e02c79e561"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260705062644_allow_negative_balances/migration.sql": {
+    "mtime": 1785657433.091966,
+    "ast_hash": "1b7e24f4cdd0d79ce0255b9baca6663b",
+    "semantic_hash": "1b7e24f4cdd0d79ce0255b9baca6663b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/20260705072300_fee_assignment_trigger/migration.sql": {
+    "mtime": 1785657433.0927079,
+    "ast_hash": "09b39e83debb0e5389085654d07c7bfb",
+    "semantic_hash": "09b39e83debb0e5389085654d07c7bfb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations/add_student_balance_materialized_view.sql": {
+    "mtime": 1776272617.6816924,
+    "ast_hash": "091f663be26f72b9fba318ae69881669",
+    "semantic_hash": "091f663be26f72b9fba318ae69881669"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260123083627_init_sqlite/migration.sql": {
+    "mtime": 1769157387.4904826,
+    "ast_hash": "048c7ae371e61ec358528498cafa1a65",
+    "semantic_hash": "048c7ae371e61ec358528498cafa1a65"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260124155248_add_school_name/migration.sql": {
+    "mtime": 1769269968.2751973,
+    "ast_hash": "9992e6820cc8c1846bdb5248ba8ea9b5",
+    "semantic_hash": "9992e6820cc8c1846bdb5248ba8ea9b5"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260124155835_add_class_name_to_batch/migration.sql": {
+    "mtime": 1769270315.198193,
+    "ast_hash": "fe5de3ba9ebf755a541a61baafa77696",
+    "semantic_hash": "fe5de3ba9ebf755a541a61baafa77696"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260124160633_add_registration_toggle/migration.sql": {
+    "mtime": 1769270793.4380195,
+    "ast_hash": "680a8e4eb3fe30f8b3bfea86965b5b07",
+    "semantic_hash": "680a8e4eb3fe30f8b3bfea86965b5b07"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260124221617_add_fee_installments/migration.sql": {
+    "mtime": 1769292977.2262058,
+    "ast_hash": "d64f163c57fb0b17b685e9ad289ee24a",
+    "semantic_hash": "d64f163c57fb0b17b685e9ad289ee24a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260126004138_add_academic_year/migration.sql": {
+    "mtime": 1769388098.7463288,
+    "ast_hash": "91c1de15dcdea67c4d832a2edbae93b9",
+    "semantic_hash": "91c1de15dcdea67c4d832a2edbae93b9"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260126005416_add_global_settings/migration.sql": {
+    "mtime": 1769388856.6373224,
+    "ast_hash": "0b0c4b754ed4f70abb5f300065c49e83",
+    "semantic_hash": "0b0c4b754ed4f70abb5f300065c49e83"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260126014318_add_academic_year_relations/migration.sql": {
+    "mtime": 1769391798.949445,
+    "ast_hash": "103880d047e91d2d9e626dc698c82a2d",
+    "semantic_hash": "103880d047e91d2d9e626dc698c82a2d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260126025335_scope_student_id_to_year/migration.sql": {
+    "mtime": 1769396015.1763175,
+    "ast_hash": "f3d9d54ac95dcfbbe183b8bc963efb7c",
+    "semantic_hash": "f3d9d54ac95dcfbbe183b8bc963efb7c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260126031034_add_student_natural_key_constraint/migration.sql": {
+    "mtime": 1769397034.5762687,
+    "ast_hash": "200d5a8188d00884c8393b608a9becf0",
+    "semantic_hash": "200d5a8188d00884c8393b608a9becf0"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260126121554_add_password_version/migration.sql": {
+    "mtime": 1769429754.9262722,
+    "ast_hash": "f30f0035807fd3e374d8aa02e1ec6b3d",
+    "semantic_hash": "f30f0035807fd3e374d8aa02e1ec6b3d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/migrations_sqlite_archived/20260126133731_allow_multiple_partial_payments/migration.sql": {
+    "mtime": 1769434651.9202535,
+    "ast_hash": "0f945ce3848cee8ce96c4d60938166d8",
+    "semantic_hash": "0f945ce3848cee8ce96c4d60938166d8"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/prisma/seed.ts": {
+    "mtime": 1779583144.4030683,
+    "ast_hash": "5bbcc6a1dfbac056140d272ed901d64e",
+    "semantic_hash": "5bbcc6a1dfbac056140d272ed901d64e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/remove-requested-students.ts": {
+    "mtime": 1785657433.0959315,
+    "ast_hash": "0ceac89ffb9a559f32536dfa1d44a9ed",
+    "semantic_hash": "0ceac89ffb9a559f32536dfa1d44a9ed"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/restore_triggers.sql": {
+    "mtime": 1785657433.096832,
+    "ast_hash": "629d4ada501d47966d106c939519f15a",
+    "semantic_hash": "629d4ada501d47966d106c939519f15a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/run-worker.ts": {
+    "mtime": 1783875109.9924693,
+    "ast_hash": "d1b28e284d43edc0ae908b0f51acec8a",
+    "semantic_hash": "d1b28e284d43edc0ae908b0f51acec8a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/backup_db.sh": {
+    "mtime": 1769400331.3430002,
+    "ast_hash": "fde6ec094c039bfc56f159733e0305d8",
+    "semantic_hash": "fde6ec094c039bfc56f159733e0305d8"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/backup_db_encrypted.sh": {
+    "mtime": 1769428206.5845764,
+    "ast_hash": "66af26051db083604d65cef27069c3a6",
+    "semantic_hash": "66af26051db083604d65cef27069c3a6"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/change_number.ts": {
+    "mtime": 1783875111.7197561,
+    "ast_hash": "731620dd14685cb1bc95639119c5176e",
+    "semantic_hash": "731620dd14685cb1bc95639119c5176e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/check_config.ts": {
+    "mtime": 1783875113.3451815,
+    "ast_hash": "662514efdeea5c95b38748e1027f58d9",
+    "semantic_hash": "662514efdeea5c95b38748e1027f58d9"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/check_config2.ts": {
+    "mtime": 1783875115.3083355,
+    "ast_hash": "7a01101e68b03459d6037c0284b1a2d4",
+    "semantic_hash": "7a01101e68b03459d6037c0284b1a2d4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/diagnostic_fees.ts": {
+    "mtime": 1785657433.0973125,
+    "ast_hash": "304943d75363bd6bebbfdb143ae9e554",
+    "semantic_hash": "304943d75363bd6bebbfdb143ae9e554"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/find_quiz.ts": {
+    "mtime": 1783875117.130838,
+    "ast_hash": "20c7f9a8c5b0d1e0d5687c4cd9c088c4",
+    "semantic_hash": "20c7f9a8c5b0d1e0d5687c4cd9c088c4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/fix_jobs.ts": {
+    "mtime": 1783875117.9064522,
+    "ast_hash": "24ac75ed4adef1091d60760142662c9b",
+    "semantic_hash": "24ac75ed4adef1091d60760142662c9b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/get_unpaid_students.ts": {
+    "mtime": 1783875119.6753123,
+    "ast_hash": "332f3700f5ed8b9c9f3b67714d46c361",
+    "semantic_hash": "332f3700f5ed8b9c9f3b67714d46c361"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/remove_students.ts": {
+    "mtime": 1785657433.0978358,
+    "ast_hash": "ea470634442326d51cb2f51884e18831",
+    "semantic_hash": "ea470634442326d51cb2f51884e18831"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/resend_reminders.ts": {
+    "mtime": 1777390625.455822,
+    "ast_hash": "05286533d5d6a9def626a4678d770df1",
+    "semantic_hash": "05286533d5d6a9def626a4678d770df1"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/reset_and_answers.ts": {
+    "mtime": 1783875121.1561587,
+    "ast_hash": "af77f5573bb14a06485f9aca6e5ef7ac",
+    "semantic_hash": "af77f5573bb14a06485f9aca6e5ef7ac"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/reset_gaurang.ts": {
+    "mtime": 1783875122.7591405,
+    "ast_hash": "14c529f96827d8efe41ea723880915d8",
+    "semantic_hash": "14c529f96827d8efe41ea723880915d8"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/restore_db.sh": {
+    "mtime": 1769400333.2403836,
+    "ast_hash": "aabad69235a705502e863be4d3ff236e",
+    "semantic_hash": "aabad69235a705502e863be4d3ff236e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/test-wa-meta.ts": {
+    "mtime": 1775959471.2003329,
+    "ast_hash": "ba8d697ddd777c0290bfd3ca23a8a9e2",
+    "semantic_hash": "ba8d697ddd777c0290bfd3ca23a8a9e2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/scripts/update_quiz_time.ts": {
+    "mtime": 1783875124.6052988,
+    "ast_hash": "1e395218dc5a29a78246fd1271cecd93",
+    "semantic_hash": "1e395218dc5a29a78246fd1271cecd93"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/adminOnboardingController.ts": {
+    "mtime": 1785657433.0986397,
+    "ast_hash": "7a82327ff1fb71c5c73a8c1b76f7d503",
+    "semantic_hash": "7a82327ff1fb71c5c73a8c1b76f7d503"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/analyticsController.ts": {
+    "mtime": 1785657433.1001644,
+    "ast_hash": "940a3f8da3fdb50b6c9ab795bfb9578e",
+    "semantic_hash": "940a3f8da3fdb50b6c9ab795bfb9578e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/authController.ts": {
+    "mtime": 1786035281.2392793,
+    "ast_hash": "cedd7b0506b60f7c7b8c5e05ce53f98f",
+    "semantic_hash": "cedd7b0506b60f7c7b8c5e05ce53f98f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/batchController.ts": {
+    "mtime": 1785657433.101484,
+    "ast_hash": "4a42bf43d46c823469ba9fd906dc63ab",
+    "semantic_hash": "4a42bf43d46c823469ba9fd906dc63ab"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/billingController.ts": {
+    "mtime": 1785657433.1020968,
+    "ast_hash": "520f5cc29443e00c8a5b052a10cbb93d",
+    "semantic_hash": "520f5cc29443e00c8a5b052a10cbb93d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/dashboardController.ts": {
+    "mtime": 1783875134.2402656,
+    "ast_hash": "edca1e6d2765cd013c6585cb5e1f52c7",
+    "semantic_hash": "edca1e6d2765cd013c6585cb5e1f52c7"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/feeController.ts": {
+    "mtime": 1785871092.827391,
+    "ast_hash": "cd74a6a193188e99426479e3ea0b3f50",
+    "semantic_hash": "cd74a6a193188e99426479e3ea0b3f50"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/instituteController.ts": {
+    "mtime": 1785657433.104151,
+    "ast_hash": "2040b0deb2b5b100f25b014158902e40",
+    "semantic_hash": "2040b0deb2b5b100f25b014158902e40"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/inviteController.ts": {
+    "mtime": 1786035336.5608969,
+    "ast_hash": "289f53ccdf2dac00f497a9e6debd7c5a",
+    "semantic_hash": "289f53ccdf2dac00f497a9e6debd7c5a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/marketplaceController.ts": {
+    "mtime": 1786034732.8219943,
+    "ast_hash": "2d9fa2979a427691879618766eecd78c",
+    "semantic_hash": "2d9fa2979a427691879618766eecd78c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/ocrController.ts": {
+    "mtime": 1783875139.6547644,
+    "ast_hash": "e53243d16c959e2dfd0a58388fa5c551",
+    "semantic_hash": "e53243d16c959e2dfd0a58388fa5c551"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/onboardingController.ts": {
+    "mtime": 1786035539.6266587,
+    "ast_hash": "123046dc86785aa557bdfd6c4cca66dd",
+    "semantic_hash": "123046dc86785aa557bdfd6c4cca66dd"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/publicController.ts": {
+    "mtime": 1785657433.1082397,
+    "ast_hash": "4574aa84116f4a066577cb8d1ca5b453",
+    "semantic_hash": "4574aa84116f4a066577cb8d1ca5b453"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/statusController.ts": {
+    "mtime": 1783875143.6526678,
+    "ast_hash": "4cbf9f27d021c9e15c04a5cad64e692e",
+    "semantic_hash": "4cbf9f27d021c9e15c04a5cad64e692e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/stickerController.ts": {
+    "mtime": 1785657433.1096206,
+    "ast_hash": "7a32f7df4c5b19d03f0bbb770a9a51b8",
+    "semantic_hash": "7a32f7df4c5b19d03f0bbb770a9a51b8"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/studentController.ts": {
+    "mtime": 1785871076.1305869,
+    "ast_hash": "bbff513467097b991c915624bdb69588",
+    "semantic_hash": "bbff513467097b991c915624bdb69588"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/studentPortalController.ts": {
+    "mtime": 1786038288.1375508,
+    "ast_hash": "e348d55f395a2d3c79b6750e3cc52806",
+    "semantic_hash": "e348d55f395a2d3c79b6750e3cc52806"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/controllers/testController.ts": {
+    "mtime": 1786038212.3767323,
+    "ast_hash": "47f28e4bbeba20dab644d92c794625ac",
+    "semantic_hash": "47f28e4bbeba20dab644d92c794625ac"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/index.ts": {
+    "mtime": 1785874256.5998685,
+    "ast_hash": "76813908e76d792d4aec58bfee20cd13",
+    "semantic_hash": "76813908e76d792d4aec58bfee20cd13"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/middleware/auth.ts": {
+    "mtime": 1783875152.0976057,
+    "ast_hash": "1e7d3886e7e8d63ee2f5ca96165dfd7e",
+    "semantic_hash": "1e7d3886e7e8d63ee2f5ca96165dfd7e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/middleware/queryMonitor.ts": {
+    "mtime": 1785657433.1142054,
+    "ast_hash": "4e3612b6786bd6d0ea5a69c9eb25fbfb",
+    "semantic_hash": "4e3612b6786bd6d0ea5a69c9eb25fbfb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/middleware/security.ts": {
+    "mtime": 1783875155.8406851,
+    "ast_hash": "181258780b4bb8124c26399cc7cae637",
+    "semantic_hash": "181258780b4bb8124c26399cc7cae637"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/middleware/validation.ts": {
+    "mtime": 1769385005.1504915,
+    "ast_hash": "d916402add18d24de45b1e05e5f23afa",
+    "semantic_hash": "d916402add18d24de45b1e05e5f23afa"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/monitoring/health.ts": {
+    "mtime": 1783875157.5025885,
+    "ast_hash": "c4b9e0ad9266f78f7390f5aa9b770deb",
+    "semantic_hash": "c4b9e0ad9266f78f7390f5aa9b770deb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/monitoring/sentry.ts": {
+    "mtime": 1785657433.114889,
+    "ast_hash": "d6f86d454d8f2108ecbb204d74de7c37",
+    "semantic_hash": "d6f86d454d8f2108ecbb204d74de7c37"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/prisma.ts": {
+    "mtime": 1785657433.1162016,
+    "ast_hash": "1568d87e9e2d1a05504288a18abd5189",
+    "semantic_hash": "1568d87e9e2d1a05504288a18abd5189"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/routes/api.ts": {
+    "mtime": 1786036227.3143327,
+    "ast_hash": "7d6c09a43c3493325a074d8b009c394d",
+    "semantic_hash": "7d6c09a43c3493325a074d8b009c394d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/routes/marketplaceRoutes.ts": {
+    "mtime": 1785873686.8589342,
+    "ast_hash": "fdcf74687f89db051bf78567f5f0daf9",
+    "semantic_hash": "fdcf74687f89db051bf78567f5f0daf9"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/routes/studentPortalRoutes.ts": {
+    "mtime": 1785846721.3969421,
+    "ast_hash": "a4bec48c21b368e81d7d83800275703e",
+    "semantic_hash": "a4bec48c21b368e81d7d83800275703e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/schemas.ts": {
+    "mtime": 1785871047.7644885,
+    "ast_hash": "4ded1f12c736941553e2f01ee839284f",
+    "semantic_hash": "4ded1f12c736941553e2f01ee839284f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/scripts/checkDoubleCharge.ts": {
+    "mtime": 1785657433.1186993,
+    "ast_hash": "8223621cb558cc670b855e668592ef82",
+    "semantic_hash": "8223621cb558cc670b855e668592ef82"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/scripts/cleanupTestInstallments.ts": {
+    "mtime": 1785657433.1200829,
+    "ast_hash": "a0b7cf278b8b24182841119a461ed388",
+    "semantic_hash": "a0b7cf278b8b24182841119a461ed388"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/scripts/compareBalances.ts": {
+    "mtime": 1785657433.122152,
+    "ast_hash": "12dfc8859da19a90ff14c96aa79b3d4d",
+    "semantic_hash": "12dfc8859da19a90ff14c96aa79b3d4d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/scripts/concurrencyTest.ts": {
+    "mtime": 1785657433.1233227,
+    "ast_hash": "3b779f7ac1d1afad55ec8e357935f349",
+    "semantic_hash": "3b779f7ac1d1afad55ec8e357935f349"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/scripts/fixDuplicates.ts": {
+    "mtime": 1785657433.1241057,
+    "ast_hash": "9be580e7ec873c90b86cd97cee407df8",
+    "semantic_hash": "9be580e7ec873c90b86cd97cee407df8"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/scripts/investigateDuplicates.ts": {
+    "mtime": 1785657433.124681,
+    "ast_hash": "db220e82f6d2294fc365cb407570b82e",
+    "semantic_hash": "db220e82f6d2294fc365cb407570b82e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/scripts/migrateAssignments.ts": {
+    "mtime": 1785657433.1251392,
+    "ast_hash": "8cc79addbe6f969228612a74187d8c70",
+    "semantic_hash": "8cc79addbe6f969228612a74187d8c70"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/scripts/showStudentDetails.js": {
+    "mtime": 1785657433.12553,
+    "ast_hash": "cc7de5c927152fa023c7f712e90b459b",
+    "semantic_hash": "cc7de5c927152fa023c7f712e90b459b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/types/express.d.ts": {
+    "mtime": 1783875169.1284885,
+    "ast_hash": "f6ba354fe3b1f2eae1d8fcff5d7af40e",
+    "semantic_hash": "f6ba354fe3b1f2eae1d8fcff5d7af40e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/ai/receipt-scanner.ts": {
+    "mtime": 1783875170.1373246,
+    "ast_hash": "99f313d24d28adea132b1226465df704",
+    "semantic_hash": "99f313d24d28adea132b1226465df704"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/ai/test-generator.ts": {
+    "mtime": 1785657433.126403,
+    "ast_hash": "c197ebe5cd2ad3ced806f32ce5425764",
+    "semantic_hash": "c197ebe5cd2ad3ced806f32ce5425764"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/attendanceLinks.ts": {
+    "mtime": 1785657433.1272585,
+    "ast_hash": "d8241270127a0f726d9808beb71fb96f",
+    "semantic_hash": "d8241270127a0f726d9808beb71fb96f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/email.ts": {
+    "mtime": 1783875173.0403976,
+    "ast_hash": "0cc900c94223feb3be2d4a3e4df38eff",
+    "semantic_hash": "0cc900c94223feb3be2d4a3e4df38eff"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/emailWorker.ts": {
+    "mtime": 1785678369.312652,
+    "ast_hash": "af0b76998f3f5468c02f70a1040e0735",
+    "semantic_hash": "af0b76998f3f5468c02f70a1040e0735"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/env.ts": {
+    "mtime": 1785657433.127829,
+    "ast_hash": "1bb20229fe98ca12237d459fc6603cec",
+    "semantic_hash": "1bb20229fe98ca12237d459fc6603cec"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/feeCalculations.ts": {
+    "mtime": 1785657433.1283724,
+    "ast_hash": "1cb8d75f88cb7425e334e37f131d792e",
+    "semantic_hash": "1cb8d75f88cb7425e334e37f131d792e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/logger.ts": {
+    "mtime": 1783875176.13768,
+    "ast_hash": "a3b032421f4dbbb60e7eec3c9ba70926",
+    "semantic_hash": "a3b032421f4dbbb60e7eec3c9ba70926"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/ocr.ts": {
+    "mtime": 1783875177.5242708,
+    "ast_hash": "287b9b54b4d86c369f614051f0fffabe",
+    "semantic_hash": "287b9b54b4d86c369f614051f0fffabe"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/ocrCache.ts": {
+    "mtime": 1783875179.4368608,
+    "ast_hash": "a652cecc12b4772bf32375ccb104d14e",
+    "semantic_hash": "a652cecc12b4772bf32375ccb104d14e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/ocrTextract.ts": {
+    "mtime": 1776447145.3763955,
+    "ast_hash": "8b3d295b1be931ca06180ebf0458f62c",
+    "semantic_hash": "8b3d295b1be931ca06180ebf0458f62c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/paymentStorage.ts": {
+    "mtime": 1785657433.1290855,
+    "ast_hash": "aa2bbcd5b8a75c911f3d4861415e4f60",
+    "semantic_hash": "aa2bbcd5b8a75c911f3d4861415e4f60"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/pdfUtils.ts": {
+    "mtime": 1785657433.1295917,
+    "ast_hash": "50bc5e62388f32c340b2f87c4fdb59f2",
+    "semantic_hash": "50bc5e62388f32c340b2f87c4fdb59f2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/pdfWorker.ts": {
+    "mtime": 1775959471.240805,
+    "ast_hash": "4a803a9cc1ee7b825b1325ef0b0f6986",
+    "semantic_hash": "4a803a9cc1ee7b825b1325ef0b0f6986"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/quizBroadcasts.ts": {
+    "mtime": 1779510838.498579,
+    "ast_hash": "1ed742e9f97b4d0ccfaf7407bfa5592c",
+    "semantic_hash": "1ed742e9f97b4d0ccfaf7407bfa5592c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/reconciliation.ts": {
+    "mtime": 1783875182.4716601,
+    "ast_hash": "a52af5fc1093754b4159c98ca7d9d6d2",
+    "semantic_hash": "a52af5fc1093754b4159c98ca7d9d6d2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/redis.ts": {
+    "mtime": 1783875183.7212005,
+    "ast_hash": "1e33b5c07330b1f0eb16c2e8c9d4219f",
+    "semantic_hash": "1e33b5c07330b1f0eb16c2e8c9d4219f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/secureLogger.ts": {
+    "mtime": 1769983945.2908506,
+    "ast_hash": "fa5fffad58491e72a8f793c8d6b405e5",
+    "semantic_hash": "fa5fffad58491e72a8f793c8d6b405e5"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/studentIds.ts": {
+    "mtime": 1775959471.2415187,
+    "ast_hash": "9ed7f60473db9ccd7f8d0929b9a3b9e5",
+    "semantic_hash": "9ed7f60473db9ccd7f8d0929b9a3b9e5"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/urlConfig.ts": {
+    "mtime": 1770149708.6529036,
+    "ast_hash": "9dc381c24cbf8d7c6ee781ac9ad657dc",
+    "semantic_hash": "9dc381c24cbf8d7c6ee781ac9ad657dc"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/whatsapp.ts": {
+    "mtime": 1783875185.438681,
+    "ast_hash": "d7793db59ae947dc92d287f6937bd531",
+    "semantic_hash": "d7793db59ae947dc92d287f6937bd531"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/utils/whatsappWorker.ts": {
+    "mtime": 1785873010.1760478,
+    "ast_hash": "7d34b2263e275624521daa1949d86984",
+    "semantic_hash": "7d34b2263e275624521daa1949d86984"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/src/workers/batchPdfWorker.ts": {
+    "mtime": 1785657433.1301067,
+    "ast_hash": "b4477212ade635f92c8fc7afa2846c09",
+    "semantic_hash": "b4477212ade635f92c8fc7afa2846c09"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/start_with_logs.sh": {
+    "mtime": 1769400380.7510464,
+    "ast_hash": "ab662ef4d9bd770fb37a8aabdb6f5776",
+    "semantic_hash": "ab662ef4d9bd770fb37a8aabdb6f5776"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/test-db-status.ts": {
+    "mtime": 1775959471.2518065,
+    "ast_hash": "ad85f162e879537a134b5eff981bc7c4",
+    "semantic_hash": "ad85f162e879537a134b5eff981bc7c4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/test-redis-store.ts": {
+    "mtime": 1783875188.8677175,
+    "ast_hash": "9d8fff18bd2a916e77ba219923028986",
+    "semantic_hash": "9d8fff18bd2a916e77ba219923028986"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/test-sentry.ts": {
+    "mtime": 1785657433.130562,
+    "ast_hash": "e8a24927e144169cbc7a542381030a40",
+    "semantic_hash": "e8a24927e144169cbc7a542381030a40"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/test.ts": {
+    "mtime": 1785657433.1307979,
+    "ast_hash": "92ab52d29ba83f41afc15dabf53c9f99",
+    "semantic_hash": "92ab52d29ba83f41afc15dabf53c9f99"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/api.integration.test.ts": {
+    "mtime": 1785657433.1311922,
+    "ast_hash": "61e1b7ea661aadf0c697abb15332c2e2",
+    "semantic_hash": "61e1b7ea661aadf0c697abb15332c2e2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/classAverage.test.ts": {
+    "mtime": 1779583144.4095433,
+    "ast_hash": "7caaa717dbfb59fc9aec52a03a439eca",
+    "semantic_hash": "7caaa717dbfb59fc9aec52a03a439eca"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/controller-success.test.ts": {
+    "mtime": 1785696322.34443,
+    "ast_hash": "49730fb966ac172dcae0ab6eb9d04248",
+    "semantic_hash": "49730fb966ac172dcae0ab6eb9d04248"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/customInvoice.test.ts": {
+    "mtime": 1779587150.731153,
+    "ast_hash": "b542a3e67dded6e4e462da569589934c",
+    "semantic_hash": "b542a3e67dded6e4e462da569589934c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/feeCalculations.test.ts": {
+    "mtime": 1775959471.2561386,
+    "ast_hash": "2992f2d94d3ee6c9dee8f03afecfc615",
+    "semantic_hash": "2992f2d94d3ee6c9dee8f03afecfc615"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/feeSecurity.test.ts": {
+    "mtime": 1785657433.1318321,
+    "ast_hash": "280db539e0f4f89b30cae7472a06c380",
+    "semantic_hash": "280db539e0f4f89b30cae7472a06c380"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/marketplace.test.ts": {
+    "mtime": 1785873791.6906905,
+    "ast_hash": "339cca245251b661d55b5503006bba2b",
+    "semantic_hash": "339cca245251b661d55b5503006bba2b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/quiz.test.ts": {
+    "mtime": 1785657433.1333685,
+    "ast_hash": "08f4bcb307146664bab73bd0e8d1bf45",
+    "semantic_hash": "08f4bcb307146664bab73bd0e8d1bf45"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/schemas.test.ts": {
+    "mtime": 1775959471.2565312,
+    "ast_hash": "0af732d9a5cf42c7690889a10ded5829",
+    "semantic_hash": "0af732d9a5cf42c7690889a10ded5829"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tests/studentIds.test.ts": {
+    "mtime": 1775959471.2592986,
+    "ast_hash": "312e6d514d6c0f8c9feed0dd31a72756",
+    "semantic_hash": "312e6d514d6c0f8c9feed0dd31a72756"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/tsconfig.json": {
+    "mtime": 1783875196.7696378,
+    "ast_hash": "c87e68cfb42ea98cd12ac24a20e82964",
+    "semantic_hash": "c87e68cfb42ea98cd12ac24a20e82964"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/CONTRIBUTING.md": {
+    "mtime": 1782266578.7763674,
+    "ast_hash": "1c5c1385fceb90701e1ed44a70d67216",
+    "semantic_hash": "1c5c1385fceb90701e1ed44a70d67216"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/README.md": {
+    "mtime": 1785657433.041022,
+    "ast_hash": "a55e10ff9bb19204533bcc997a9ff592",
+    "semantic_hash": "a55e10ff9bb19204533bcc997a9ff592"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/README.md": {
+    "mtime": 1782266578.7777097,
+    "ast_hash": "cac141da861c855e069a9c32557458ac",
+    "semantic_hash": "cac141da861c855e069a9c32557458ac"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/index.html": {
+    "mtime": 1782266578.8097026,
+    "ast_hash": "b1009e0ba90f1d566f3e63c7d70e9044",
+    "semantic_hash": "b1009e0ba90f1d566f3e63c7d70e9044"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/CapApp-SPM/README.md": {
+    "mtime": 1782266578.82038,
+    "ast_hash": "9cfb163b70d2e73140eab9557c445dfa",
+    "semantic_hash": "9cfb163b70d2e73140eab9557c445dfa"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/robots.txt": {
+    "mtime": 1782266578.858289,
+    "ast_hash": "774ccdb79849a99ee1194871918c7d57",
+    "semantic_hash": "774ccdb79849a99ee1194871918c7d57"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/guides/BACKUP_RECOVERY_GUIDE.md": {
+    "mtime": 1782266578.8837497,
+    "ast_hash": "0f63b993e2cbcf8c7f8153674c9885c2",
+    "semantic_hash": "0f63b993e2cbcf8c7f8153674c9885c2"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/guides/DEPLOY_TO_HEROKU.md": {
+    "mtime": 1782266578.883907,
+    "ast_hash": "75b42ab3fd0a490b04233f9782c42cde",
+    "semantic_hash": "75b42ab3fd0a490b04233f9782c42cde"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/guides/DOMAIN_SETUP_GUIDE.md": {
+    "mtime": 1782266578.88411,
+    "ast_hash": "4ec1599a25f77cf4d831ace1407555b7",
+    "semantic_hash": "4ec1599a25f77cf4d831ace1407555b7"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/guides/LOCAL_DEVELOPMENT_GUIDE.md": {
+    "mtime": 1782266578.8842921,
+    "ast_hash": "b0d4522031831142b0553e49c52f7b21",
+    "semantic_hash": "b0d4522031831142b0553e49c52f7b21"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/guides/LOG_MANAGEMENT_GUIDE.md": {
+    "mtime": 1782266578.8845274,
+    "ast_hash": "9600b4ef706c732278a0aef84ad289a5",
+    "semantic_hash": "9600b4ef706c732278a0aef84ad289a5"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/guides/PWA_INSTALLATION.md": {
+    "mtime": 1782266578.884753,
+    "ast_hash": "07e4f058db746bb51c4e6a3f0465f18c",
+    "semantic_hash": "07e4f058db746bb51c4e6a3f0465f18c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/guides/SENTRY_QUICKSTART.md": {
+    "mtime": 1782266578.884947,
+    "ast_hash": "7b60a693788cb78e9e2a7801602c8490",
+    "semantic_hash": "7b60a693788cb78e9e2a7801602c8490"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/guides/SENTRY_SETUP.md": {
+    "mtime": 1782266578.8852432,
+    "ast_hash": "170b1dc6b6d2e472cdcc283c6f030762",
+    "semantic_hash": "170b1dc6b6d2e472cdcc283c6f030762"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/guides/WHATSAPP_BOT_SETUP.md": {
+    "mtime": 1782266578.8855128,
+    "ast_hash": "db4a534316aea4ef7d279689d3a3bed3",
+    "semantic_hash": "db4a534316aea4ef7d279689d3a3bed3"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/plans/PLAN-customer-onboarding.md": {
+    "mtime": 1782266578.8858192,
+    "ast_hash": "4fb0b645b5b8d49f3941166a7a000c05",
+    "semantic_hash": "4fb0b645b5b8d49f3941166a7a000c05"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/plans/attendance-system.md": {
+    "mtime": 1782266578.8861177,
+    "ast_hash": "092a63056331ce6780fd76dda57bc207",
+    "semantic_hash": "092a63056331ce6780fd76dda57bc207"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/plans/mobile-app-launch.md": {
+    "mtime": 1782266578.8866956,
+    "ast_hash": "94915cca6830e541a5290d6a6c55746b",
+    "semantic_hash": "94915cca6830e541a5290d6a6c55746b"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/tasks/multi_tenant_migration.md": {
+    "mtime": 1782266578.8868577,
+    "ast_hash": "8f193cbe65c9af3016fdce41a9d63910",
+    "semantic_hash": "8f193cbe65c9af3016fdce41a9d63910"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/tasks/production-hardening.md": {
+    "mtime": 1782266578.8869948,
+    "ast_hash": "60aa58b5679760f9836ea710ef09a02c",
+    "semantic_hash": "60aa58b5679760f9836ea710ef09a02c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/docs/tasks/scale-hardening.md": {
+    "mtime": 1782266578.8871436,
+    "ast_hash": "df28d202a7df159c096ae11c4723316a",
+    "semantic_hash": "df28d202a7df159c096ae11c4723316a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-land-hdpi/splash.png": {
+    "mtime": 1782266578.7805233,
+    "ast_hash": "f7a80786dd355bd39014e58027aa6e19",
+    "semantic_hash": "f7a80786dd355bd39014e58027aa6e19"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-land-mdpi/splash.png": {
+    "mtime": 1782266578.7807746,
+    "ast_hash": "acc976d4a36479233371a53021525c0c",
+    "semantic_hash": "acc976d4a36479233371a53021525c0c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-land-xhdpi/splash.png": {
+    "mtime": 1782266578.78109,
+    "ast_hash": "b8c72969bc1f78aab71a76035360d4af",
+    "semantic_hash": "b8c72969bc1f78aab71a76035360d4af"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-land-xxhdpi/splash.png": {
+    "mtime": 1782266578.7814314,
+    "ast_hash": "f87e988387b07d843905f38b084929fb",
+    "semantic_hash": "f87e988387b07d843905f38b084929fb"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-land-xxxhdpi/splash.png": {
+    "mtime": 1782266578.7817302,
+    "ast_hash": "055a69553b16b0bf5f72094a2e459fc7",
+    "semantic_hash": "055a69553b16b0bf5f72094a2e459fc7"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-port-hdpi/splash.png": {
+    "mtime": 1782266578.7820778,
+    "ast_hash": "5eb10d16c81338abe8bbc033d49638a8",
+    "semantic_hash": "5eb10d16c81338abe8bbc033d49638a8"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-port-mdpi/splash.png": {
+    "mtime": 1782266578.7824423,
+    "ast_hash": "d855a76a5070c8e6fcfd83a27549bdce",
+    "semantic_hash": "d855a76a5070c8e6fcfd83a27549bdce"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-port-xhdpi/splash.png": {
+    "mtime": 1782266578.78292,
+    "ast_hash": "df100b2a36bdb98b711cca58941728de",
+    "semantic_hash": "df100b2a36bdb98b711cca58941728de"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-port-xxhdpi/splash.png": {
+    "mtime": 1782266578.783272,
+    "ast_hash": "2c1b668364e815256f67b71dcdfa4d6e",
+    "semantic_hash": "2c1b668364e815256f67b71dcdfa4d6e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable-port-xxxhdpi/splash.png": {
+    "mtime": 1782266578.7836235,
+    "ast_hash": "b5b1b22b59abe686c1df0d74a423d034",
+    "semantic_hash": "b5b1b22b59abe686c1df0d74a423d034"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/drawable/splash.png": {
+    "mtime": 1782266578.784426,
+    "ast_hash": "acc976d4a36479233371a53021525c0c",
+    "semantic_hash": "acc976d4a36479233371a53021525c0c"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-hdpi/ic_launcher.png": {
+    "mtime": 1782266578.7854385,
+    "ast_hash": "1956941339dd5fe36d5c66601c89a08d",
+    "semantic_hash": "1956941339dd5fe36d5c66601c89a08d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png": {
+    "mtime": 1782266578.785747,
+    "ast_hash": "73b1e06d769fa08a9c3b8328cc15fd75",
+    "semantic_hash": "73b1e06d769fa08a9c3b8328cc15fd75"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png": {
+    "mtime": 1782266578.7860575,
+    "ast_hash": "f43e5674865a00186dd76183cf1f2f8e",
+    "semantic_hash": "f43e5674865a00186dd76183cf1f2f8e"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-mdpi/ic_launcher.png": {
+    "mtime": 1782266578.7863517,
+    "ast_hash": "7ed1b3739b83215d0c4a0b4a7f2dcab4",
+    "semantic_hash": "7ed1b3739b83215d0c4a0b4a7f2dcab4"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png": {
+    "mtime": 1782266578.786632,
+    "ast_hash": "5b77e8aec8b17eed320a97567c7cb8bf",
+    "semantic_hash": "5b77e8aec8b17eed320a97567c7cb8bf"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png": {
+    "mtime": 1782266578.7868874,
+    "ast_hash": "a49547a32c7d9b529af607b033811d81",
+    "semantic_hash": "a49547a32c7d9b529af607b033811d81"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png": {
+    "mtime": 1782266578.7871747,
+    "ast_hash": "5689511ee4e41a367d0342f37ac48bdf",
+    "semantic_hash": "5689511ee4e41a367d0342f37ac48bdf"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png": {
+    "mtime": 1782266578.7875173,
+    "ast_hash": "15cdded29b9877ac98c5931024c5da5d",
+    "semantic_hash": "15cdded29b9877ac98c5931024c5da5d"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png": {
+    "mtime": 1782266578.7878351,
+    "ast_hash": "c890fa4af62a63486d5dea62441ce7ab",
+    "semantic_hash": "c890fa4af62a63486d5dea62441ce7ab"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png": {
+    "mtime": 1782266578.788454,
+    "ast_hash": "a3285eeaedda8201f04e7737b9df8421",
+    "semantic_hash": "a3285eeaedda8201f04e7737b9df8421"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png": {
+    "mtime": 1782266578.7891278,
+    "ast_hash": "4e9584ecc16d1fc75afb798688ce576f",
+    "semantic_hash": "4e9584ecc16d1fc75afb798688ce576f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png": {
+    "mtime": 1782266578.7894976,
+    "ast_hash": "14cde87848553e24d7106f56eb8ceb6f",
+    "semantic_hash": "14cde87848553e24d7106f56eb8ceb6f"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png": {
+    "mtime": 1782266578.7898889,
+    "ast_hash": "9e029293ab1ae8e3a6a7b7d0b7177e46",
+    "semantic_hash": "9e029293ab1ae8e3a6a7b7d0b7177e46"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png": {
+    "mtime": 1782266578.7904606,
+    "ast_hash": "ed3696b7c52d9747411a475dbe3fa34a",
+    "semantic_hash": "ed3696b7c52d9747411a475dbe3fa34a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png": {
+    "mtime": 1782266578.7908444,
+    "ast_hash": "85addb4159ecd3f76f02fbacd5ec86de",
+    "semantic_hash": "85addb4159ecd3f76f02fbacd5ec86de"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png": {
+    "mtime": 1782266578.8141422,
+    "ast_hash": "0ac741c9e1701ee14dd05ea131f7cfd8",
+    "semantic_hash": "0ac741c9e1701ee14dd05ea131f7cfd8"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-1.png": {
+    "mtime": 1782266578.8171759,
+    "ast_hash": "958532b95c3e7d4997327dc977b80600",
+    "semantic_hash": "958532b95c3e7d4997327dc977b80600"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-2.png": {
+    "mtime": 1782266578.8174164,
+    "ast_hash": "958532b95c3e7d4997327dc977b80600",
+    "semantic_hash": "958532b95c3e7d4997327dc977b80600"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png": {
+    "mtime": 1782266578.817615,
+    "ast_hash": "958532b95c3e7d4997327dc977b80600",
+    "semantic_hash": "958532b95c3e7d4997327dc977b80600"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/apple-touch-icon.png": {
+    "mtime": 1782266578.8335078,
+    "ast_hash": "dc1c4dc90851c2532861bc69dd096243",
+    "semantic_hash": "dc1c4dc90851c2532861bc69dd096243"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/dashboard.png": {
+    "mtime": 1782266578.8363419,
+    "ast_hash": "7471501f7edf95df3082f8ca140e1670",
+    "semantic_hash": "7471501f7edf95df3082f8ca140e1670"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/dashboard.webp": {
+    "mtime": 1782266578.8411064,
+    "ast_hash": "7471501f7edf95df3082f8ca140e1670",
+    "semantic_hash": "7471501f7edf95df3082f8ca140e1670"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/icon-192x192.png": {
+    "mtime": 1782266578.843629,
+    "ast_hash": "dc1c4dc90851c2532861bc69dd096243",
+    "semantic_hash": "dc1c4dc90851c2532861bc69dd096243"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/icon-512x512.png": {
+    "mtime": 1782266578.845161,
+    "ast_hash": "dc1c4dc90851c2532861bc69dd096243",
+    "semantic_hash": "dc1c4dc90851c2532861bc69dd096243"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/images/features/batch-dashboard.png": {
+    "mtime": 1782266578.8481488,
+    "ast_hash": "d9cc1a30d0ae395f8e7f3b0c009ef0d6",
+    "semantic_hash": "d9cc1a30d0ae395f8e7f3b0c009ef0d6"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/images/features/dashboard-mobile.png": {
+    "mtime": 1782266578.8494873,
+    "ast_hash": "52267eadb5df9ed3c2de13e9951832d7",
+    "semantic_hash": "52267eadb5df9ed3c2de13e9951832d7"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/images/features/dashboard-mobile.webp": {
+    "mtime": 1782266578.8501804,
+    "ast_hash": "1c04722f9e52e395dd1af0f59e0181d7",
+    "semantic_hash": "1c04722f9e52e395dd1af0f59e0181d7"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/images/features/dashboard-tablet.png": {
+    "mtime": 1782266578.852471,
+    "ast_hash": "4575631637aa7603612a749412d17f02",
+    "semantic_hash": "4575631637aa7603612a749412d17f02"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/images/features/dashboard-tablet.webp": {
+    "mtime": 1782266578.854658,
+    "ast_hash": "d57586fc56690f0aa658c0a5ed765fec",
+    "semantic_hash": "d57586fc56690f0aa658c0a5ed765fec"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/images/features/registration-success.png": {
+    "mtime": 1782266578.8571484,
+    "ast_hash": "8c0c4c030c4c45352a3bbc281e0ab017",
+    "semantic_hash": "8c0c4c030c4c45352a3bbc281e0ab017"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/images/features/student-registration.png": {
+    "mtime": 1782266578.8577566,
+    "ast_hash": "22ea2c2fbe7a402d0aafd62ae13f3b18",
+    "semantic_hash": "22ea2c2fbe7a402d0aafd62ae13f3b18"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/logo-64.webp": {
+    "mtime": 1782266578.8580205,
+    "ast_hash": "c4080aff0ab5ca3a9f8caf115d40ea14",
+    "semantic_hash": "c4080aff0ab5ca3a9f8caf115d40ea14"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/sticker-mockup.png": {
+    "mtime": 1782266578.8595078,
+    "ast_hash": "5822cb4b7da5c1ac3e7c3490618c1ae0",
+    "semantic_hash": "5822cb4b7da5c1ac3e7c3490618c1ae0"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/public/vite.svg": {
+    "mtime": 1782266578.859692,
+    "ast_hash": "8e3a10e157f75ada21ab742c022d5430",
+    "semantic_hash": "8e3a10e157f75ada21ab742c022d5430"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/client/src/assets/react.svg": {
+    "mtime": 1782266578.8602145,
+    "ast_hash": "f0402b67b6ce880f65666bb49e841696",
+    "semantic_hash": "f0402b67b6ce880f65666bb49e841696"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/assets/images/android-icon-background.png": {
+    "mtime": 1778984235.1629434,
+    "ast_hash": "d3e03197ce9f5d8688dc86f8bf060d42",
+    "semantic_hash": "d3e03197ce9f5d8688dc86f8bf060d42"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/assets/images/android-icon-foreground.png": {
+    "mtime": 1778984235.0673618,
+    "ast_hash": "d3e03197ce9f5d8688dc86f8bf060d42",
+    "semantic_hash": "d3e03197ce9f5d8688dc86f8bf060d42"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/assets/images/android-icon-monochrome.png": {
+    "mtime": 1775959471.1410093,
+    "ast_hash": "1e097dab989759fc0b69440092ca22cd",
+    "semantic_hash": "1e097dab989759fc0b69440092ca22cd"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/assets/images/favicon.png": {
+    "mtime": 1775959471.142488,
+    "ast_hash": "d9f444efbdfbe7931aa93beada07318a",
+    "semantic_hash": "d9f444efbdfbe7931aa93beada07318a"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/assets/images/icon.png": {
+    "mtime": 1778984234.8513916,
+    "ast_hash": "d3e03197ce9f5d8688dc86f8bf060d42",
+    "semantic_hash": "d3e03197ce9f5d8688dc86f8bf060d42"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/assets/images/slide_admin.png": {
+    "mtime": 1783875076.0905952,
+    "ast_hash": "e0d1e30387cd90006f2bf16211abb3c6",
+    "semantic_hash": "e0d1e30387cd90006f2bf16211abb3c6"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/assets/images/slide_ai_tests.png": {
+    "mtime": 1783875080.8054266,
+    "ast_hash": "60854c47a2d3619582f8c6b895b3a247",
+    "semantic_hash": "60854c47a2d3619582f8c6b895b3a247"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/assets/images/slide_smart_scanner.png": {
+    "mtime": 1783875084.9691246,
+    "ast_hash": "6bde963a671dc8b6550585cbf72a0fa3",
+    "semantic_hash": "6bde963a671dc8b6550585cbf72a0fa3"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/mobile/assets/images/splash-icon.png": {
+    "mtime": 1778984234.9581273,
+    "ast_hash": "d3e03197ce9f5d8688dc86f8bf060d42",
+    "semantic_hash": "d3e03197ce9f5d8688dc86f8bf060d42"
+  },
+  "/Users/gaurangbhatia/Desktop/Projects/MathLogs/server/assets/mathlogs-logo.png": {
+    "mtime": 1769987122.1463606,
+    "ast_hash": "af99dfda08558137b263825b8e6a08a9",
+    "semantic_hash": "af99dfda08558137b263825b8e6a08a9"
+  }
+}

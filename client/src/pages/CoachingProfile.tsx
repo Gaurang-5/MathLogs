@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Star, MapPin, Phone, MessageCircle, CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, Send, Loader2, MessageSquarePlus } from 'lucide-react';
+import { Star, MapPin, Phone, MessageCircle, CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, Send, Loader2, MessageSquarePlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { GooglePlaceConnectModal } from '../components/GooglePlaceConnectModal';
+import { useMetaTags } from '../hooks/useMetaTags';
 
 interface GoogleReviewItem {
   authorName: string;
@@ -69,6 +70,11 @@ export default function CoachingProfile() {
   const [profile, setProfile] = useState<CoachingProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  useMetaTags({
+    title: profile?.name ? `${profile.name} - Coaching Profile | MathLogs Marketplace` : 'Coaching Institute Profile - MathLogs Marketplace',
+    description: profile?.tagline || profile?.aboutUs || 'View courses, batch timings, fee details, location map, and contact info for this coaching institute on MathLogs.'
+  });
+
   // Inquiry Form state
   const [studentName, setStudentName] = useState('');
   const [inquiryPhone, setInquiryPhone] = useState('');
@@ -85,6 +91,50 @@ export default function CoachingProfile() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Claim Profile state
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimantName, setClaimantName] = useState('');
+  const [claimPhone, setClaimPhone] = useState('');
+  const [claimEmail, setClaimEmail] = useState('');
+  const [claimNote, setClaimNote] = useState('');
+  const [submittingClaim, setSubmittingClaim] = useState(false);
+
+  const handleClaimSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || !claimantName.trim() || !claimPhone.trim()) {
+      toast.error('Please enter your name and phone number');
+      return;
+    }
+    setSubmittingClaim(true);
+    try {
+      const res = await fetch(`/api/marketplace/coaching/${profile.id}/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          claimantName,
+          phone: claimPhone,
+          email: claimEmail,
+          proofNote: claimNote
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || 'Claim request submitted!');
+        setShowClaimModal(false);
+        setClaimantName('');
+        setClaimPhone('');
+        setClaimEmail('');
+        setClaimNote('');
+      } else {
+        toast.error(data.message || 'Failed to submit claim request');
+      }
+    } catch (err) {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setSubmittingClaim(false);
+    }
+  };
 
   const fetchProfile = useCallback(async () => {
     if (!slug) return;
@@ -312,6 +362,28 @@ export default function CoachingProfile() {
       <main className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
         {/* Left 2 Cols: Details & Reviews */}
         <div className="lg:col-span-2 space-y-8">
+          {/* Claim Profile Banner for Unverified Listings */}
+          {!profile.isVerified && (
+            <div className="bg-amber-50 border border-amber-200/90 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="p-3 bg-amber-100/90 rounded-2xl text-amber-900 shrink-0 mt-0.5">
+                  <Sparkles className="w-5 h-5 text-amber-700" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-amber-950">Is this your Coaching Institute or Teacher Profile?</h4>
+                  <p className="text-xs text-amber-800/90 mt-1 leading-relaxed">
+                    This is a public directory listing on MathLogs. Claim this profile now to manage student enrollments, batch schedules, fees, online tests, and inquiries directly.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowClaimModal(true)}
+                className="shrink-0 px-5 py-2.5 bg-amber-900 hover:bg-black text-white font-bold text-xs rounded-full transition-all shadow-xs active:scale-95"
+              >
+                Claim Profile Now
+              </button>
+            </div>
+          )}
           {/* Tagline & About */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
             <h2 className="text-xl font-extrabold text-[#1A1F36] mb-4">About Coaching</h2>
@@ -852,6 +924,132 @@ export default function CoachingProfile() {
             fetchProfile();
           }}
         />
+      )}
+
+      {/* Claim Profile Modal */}
+      {showClaimModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setShowClaimModal(false)}
+              className="absolute top-5 right-5 text-neutral-400 hover:text-neutral-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-neutral-900">Claim {profile.name}</h3>
+                <p className="text-xs text-neutral-500 font-medium">Verify your ownership of this coaching institute</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleClaimSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">Your Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ramesh Sharma"
+                  value={claimantName}
+                  onChange={e => setClaimantName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">Contact Phone Number *</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. +91 9876543210"
+                  value={claimPhone}
+                  onChange={e => setClaimPhone(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">Official Email (Optional)</label>
+                <input
+                  type="email"
+                  placeholder="e.g. contact@coaching.com"
+                  value={claimEmail}
+                  onChange={e => setClaimEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">Verification Note / Designation</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Founder & Head Teacher at Sharma Classes"
+                  value={claimNote}
+                  onChange={e => setClaimNote(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingClaim}
+                className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                {submittingClaim ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <span>Submit Claim & Verification Request</span>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Mobile Sticky Contact Action Bar ────────────────────────────── */}
+      {profile && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-2xl border-t border-neutral-200/80 p-3 shadow-[0_-10px_30px_rgba(0,0,0,0.1)] flex items-center gap-2 sm:hidden">
+          {(profile.whatsappPhone || profile.phone) ? (
+            <a
+              href={`https://wa.me/${(profile.whatsappPhone || profile.phone)?.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi ${profile.name}, I found your coaching profile on MathLogs and would like to inquire about admission.`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-full flex items-center justify-center gap-1.5 shadow-sm transition-all"
+            >
+              <MessageCircle className="w-4 h-4 fill-white text-emerald-600" />
+              <span>WhatsApp</span>
+            </a>
+          ) : null}
+
+          {profile.phone && (
+            <a
+              href={`tel:${profile.phone}`}
+              className="py-3 px-4 bg-neutral-100 hover:bg-neutral-200 active:scale-95 text-neutral-900 font-bold text-xs rounded-full flex items-center justify-center gap-1.5 border border-neutral-200 transition-all"
+            >
+              <Phone className="w-4 h-4 text-neutral-700" />
+              <span>Call</span>
+            </a>
+          )}
+
+          <button
+            onClick={() => {
+              const el = document.getElementById('inquiry-form');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+              } else {
+                toast.success('Scroll down to send direct inquiry');
+              }
+            }}
+            className="flex-1 py-3 bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white font-bold text-xs rounded-full flex items-center justify-center gap-1.5 shadow-sm transition-all"
+          >
+            <Send className="w-3.5 h-3.5 text-amber-400" />
+            <span>Inquire</span>
+          </button>
+        </div>
       )}
     </div>
   );

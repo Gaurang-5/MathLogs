@@ -12,9 +12,10 @@ interface QuizBillingProps {
 }
 
 const creditPackages = [
-    { id: 'quiz_credits_10', credits: 10, price: 1000, popular: false, oldPrice: 1599 },
-    { id: 'quiz_credits_25', credits: 25, price: 2000, popular: true, oldPrice: 3499 },
-    { id: 'quiz_credits_40', credits: 40, price: 3000, popular: false, oldPrice: 5999 }
+    { id: 'quiz_credits_5', credits: 5, price: 250, popular: false, oldPrice: 500 },
+    { id: 'quiz_credits_10', credits: 10, price: 500, popular: false, oldPrice: 1000 },
+    { id: 'quiz_credits_25', credits: 25, price: 1000, popular: true, oldPrice: 2000 },
+    { id: 'quiz_credits_40', credits: 40, price: 1500, popular: false, oldPrice: 3000 }
 ];
 
 export default function QuizBilling({ institute, fetchInstituteDetails, isCheckoutLoading, setIsCheckoutLoading, loadScript }: QuizBillingProps) {
@@ -118,7 +119,7 @@ export default function QuizBilling({ institute, fetchInstituteDetails, isChecko
                     <p className="text-app-text-tertiary text-sm">Select a credit package that suits your needs. Credits never expire.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
                     {creditPackages.map((pkg) => (
                         <div
                             key={pkg.id}
