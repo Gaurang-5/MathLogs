@@ -85,7 +85,10 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
                         institute: {
                             select: {
                                 planExpiryDate: true,
-                                plan: true
+                                plan: true,
+                                isQuizOnly: true,
+                                quizCredits: true,
+                                config: true
                             }
                         }
                     }
@@ -116,15 +119,19 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
                 return;
             }
 
-            if (dbUser.institute && (dbUser.institute.planExpiryDate || dbUser.institute.plan === 'NO_PLAN')) {
-                const expiry = dbUser.institute.planExpiryDate ? new Date(dbUser.institute.planExpiryDate) : new Date(0);
-                const isNoPlan = dbUser.institute.plan === 'NO_PLAN';
+            const institute = dbUser.institute;
+            const isQuizOnlyInst = institute?.isQuizOnly === true || (institute?.config as any)?.planName === 'QUIZ_ONLY' || (institute?.config as any)?.isQuizOnly === true;
+
+            // Quiz-Only accounts operate on a credit-based model (quizCredits) and must not be blocked by ERP plan expiry.
+            if (institute && !isQuizOnlyInst && (institute.planExpiryDate || institute.plan === 'NO_PLAN')) {
+                const expiry = institute.planExpiryDate ? new Date(institute.planExpiryDate) : new Date(0);
+                const isNoPlan = institute.plan === 'NO_PLAN';
                 const isExpired = expiry.getTime() < Date.now();
 
                 if (isExpired || isNoPlan) {
                     // Allowed paths even when expired
                     const path = req.path;
-                    const isExempt = path.startsWith('/billing') || path.startsWith('/auth') || path.startsWith('/institute');
+                    const isExempt = path.startsWith('/billing') || path.startsWith('/auth') || path.startsWith('/institute') || path.startsWith('/tests/online') || path.startsWith('/tests/generate');
                     
                     if (!isExempt) {
                         // Grant "View Only" access: they can read and download PDFs (GET) but cannot create/update/delete (POST/PUT/DELETE)

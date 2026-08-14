@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Trash2, Image, Upload, Check, ArrowUp, ArrowDown, Sparkles, Layers, BookOpen, Clock, Loader2 } from 'lucide-react';
+import { X, Plus, Trash2, Image, Upload, Check, ArrowUp, ArrowDown, Sparkles, Layers, BookOpen, Clock, Loader2, Globe, Lock } from 'lucide-react';
 import { api, apiRequest } from '../utils/api';
 import toast from 'react-hot-toast';
 import Dropdown from './Dropdown';
+import { cn } from '../utils/cn';
 
 interface ManualQuestion {
     id?: string;
@@ -46,10 +47,12 @@ function getCorrectOptions(value: string | string[] | undefined): string[] {
 }
 
 export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, quizToEdit }: ManualQuizModalProps) {
+    const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
     const [title, setTitle] = useState('');
     const [topic, setTopic] = useState('');
     const [difficulty, setDifficulty] = useState('Medium');
     const [timeLimitMins, setTimeLimitMins] = useState('30');
+    const [isPublic, setIsPublic] = useState<boolean>(isQuizOnly ? true : false);
     const [batchIds, setBatchIds] = useState<string[]>([]);
     const [availableFrom, setAvailableFrom] = useState(() => formatLocalDateTimeInput(new Date()));
     const [availableUntil, setAvailableUntil] = useState(() => formatLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
@@ -81,6 +84,7 @@ export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, qui
                 setDifficulty(quizToEdit.difficulty || 'Medium');
                 setTimeLimitMins(String(quizToEdit.timeLimitMins || 30));
                 setBatchIds(quizToEdit.batchIds || (quizToEdit.batchId ? [quizToEdit.batchId] : []) || (quizToEdit.batch?.id ? [quizToEdit.batch.id] : []));
+                setIsPublic(isQuizOnly ? true : (typeof quizToEdit.isPublic === 'boolean' ? quizToEdit.isPublic : false));
 
                 if (quizToEdit.availableFrom) setAvailableFrom(formatLocalDateTimeInput(new Date(quizToEdit.availableFrom)));
                 if (quizToEdit.availableUntil) setAvailableUntil(formatLocalDateTimeInput(new Date(quizToEdit.availableUntil)));
@@ -100,6 +104,7 @@ export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, qui
                 setTopic('');
                 setDifficulty('Medium');
                 setTimeLimitMins('30');
+                setIsPublic(isQuizOnly ? true : false);
                 setBatchIds(batches.length > 0 ? [batches[0].id] : []);
                 setAvailableFrom(formatLocalDateTimeInput(new Date()));
                 setAvailableUntil(formatLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
@@ -114,7 +119,7 @@ export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, qui
                 ]);
             }
         }
-    }, [isOpen, quizToEdit, batches]);
+    }, [isOpen, quizToEdit, batches, isQuizOnly]);
 
     const batchOptions = useMemo(() => batches.map(b => ({ value: b.id, label: b.name })), [batches]);
 
@@ -278,8 +283,8 @@ export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, qui
             toast.error('Please enter a quiz title.');
             return;
         }
-        if (!saveAsDraft && batchIds.length === 0) {
-            toast.error('Please select at least one batch.');
+        if (!saveAsDraft && !isPublic && !isQuizOnly && batchIds.length === 0) {
+            toast.error('Please select at least one batch for a private quiz.');
             return;
         }
 
@@ -317,7 +322,8 @@ export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, qui
                 topic: topic.trim(),
                 difficulty,
                 timeLimitMins: Number(timeLimitMins) || 30,
-                batchIds,
+                batchIds: isPublic ? [] : batchIds,
+                isPublic: isQuizOnly ? true : isPublic,
                 availableFrom: saveAsDraft ? null : availableFrom,
                 availableUntil: saveAsDraft ? null : availableUntil,
                 isDraft: saveAsDraft,
@@ -329,6 +335,11 @@ export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, qui
                 toast.success(saveAsDraft ? 'Quiz draft saved!' : 'Quiz updated successfully!');
             } else {
                 await api.post('/tests/online', payload);
+                if (isQuizOnly && !saveAsDraft) {
+                    const currentCredits = parseInt(localStorage.getItem('quizCredits') || '0', 10);
+                    localStorage.setItem('quizCredits', Math.max(0, currentCredits - 1).toString());
+                    window.dispatchEvent(new Event('storage'));
+                }
                 toast.success(saveAsDraft ? 'Quiz draft saved!' : 'Quiz created successfully!');
             }
 
@@ -461,32 +472,90 @@ export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, qui
                             </div>
                         </div>
 
-                        {/* Batch selection */}
+                        {/* Quiz Visibility Selector */}
                         <div>
                             <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">
-                                Assign to Batches *
+                                Quiz Access & Visibility
                             </label>
-                            <div className="flex flex-wrap gap-2">
-                                {batches.map(b => (
-                                    <button
-                                        key={b.id}
-                                        type="button"
-                                        onClick={() => {
-                                            setBatchIds(prev =>
-                                                prev.includes(b.id) ? prev.filter(id => id !== b.id) : [...prev, b.id]
-                                            );
-                                        }}
-                                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                                            batchIds.includes(b.id)
-                                                ? 'bg-black text-white'
-                                                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                                        }`}
-                                    >
-                                        {b.name}
-                                    </button>
-                                ))}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPublic(true)}
+                                    className={cn(
+                                        "flex items-start gap-3 p-3 rounded-xl border text-left transition-all",
+                                        isPublic
+                                            ? "bg-emerald-50/70 border-emerald-500 ring-1 ring-emerald-500"
+                                            : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"
+                                    )}
+                                >
+                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5", isPublic ? "bg-emerald-600 text-white" : "bg-neutral-200 text-neutral-500")}>
+                                        <Globe className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={cn("font-bold text-xs", isPublic ? "text-emerald-900" : "text-neutral-700")}>Public Quiz</span>
+                                            {isPublic && <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">Active</span>}
+                                        </div>
+                                        <p className="text-[11px] text-neutral-500 mt-0.5 leading-tight">Anyone with the link can participate. No batch required.</p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    disabled={isQuizOnly}
+                                    onClick={() => { if (!isQuizOnly) setIsPublic(false); }}
+                                    className={cn(
+                                        "flex items-start gap-3 p-3 rounded-xl border text-left transition-all",
+                                        !isPublic
+                                            ? "bg-black border-black"
+                                            : isQuizOnly
+                                                ? "bg-neutral-50 border-neutral-200 opacity-50 cursor-not-allowed"
+                                                : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"
+                                    )}
+                                    title={isQuizOnly ? "Quiz-Only accounts can only create public quizzes" : undefined}
+                                >
+                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5", !isPublic ? "bg-white text-black" : "bg-neutral-200 text-neutral-400")}>
+                                        <Lock className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={cn("font-bold text-xs", !isPublic ? "text-white" : "text-neutral-600")}>Private Quiz</span>
+                                            {isQuizOnly && <span className="text-[9px] font-bold bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded">Institute Plan</span>}
+                                        </div>
+                                        <p className={cn("text-[11px] mt-0.5 leading-tight", !isPublic ? "text-neutral-400" : "text-neutral-400")}>Restricted to students in selected batches.</p>
+                                    </div>
+                                </button>
                             </div>
                         </div>
+
+                        {/* Batch selection — only for Private, non-quiz-only */}
+                        {!isPublic && !isQuizOnly && (
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                                    Assign to Batches *
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {batches.map(b => (
+                                        <button
+                                            key={b.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setBatchIds(prev =>
+                                                    prev.includes(b.id) ? prev.filter(id => id !== b.id) : [...prev, b.id]
+                                                );
+                                            }}
+                                            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                                                batchIds.includes(b.id)
+                                                    ? 'bg-black text-white'
+                                                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                                            }`}
+                                        >
+                                            {b.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* SECTION 2: QUESTION BUILDER */}

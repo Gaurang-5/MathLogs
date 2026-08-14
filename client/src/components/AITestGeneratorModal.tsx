@@ -1,10 +1,11 @@
 /* eslint-disable */
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Loader, X, FileText, Check, Upload, Trash2, RefreshCw, Layers, Link2 } from 'lucide-react';
+import { Sparkles, Loader, X, FileText, Check, Upload, Trash2, RefreshCw, Layers, Link2, Globe, Lock } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 import Dropdown from './Dropdown';
+import { cn } from '../utils/cn';
 
 const ProgressSteps = [
     "Analyzing topic & constraints...",
@@ -110,6 +111,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
     const [pendingReverts, setPendingReverts] = useState<Record<string, GeneratedQuestion[]>>({});
 
     const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+    const [isPublic, setIsPublic] = useState<boolean>(isQuizOnly ? true : false);
 
     const handleRevertQuestion = (regenId: string) => {
         if (!generatedTest) return;
@@ -171,6 +173,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
             setDifficulty(quizToEdit.difficulty || 'Medium');
             setQuestionCount(quizToEdit.studentQuestionCount ? String(quizToEdit.studentQuestionCount) : String(quizToEdit.questions?.length || 10));
             setBatchIds(quizToEdit.batchIds || (quizToEdit.batchId ? [quizToEdit.batchId] : []) || (quizToEdit.batch?.id ? [quizToEdit.batch.id] : []));
+            setIsPublic(isQuizOnly ? true : (typeof quizToEdit.isPublic === 'boolean' ? quizToEdit.isPublic : false));
 
             if (quizToEdit.availableFrom) setAvailableFrom(formatLocalDateTimeInput(new Date(quizToEdit.availableFrom)));
             if (quizToEdit.availableUntil) setAvailableUntil(formatLocalDateTimeInput(new Date(quizToEdit.availableUntil)));
@@ -193,8 +196,10 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                 totalMarks: quizToEdit.totalMarks,
                 questions: mappedQuestions
             });
+        } else if (isOpen) {
+            setIsPublic(isQuizOnly ? true : false);
         }
-    }, [isOpen, quizToEdit]);
+    }, [isOpen, quizToEdit, isQuizOnly]);
 
     const batchOptions = useMemo(() => {
         return batches.map(b => ({ value: b.id, label: b.name }));
@@ -489,8 +494,13 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
     };
 
     const handleSaveTest = async (saveAsDraft = false) => {
-        if (!generatedTest || (!saveAsDraft && !isQuizOnly && batchIds.length === 0)) {
-            toast.error('Please assign the quiz to at least one batch.');
+        if (!generatedTest) {
+            toast.error('No test questions generated.');
+            return;
+        }
+
+        if (!saveAsDraft && !isPublic && !isQuizOnly && batchIds.length === 0) {
+            toast.error('Please assign the private quiz to at least one batch.');
             return;
         }
 
@@ -516,8 +526,8 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                 totalMarks: generatedTest.totalMarks,
                 availableFrom: saveAsDraft ? null : fromDate.toISOString(),
                 availableUntil: saveAsDraft ? null : untilDate.toISOString(),
-                batchIds,
-                isPublic: isQuizOnly,
+                batchIds: isPublic ? [] : batchIds,
+                isPublic: isQuizOnly ? true : isPublic,
                 isDraft: saveAsDraft,
                 questions: generatedTest.questions,
                 studentQuestionCount: parseInt(questionCount) || null
@@ -1000,35 +1010,100 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                     {/* Quiz Settings */}
                                     <div className="bg-neutral-50 border border-neutral-100 p-3.5 sm:p-4 rounded-xl mt-4 space-y-4">
                                         <h4 className="font-bold text-neutral-900 text-sm">Quiz Settings</h4>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            {!isQuizOnly && (
-                                                <div className="col-span-1 sm:col-span-2">
-                                                    <label className="block text-xs font-bold text-neutral-800 uppercase mb-2">Assign to Batches</label>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-3 bg-white border border-neutral-200 rounded-lg">
-                                                        {batchOptions.length === 0 ? (
-                                                            <p className="text-sm text-neutral-400 col-span-full">No batches available.</p>
-                                                        ) : (
-                                                            batchOptions.map(b => (
-                                                                <label key={b.value} className="flex items-center gap-2 text-sm font-medium cursor-pointer text-neutral-700 hover:text-black">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500 accent-emerald-600"
-                                                                        checked={batchIds.includes(b.value)}
-                                                                        onChange={(e) => {
-                                                                            if (e.target.checked) {
-                                                                                setBatchIds([...batchIds, b.value]);
-                                                                            } else {
-                                                                                setBatchIds(batchIds.filter(id => id !== b.value));
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    <span>{b.label}</span>
-                                                                </label>
-                                                            ))
-                                                        )}
+                                        
+                                        {/* Quiz Access / Visibility Selector */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-neutral-800 uppercase mb-2">Quiz Access & Visibility</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsPublic(true)}
+                                                    className={cn(
+                                                        "flex items-start gap-3 p-3 rounded-xl border text-left transition-all",
+                                                        isPublic
+                                                            ? "bg-emerald-50/70 border-emerald-500 text-emerald-950 ring-1 ring-emerald-500"
+                                                            : "bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300"
+                                                    )}
+                                                >
+                                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5", isPublic ? "bg-emerald-600 text-white" : "bg-neutral-100 text-neutral-500")}>
+                                                        <Globe className="w-4 h-4" />
                                                     </div>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-bold text-xs">Public Quiz</span>
+                                                            {isPublic && <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">Active</span>}
+                                                        </div>
+                                                        <p className="text-[11px] text-neutral-500 mt-0.5 leading-tight">Anyone with the quiz link can participate. No batch assignment required.</p>
+                                                    </div>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    disabled={isQuizOnly}
+                                                    onClick={() => {
+                                                        if (!isQuizOnly) setIsPublic(false);
+                                                    }}
+                                                    className={cn(
+                                                        "flex items-start gap-3 p-3 rounded-xl border text-left transition-all",
+                                                        !isPublic
+                                                            ? "bg-black border-black text-white"
+                                                            : isQuizOnly
+                                                                ? "bg-neutral-50 border-neutral-200 text-neutral-400 opacity-60 cursor-not-allowed"
+                                                                : "bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300"
+                                                    )}
+                                                    title={isQuizOnly ? "Quiz-Only accounts create public shareable quizzes" : undefined}
+                                                >
+                                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5", !isPublic ? "bg-white text-black" : "bg-neutral-100 text-neutral-400")}>
+                                                        <Lock className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-bold text-xs">Private Quiz</span>
+                                                            {isQuizOnly && (
+                                                                <span className="text-[9px] font-bold bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded">
+                                                                    Institute Plan
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className={cn("text-[11px] mt-0.5 leading-tight", !isPublic ? "text-neutral-300" : "text-neutral-400")}>
+                                                            Restricted to students in selected batches.
+                                                        </p>
+                                                    </div>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Batch selection - only shown if NOT public and NOT quiz-only */}
+                                        {!isPublic && !isQuizOnly && (
+                                            <div className="animate-in fade-in duration-200">
+                                                <label className="block text-xs font-bold text-neutral-800 uppercase mb-2">Assign to Batches *</label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-3 bg-white border border-neutral-200 rounded-lg">
+                                                    {batchOptions.length === 0 ? (
+                                                        <p className="text-sm text-neutral-400 col-span-full">No batches available.</p>
+                                                    ) : (
+                                                        batchOptions.map(b => (
+                                                            <label key={b.value} className="flex items-center gap-2 text-sm font-medium cursor-pointer text-neutral-700 hover:text-black">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500 accent-emerald-600"
+                                                                    checked={batchIds.includes(b.value)}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            setBatchIds([...batchIds, b.value]);
+                                                                        } else {
+                                                                            setBatchIds(batchIds.filter(id => id !== b.value));
+                                                                        }
+                                                                    }}
+                                                                />
+                                                                <span>{b.label}</span>
+                                                            </label>
+                                                        ))
+                                                    )}
                                                 </div>
-                                            )}
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                             <div>
                                                 <label className="block text-xs font-bold text-neutral-800 uppercase mb-2">Time Limit (mins)</label>
                                                 <input
@@ -1080,7 +1155,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                         </button>
                                         <button
                                             onClick={() => handleSaveTest(false)}
-                                            disabled={savingMode !== null || (!isQuizOnly && batchIds.length === 0)}
+                                            disabled={savingMode !== null || (!isPublic && !isQuizOnly && batchIds.length === 0)}
                                             className="flex-1 min-h-11 bg-neutral-900 text-white font-bold py-3 rounded-xl hover:bg-neutral-800 flex justify-center items-center gap-2 disabled:opacity-50"
                                         >
                                             {savingMode === 'publish' ? <Loader className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
