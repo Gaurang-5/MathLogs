@@ -19,7 +19,6 @@ interface MarketplaceProfileData {
   tagline?: string;
   aboutUs?: string;
   logoUrl?: string;
-  googleMapsUrl?: string;
   subjectsOffered?: string[];
   classesOffered?: string[];
   isPubliclyListed: boolean;
@@ -65,7 +64,6 @@ export default function MarketplaceSettings() {
   const [city, setCity] = useState('Muzaffarnagar');
   const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
-  const [googleMapsUrl, setGoogleMapsUrl] = useState('');
   const [tagline, setTagline] = useState('');
   const [aboutUs, setAboutUs] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
@@ -97,7 +95,6 @@ export default function MarketplaceSettings() {
         setCity(p.city || '');
         setArea(p.area || '');
         setAddress(p.address || '');
-        setGoogleMapsUrl(p.googleMapsUrl || '');
         setTagline(p.tagline || '');
         setAboutUs(p.aboutUs || '');
         setLogoUrl(p.logoUrl || '');
@@ -169,7 +166,6 @@ export default function MarketplaceSettings() {
           city,
           area,
           address,
-          googleMapsUrl,
           tagline,
           aboutUs,
           logoUrl,
@@ -458,16 +454,6 @@ export default function MarketplaceSettings() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1.5">Google Business / Maps Review Link</label>
-                <input
-                  type="url"
-                  value={googleMapsUrl}
-                  onChange={(e) => setGoogleMapsUrl(e.target.value)}
-                  placeholder="https://maps.google.com/?cid=..."
-                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
-                />
-              </div>
             </div>
 
             {/* Subjects & Classes Selection */}

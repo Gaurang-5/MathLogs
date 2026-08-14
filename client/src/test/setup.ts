@@ -32,3 +32,5 @@ Object.defineProperty(globalThis, 'sessionStorage', {
     value: createStorage(),
     configurable: true,
 });
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

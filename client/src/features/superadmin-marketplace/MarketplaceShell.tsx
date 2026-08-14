@@ -11,11 +11,11 @@ const navigation: Array<{ id: MarketplaceSection; label: string; icon: typeof La
 
 export function MarketplaceShell({ section, counts, refreshing, onSelect, onRefresh, onSearch, children }: {
   section: MarketplaceSection; counts: Partial<Record<'claims' | 'reviews' | 'leads', number>>; refreshing: boolean;
-  onSelect: (section: MarketplaceSection) => void; onRefresh: () => void; onSearch: (query: string) => void; children: ReactNode;
+  onSelect: (section: MarketplaceSection) => boolean; onRefresh: () => void; onSearch: (query: string) => void; children: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const select = (next: MarketplaceSection) => { onSelect(next); setMobileOpen(false); };
+  const select = (next: MarketplaceSection) => { if (onSelect(next)) setMobileOpen(false); };
   const submitSearch = (event: React.FormEvent) => { event.preventDefault(); onSearch(query); };
   return <div className="min-h-screen bg-[#f6f7f9] text-neutral-950">
     <div className="mx-auto flex min-h-screen max-w-[1540px]">

@@ -1,10 +1,22 @@
-import { apiRequest } from '../../utils/api';
+import { ApiRequestError, apiRequest } from '../../utils/api';
 import type {
   ListingUpdateInput, MarketplaceActivity, MarketplaceClaim, MarketplaceLead, MarketplaceListing,
   MarketplaceListingDetail, MarketplaceOverview, MarketplaceReview, ReviewStatus,
 } from './types';
 
 interface Envelope<T> { success?: boolean; data?: T; message?: string; }
+
+export class MarketplaceApiError extends Error {
+  readonly status: number;
+  readonly latestListing?: MarketplaceListingDetail;
+
+  constructor(message: string, status: number, latestListing?: MarketplaceListingDetail) {
+    super(message);
+    this.name = 'MarketplaceApiError';
+    this.status = status;
+    this.latestListing = latestListing;
+  }
+}
 
 const unwrap = <T>(response: Envelope<T> | T): T => {
   if (response && typeof response === 'object' && 'data' in response) {
@@ -17,6 +29,13 @@ const unwrap = <T>(response: Envelope<T> | T): T => {
 
 const request = async <T>(path: string, method: 'GET' | 'POST' | 'PATCH' = 'GET', body?: unknown) =>
   unwrap<T>(await apiRequest<Envelope<T>>(path, method, body));
+
+const listingConflict = (error: unknown): MarketplaceApiError | null => {
+  if (!(error instanceof ApiRequestError) || error.status !== 409) return null;
+  const response = error.response as Envelope<MarketplaceListingDetail> | undefined;
+  if (!response?.data || typeof response.data !== 'object' || !('id' in response.data) || !('updatedAt' in response.data)) return null;
+  return new MarketplaceApiError(error.message, error.status, response.data);
+};
 
 const query = (values: Record<string, string | undefined>) => {
   const search = new URLSearchParams();
@@ -37,7 +56,13 @@ export const marketplaceApi = {
   },
   getListings: async (filters: { query?: string; filter?: string } = {}) => collection<MarketplaceListing>(await request<unknown>(`/marketplace/super-admin/listings${query(filters)}`), 'listings'),
   getListing: (id: string) => request<MarketplaceListingDetail>(`/marketplace/super-admin/listings/${id}`),
-  updateListing: (id: string, values: ListingUpdateInput) => request<MarketplaceListingDetail>(`/marketplace/super-admin/listings/${id}`, 'PATCH', values),
+  updateListing: async (id: string, values: ListingUpdateInput) => {
+    try {
+      return await request<MarketplaceListingDetail>(`/marketplace/super-admin/listings/${id}`, 'PATCH', values);
+    } catch (error) {
+      throw listingConflict(error) || error;
+    }
+  },
   getClaims: async (filters: { status?: string; query?: string } = {}) => collection<MarketplaceClaim>(await request<unknown>(`/marketplace/super-admin/claims${query(filters)}`), 'claims'),
   getClaim: (id: string) => request<MarketplaceClaim>(`/marketplace/super-admin/claims/${id}`),
   contactClaim: (id: string) => request<MarketplaceClaim>(`/marketplace/super-admin/claims/${id}/contacted`, 'PATCH'),

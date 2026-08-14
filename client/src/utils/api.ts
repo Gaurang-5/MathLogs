@@ -10,6 +10,18 @@ declare global {
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 type QueueEntry = { resolve: (value: string | null) => void; reject: (reason?: unknown) => void };
 
+export class ApiRequestError<TResponse = unknown> extends Error {
+    readonly status: number;
+    readonly response: TResponse;
+
+    constructor(message: string, status: number, response: TResponse) {
+        super(message);
+        this.name = 'ApiRequestError';
+        this.status = status;
+        this.response = response;
+    }
+}
+
 const isCapacitor = typeof window !== 'undefined' && window.Capacitor?.isNative;
 export const API_URL = isCapacitor
     ? 'https://mathlogs.app/api'
@@ -168,12 +180,14 @@ async function request<T = unknown>(
 
             // Extract error message from response
             let serverMessage = 'Request failed';
+            let errorResponse: unknown;
             try {
                 const errorData = await parseJsonResponse<{
                     error?: string;
                     message?: string;
                     details?: Array<{ path?: Array<string | number>; message?: string }>;
                 }>(res);
+                errorResponse = errorData;
                 const validationMessage = errorData.details
                     ?.map(detail => detail.message?.trim())
                     .filter((message): message is string => Boolean(message))
@@ -183,12 +197,14 @@ async function request<T = unknown>(
                 // Ignore JSON parse errors for error responses, just use default message
             }
 
+            const requestError = (message = serverMessage) => new ApiRequestError(message, res.status, errorResponse);
+
             // Special case for expired free trial / subscription
             if (res.status === 402) {
                 if (window.location.pathname !== '/billing') {
                     window.location.href = '/billing';
                 }
-                throw new Error(serverMessage || 'Subscription expired.');
+                throw requestError(serverMessage || 'Subscription expired.');
             }
 
             // Categorize by status code and provide context
@@ -198,7 +214,7 @@ async function request<T = unknown>(
 
                 case 409:
                     // Conflict
-                    throw new Error(serverMessage);
+                    throw requestError();
 
                 case 429:
                     // Log rate limit for monitoring - should NOT occur in normal testing
@@ -207,15 +223,15 @@ async function request<T = unknown>(
                         timestamp: new Date().toISOString(),
                         message: 'Rate limit exceeded - investigate if occurs during testing'
                     });
-                    throw new Error('Too many requests from this location. Please wait a few minutes and try again.');
+                    throw requestError('Too many requests from this location. Please wait a few minutes and try again.');
 
                 case 500:
                 case 502:
                 case 503:
-                    throw new Error(serverMessage + ' Please try again or contact support if this persists.');
+                    throw requestError(serverMessage + ' Please try again or contact support if this persists.');
 
                 default:
-                    throw new Error(serverMessage);
+                    throw requestError();
             }
         }
         return parseJsonResponse<T>(res);

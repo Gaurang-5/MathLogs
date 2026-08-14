@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { API_URL, apiRequest } from './api';
+import { API_URL, ApiRequestError, apiRequest } from './api';
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
     return new Response(JSON.stringify(body), {
@@ -78,5 +78,25 @@ describe('apiRequest', () => {
 
         await expect(apiRequest('/public/register', 'POST', {}))
             .rejects.toThrow('Invalid phone number (10-15 digits)');
+    });
+
+    it('preserves structured conflict data while retaining the server message', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+            success: false,
+            message: 'Listing was updated by another operator',
+            data: { id: 'listing-1', updatedAt: '2026-08-15T01:00:00.000Z' },
+        }, { status: 409 }));
+
+        const error = await apiRequest('/marketplace/super-admin/listings/listing-1', 'PATCH', {})
+            .catch(reason => reason);
+
+        expect(error).toBeInstanceOf(ApiRequestError);
+        expect(error).toMatchObject({
+            message: 'Listing was updated by another operator',
+            status: 409,
+            response: {
+                data: { id: 'listing-1', updatedAt: '2026-08-15T01:00:00.000Z' },
+            },
+        });
     });
 });
