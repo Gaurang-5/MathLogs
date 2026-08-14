@@ -5,7 +5,7 @@ import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Monitor, Copy, Share2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Monitor, Copy, Share2, Sparkles, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
@@ -1252,15 +1252,26 @@ export default function BatchDetails() {
                             const avg = getStudentAverage(student);
 
                             return (
-                                <div key={student.id} onClick={() => setSelectedStudentId(student.id)} className="bg-white active:bg-neutral-50 transition-colors cursor-pointer">
+                                <div key={student.id} className="bg-white transition-colors">
                                     {/* Card body */}
                                     <div className="px-4 pt-4 pb-3">
-                                        {/* Row 1: Name + ID pill */}
+                                        {/* Row 1: Name (Clickable for profile) + Avg score */}
                                         <div className="flex items-start justify-between gap-3 mb-2">
                                             <div className="flex-1 min-w-0">
-                                                <h4 className="font-black text-[17px] text-black tracking-tight leading-snug break-words text-left">
-                                                    {student.name}
-                                                </h4>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedStudentId(student.id);
+                                                    }}
+                                                    className="group/name flex items-center gap-1.5 text-left transition-opacity active:opacity-70 max-w-full focus:outline-none"
+                                                    title="View student profile"
+                                                >
+                                                    <h4 className="font-black text-[17px] text-black tracking-tight leading-snug break-words group-hover/name:underline decoration-neutral-400 underline-offset-2">
+                                                        {student.name}
+                                                    </h4>
+                                                    <ChevronRight className="w-4 h-4 text-app-text-tertiary group-hover/name:text-black shrink-0 transition-transform group-hover/name:translate-x-0.5" />
+                                                </button>
                                                 {student.humanId && (
                                                     <span className="inline-flex items-center gap-1 mt-1 font-mono text-[11px] bg-neutral-100 border border-black/[0.06] px-2 py-0.5 rounded-md text-app-text-secondary font-bold">
                                                         {student.humanId}
@@ -1318,7 +1329,8 @@ export default function BatchDetails() {
                                                     return (
                                                         <button
                                                             key={inst.id}
-                                                            onClick={() => {
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
                                                                 if (isFullyPaid) {
                                                                     if (payments.length > 0) {
                                                                         setViewPayment({ student, installment: inst, payments });
@@ -1375,7 +1387,8 @@ export default function BatchDetails() {
                                                     return (
                                                         <button
                                                             key={inst.id}
-                                                            onClick={() => {
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
                                                                 if (isFullyPaid) {
                                                                     if (payments.length > 0) setViewPayment({ student, installment: inst, payments });
                                                                     else toast.success('Paid via Account Balance');
@@ -1409,7 +1422,7 @@ export default function BatchDetails() {
                                     {/* Bottom action row — native-app style, 48px touch targets */}
                                     <div className="flex border-t border-black/[0.05]">
                                         <button
-                                            onClick={() => setViewMarksId(student.id)}
+                                            onClick={(e) => { e.stopPropagation(); setViewMarksId(student.id); }}
                                             className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
                                         >
                                             <Eye className="w-4 h-4" />
@@ -1418,6 +1431,7 @@ export default function BatchDetails() {
                                         <div className="w-px bg-black/[0.05] self-stretch" />
                                         <a
                                             href={`tel:${student.parentWhatsapp}`}
+                                            onClick={(e) => e.stopPropagation()}
                                             className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition-colors"
                                         >
                                             <Phone className="w-4 h-4" />
@@ -1425,7 +1439,7 @@ export default function BatchDetails() {
                                         </a>
                                         <div className="w-px bg-black/[0.05] self-stretch" />
                                         <button
-                                            onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
+                                            onClick={(e) => { e.stopPropagation(); setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
                                             className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
                                         >
                                             <Receipt className="w-4 h-4" />
@@ -1433,7 +1447,7 @@ export default function BatchDetails() {
                                         </button>
                                         <div className="w-px bg-black/[0.05] self-stretch" />
                                         <button
-                                            onClick={() => setEditingStudent(student)}
+                                            onClick={(e) => { e.stopPropagation(); setEditingStudent(student); }}
                                             className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
                                         >
                                             <Edit2 className="w-4 h-4" />
@@ -1441,7 +1455,7 @@ export default function BatchDetails() {
                                         </button>
                                         <div className="w-px bg-black/[0.05] self-stretch" />
                                         <button
-                                            onClick={() => handleDelete(student)}
+                                            onClick={(e) => { e.stopPropagation(); handleDelete(student); }}
                                             className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-red-400 hover:bg-red-50 active:bg-red-100 transition-colors"
                                         >
                                             <Trash2 className="w-4 h-4" />
