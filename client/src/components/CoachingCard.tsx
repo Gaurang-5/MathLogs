@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, MapPin, Phone, CheckCircle2, BookOpen, MessageCircle, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Star, MapPin, Phone, CheckCircle2, MessageCircle, Sparkles } from 'lucide-react';
+import { appleSpringDefault, appleSpringSnappy } from '../utils/appleDesign';
 
 export interface CoachingItem {
   id: string;
@@ -38,7 +40,15 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
     : null;
 
   return (
-    <div className="bg-white rounded-3xl border border-neutral-200/80 p-6 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between relative overflow-hidden">
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      whileHover={{ y: -3, scale: 1.012 }}
+      transition={appleSpringDefault}
+      className="bg-white/80 backdrop-blur-md rounded-3xl border border-neutral-200/80 p-6 shadow-xs hover:shadow-xl transition-shadow duration-300 group flex flex-col justify-between relative overflow-hidden"
+    >
       {/* Exclusive Gold Top Accent Line */}
       {coaching.isExclusive && (
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500" />
@@ -62,7 +72,7 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
 
             <div>
               <Link to={`/coaching/${coaching.slug}`} className="group-hover:text-neutral-700 transition-colors">
-                <h3 className="font-bold text-[#1A1F36] text-base leading-snug line-clamp-1">
+                <h3 className="font-bold text-[#1A1F36] text-base leading-snug tracking-[-0.015em] line-clamp-1">
                   {coaching.name}
                 </h3>
               </Link>
@@ -78,15 +88,20 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
 
         {/* Exclusive Partner Badge */}
         {coaching.isExclusive && (
-          <div className="mb-3.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-[11px] font-bold text-amber-800 shadow-2xs">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={appleSpringSnappy}
+            className="mb-3.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50/90 border border-amber-200/80 text-[11px] font-bold text-amber-800 shadow-2xs"
+          >
             <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400 shrink-0" />
             <span>Exclusive MathLogs Partner</span>
-          </div>
+          </motion.div>
         )}
 
         {/* Tagline */}
         {coaching.tagline && (
-          <p className="text-xs text-neutral-500 italic mt-1 mb-3 line-clamp-2 bg-neutral-50 p-2.5 rounded-xl border border-neutral-100">
+          <p className="text-xs text-neutral-500 italic mt-1 mb-3 line-clamp-2 bg-neutral-50/70 p-2.5 rounded-xl border border-neutral-100/80">
             "{coaching.tagline}"
           </p>
         )}
@@ -123,7 +138,7 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
             coaching.subjectsOffered.slice(0, 4).map((sub, i) => (
               <span
                 key={i}
-                className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200/60"
+                className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100/90 text-neutral-700 border border-neutral-200/60"
               >
                 {sub}
               </span>
@@ -141,39 +156,49 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
         </div>
       </div>
 
-      {/* Action Footer */}
+      {/* Action Footer with Apple Instant Feedback on Touch */}
       <div className="mt-5 pt-3.5 border-t border-neutral-100 flex items-center gap-2">
         <Link
           to={`/coaching/${coaching.slug}`}
-          className="flex-1 text-center px-4 py-2.5 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 rounded-full transition-all hover:shadow-sm active:scale-95"
+          className="flex-1"
         >
-          View Profile
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            transition={appleSpringSnappy}
+            className="w-full text-center px-4 py-2.5 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 rounded-full transition-colors cursor-pointer"
+          >
+            View Profile
+          </motion.button>
         </Link>
 
         {whatsappUrl && (
-          <a
+          <motion.a
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-[#16a34a] bg-[#effdf4] hover:bg-[#dcfce7] border border-[#bbf7d0] rounded-full transition-colors"
+            whileTap={{ scale: 0.94 }}
+            transition={appleSpringSnappy}
+            className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-[#16a34a] bg-[#effdf4] hover:bg-[#dcfce7] border border-[#bbf7d0] rounded-full transition-colors cursor-pointer"
             title="Chat on WhatsApp"
           >
             <MessageCircle className="w-4 h-4 fill-[#16a34a] text-white" />
             <span className="hidden sm:inline">WhatsApp</span>
-          </a>
+          </motion.a>
         )}
 
         {coaching.phone && (
-          <a
+          <motion.a
             href={`tel:${coaching.phone}`}
-            className="p-2.5 text-neutral-700 bg-white border border-neutral-200/80 rounded-full hover:bg-neutral-100 transition-colors"
+            whileTap={{ scale: 0.94 }}
+            transition={appleSpringSnappy}
+            className="p-2.5 text-neutral-700 bg-white border border-neutral-200/80 rounded-full hover:bg-neutral-100 transition-colors cursor-pointer"
             title={`Call ${coaching.phone}`}
           >
             <Phone className="w-4 h-4 text-neutral-700" />
-          </a>
+          </motion.a>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };
 

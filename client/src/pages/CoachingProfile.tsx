@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Star, MapPin, Phone, MessageCircle, CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, Send, Loader2, MessageSquarePlus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Star, MapPin, Phone, MessageCircle, CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, Send, Loader2, MessageSquarePlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { appleSpringDefault, appleSpringSnappy } from '../utils/appleDesign';
 
 interface Review {
   id: string;
@@ -204,8 +206,8 @@ export default function CoachingProfile() {
 
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col font-sans pb-16 text-neutral-900 selection:bg-neutral-900 selection:text-white">
-      {/* Header Bar */}
-      <header className="bg-white/90 backdrop-blur-xl border-b border-neutral-200/80 sticky top-0 z-40">
+      {/* Translucent Header Bar */}
+      <header className="bg-white/70 backdrop-blur-2xl saturate-180 border-b border-white/40 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
           <Link to="/coaching" className="inline-flex items-center gap-2 text-sm font-bold text-neutral-700 hover:text-neutral-900 transition-colors">
             <ArrowLeft className="w-4 h-4" />
@@ -214,13 +216,18 @@ export default function CoachingProfile() {
 
           <Link to="/" className="flex items-center gap-2">
             <img src="/logo-64.webp" alt="MathLogs Logo" width={32} height={32} className="w-8 h-8 rounded-lg shadow-sm border border-neutral-100" />
-            <span className="font-extrabold text-lg text-neutral-900 tracking-tight">MathLogs</span>
+            <span className="font-extrabold text-lg text-neutral-900 tracking-[-0.02em]">MathLogs</span>
           </Link>
         </div>
       </header>
 
-      {/* Profile Header Banner */}
-      <section className="bg-white border-b border-neutral-200/80 py-10 px-6">
+      {/* Profile Header Banner with Motion */}
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={appleSpringDefault}
+        className="bg-white/80 backdrop-blur-md border-b border-neutral-200/80 py-10 px-6"
+      >
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             {profile.logoUrl ? (
@@ -237,9 +244,9 @@ export default function CoachingProfile() {
 
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1A1F36] tracking-tight">{profile.name}</h1>
+                <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1A1F36] tracking-[-0.025em]">{profile.name}</h1>
                 {profile.isExclusive && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold shadow-2xs">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50/90 border border-amber-200/80 text-amber-800 text-xs font-bold shadow-2xs">
                     <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
                     <span>Exclusive MathLogs Partner</span>
                   </span>
@@ -273,42 +280,48 @@ export default function CoachingProfile() {
             </div>
           </div>
 
-          {/* Quick Action CTAs */}
+          {/* Quick Action CTAs with Apple Instant Feedback */}
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-neutral-100">
             {whatsappUrl && (
-              <a
+              <motion.a
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold text-xs rounded-full shadow-xs transition-transform hover:scale-105"
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.02 }}
+                transition={appleSpringSnappy}
+                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold text-xs rounded-full shadow-xs cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4 fill-white text-[#16a34a]" />
                 <span>Chat on WhatsApp</span>
-              </a>
+              </motion.a>
             )}
 
             {profile.phone && (
-              <a
+              <motion.a
                 href={`tel:${profile.phone}`}
-                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full shadow-xs transition-colors"
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.02 }}
+                transition={appleSpringSnappy}
+                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full shadow-xs cursor-pointer"
               >
                 <Phone className="w-4 h-4" />
                 <span>Call Teacher</span>
-              </a>
+              </motion.a>
             )}
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Main Content Details Grid */}
       <main className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
         {/* Left 2 Cols: Details & Reviews */}
         <div className="lg:col-span-2 space-y-8">
           {/* Tagline & About */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
-            <h2 className="text-xl font-extrabold text-[#1A1F36] mb-4">About Coaching</h2>
+          <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
+            <h2 className="text-xl font-extrabold text-[#1A1F36] tracking-[-0.015em] mb-4">About Coaching</h2>
             {profile.tagline && (
-              <blockquote className="p-4 bg-neutral-50 border-l-4 border-neutral-900 rounded-r-2xl text-sm font-semibold text-neutral-700 italic mb-4">
+              <blockquote className="p-4 bg-neutral-50/80 border-l-4 border-neutral-900 rounded-r-2xl text-sm font-semibold text-neutral-700 italic mb-4">
                 "{profile.tagline}"
               </blockquote>
             )}
@@ -324,7 +337,7 @@ export default function CoachingProfile() {
                 <div className="flex flex-wrap gap-2">
                   {profile.subjectsOffered && profile.subjectsOffered.length > 0 ? (
                     profile.subjectsOffered.map((s, i) => (
-                      <span key={i} className="px-3.5 py-1 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200/80">
+                      <span key={i} className="px-3.5 py-1 rounded-full text-xs font-semibold bg-neutral-100/90 text-neutral-800 border border-neutral-200/80">
                         {s}
                       </span>
                     ))
@@ -339,7 +352,7 @@ export default function CoachingProfile() {
                   <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">Classes & Grades Covered</h4>
                   <div className="flex flex-wrap gap-2">
                     {profile.classesOffered.map((c, i) => (
-                      <span key={i} className="px-3.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-900 border border-purple-200/80">
+                      <span key={i} className="px-3.5 py-1 rounded-full text-xs font-semibold bg-purple-50/90 text-purple-900 border border-purple-200/80">
                         {c}
                       </span>
                     ))}
@@ -360,22 +373,24 @@ export default function CoachingProfile() {
                 </div>
 
                 {mapsUrl && (
-                  <a
+                  <motion.a
                     href={mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-bold text-neutral-900 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-4 py-2 rounded-full border border-neutral-200 transition-colors shrink-0"
+                    whileTap={{ scale: 0.95 }}
+                    transition={appleSpringSnappy}
+                    className="text-xs font-bold text-neutral-900 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-4 py-2 rounded-full border border-neutral-200 transition-colors shrink-0 cursor-pointer"
                   >
                     View on Google Maps →
-                  </a>
+                  </motion.a>
                 )}
               </div>
             )}
           </div>
 
           {/* Available Batches Section */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
-            <h2 className="text-xl font-extrabold text-[#1A1F36] mb-4 flex items-center gap-2">
+          <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
+            <h2 className="text-xl font-extrabold text-[#1A1F36] tracking-[-0.015em] mb-4 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-neutral-900" />
               <span>Available Batches</span>
             </h2>
@@ -383,7 +398,12 @@ export default function CoachingProfile() {
             {profile.batches && profile.batches.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {profile.batches.map((batch) => (
-                  <div key={batch.id} className="p-5 bg-neutral-50 rounded-2xl border border-neutral-200/60">
+                  <motion.div
+                    key={batch.id}
+                    whileHover={{ scale: 1.015 }}
+                    transition={appleSpringDefault}
+                    className="p-5 bg-neutral-50/90 rounded-2xl border border-neutral-200/60"
+                  >
                     <h3 className="font-bold text-neutral-900 text-sm">{batch.name}</h3>
                     <div className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
                       {batch.subject && <p><span className="text-neutral-400">Subject:</span> {batch.subject}</p>}
@@ -400,7 +420,7 @@ export default function CoachingProfile() {
                         </p>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             ) : (
@@ -411,25 +431,27 @@ export default function CoachingProfile() {
           </div>
 
           {/* Reviews & Ratings Section */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
+          <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-extrabold text-[#1A1F36] flex items-center gap-2">
+              <h2 className="text-xl font-extrabold text-[#1A1F36] tracking-[-0.015em] flex items-center gap-2">
                 <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
                 <span>Reviews & Ratings</span>
               </h2>
 
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                transition={appleSpringSnappy}
                 onClick={() => setShowReviewModal(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-full transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-full transition-colors cursor-pointer"
               >
                 <MessageSquarePlus className="w-4 h-4" />
                 <span>Write a Review</span>
-              </button>
+              </motion.button>
             </div>
 
             {/* Google Business Profile Reviews Badge */}
             {profile.googleMapsUrl && (
-              <div className="p-5 bg-gradient-to-r from-blue-50/50 via-white to-blue-50/50 rounded-2xl border border-blue-200/80 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="p-5 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/60 rounded-2xl border border-blue-200/80 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-white border border-neutral-200 flex items-center justify-center font-extrabold text-blue-600 text-lg shadow-2xs">
                     G
@@ -446,15 +468,17 @@ export default function CoachingProfile() {
                   </div>
                 </div>
 
-                <a
+                <motion.a
                   href={profile.googleMapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-full shadow-2xs transition-colors flex items-center gap-1.5 shrink-0"
+                  whileTap={{ scale: 0.95 }}
+                  transition={appleSpringSnappy}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-full shadow-2xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <span>Read Reviews on Google Maps</span>
                   <span>↗</span>
-                </a>
+                </motion.a>
               </div>
             )}
 
@@ -482,7 +506,7 @@ export default function CoachingProfile() {
                     <div key={star} className="flex items-center gap-2">
                       <span className="w-6 text-right text-neutral-500 font-bold">{star} ★</span>
                       <div className="flex-1 h-2.5 bg-white rounded-full overflow-hidden border border-amber-200/60">
-                        <div className="h-full bg-amber-400 rounded-full" style={{ width: `${pct}%` }} />
+                        <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                       </div>
                       <span className="w-8 text-neutral-400 font-normal text-[11px]">{count}</span>
                     </div>
@@ -495,7 +519,7 @@ export default function CoachingProfile() {
             {profile.reviews && profile.reviews.length > 0 ? (
               <div className="space-y-4">
                 {profile.reviews.map((rev) => (
-                  <div key={rev.id} className={`p-5 rounded-2xl border ${rev.source === 'GOOGLE' ? 'bg-blue-50/40 border-blue-200/60' : 'bg-neutral-50 border-neutral-200/60'}`}>
+                  <div key={rev.id} className={`p-5 rounded-2xl border ${rev.source === 'GOOGLE' ? 'bg-blue-50/40 border-blue-200/60' : 'bg-neutral-50/80 border-neutral-200/60'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2.5">
                         <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center ${rev.source === 'GOOGLE' ? 'bg-blue-100 text-blue-700' : 'bg-neutral-900 text-white'}`}>
@@ -537,15 +561,15 @@ export default function CoachingProfile() {
           </div>
         </div>
 
-        {/* Right 1 Col: Lead Inquiry Card */}
+        {/* Right 1 Col: Lead Inquiry Card Sticky */}
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-md sticky top-24">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-700 text-xs font-bold mb-3">
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-md sticky top-24">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100/80 border border-neutral-200 text-neutral-700 text-xs font-bold mb-3">
               <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
               <span>Direct Coaching Inquiry</span>
             </div>
 
-            <h3 className="text-xl font-extrabold text-[#1A1F36]">Interested in Joining?</h3>
+            <h3 className="text-xl font-extrabold text-[#1A1F36] tracking-[-0.015em]">Interested in Joining?</h3>
             <p className="text-xs text-neutral-500 font-medium mt-1 mb-6">
               Send your contact details to get callback & batch information directly from teacher.
             </p>
@@ -559,7 +583,7 @@ export default function CoachingProfile() {
                   placeholder="Your full name"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
+                  className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 transition-all"
                 />
               </div>
 
@@ -571,7 +595,7 @@ export default function CoachingProfile() {
                   placeholder="10-digit mobile number"
                   value={inquiryPhone}
                   onChange={(e) => setInquiryPhone(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
+                  className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 transition-all"
                 />
               </div>
 
@@ -581,7 +605,7 @@ export default function CoachingProfile() {
                   <select
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 outline-none"
+                    className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 outline-none cursor-pointer"
                   >
                     <option value="">Select subject (Optional)</option>
                     {profile.subjectsOffered.map((sub, i) => (
@@ -598,7 +622,7 @@ export default function CoachingProfile() {
                   placeholder="e.g. Class 10 / JEE"
                   value={selectedClass}
                   onChange={(e) => setSelectedClass(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
+                  className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 transition-all"
                 />
               </div>
 
@@ -609,14 +633,16 @@ export default function CoachingProfile() {
                   placeholder="Any questions about timings or fees..."
                   value={inquiryMessage}
                   onChange={(e) => setInquiryMessage(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 resize-none"
+                  className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 transition-all resize-none"
                 />
               </div>
 
-              <button
+              <motion.button
                 type="submit"
                 disabled={submittingInquiry}
-                className="w-full py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-all hover:shadow-md active:scale-95 flex items-center justify-center gap-2"
+                whileTap={{ scale: 0.95 }}
+                transition={appleSpringSnappy}
+                className="w-full py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 {submittingInquiry ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -626,96 +652,123 @@ export default function CoachingProfile() {
                     <span>Send Inquiry to Teacher</span>
                   </>
                 )}
-              </button>
+              </motion.button>
             </form>
           </div>
         </div>
       </main>
 
-      {/* Write Review Modal */}
-      {showReviewModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-neutral-200">
-            <h3 className="text-xl font-extrabold text-[#1A1F36] mb-1">Write a Review</h3>
-            <p className="text-xs text-neutral-500 font-medium mb-6">Share your learning experience with {profile.name}.</p>
+      {/* Write Review Modal with Apple Spring Scale Overlay */}
+      <AnimatePresence>
+        {showReviewModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowReviewModal(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 10 }}
+              transition={appleSpringDefault}
+              className="bg-white/95 backdrop-blur-2xl rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-neutral-200 z-10 relative"
+            >
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="absolute top-5 right-5 text-neutral-400 hover:text-neutral-700 p-1.5 rounded-full hover:bg-neutral-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
 
-            <form onSubmit={handleReviewSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">Your Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Rahul Sharma"
-                  value={reviewerName}
-                  onChange={(e) => setReviewerName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
-                />
-              </div>
+              <h3 className="text-xl font-extrabold text-[#1A1F36] mb-1">Write a Review</h3>
+              <p className="text-xs text-neutral-500 font-medium mb-6">Share your learning experience with {profile.name}.</p>
 
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">I am a *</label>
-                <select
-                  value={reviewerRole}
-                  onChange={(e) => setReviewerRole(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 outline-none"
-                >
-                  <option value="Student">Student</option>
-                  <option value="Parent">Parent</option>
-                  <option value="Alumni">Alumni</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-2">Rating *</label>
-                <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setReviewRating(star)}
-                      className="p-1.5 focus:outline-none transition-transform hover:scale-110"
-                    >
-                      <Star
-                        className={`w-7 h-7 ${star <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-neutral-300'}`}
-                      />
-                    </button>
-                  ))}
+              <form onSubmit={handleReviewSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">Your Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Rahul Sharma"
+                    value={reviewerName}
+                    onChange={(e) => setReviewerName(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
+                  />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">Your Feedback *</label>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="Share details about teaching quality, results, environment..."
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900 resize-none"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">I am a *</label>
+                  <select
+                    value={reviewerRole}
+                    onChange={(e) => setReviewerRole(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 outline-none cursor-pointer"
+                  >
+                    <option value="Student">Student</option>
+                    <option value="Parent">Parent</option>
+                    <option value="Alumni">Alumni</option>
+                  </select>
+                </div>
 
-              <div className="flex items-center gap-3 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowReviewModal(false)}
-                  className="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs rounded-full transition-colors"
-                >
-                  Cancel
-                </button>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-2">Rating *</label>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <motion.button
+                        key={star}
+                        type="button"
+                        whileTap={{ scale: 0.85 }}
+                        transition={appleSpringSnappy}
+                        onClick={() => setReviewRating(star)}
+                        className="p-1.5 focus:outline-none cursor-pointer"
+                      >
+                        <Star
+                          className={`w-7 h-7 ${star <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-neutral-300'}`}
+                        />
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
 
-                <button
-                  type="submit"
-                  disabled={submittingReview}
-                  className="flex-1 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-colors flex items-center justify-center"
-                >
-                  {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Review'}
-                </button>
-              </div>
-            </form>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">Your Feedback *</label>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder="Share details about teaching quality, results, environment..."
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900 resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 pt-3">
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowReviewModal(false)}
+                    className="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs rounded-full transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </motion.button>
+
+                  <motion.button
+                    type="submit"
+                    disabled={submittingReview}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex-1 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-colors flex items-center justify-center cursor-pointer"
+                  >
+                    {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Review'}
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }
