@@ -471,18 +471,18 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
             {/* ─── Form Card ─── */}
             <div className="px-4 pb-10 -mt-1">
                 <motion.div
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.08 }}
-                    className="max-w-md mx-auto bg-app-surface-opaque rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/60 p-6 sm:p-8"
+                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    className="max-w-md mx-auto bg-white/80 backdrop-blur-2xl rounded-3xl shadow-xl border border-white/60 p-6 sm:p-8"
                 >
-                    <h2 className="text-lg font-semibold text-app-text mb-1">Student Registration</h2>
+                    <h2 className="text-lg font-bold text-app-text tracking-[-0.015em] mb-1">Student Registration</h2>
                     <p className="text-sm text-app-text-tertiary mb-6">Fill in the details below to enroll.</p>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {(batchStatus?.institute?.config?.registrationForm?.fields || DEFAULT_FORM_FIELDS).map((field) => (
                             <div key={field.id}>
-                                <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">
+                                <label className="block text-sm font-bold text-app-text-secondary mb-1.5 ml-0.5">
                                     {field.label} {!field.required && <span className="text-app-text-tertiary font-normal">(Optional)</span>}
                                 </label>
                                 <div className="relative group">
@@ -569,14 +569,16 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                             </p>
                         </div>
 
-                        {/* Submit */}
-                        <button
+                        {/* Submit Button with Instant Spring Touch Feedback */}
+                        <motion.button
                             type="submit"
-                            className="w-full bg-neutral-900 hover:bg-black text-white font-semibold py-3.5 rounded-xl mt-2 shadow-md shadow-neutral-900/20 transition-all duration-200 hover:shadow-lg hover:shadow-black/25 active:scale-[0.98] flex items-center justify-center gap-2 group"
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+                            className="w-full bg-neutral-900 hover:bg-black text-white font-bold py-3.5 rounded-2xl mt-2 shadow-md shadow-neutral-900/20 transition-colors flex items-center justify-center gap-2 group cursor-pointer"
                         >
-                            Submit Registration
+                            <span>Submit Registration</span>
                             <ArrowRight className="w-[18px] h-[18px] group-hover:translate-x-0.5 transition-transform" />
-                        </button>
+                        </motion.button>
                     </form>
                 </motion.div>
 

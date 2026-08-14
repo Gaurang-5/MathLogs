@@ -17,12 +17,53 @@ const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
 
 
 
-function isPlainAnswerMap(value: unknown): value is Record<string, string> {
+type QuizAnswerValue = string | string[];
+
+function isPlainAnswerMap(value: unknown): value is Record<string, QuizAnswerValue> {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return false;
     }
 
-    return Object.values(value).every((answer) => typeof answer === 'string');
+    return Object.values(value).every((answer) =>
+        typeof answer === 'string' ||
+        (Array.isArray(answer) && answer.every((item) => typeof item === 'string'))
+    );
+}
+
+function parseAnswerList(value: unknown): string[] {
+    if (Array.isArray(value)) {
+        return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+    }
+
+    if (typeof value !== 'string' || !value.trim()) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+            return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+        }
+    } catch {
+        // Existing single-answer quizzes store plain strings.
+    }
+
+    return [value];
+}
+
+function serializeAnswerValue(value: unknown): string | null {
+    const answers = parseAnswerList(value);
+    if (answers.length === 0) return null;
+    return answers.length === 1 ? answers[0] : JSON.stringify(answers);
+}
+
+function areAnswerListsEqual(selected: unknown, correct: unknown): boolean {
+    const selectedAnswers = parseAnswerList(selected).sort();
+    const correctAnswers = parseAnswerList(correct).sort();
+
+    return selectedAnswers.length > 0 &&
+        selectedAnswers.length === correctAnswers.length &&
+        selectedAnswers.every((answer, index) => answer === correctAnswers[index]);
 }
 
 function getRouteParam(value: string | string[] | undefined): string | undefined {
@@ -998,8 +1039,11 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
             });
         }
 
-        const clientQuestions = shuffledQuestionsData.map(({ correctOption: _co, ...rest }) => rest);
-        const autoSavedAnswers = submission.autoSavedAnswers as Record<string, string> | null;
+        const clientQuestions = shuffledQuestionsData.map(({ correctOption, ...rest }) => ({
+            ...rest,
+            allowMultiple: parseAnswerList(correctOption).length > 1
+        }));
+        const autoSavedAnswers = submission.autoSavedAnswers as Record<string, QuizAnswerValue> | null;
 
         res.json({
             quiz: {
@@ -1238,13 +1282,13 @@ export const submitOnlineQuiz = async (req: Request, res: Response): Promise<voi
             const answerRecords: { questionId: string; selectedOption: string | null; isCorrect: boolean; marksObtained: number }[] = [];
 
             for (const q of shuffledQuestionsData) {
-                const selected = answers[q.id] || null;
-                const isCorrect = selected !== null && selected === q.correctOption;
+                const selected = answers[q.id] ?? null;
+                const isCorrect = areAnswerListsEqual(selected, q.correctOption);
                 const marksObtained = isCorrect ? (q.marks || 1) : 0;
                 totalScore += marksObtained;
                 answerRecords.push({
                     questionId: q.id,
-                    selectedOption: selected,
+                    selectedOption: serializeAnswerValue(selected),
                     isCorrect,
                     marksObtained
                 });
@@ -1392,7 +1436,7 @@ export const autoFinalizeExpiredSubmissions = async (quizId: string): Promise<vo
         if (expiredSubmissions.length === 0) return;
 
         for (const sub of expiredSubmissions) {
-            const answers = (sub.autoSavedAnswers as Record<string, string>) || {};
+            const answers = (sub.autoSavedAnswers as Record<string, QuizAnswerValue>) || {};
             const shuffledQuestionsData = Array.isArray(sub.shuffledQuestions)
                 ? (sub.shuffledQuestions as any[])
                 : [];
@@ -1401,13 +1445,13 @@ export const autoFinalizeExpiredSubmissions = async (quizId: string): Promise<vo
             const answerRecords: { questionId: string; selectedOption: string | null; isCorrect: boolean; marksObtained: number }[] = [];
 
             for (const q of shuffledQuestionsData) {
-                const selected = answers[q.id] || null;
-                const isCorrect = selected !== null && selected === q.correctOption;
+                const selected = answers[q.id] ?? null;
+                const isCorrect = areAnswerListsEqual(selected, q.correctOption);
                 const marksObtained = isCorrect ? (q.marks || 1) : 0;
                 totalScore += marksObtained;
                 answerRecords.push({
                     questionId: q.id,
-                    selectedOption: selected,
+                    selectedOption: serializeAnswerValue(selected),
                     isCorrect,
                     marksObtained
                 });

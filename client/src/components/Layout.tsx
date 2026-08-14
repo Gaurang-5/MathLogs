@@ -2,9 +2,10 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, FileText, Sparkles, Scan, ReceiptIndianRupee, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Sparkles, Scan, ReceiptIndianRupee, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard, Store } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
+import { api } from '../utils/api';
 import ToastProvider from './ToastProvider';
 import QuickFeeModal from './QuickFeeModal';
 import PWAInstallPrompt from './PWAInstallPrompt';
@@ -12,13 +13,27 @@ import PWAInstallPrompt from './PWAInstallPrompt';
 interface LayoutProps {
     children: React.ReactNode;
     title?: string;
+    headerAction?: React.ReactNode;
     hideMobileNav?: boolean;
 }
 
-export default function Layout({ children, title, hideMobileNav = false }: LayoutProps) {
+export default function Layout({ children, title, headerAction, hideMobileNav = false }: LayoutProps) {
     const location = useLocation();
     const navigate = useNavigate();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [quizCredits, setQuizCredits] = useState<number>(() => {
+        return parseInt(localStorage.getItem('quizCredits') || '0', 10);
+    });
+
+    useEffect(() => {
+        api.get<{ quizCredits?: number }>('/institute/me').then((res) => {
+            if (res && res.quizCredits !== undefined) {
+                setQuizCredits(res.quizCredits);
+                localStorage.setItem('quizCredits', res.quizCredits.toString());
+            }
+        }).catch(() => {});
+    }, []);
+
     // Default to collapsed on screens smaller than 1280px (xl) to prevent squashed content on tablets/laptops
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -27,8 +42,16 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
         return false;
     });
     const [showQuickFeeModal, setShowQuickFeeModal] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
-
+    // Watch for billing modals being opened (they set data-modal-open on body)
+    useEffect(() => {
+        const observer = new MutationObserver(() => {
+            setIsModalOpen(document.body.getAttribute('data-modal-open') === 'true');
+        });
+        observer.observe(document.body, { attributes: true, attributeFilter: ['data-modal-open'] });
+        return () => observer.disconnect();
+    }, []);
 
     const [pullY, setPullY] = useState(0);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -64,7 +87,7 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
         startYRef.current = 0;
     };
 
-    const showMobileNav = !hideMobileNav && ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing'].includes(location.pathname);
+    const showMobileNav = !hideMobileNav && ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing', '/marketplace-settings'].includes(location.pathname);
 
     const handleLogout = () => {
         localStorage.clear();
@@ -72,17 +95,37 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
     };
 
     const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+    const isPageOnly = localStorage.getItem('isPageOnly') === 'true';
 
-    const navItems = [
-        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        ...(isQuizOnly ? [] : [{ name: 'Batches', path: '/batches', icon: Users }]),
-        ...(isQuizOnly ? [] : [{ name: 'Tests', path: '/tests', icon: FileText }]),
-        { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
-        ...(isQuizOnly ? [] : [{ name: 'Scan Marks', path: '/scan', icon: Scan }]),
-        ...(isQuizOnly ? [] : [{ name: 'Fees', path: '/fees', icon: ReceiptIndianRupee }]),
-        { name: isQuizOnly ? 'Buy Credits' : 'Billing', path: '/billing', icon: CreditCard },
-        { name: 'Settings', path: '/settings', icon: Settings },
-    ];
+    let navItems: { name: string; path: string; icon: any }[] = [];
+
+    if (isPageOnly) {
+        navItems = [
+            { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
+            { name: 'Upgrade ERP Plan', path: '/billing', icon: CreditCard },
+            { name: 'Settings', path: '/settings', icon: Settings },
+        ];
+    } else if (isQuizOnly) {
+        navItems = [
+            { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+            { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
+            { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
+            { name: 'Buy Credits', path: '/billing', icon: CreditCard },
+            { name: 'Settings', path: '/settings', icon: Settings },
+        ];
+    } else {
+        navItems = [
+            { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+            { name: 'Batches', path: '/batches', icon: Users },
+            { name: 'Tests', path: '/tests', icon: FileText },
+            { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
+            { name: 'Scan Marks', path: '/scan', icon: Scan },
+            { name: 'Fees', path: '/fees', icon: ReceiptIndianRupee },
+            { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
+            { name: 'Billing', path: '/billing', icon: CreditCard },
+            { name: 'Settings', path: '/settings', icon: Settings },
+        ];
+    }
 
     return (
         <div className="flex min-h-screen bg-app-bg text-app-text transition-colors duration-500 font-sans selection:bg-accent-subtle selection:text-accent">
@@ -153,19 +196,17 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                 </nav>
 
                 <div className={cn("p-4 border-t border-app-border shrink-0 flex flex-col gap-3", isSidebarCollapsed && "px-2 items-center")}>
-                    {isQuizOnly && (
-                        <div className={cn("flex items-center justify-between px-3 py-2.5 bg-blue-50 text-blue-700 rounded-xl", isSidebarCollapsed && "justify-center")}>
-                            <div className="flex items-center gap-2">
-                                <Sparkles className="w-4 h-4" />
-                                {!isSidebarCollapsed && <span className="text-sm font-semibold tracking-tight">Quiz Credits</span>}
-                            </div>
-                            {!isSidebarCollapsed && (
-                                <span className="text-sm font-bold bg-blue-100 px-2 py-0.5 rounded-full">
-                                    {localStorage.getItem('quizCredits') || 0}
-                                </span>
-                            )}
+                    <div className={cn("flex items-center justify-between px-3 py-2.5 bg-blue-50/80 border border-blue-100 text-blue-700 rounded-xl", isSidebarCollapsed && "justify-center px-2")}>
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                            {!isSidebarCollapsed && <span className="text-xs font-bold tracking-tight">Quiz Credits</span>}
                         </div>
-                    )}
+                        {!isSidebarCollapsed && (
+                            <span className="text-xs font-black bg-blue-600 text-white px-2.5 py-0.5 rounded-full shadow-xs">
+                                {quizCredits}
+                            </span>
+                        )}
+                    </div>
                     
                     {!isQuizOnly && (
                         <button
@@ -215,6 +256,13 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                         </Link>
                         <div className="flex items-center gap-2">
                             <Link
+                                to="/marketplace-settings"
+                                className="w-9 h-9 flex items-center justify-center rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all active:scale-90"
+                                title="Marketplace Listing"
+                            >
+                                <Store className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                            </Link>
+                            <Link
                                 to="/quizzes"
                                 className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:text-blue-700 hover:bg-blue-100 transition-all active:scale-90"
                             >
@@ -244,37 +292,60 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                         className="fixed inset-0 z-40 bg-app-bg px-6 xl:hidden backdrop-blur-3xl overflow-y-auto"
                         style={{ paddingTop: 'calc(5.5rem + env(safe-area-inset-top))' }}
                     >
-                        <nav className="space-y-2">
-                            <div className="pt-2">
+                        <nav className="space-y-2 pb-12">
+                            <div className="pt-2 space-y-1.5">
+                                <Link
+                                    to="/coaching"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center justify-between w-full px-4 py-3.5 text-base font-bold text-amber-900 bg-amber-50 rounded-2xl border border-amber-200"
+                                >
+                                    <div className="flex items-center">
+                                        <Store className="w-5 h-5 mr-3.5 text-amber-600" />
+                                        <span>Coaching Marketplace</span>
+                                    </div>
+                                    <span className="text-[10px] bg-amber-600 text-white font-extrabold px-2.5 py-0.5 rounded-full">EXPLORE</span>
+                                </Link>
+
+                                <Link
+                                    to="/marketplace-settings"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center w-full px-4 py-3.5 text-base font-medium text-app-text hover:bg-black/5 rounded-2xl"
+                                >
+                                    <Store className="w-5 h-5 mr-3.5 text-app-text-secondary" />
+                                    Marketplace Listing Settings
+                                </Link>
+
+
+
                                 <Link
                                     to="/quizzes"
                                     onClick={() => setMobileMenuOpen(false)}
-                                    className="flex items-center w-full px-4 py-4 text-base font-medium text-indigo-600 hover:bg-indigo-50/10 hover:text-indigo-700 rounded-2xl animate-pulse-subtle border border-indigo-100/20 bg-indigo-50/5"
+                                    className="flex items-center w-full px-4 py-3.5 text-base font-medium text-indigo-600 hover:bg-indigo-50/10 rounded-2xl border border-indigo-100/30 bg-indigo-50/10"
                                 >
-                                    <Sparkles className="w-6 h-6 mr-4 text-indigo-500" />
+                                    <Sparkles className="w-5 h-5 mr-3.5 text-indigo-500" />
                                     Quizzes
                                 </Link>
                                 <Link
                                     to="/billing"
                                     onClick={() => setMobileMenuOpen(false)}
-                                    className="flex items-center w-full px-4 py-4 text-base font-medium text-app-text-secondary hover:bg-black/5 hover:text-app-text rounded-2xl"
+                                    className="flex items-center w-full px-4 py-3.5 text-base font-medium text-app-text-secondary hover:bg-black/5 rounded-2xl"
                                 >
-                                    <CreditCard className="w-6 h-6 mr-4" />
-                                    Billing
+                                    <CreditCard className="w-5 h-5 mr-3.5" />
+                                    Billing & Plans
                                 </Link>
                                 <Link
                                     to="/settings"
                                     onClick={() => setMobileMenuOpen(false)}
-                                    className="flex items-center w-full px-4 py-4 text-base font-medium text-app-text-secondary hover:bg-black/5 hover:text-app-text rounded-2xl"
+                                    className="flex items-center w-full px-4 py-3.5 text-base font-medium text-app-text-secondary hover:bg-black/5 rounded-2xl"
                                 >
-                                    <Settings className="w-6 h-6 mr-4" />
+                                    <Settings className="w-5 h-5 mr-3.5" />
                                     Settings
                                 </Link>
                                 <button
                                     onClick={handleLogout}
-                                    className="flex items-center w-full px-4 py-4 text-base font-medium text-danger hover:bg-danger/5 rounded-2xl mt-4"
+                                    className="flex items-center w-full px-4 py-3.5 text-base font-medium text-danger hover:bg-danger/5 rounded-2xl mt-4"
                                 >
-                                    <LogOut className="w-6 h-6 mr-4" />
+                                    <LogOut className="w-5 h-5 mr-3.5" />
                                     Sign Out
                                 </button>
                             </div>
@@ -308,7 +379,7 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
 
                 <div className="flex-1 p-4 lg:p-8 w-full max-w-full mx-auto animate-fadeIn relative z-0 overflow-x-hidden">
                     {title && (
-                        <div className="mb-8 flex items-center justify-between">
+                        <div className="mb-8 flex items-center justify-between gap-4 flex-wrap">
                             <motion.h2
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -317,6 +388,15 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
                             >
                                 {title}
                             </motion.h2>
+                            {headerAction && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.4 }}
+                                >
+                                    {headerAction}
+                                </motion.div>
+                            )}
                         </div>
                     )}
                     {children}
@@ -325,7 +405,7 @@ export default function Layout({ children, title, hideMobileNav = false }: Layou
 
 
             {/* Mobile Bottom Navigation (Floating Island) */}
-            {showMobileNav && (
+            {showMobileNav && !isModalOpen && (
                 <nav className="fixed bottom-6 left-4 right-4 z-50 bg-app-surface/80 backdrop-blur-3xl border border-app-border shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] rounded-[32px] h-[72px] xl:hidden">
 
                     {isQuizOnly ? (

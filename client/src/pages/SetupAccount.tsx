@@ -178,44 +178,51 @@ export default function SetupAccount() {
     // ── INVALID ───────────────────────────────────────────────────────────────
     if (step === 'invalid') {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))]">
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-md w-full text-center">
+            <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] font-sans selection:bg-neutral-900 selection:text-white">
+                <motion.div
+                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    className="bg-white/80 backdrop-blur-2xl p-8 rounded-3xl shadow-xl border border-white/60 max-w-md w-full text-center"
+                >
                     <div className="mx-auto bg-red-50 h-16 w-16 rounded-full flex items-center justify-center mb-6">
                         <AlertTriangle className="h-8 w-8 text-red-500" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Link Expired or Invalid</h2>
-                    <p className="text-gray-500 mb-6">{error || 'This setup link is invalid or has already been used.'}</p>
+                    <h2 className="text-2xl font-extrabold text-neutral-900 tracking-[-0.025em] mb-2">Link Expired or Invalid</h2>
+                    <p className="text-neutral-500 text-sm mb-6">{error || 'This setup link is invalid or has already been used.'}</p>
 
                     {/* Resend Section */}
-                    <div className="bg-gray-50 rounded-xl p-5 mb-6 text-left">
+                    <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 mb-6 text-left">
                         <div className="flex items-center gap-2 mb-3">
-                            <RotateCcw className="h-4 w-4 text-gray-600" />
-                            <p className="text-sm font-semibold text-gray-700">Get a new setup link</p>
+                            <RotateCcw className="h-4 w-4 text-neutral-600" />
+                            <p className="text-sm font-bold text-neutral-800">Get a new setup link</p>
                         </div>
-                        <p className="text-xs text-gray-500 mb-3">Enter the phone number you used during signup:</p>
+                        <p className="text-xs text-neutral-500 font-medium mb-3">Enter the phone number you used during signup:</p>
                         <div className="flex gap-2">
                             <div className="relative flex-1">
-                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                                 <input
                                     type="tel"
                                     value={resendPhone}
                                     onChange={(e) => { setResendPhone(e.target.value); setResendResult(null); }}
-                                    className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-gray-400"
+                                    className="w-full bg-white border border-neutral-200 rounded-xl pl-10 pr-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-neutral-900 transition-all placeholder:text-neutral-400"
                                     placeholder="9876543210"
                                 />
                             </div>
-                            <button
+                            <motion.button
                                 type="button"
+                                whileTap={{ scale: 0.95 }}
+                                transition={{ type: 'spring', stiffness: 450, damping: 30 }}
                                 disabled={resendPhone.length < 10 || resendLoading}
                                 onClick={handleResendLink}
-                                className="px-4 py-2.5 bg-gray-900 text-white rounded-lg font-bold text-sm hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                className="px-4 py-2.5 bg-neutral-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
                             >
                                 {resendLoading ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                     'Resend'
                                 )}
-                            </button>
+                            </motion.button>
                         </div>
 
                         {resendResult && (
@@ -224,7 +231,7 @@ export default function SetupAccount() {
                                 animate={{ opacity: 1, y: 0 }}
                                 className={`mt-3 p-2.5 rounded-lg text-xs font-medium ${
                                     resendResult.type === 'success'
-                                        ? 'bg-green-50 text-green-700 border border-green-100'
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                                         : 'bg-red-50 text-red-600 border border-red-100'
                                 }`}
                             >
@@ -235,11 +242,11 @@ export default function SetupAccount() {
 
                     <button
                         onClick={() => navigate('/')}
-                        className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+                        className="w-full py-3 px-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl font-semibold transition-colors cursor-pointer text-sm"
                     >
                         Go Home
                     </button>
-                </div>
+                </motion.div>
             </div>
         );
     }

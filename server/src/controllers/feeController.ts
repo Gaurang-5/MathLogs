@@ -208,12 +208,41 @@ export const getPaymentHistory = async (req: Request, res: Response) => {
     }
 };
 
+export const getFeeInstallmentsList = async (req: Request, res: Response) => {
+    try {
+        const user = (req as any).user;
+        const teacherId = user?.id;
+        const instituteId = user?.instituteId;
+        const role = user?.role;
+
+        const whereClause: any = {
+            batch: {
+                ...(instituteId ? { instituteId } : {}),
+                ...(role !== 'SUPER_ADMIN' ? { teacherId } : {})
+            }
+        };
+
+        const installments = await prisma.feeInstallment.findMany({
+            where: whereClause,
+            select: { name: true },
+            orderBy: { name: 'asc' }
+        });
+
+        const uniqueNames = Array.from(new Set(installments.map(i => i.name.trim()).filter(Boolean)));
+        res.json(uniqueNames);
+    } catch (error) {
+        console.error('Error fetching fee installments list:', error);
+        res.status(500).json({ error: 'Failed to fetch fee installments list' });
+    }
+};
+
 export const getFeeSummary = async (req: Request, res: Response) => {
     try {
         const user = (req as any).user;
         const teacherId = user?.id;
         const instituteId = user?.instituteId;
         const role = user?.role;
+        const installmentFilter = (req.query.installment as string) || 'All';
 
         const whereClause: any = {
             status: 'APPROVED',
@@ -274,6 +303,14 @@ export const getFeeSummary = async (req: Request, res: Response) => {
             orderBy: { name: 'asc' }
         });
 
+        // Collect all distinct installment names across all students
+        const allInstallmentNamesSet = new Set<string>();
+        students.forEach((s: any) => {
+            (s.batch?.feeInstallments || []).forEach((inst: any) => {
+                if (inst.name) allInstallmentNamesSet.add(inst.name.trim());
+            });
+        });
+
         const summary = students.map((student: any) => {
             const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
             const allBatchInstallments = student.batch?.feeInstallments || [];
@@ -288,27 +325,33 @@ export const getFeeSummary = async (req: Request, res: Response) => {
 
             // Filter installments: include global ones (no studentId) that are after join date OR have payments OR are explicitly assigned,
             // plus student-specific ones that belong to THIS student
-            const validInstallments = allBatchInstallments.filter((inst: any) => {
+            let validInstallments = allBatchInstallments.filter((inst: any) => {
                 if (inst.studentId) {
-                    // Student-specific installment: only include if it belongs to this student
                     return inst.studentId === student.id;
                 }
-                // Global installment: include if after join date OR student has payments for it OR is explicitly assigned
                 const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
                 const hasPayment = paidInstallmentIds.has(inst.id);
                 const isAssigned = assignedIds.has(inst.id);
                 return isAfterJoin || hasPayment || isAssigned;
             });
+
+            // If a specific installment filter is selected, filter validInstallments to only matching ones
+            if (installmentFilter !== 'All') {
+                validInstallments = validInstallments.filter((inst: any) => inst.name.trim() === installmentFilter.trim());
+            }
+
             const validInstallmentIds = new Set(validInstallments.map((inst: any) => inst.id));
 
-            // Calculate adhoc/generic cash payments (FeeRecords)
-            const paidSimple = student.fees
-                .filter((f: any) => f.status === 'PAID')
-                .reduce((sum: number, fee: any) => sum + fee.amount, 0);
+            // Calculate adhoc/generic cash payments (FeeRecords) - only if 'All' is selected
+            const paidSimple = (installmentFilter === 'All')
+                ? student.fees
+                    .filter((f: any) => f.status === 'PAID')
+                    .reduce((sum: number, fee: any) => sum + fee.amount, 0)
+                : 0;
 
             let unallocatedCash = paidSimple;
 
-            // Only count FeePayments that are linked to VALID installments (after join date)
+            // Only count FeePayments that are linked to VALID installments
             const validFeePayments = student.feePayments.filter((p: any) => validInstallmentIds.has(p.installmentId));
             const paidInstallments = validFeePayments
                 .reduce((sum: number, p: any) => sum + p.amountPaid, 0);
@@ -323,10 +366,8 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 const paymentsForThis = validFeePayments.filter((p: any) => p.installmentId === inst.id);
                 const paidDirectly = paymentsForThis.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
 
-                // Remaining due on this installment
                 let due = inst.amount - paidDirectly;
 
-                // Try to cover with generic/unallocated cash
                 if (due > 0 && unallocatedCash > 0) {
                     const coverage = Math.min(due, unallocatedCash);
                     due -= coverage;
@@ -338,10 +379,6 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 }
             });
 
-            // Fallback for non-installment batches
-            // Total fee calculation: If batch uses global installments, use global valid installments
-            // If batch uses flat fee, use flat fee.
-            // In both cases, add custom valid installments (which only apply to this student).
             const globalInstallmentsTotal = validInstallments
                 .filter((inst: any) => !inst.studentId)
                 .reduce((sum: number, inst: any) => sum + inst.amount, 0);
@@ -350,19 +387,21 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 .filter((inst: any) => inst.studentId)
                 .reduce((sum: number, inst: any) => sum + inst.amount, 0);
 
-            const totalFee = (isBatchInstallmentActive ? globalInstallmentsTotal : (student.batch?.feeAmount || 0)) + customInstallmentsTotal;
+            let totalFee = 0;
+            if (installmentFilter !== 'All') {
+                totalFee = globalInstallmentsTotal + customInstallmentsTotal;
+            } else {
+                totalFee = (isBatchInstallmentActive ? globalInstallmentsTotal : (student.batch?.feeAmount || 0)) + customInstallmentsTotal;
+            }
 
             const totalPaid = paidSimple + paidInstallments;
-            // Clamp balance: negative means overpaid — show as 0 (no dues)
             const balance = Math.max(0, totalFee - totalPaid);
 
-            // Last Payment Date
             const dates = [
                 ...student.fees.map((f: any) => f.date),
                 ...student.feePayments.map((p: any) => p.date)
             ].sort((a: any, b: any) => new Date(b).getTime() - new Date(a).getTime());
 
-            // Calculate Oldest Due
             let oldestDue = null;
             if (breakdown.length > 0) {
                 const firstDueInst = validInstallments.find((i: any) => i.name === breakdown[0].name);
@@ -382,7 +421,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 balance,
                 lastPaymentDate: dates.length > 0 ? dates[0] : null,
                 oldestDue,
-                breakdown // New field
+                breakdown
             };
         });
 

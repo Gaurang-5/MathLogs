@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+import crypto from 'crypto';
 import { secureLogger } from '../utils/secureLogger';
 import { getClientUrl } from '../utils/urlConfig';
 
@@ -149,8 +150,8 @@ export const validateInvite = async (req: Request, res: Response) => {
 export const setupAccount = async (req: Request, res: Response) => {
     const { token, username, password, requiresGrades, allowedClasses, subjects } = req.body;
 
-    if (!username || !password || !token) {
-        return res.status(400).json({ error: 'All fields required' });
+    if (!token) {
+        return res.status(400).json({ error: 'Invite token is required' });
     }
 
     try {
@@ -163,13 +164,15 @@ export const setupAccount = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Invalid or expired token' });
         }
 
-        // Check if username unique
-        const existing = await prisma.admin.findUnique({ where: { username } });
-        if (existing) {
-            return res.status(400).json({ error: 'Username already taken' });
-        }
+        const effectiveUsername = (username && username.trim()) ? username.trim() : invite.institute.phoneNumber;
+        const effectivePassword = password || crypto.randomBytes(16).toString('hex');
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Check if existing admin for this institute already exists
+        let existing = await prisma.admin.findFirst({
+            where: { instituteId: invite.instituteId }
+        });
+
+        const hashedPassword = await bcrypt.hash(effectivePassword, 10);
 
         // Transaction: Create Admin + Invalidate Token + Create Default Year + Update Institute Config
         const result = await prisma.$transaction(async (tx) => {
@@ -204,15 +207,18 @@ export const setupAccount = async (req: Request, res: Response) => {
                 });
             }
 
-            // 2. Create Admin
-            const admin = await tx.admin.create({
-                data: {
-                    username,
-                    password: hashedPassword,
-                    instituteId: invite.instituteId,
-                    role: 'INSTITUTE_ADMIN'
-                }
-            });
+            // 2. Create or reuse Admin
+            let admin = existing;
+            if (!admin) {
+                admin = await tx.admin.create({
+                    data: {
+                        username: effectiveUsername,
+                        password: hashedPassword,
+                        instituteId: invite.instituteId,
+                        role: 'INSTITUTE_ADMIN'
+                    }
+                });
+            }
 
 
 

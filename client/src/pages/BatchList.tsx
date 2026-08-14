@@ -29,7 +29,6 @@ interface InstituteResponse {
 }
 
 interface CreateBatchPayload {
-    batchNumber: string;
     customName: string;
     subject: string;
     timeSlot: string;
@@ -46,7 +45,6 @@ export default function BatchList() {
     const [showForm, setShowForm] = useState(false);
 
     // Form State
-    const [batchNumber, setBatchNumber] = useState('');
     const [customName, setCustomName] = useState('');
     const [subject, setSubject] = useState('Mathematics');
     const [timeSlot, setTimeSlot] = useState('');
@@ -77,11 +75,14 @@ export default function BatchList() {
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!customName.trim()) {
+            toast.error('Batch Name is required');
+            return;
+        }
         const toastId = toast.loading('Creating batch...');
 
         try {
             const payload: CreateBatchPayload = {
-                batchNumber,
                 customName,
                 subject,
                 timeSlot,
@@ -96,7 +97,7 @@ export default function BatchList() {
             await apiRequest('/batches', 'POST', payload);
             setShowForm(false);
             // Reset
-            setBatchNumber(''); setCustomName(''); setTimeSlot(''); setClassName('');
+            setCustomName(''); setTimeSlot(''); setClassName('');
             queryClient.invalidateQueries({ queryKey: ['batches'] });
             toast.success('Batch created successfully!', { id: toastId });
         } catch (error: unknown) {
@@ -158,23 +159,7 @@ export default function BatchList() {
                                 )}
 
                                 <div className="space-y-2 group">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Batch Number</label>
-                                    <div className="relative">
-                                        <Hash className="absolute left-4 top-4 w-5 h-5 text-gray-400 group-focus-within:text-accent-primary transition-colors" />
-                                        <input
-                                            className="w-full bg-neutral-50/50 border-2 border-transparent focus:bg-white focus:border-accent-primary text-app-text pl-12 p-4 rounded-2xl outline-none transition-all placeholder:text-gray-400 font-semibold"
-                                            type="number"
-                                            min="1"
-                                            placeholder="e.g. 1"
-                                            value={batchNumber}
-                                            onChange={e => setBatchNumber(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2 group">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Batch Name (Optional)</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Batch Name *</label>
                                     <div className="relative">
                                         <Type className="absolute left-4 top-4 w-5 h-5 text-gray-400 group-focus-within:text-accent-primary transition-colors" />
                                         <input
@@ -183,6 +168,7 @@ export default function BatchList() {
                                             placeholder="e.g. Target 2026 Batch"
                                             value={customName}
                                             onChange={e => setCustomName(e.target.value)}
+                                            required
                                         />
                                     </div>
                                 </div>

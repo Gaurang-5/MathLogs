@@ -63,6 +63,8 @@ const Fees: React.FC = () => {
     }, [searchTerm]);
 
     const [selectedBatch, setSelectedBatch] = useState('All');
+    const [selectedInstallment, setSelectedInstallment] = useState('All');
+    const [showInstallmentMenu, setShowInstallmentMenu] = useState(false);
     const [viewMode, setViewMode] = useState<'defaulters' | 'recent' | 'upi' | 'custom'>('defaulters');
 
     const [selectedStudent, setSelectedStudent] = useState<FeeSummary | null>(null);
@@ -87,7 +89,7 @@ const Fees: React.FC = () => {
     useEffect(() => {
         setSelectedStudentIds([]);
         setExpandedStudentId(null);
-    }, [viewMode, selectedBatch, debouncedSearchTerm]);
+    }, [viewMode, selectedBatch, selectedInstallment, debouncedSearchTerm]);
 
     // Report Dropdown States
     const [showReportBatchMenu, setShowReportBatchMenu] = useState(false);
@@ -95,9 +97,14 @@ const Fees: React.FC = () => {
     const [showMonthMenu, setShowMonthMenu] = useState(false);
     const [showYearMenu, setShowYearMenu] = useState(false);
 
+    const { data: installmentsList = [] } = useQuery({
+        queryKey: ['feeInstallmentsList'],
+        queryFn: () => api.get<string[]>('/fees/installments-list')
+    });
+
     const { data: students = [], isLoading: feesLoading } = useQuery({
-        queryKey: ['fees'],
-        queryFn: () => api.get<FeeSummary[]>('/fees')
+        queryKey: ['fees', selectedInstallment],
+        queryFn: () => api.get<FeeSummary[]>(`/fees?installment=${encodeURIComponent(selectedInstallment)}`)
     });
 
     const { data: transactions = [], isLoading: transactionsLoading } = useQuery({
@@ -227,7 +234,47 @@ const Fees: React.FC = () => {
         : 0;
 
     return (
-        <Layout title="Fee Management">
+        <Layout
+            title="Fee Management"
+            headerAction={
+                <div className="relative">
+                    <button
+                        onClick={() => setShowInstallmentMenu(!showInstallmentMenu)}
+                        className="bg-white hover:bg-neutral-50 border border-neutral-200/80 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold text-neutral-800 shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                    >
+                        <span className="truncate max-w-[170px] sm:max-w-[240px]">
+                            {selectedInstallment === 'All' ? 'All Installments (Lifetime)' : selectedInstallment}
+                        </span>
+                        <ChevronDown className={cn("w-4 h-4 text-neutral-400 transition-transform", showInstallmentMenu && "rotate-180")} />
+                    </button>
+
+                    {showInstallmentMenu && (
+                        <>
+                            <div className="fixed inset-0 z-20" onClick={() => setShowInstallmentMenu(false)}></div>
+                            <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-black/5 p-1.5 z-30 max-h-64 overflow-y-auto custom-scrollbar">
+                                <button
+                                    onClick={() => { setSelectedInstallment('All'); setShowInstallmentMenu(false); }}
+                                    className={cn("w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex justify-between items-center transition-colors", selectedInstallment === 'All' ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-50")}
+                                >
+                                    All Installments (Lifetime)
+                                    {selectedInstallment === 'All' && <Check className="w-4 h-4" />}
+                                </button>
+                                {installmentsList.map(inst => (
+                                    <button
+                                        key={inst}
+                                        onClick={() => { setSelectedInstallment(inst); setShowInstallmentMenu(false); }}
+                                        className={cn("w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex justify-between items-center transition-colors", selectedInstallment === inst ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-50")}
+                                    >
+                                        <span className="truncate">{inst}</span>
+                                        {selectedInstallment === inst && <Check className="w-4 h-4" />}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+            }
+        >
             {/* Design Improvements:
                 1. Cleaner Stats cards with no border and shadow.
                 2. Unified List layout.

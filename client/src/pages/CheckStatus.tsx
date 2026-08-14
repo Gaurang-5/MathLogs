@@ -4,6 +4,7 @@ import { apiRequest } from '../utils/api';
 import { motion } from 'framer-motion';
 import { Search, CheckCircle, XCircle, ArrowLeft, Smartphone } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { appleSpringDefault, appleSpringSnappy } from '../utils/appleDesign';
 
 interface RegistrationStatusStudent {
     id?: string;
@@ -52,62 +53,65 @@ export default function CheckStatus() {
     };
 
     return (
-        <div className="min-h-screen bg-app-bg flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] relative overflow-hidden font-sans">
+        <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] relative overflow-hidden font-sans text-neutral-900 selection:bg-neutral-900 selection:text-white">
             <Toaster position="top-center" />
 
             {/* Background Effects */}
-            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[100px] translate-x-1/3 -translate-y-1/3 pointer-events-none"></div>
+            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-neutral-200/50 rounded-full blur-[120px] translate-x-1/3 -translate-y-1/3 pointer-events-none"></div>
 
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="max-w-md w-full bg-app-surface-opaque p-10 rounded-[32px] shadow-2xl border border-app-border relative z-10"
+                initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={appleSpringDefault}
+                className="max-w-md w-full bg-white/80 backdrop-blur-2xl p-8 sm:p-10 rounded-3xl shadow-xl border border-white/60 relative z-10"
             >
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-app-text tracking-tight mb-2">Check Registration Status</h1>
-                    <p className="text-app-text-secondary">Verify if your registration was successful</p>
+                    <h1 className="text-3xl font-extrabold text-neutral-900 tracking-[-0.025em] mb-2">Check Registration Status</h1>
+                    <p className="text-neutral-500 font-medium text-sm">Verify if your registration was successful</p>
                 </div>
 
                 {!result ? (
                     <form onSubmit={handleCheck} className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-app-text-secondary uppercase tracking-widest ml-1">
+                            <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider ml-1">
                                 Parent WhatsApp Number
                             </label>
                             <div className="relative group">
-                                <Smartphone className="absolute left-4 top-3.5 w-5 h-5 text-app-text-tertiary group-focus-within:text-accent transition-colors" />
+                                <Smartphone className="absolute left-4 top-3.5 w-5 h-5 text-neutral-400 group-focus-within:text-neutral-900 transition-colors" />
                                 <input
-                                    className="w-full bg-app-bg border border-app-border text-app-text pl-12 p-3.5 rounded-xl focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
+                                    className="w-full bg-neutral-50/80 border border-neutral-200 text-neutral-900 pl-12 p-3.5 rounded-2xl focus:bg-white focus:ring-2 focus:ring-neutral-900 outline-none transition-all placeholder:text-neutral-400 font-medium"
                                     placeholder="Enter WhatsApp number"
                                     value={whatsapp}
                                     onChange={e => setWhatsapp(e.target.value)}
                                     required
                                 />
                             </div>
-                            <p className="text-xs text-app-text-tertiary ml-1">
+                            <p className="text-xs text-neutral-400 font-medium ml-1">
                                 Enter the same number used during registration
                             </p>
                         </div>
 
-                        <button
+                        <motion.button
                             type="submit"
                             disabled={checking}
-                            className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-lg transition-all hover:scale-[1.01] active:scale-[0.98] flex items-center justify-center group disabled:opacity-50 disabled:cursor-not-allowed"
+                            whileTap={{ scale: 0.95 }}
+                            transition={appleSpringSnappy}
+                            className="w-full bg-neutral-900 hover:bg-black text-white font-bold py-4 rounded-2xl shadow-md transition-colors flex items-center justify-center group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                             {checking ? (
                                 'Checking...'
                             ) : (
                                 <>
-                                    Check Status
+                                    <span>Check Status</span>
                                     <Search className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
                                 </>
                             )}
-                        </button>
+                        </motion.button>
 
                         <button
                             type="button"
                             onClick={() => navigate(`/register/${batchId}`)}
-                            className="w-full text-app-text-secondary hover:text-app-text py-3 rounded-xl transition-colors flex items-center justify-center"
+                            className="w-full text-neutral-500 hover:text-neutral-900 font-semibold text-xs py-3 rounded-xl transition-colors flex items-center justify-center cursor-pointer"
                         >
                             <ArrowLeft className="w-4 h-4 mr-2" />
                             Back to Registration
@@ -117,63 +121,70 @@ export default function CheckStatus() {
                     <motion.div
                         initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
+                        transition={appleSpringDefault}
                         className="space-y-6"
                     >
-                        <div className="bg-success/10 border border-success/20 rounded-2xl p-6 text-center">
+                        <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-6 text-center">
                             <motion.div
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
-                                transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-                                className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4"
+                                transition={appleSpringSnappy}
+                                className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4"
                             >
-                                <CheckCircle className="w-8 h-8 text-success" />
+                                <CheckCircle className="w-8 h-8 text-emerald-600" />
                             </motion.div>
-                            <h2 className="text-xl font-bold text-app-text mb-2">Registration Found!</h2>
-                            <p className="text-app-text-secondary text-sm">Your registration was successful</p>
+                            <h2 className="text-xl font-extrabold text-neutral-900 mb-1">Registration Found!</h2>
+                            <p className="text-emerald-700 text-xs font-semibold">Your registration was successful</p>
                         </div>
 
-                        <div className="bg-app-bg rounded-2xl p-5 space-y-4 border border-app-border">
-                            <div className="flex justify-between items-center pb-3 border-b border-app-border">
-                                <span className="text-xs text-app-text-secondary uppercase font-bold">Student ID</span>
-                                <span className="text-sm font-mono font-bold text-app-text bg-app-surface px-2 py-1 rounded-md border border-app-border">
-                                    {result.student.humanId || result.student.id || '-'}
+                        <div className="bg-neutral-50/80 rounded-2xl p-5 space-y-4 border border-neutral-200/60 font-medium text-xs">
+                            <div className="flex justify-between items-center pb-3 border-b border-neutral-200/60">
+                                <span className="text-neutral-400 font-bold uppercase tracking-wider">Student ID</span>
+                                <span className="text-sm font-mono font-extrabold text-neutral-900 bg-white px-2.5 py-1 rounded-lg border border-neutral-200">
+                                    {result.student?.humanId || result.student?.id || '-'}
                                 </span>
                             </div>
                             <div>
-                                <p className="text-xs text-app-text-tertiary uppercase font-bold mb-1">Student Name</p>
-                                <p className="text-app-text font-semibold">{result.student.name}</p>
+                                <p className="text-neutral-400 font-bold uppercase tracking-wider mb-1">Student Name</p>
+                                <p className="text-neutral-900 font-bold text-sm">{result.student?.name}</p>
                             </div>
+                            {result.student?.schoolName && (
+                                <div>
+                                    <p className="text-neutral-400 font-bold uppercase tracking-wider mb-1">School</p>
+                                    <p className="text-neutral-700">{result.student.schoolName}</p>
+                                </div>
+                            )}
                             <div>
-                                <p className="text-xs text-app-text-tertiary uppercase font-bold mb-1">School</p>
-                                <p className="text-app-text">{result.student.schoolName}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-app-text-tertiary uppercase font-bold mb-1">Status</p>
-                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${result.student.status === 'APPROVED'
-                                        ? 'bg-success/10 text-success'
-                                        : 'bg-orange-500/10 text-orange-500'
-                                    }`}>
-                                    {result.student.status}
+                                <p className="text-neutral-400 font-bold uppercase tracking-wider mb-1">Status</p>
+                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                                    result.student?.status === 'APPROVED'
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                        : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                }`}>
+                                    {result.student?.status}
                                 </span>
                             </div>
-                            <div>
-                                <p className="text-xs text-app-text-tertiary uppercase font-bold mb-1">Registered On</p>
-                                <p className="text-app-text text-sm">
-                                    {new Date(result.student.registeredAt).toLocaleString()}
-                                </p>
-                            </div>
+                            {result.student?.registeredAt && (
+                                <div>
+                                    <p className="text-neutral-400 font-bold uppercase tracking-wider mb-1">Registered On</p>
+                                    <p className="text-neutral-600 text-xs">
+                                        {new Date(result.student.registeredAt).toLocaleString()}
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-3">
-                            <button
+                            <motion.button
+                                whileTap={{ scale: 0.95 }}
                                 onClick={() => setResult(null)}
-                                className="w-full bg-gray-900 hover:bg-black text-white font-bold py-3 rounded-xl transition-colors"
+                                className="w-full bg-neutral-900 hover:bg-black text-white font-bold py-3.5 rounded-2xl transition-colors cursor-pointer"
                             >
                                 Check Another Number
-                            </button>
+                            </motion.button>
                             <button
                                 onClick={() => navigate(`/register/${batchId}`)}
-                                className="w-full text-app-text-secondary hover:text-app-text py-3 rounded-xl transition-colors flex items-center justify-center"
+                                className="w-full text-neutral-500 hover:text-neutral-900 font-semibold text-xs py-3 rounded-xl transition-colors flex items-center justify-center cursor-pointer"
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
                                 Back to Registration
@@ -184,51 +195,44 @@ export default function CheckStatus() {
                     <motion.div
                         initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
+                        transition={appleSpringDefault}
                         className="space-y-6"
                     >
-                        <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-6 text-center">
+                        <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-6 text-center">
                             <motion.div
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
-                                transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-                                className="w-16 h-16 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-4"
+                                transition={appleSpringSnappy}
+                                className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4"
                             >
-                                <XCircle className="w-8 h-8 text-orange-500" />
+                                <XCircle className="w-8 h-8 text-amber-600" />
                             </motion.div>
-                            <h2 className="text-xl font-bold text-app-text mb-2">No Registration Found</h2>
-                            <p className="text-app-text-secondary text-sm">
+                            <h2 className="text-xl font-extrabold text-neutral-900 mb-1">No Registration Found</h2>
+                            <p className="text-amber-800 text-xs font-semibold">
                                 No registration found for this WhatsApp number in this batch
                             </p>
                         </div>
 
-                        <div className="bg-app-bg rounded-2xl p-5 border border-app-border">
-                            <p className="text-sm text-app-text-secondary mb-3">This could mean:</p>
-                            <ul className="space-y-2 text-sm text-app-text-secondary">
-                                <li className="flex items-start">
-                                    <span className="mr-2">•</span>
-                                    <span>The WhatsApp number doesn't match the one used during registration</span>
-                                </li>
-                                <li className="flex items-start">
-                                    <span className="mr-2">•</span>
-                                    <span>Registration wasn't completed successfully</span>
-                                </li>
-                                <li className="flex items-start">
-                                    <span className="mr-2">•</span>
-                                    <span>There was a network issue during registration</span>
-                                </li>
+                        <div className="bg-neutral-50/80 rounded-2xl p-5 border border-neutral-200/60 text-xs font-medium text-neutral-600">
+                            <p className="font-bold text-neutral-800 mb-2">This could mean:</p>
+                            <ul className="space-y-1.5 list-disc list-inside">
+                                <li>The WhatsApp number doesn't match the one used during registration</li>
+                                <li>Registration wasn't completed successfully</li>
+                                <li>There was a network issue during registration</li>
                             </ul>
                         </div>
 
                         <div className="space-y-3">
-                            <button
+                            <motion.button
+                                whileTap={{ scale: 0.95 }}
                                 onClick={() => navigate(`/register/${batchId}`)}
-                                className="w-full bg-gray-900 hover:bg-black text-white font-bold py-3 rounded-xl transition-colors"
+                                className="w-full bg-neutral-900 hover:bg-black text-white font-bold py-3.5 rounded-2xl transition-colors cursor-pointer"
                             >
                                 Register Now
-                            </button>
+                            </motion.button>
                             <button
                                 onClick={() => setResult(null)}
-                                className="w-full text-app-text-secondary hover:text-app-text py-3 rounded-xl transition-colors"
+                                className="w-full text-neutral-500 hover:text-neutral-900 font-semibold text-xs py-3 rounded-xl transition-colors cursor-pointer"
                             >
                                 Try Different Number
                             </button>

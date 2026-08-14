@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Building2, User, Phone, Mail, CreditCard, Shield, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
@@ -303,14 +304,14 @@ export default function JoinOnboarding() {
     }
 
     return (
-        <div className="min-h-screen bg-[#FAFAFA] font-sans text-gray-900">
-            {/* Header */}
-            <div className="bg-white border-b border-gray-100">
+        <div className="min-h-screen bg-[#FAFAFA] font-sans text-gray-900 selection:bg-black selection:text-white">
+            {/* Apple Translucent Glass Header */}
+            <div className="sticky top-0 z-40 bg-white/70 backdrop-blur-2xl saturate-180 border-b border-white/40 shadow-xs">
                 <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-3">
-                    <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 bg-black rounded-xl flex items-center justify-center shadow-xs">
                         <span className="text-white font-bold text-sm">M</span>
                     </div>
-                    <span className="text-lg font-bold tracking-tight">MathLogs</span>
+                    <span className="text-lg font-extrabold tracking-[-0.02em]">MathLogs</span>
                 </div>
             </div>
 
@@ -468,11 +469,13 @@ export default function JoinOnboarding() {
                     </div>
                 </div>
 
-                {/* Pay Button */}
-                <button
+                {/* Pay Button with Apple Spring Touch Feedback */}
+                <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: 'spring', stiffness: 450, damping: 30 }}
                     onClick={handlePayment}
                     disabled={!isFormValid || isProcessing}
-                    className="w-full bg-black text-white font-bold py-4 rounded-2xl shadow-lg shadow-black/10 hover:bg-gray-800 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg"
+                    className="w-full bg-black text-white font-bold py-4 rounded-2xl shadow-lg shadow-black/10 hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg cursor-pointer"
                 >
                     {isProcessing ? (
                         <>
@@ -489,7 +492,7 @@ export default function JoinOnboarding() {
                             Pay ₹{displayPrice.toLocaleString('en-IN')} & Setup Account
                         </>
                     )}
-                </button>
+                </motion.button>
 
                 {!linkData?.isFreeTrial && (
                     <p className="text-center text-xs text-gray-400 mt-4">

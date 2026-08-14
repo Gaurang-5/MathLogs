@@ -74,6 +74,7 @@ export const processWhatsappQueue = async () => {
             timeout: 15_000, // transaction must complete within 15 s
         });
 
+
         if (ids.length === 0) return 0;
 
         // ── Step 2: Fetch full job rows outside the transaction ───────────────

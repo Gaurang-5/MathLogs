@@ -9,6 +9,8 @@ export interface GooglePlaceSearchResult {
     userRatingsTotal?: number;
 }
 
+export type GooglePlaceResult = GooglePlaceSearchResult;
+
 export interface GoogleReview {
     authorName: string;
     authorPhotoUrl?: string;
@@ -22,9 +24,10 @@ export interface GooglePlaceDetails {
     placeId: string;
     name: string;
     formattedAddress?: string;
+    url?: string;
+    mapsUrl: string;
     rating: number;
     userRatingsTotal: number;
-    mapsUrl: string;
     reviews: GoogleReview[];
     photos?: string[];
 }
@@ -79,7 +82,9 @@ export const searchGooglePlaces = async (query: string): Promise<GooglePlaceSear
 /**
  * Fetch full Google Place details including ratings, reviews count, top reviews, and Google Maps URL.
  */
-export const fetchGooglePlaceDetails = async (placeId: string): Promise<GooglePlaceDetails> => {
+export const fetchGooglePlaceDetails = async (placeId: string): Promise<GooglePlaceDetails | null> => {
+    if (!placeId) return null;
+
     if (GOOGLE_PLACES_API_KEY && !placeId.startsWith('ChIJ_')) {
         try {
             const fields = 'name,rating,user_ratings_total,reviews,photos,url,formatted_address';
@@ -105,9 +110,10 @@ export const fetchGooglePlaceDetails = async (placeId: string): Promise<GooglePl
                     placeId,
                     name: result.name || 'Coaching Institute',
                     formattedAddress: result.formatted_address || '',
+                    url: result.url,
+                    mapsUrl: result.url || `https://www.google.com/maps/place/?q=place_id:${placeId}`,
                     rating: result.rating || 4.8,
                     userRatingsTotal: result.user_ratings_total || reviews.length || 50,
-                    mapsUrl: result.url || `https://www.google.com/maps/place/?q=place_id:${placeId}`,
                     reviews,
                     photos
                 };
@@ -124,6 +130,7 @@ export const fetchGooglePlaceDetails = async (placeId: string): Promise<GooglePl
         formattedAddress: 'Main Education Hub, City',
         rating: 4.9,
         userRatingsTotal: 142,
+        url: `https://www.google.com/maps/place/?q=place_id:${placeId}`,
         mapsUrl: `https://www.google.com/maps/place/?q=place_id:${placeId}`,
         reviews: [
             {

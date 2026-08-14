@@ -445,4 +445,150 @@ export const updateMyInstituteConfig = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Helper to generate unique slug
+ */
+function slugify(text: string): string {
+    return text
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * SuperAdmin Bulk Import Institutes & Teachers
+ * POST /api/institutes/bulk-import
+ */
+export const bulkImportInstitutes = async (req: Request, res: Response) => {
+    const user = req.user;
+    if (user?.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Unauthorized. SuperAdmin privileges required.' });
+    }
+
+    try {
+        const { institutes } = req.body;
+        if (!Array.isArray(institutes) || institutes.length === 0) {
+            return res.status(400).json({ error: 'An array of institutes is required in req.body.institutes' });
+        }
+
+        const createdInstitutes = [];
+        for (const item of institutes) {
+            if (!item.name || typeof item.name !== 'string' || !item.name.trim()) {
+                continue;
+            }
+
+            const name = item.name.trim();
+            const teacherName = item.teacherName ? item.teacherName.trim() : null;
+            const city = item.city ? item.city.trim() : 'Muzaffarnagar';
+            const area = item.area ? item.area.trim() : null;
+            const address = item.address ? item.address.trim() : null;
+            const phone = item.phone || item.publicPhone || item.phoneNumber || null;
+            const whatsappPhone = item.whatsappPhone || phone || null;
+            const tagline = item.tagline ? item.tagline.trim() : null;
+            const aboutUs = item.aboutUs ? item.aboutUs.trim() : null;
+            const logoUrl = item.logoUrl || null;
+            const googleMapsUrl = item.googleMapsUrl || null;
+
+            // Normalize subjects offered
+            let subjectsOffered: string[] = [];
+            if (Array.isArray(item.subjectsOffered)) {
+                subjectsOffered = item.subjectsOffered.map((s: any) => String(s).trim()).filter(Boolean);
+            } else if (typeof item.subjectsOffered === 'string') {
+                subjectsOffered = item.subjectsOffered.split(',').map((s: string) => s.trim()).filter(Boolean);
+            } else {
+                subjectsOffered = ['Mathematics'];
+            }
+
+            // Normalize classes offered
+            let classesOffered: string[] = [];
+            if (Array.isArray(item.classesOffered)) {
+                classesOffered = item.classesOffered.map((c: any) => String(c).trim()).filter(Boolean);
+            } else if (typeof item.classesOffered === 'string') {
+                classesOffered = item.classesOffered.split(',').map((c: string) => c.trim()).filter(Boolean);
+            } else {
+                classesOffered = ['Class 9', 'Class 10', 'Class 11', 'Class 12'];
+            }
+
+            // Generate unique slug
+            let baseSlug = slugify(`${name} ${city}`);
+            if (!baseSlug) baseSlug = `coaching-${Date.now()}`;
+            let slug = baseSlug;
+            let counter = 1;
+            while (await prisma.institute.findUnique({ where: { slug } })) {
+                slug = `${baseSlug}-${counter}`;
+                counter++;
+            }
+
+            const created = await prisma.institute.create({
+                data: {
+                    name,
+                    slug,
+                    teacherName,
+                    city,
+                    area,
+                    address,
+                    publicPhone: phone,
+                    phoneNumber: phone,
+                    whatsappPhone,
+                    tagline,
+                    aboutUs,
+                    logoUrl,
+                    googleMapsUrl,
+                    subjectsOffered,
+                    classesOffered,
+                    isPubliclyListed: item.isPubliclyListed !== false, // default true
+                    isVerified: item.isVerified === true, // default false (unverified public listing)
+                    status: 'ACTIVE',
+                    plan: 'FREE'
+                }
+            });
+
+            createdInstitutes.push(created);
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully imported ${createdInstitutes.length} institutes`,
+            count: createdInstitutes.length,
+            institutes: createdInstitutes
+        });
+    } catch (error: any) {
+        console.error('Error in bulkImportInstitutes:', error);
+        res.status(500).json({ error: 'Failed to bulk import institutes: ' + error.message });
+    }
+};
+
+/**
+ * Toggle Public Listing or Verification Status for an Institute
+ * PATCH /api/institutes/:id/toggle-listing
+ */
+export const toggleInstituteStatus = async (req: Request, res: Response) => {
+    const user = req.user;
+    if (user?.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Unauthorized. SuperAdmin privileges required.' });
+    }
+
+    try {
+        const id = req.params.id as string;
+        const { isPubliclyListed, isVerified } = req.body;
+
+        const dataToUpdate: any = {};
+        if (isPubliclyListed !== undefined) dataToUpdate.isPubliclyListed = Boolean(isPubliclyListed);
+        if (isVerified !== undefined) dataToUpdate.isVerified = Boolean(isVerified);
+
+        const updated = await prisma.institute.update({
+            where: { id },
+            data: dataToUpdate
+        });
+
+        res.json({ success: true, message: 'Institute listing status updated.', updated });
+    } catch (error: any) {
+        console.error('Error toggling institute status:', error);
+        res.status(500).json({ error: 'Failed to update institute status' });
+    }
+};
+
+
 

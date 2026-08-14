@@ -56,7 +56,7 @@ export const trackLead = async (req: Request, res: Response) => {
 // Create Order (Step 3 checkout initialization)
 export const createOrder = async (req: Request, res: Response) => {
     try {
-        const { tuitionName, ownerName, phone, email, planId, billingCycle } = req.body;
+        const { tuitionName, ownerName, phone, email, planId } = req.body;
 
         // Validate inputs
         if (!tuitionName || !ownerName || !phone || !email || !planId) {
@@ -64,7 +64,14 @@ export const createOrder = async (req: Request, res: Response) => {
         }
 
         // Determine price based on planId
-        const monthlyAmountInINR = planId === 'pro' ? 1999 : 999;
+        let amountInINR = 500;
+        if (planId === 'listing') {
+            amountInINR = 99;
+        } else if (planId === 'quiz' || planId === 'quiz_only') {
+            amountInINR = 250;
+        } else if (planId === 'all_inclusive' || planId === 'pro') {
+            amountInINR = 500;
+        }
 
         // Check if user/institute already exists by email/phone
         const existingAdmin = await prisma.admin.findUnique({ where: { username: phone } });
@@ -72,97 +79,60 @@ export const createOrder = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'An account with this phone number already exists.' });
         }
 
-        if (billingCycle === 'yearly' || planId === 'quiz_only') {
-            const amountInINR = planId === 'quiz_only' ? 500 : (planId === 'pro' ? 19999 : 9999);
-            const amountInPaise = amountInINR * 100;
+        const amountInPaise = amountInINR * 100;
 
-            // Create Razorpay Order
-            let order: any;
-            try {
-                order = await razorpay.orders.create({
-                    amount: amountInPaise,
-                    currency: 'INR',
-                    receipt: `receipt_${Date.now()}`,
-                    payment_capture: true, // Auto-capture payment
-                    notes: {
-                        tuitionName,
-                        ownerName,
-                        phone,
-                        email,
-                        planId,
-                        billingCycle
-                    }
-                });
-            } catch (rzpError) {
-                console.error('Razorpay Order Error:', rzpError);
-                return res.status(500).json({ error: 'Failed to initialize payment gateway.' });
-            }
-
-            return res.json({
-                success: true,
-                orderId: order.id,
-                amount: order.amount,
-                currency: order.currency,
-                keyId: razorpayConfig.keyId,
-            });
-        } else {
-            // MONTHLY AUTOPAY
-            let plan_id = '';
-            try {
-                // Find existing plan to avoid duplicates
-                const allPlans = await razorpay.plans.all();
-                const existingPlan = allPlans.items.find((p: any) =>
-                    p.item.amount === monthlyAmountInINR * 100 &&
-                    p.period === 'monthly'
-                );
-
-                if (existingPlan) {
-                    plan_id = existingPlan.id;
-                } else {
-                    const newPlan = await razorpay.plans.create({
-                        period: 'monthly',
-                        interval: 1,
-                        item: {
-                            name: `MathLogs ${planId === 'pro' ? 'Pro' : 'Basic'} Monthly`,
-                            amount: monthlyAmountInINR * 100,
-                            currency: 'INR',
-                            description: 'Monthly Subscription for MathLogs'
-                        }
-                    });
-                    plan_id = newPlan.id;
+        // Create Razorpay Order
+        let order: any;
+        try {
+            order = await razorpay.orders.create({
+                amount: amountInPaise,
+                currency: 'INR',
+                receipt: `receipt_${Date.now()}`,
+                payment_capture: true, // Auto-capture payment
+                notes: {
+                    tuitionName,
+                    ownerName,
+                    phone,
+                    email,
+                    planId
                 }
-
-                const subscription = await razorpay.subscriptions.create({
-                    plan_id: plan_id,
-                    customer_notify: 1,
-                    total_count: 120, // max 10 years per mandate
-                    notes: {
-                        tuitionName,
-                        ownerName,
-                        phone,
-                        email,
-                        planId,
-                        billingCycle
-                    }
-                });
-
-                return res.json({
-                    success: true,
-                    subscriptionId: subscription.id,
-                    keyId: razorpayConfig.keyId,
-                });
-
-            } catch (error) {
-                console.error('Razorpay Subscription Error:', error);
-                return res.status(500).json({ error: 'Failed to initialize recurring payment gateway.' });
-            }
+            });
+        } catch (rzpError) {
+            console.error('Razorpay Order Error:', rzpError);
+            return res.status(500).json({ error: 'Failed to initialize payment gateway.' });
         }
+
+        return res.json({
+            success: true,
+            orderId: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            keyId: razorpayConfig.keyId,
+        });
 
     } catch (error) {
         console.error('Create Order Error:', error);
         res.status(500).json({ error: 'Internal server error during order creation.' });
     }
 };
+
+function slugify(text: string) {
+    return text.toString().toLowerCase().trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-');
+}
+
+async function createUniqueSlug(name: string) {
+    let baseSlug = slugify(name);
+    if (!baseSlug) baseSlug = 'coaching';
+    let uniqueSlug = baseSlug;
+    let count = 1;
+    while (await prisma.institute.findUnique({ where: { slug: uniqueSlug } })) {
+        uniqueSlug = `${baseSlug}-${count++}`;
+    }
+    return uniqueSlug;
+}
 
 // Verify Payment and Provision Account
 export const verifyPayment = async (req: Request, res: Response) => {
@@ -177,18 +147,21 @@ export const verifyPayment = async (req: Request, res: Response) => {
             phone,
             email,
             planId,
-            billingCycle
+            listOnMarketplace,
+            city,
+            area,
+            subjectsOffered,
+            googleMapsUrl
         } = req.body;
 
         // 1. Verify Signature
         const secret = razorpayConfig.keySecret;
 
-        let bodyText = '';
-        if (billingCycle === 'yearly' || planId === 'quiz_only') {
-            bodyText = razorpay_order_id + '|' + razorpay_payment_id;
-        } else {
+        let bodyText = razorpay_order_id + '|' + razorpay_payment_id;
+        if (razorpay_subscription_id && !razorpay_order_id) {
             bodyText = razorpay_payment_id + '|' + razorpay_subscription_id;
         }
+
         const expectedSignature = crypto
             .createHmac('sha256', secret)
             .update(bodyText.toString())
@@ -199,23 +172,35 @@ export const verifyPayment = async (req: Request, res: Response) => {
         }
 
         // 2. Provision the Database Records
-        // Map plan id to Tier enum
-        const tier = planId === 'pro' ? 'PRO' : (planId === 'quiz_only' ? 'NO_PLAN' : 'FREE');
+        const isQuizOnly = planId === 'quiz' || planId === 'quiz_only';
+        const isAllInclusive = planId === 'all_inclusive' || planId === 'pro';
+        const tier = isAllInclusive ? 'PRO' : 'FREE';
 
-        // A. Create Institute
+        const uniqueSlug = await createUniqueSlug(tuitionName);
+
+        // A. Create Institute with Marketplace Listing
         const newInstitute = await prisma.institute.create({
             data: {
                 name: tuitionName,
                 teacherName: ownerName,
                 phoneNumber: phone,
+                publicPhone: phone,
+                whatsappPhone: phone,
                 email: email,
                 plan: tier,
-                isQuizOnly: planId === 'quiz_only',
-                quizCredits: planId === 'quiz_only' ? 10 : 0,
+                isQuizOnly: isQuizOnly,
+                quizCredits: isQuizOnly ? 5 : (isAllInclusive ? 10 : 0),
+                isPubliclyListed: listOnMarketplace ?? true,
+                isExclusive: false,
+                slug: uniqueSlug,
+                city: city ? city.trim() : null,
+                area: area ? area.trim() : null,
+                subjectsOffered: Array.isArray(subjectsOffered) ? subjectsOffered : [],
+                googleMapsUrl: googleMapsUrl ? googleMapsUrl.trim() : null,
                 config: {
                     requiresGrades: true,
                     maxClasses: 12,
-                    maxBatches: planId === 'pro' ? 250 : 100,
+                    maxBatches: isAllInclusive ? 250 : 100,
                     maxBatchesPerClass: 100,
                     allowedClasses: ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"],
                     subjects: ["Mathematics", "Science", "Physics", "Chemistry", "Biology", "English"]
@@ -261,7 +246,8 @@ export const verifyPayment = async (req: Request, res: Response) => {
 
 export const startTrial = async (req: Request, res: Response) => {
     try {
-        const { tuitionName, ownerName, phone, email, planId, billingCycle } = req.body;
+        const { tuitionName, ownerName, phone, email, planId, billingCycle,
+                listOnMarketplace, city, area, subjectsOffered, googleMapsUrl } = req.body;
 
         if (!tuitionName || !ownerName || !phone || !email || !planId) {
             return res.status(400).json({ error: 'All fields are required.' });
@@ -272,25 +258,40 @@ export const startTrial = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'An account with this phone number already exists.' });
         }
 
-        const tier = planId === 'pro' ? 'PRO' as const : 'BASIC' as const;
+        const isQuizOnly = planId === 'quiz' || planId === 'quiz_only';
+        const isAllInclusive = planId === 'all_inclusive' || planId === 'pro';
+        const tier = isAllInclusive ? 'PRO' as const : 'FREE' as const;
 
-        // 14 days trial
+        // 14 days trial for all_inclusive
         const planStartDate = new Date();
         const planExpiryDate = new Date();
         planExpiryDate.setDate(planExpiryDate.getDate() + 14);
+
+        const uniqueSlug = await createUniqueSlug(tuitionName);
 
         const newInstitute = await prisma.institute.create({
             data: {
                 name: tuitionName,
                 teacherName: ownerName,
                 phoneNumber: phone,
+                publicPhone: phone,
+                whatsappPhone: phone,
                 email: email,
                 plan: tier,
+                isQuizOnly: isQuizOnly,
+                quizCredits: 1, // 1 Quiz credit for free trial
                 planStartDate,
                 planExpiryDate,
+                isPubliclyListed: listOnMarketplace ?? true,
+                isExclusive: false,
+                slug: uniqueSlug,
+                city: city ? city.trim() : null,
+                area: area ? area.trim() : null,
+                subjectsOffered: Array.isArray(subjectsOffered) ? subjectsOffered : [],
+                googleMapsUrl: googleMapsUrl ? googleMapsUrl.trim() : null,
                 config: {
                     requiresGrades: true,
-                    maxStudents: planId === 'pro' ? 250 : 100,
+                    maxStudents: 1000,
                     isTrial: true,
                     trialStartDate: planStartDate.toISOString(),
                     allowedClasses: ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"],

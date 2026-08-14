@@ -14,11 +14,16 @@ import { getJwtSecret } from '../utils/env';
 const JWT_SECRET = getJwtSecret();
 
 export const createBatch = async (req: Request, res: Response) => {
-    const { timeSlot, feeAmount, className, batchNumber, subject, customName } = req.body;
+    const { timeSlot, feeAmount, className, batchNumber, subject, customName, name: bodyName } = req.body;
     const teacherId = req.user?.id;
     const user = req.user;
 
     if (!user.instituteId) return res.status(401).json({ error: 'Unauthorized: No institute assigned' });
+
+    const batchName = (customName || bodyName || '').trim();
+    if (!batchName) {
+        return res.status(400).json({ error: 'Batch Name is required' });
+    }
 
     // Fetch Institute Config
     const institute = await prisma.institute.findUnique({
@@ -28,7 +33,6 @@ export const createBatch = async (req: Request, res: Response) => {
 
     if (!institute) return res.status(404).json({ error: 'Institute not found' });
 
-    // Default Config if none exists
     const config = (institute.config as any) || {
         requiresGrades: true,
         classes: [
@@ -37,140 +41,55 @@ export const createBatch = async (req: Request, res: Response) => {
         ]
     };
 
-    const requiresGrades = config.requiresGrades !== false; // Default to true if not specified
+    const requiresGrades = config.requiresGrades !== false;
 
-    // Validate Global Limit (New Requirement) - REMOVED (Replaced by Student Limits)
-    // if (config.maxBatches) { ... }
-
-    // If institute doesn't require grades, skip className validation
-    if (!requiresGrades) {
-        // For non-grade-based institutes, just validate batch number
-        if (!batchNumber) {
-            return res.status(400).json({ error: 'Batch Number is required' });
-        }
-
-        const num = parseInt(batchNumber);
-        if (isNaN(num) || num < 1) {
-            return res.status(400).json({ error: 'Invalid Batch Number' });
-        }
-
-        // Check Max Batches per Subject Limit
-        const maxBatchesPerSubject = config.maxBatchesPerClass || 5;
-        const currentSubject = subject || 'General';
-
-
-        const existingBatchesCount = await prisma.batch.count({
-            where: {
-                instituteId: user.instituteId,
-                className: null,
-                subject: currentSubject
+    // For grade-based institutes, validate className if required
+    if (requiresGrades && className) {
+        let classConfig;
+        if (Array.isArray(config.allowedClasses)) {
+            if (!config.allowedClasses.includes(className)) {
+                return res.status(400).json({ error: `Class "${className}" is not allowed for this institute` });
             }
-        });
-
-    // Only enforce subject limit if Global Limit is NOT active - REMOVED
-
-        try {
-            // Check for duplicate batch number in the current institute
-            const existing = await prisma.batch.findFirst({
-                where: {
-                    batchNumber: num,
-                    className: null, // For non-grade institutes, className is null
-                    instituteId: user.instituteId // Scoped to tenant!
-                }
-            });
-            if (existing) {
-                return res.status(400).json({ error: `Batch ${num} already exists (Batches must have unique numbers across all subjects)` });
+        } else if (config.classes) {
+            classConfig = config.classes.find((c: any) => c.name === className);
+            if (!classConfig) {
+                return res.status(400).json({ error: `Class "${className}" is not allowed for this institute` });
             }
-
-            const batch = await prisma.batch.create({
-                data: {
-                    name: customName || `${subject || 'Course'} - Batch ${num}`,
-                    subject: subject || 'General',
-                    timeSlot,
-                    className: null, // No class/grade for this type of institute
-                    batchNumber: num,
-                    feeAmount: feeAmount ? parseFloat(feeAmount) : 0,
-                    teacherId,
-                    instituteId: user.instituteId
-                }
-            });
-            return res.json(batch);
-        } catch (error) {
-            console.error('Error creating batch:', error);
-            return res.status(500).json({ error: 'Failed to create batch' });
         }
     }
 
-    // For grade-based institutes, validate className
-    if (!className || !batchNumber) {
-        return res.status(400).json({ error: 'Class and Batch Number are required' });
-    }
-
-    // Validation
-    const num = parseInt(batchNumber);
-    if (isNaN(num)) return res.status(400).json({ error: 'Invalid Batch Number' });
-
-    // Dynamic Validation based on Institute Config
-    // Simplify parsing if config is old format vs new format
-    // Normalize config to array of objects
-    let classConfig;
-    if (Array.isArray(config.allowedClasses)) {
-        // Migration support for simple array format
-        if (!config.allowedClasses.includes(className)) {
-            return res.status(400).json({ error: `Class "${className}" is not allowed for this institute` });
-        }
-        classConfig = { maxBatches: config.maxBatchesPerClass || 5 }; // Use configured limit or default to 5
-    } else if (config.classes) {
-        // Robust object format
-        classConfig = config.classes.find((c: any) => c.name === className);
-        if (!classConfig) {
-            return res.status(400).json({ error: `Class "${className}" is not allowed for this institute` });
-        }
-    } else {
-        // Fallback for empty config
-        if (className !== 'Class 9' && className !== 'Class 10') {
-            return res.status(400).json({ error: 'Invalid Class (Default Rule)' });
-        }
-        classConfig = { maxBatches: className === 'Class 9' ? 2 : 3 };
-    }
-
-    if (num < 1) {
-        return res.status(400).json({ error: 'Batch Number must be greater than 0' });
-    }
-
-    // Only enforce class limit if Global Limit is NOT active - REMOVED
+    const num = batchNumber ? parseInt(batchNumber) : null;
+    const validNum = (num && !isNaN(num) && num > 0) ? num : null;
 
     try {
-        // Check for duplicate
-        // Check for duplicate in the current institute
+        // Check for duplicate batch name in the current institute
         const existing = await prisma.batch.findFirst({
             where: {
-                className,
-                batchNumber: num,
-                instituteId: user.instituteId // Scoped to tenant!
+                name: batchName,
+                className: requiresGrades ? (className || null) : null,
+                instituteId: user.instituteId
             }
         });
         if (existing) {
-            return res.status(400).json({ error: `${className} - Batch ${num} already exists` });
+            return res.status(400).json({ error: `Batch "${batchName}" already exists` });
         }
 
         const batch = await prisma.batch.create({
             data: {
-                name: customName || `${className} - Batch ${num}`,
+                name: batchName,
                 subject: subject || 'Mathematics',
                 timeSlot,
-                className,
-                batchNumber: num,
+                className: requiresGrades ? (className || null) : null,
+                batchNumber: validNum,
                 feeAmount: feeAmount ? parseFloat(feeAmount) : 0,
-
                 teacherId,
                 instituteId: user.instituteId
             }
         });
-        res.json(batch);
+        return res.json(batch);
     } catch (error) {
         console.error('Error creating batch:', error);
-        res.status(500).json({ error: 'Failed to create batch' });
+        return res.status(500).json({ error: 'Failed to create batch' });
     }
 };
 

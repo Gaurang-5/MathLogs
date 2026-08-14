@@ -145,6 +145,89 @@ export default function SuperAdminDashboard() {
     const [selectedNewPlan, setSelectedNewPlan] = useState<'NO_PLAN' | 'BASIC' | 'PRO'>('NO_PLAN');
     const [isSavingPlan, setIsSavingPlan] = useState(false);
 
+    // Bulk Import Directory Modal State
+    const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+    const [bulkPayload, setBulkPayload] = useState('');
+    const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
+
+    const loadSampleBulkTemplate = () => {
+        const sample = [
+            {
+                name: "Sharma Mathematics Classes",
+                teacherName: "Prof. R.K. Sharma",
+                phone: "9876543210",
+                city: "Muzaffarnagar",
+                area: "Civil Lines",
+                address: "Opposite Town Hall, Civil Lines, Muzaffarnagar",
+                tagline: "Premier Mathematics Institute for Class 9-12 & JEE Main",
+                subjectsOffered: ["Mathematics", "Physics"],
+                classesOffered: ["Class 9", "Class 10", "Class 11", "Class 12", "JEE"],
+                isPubliclyListed: true,
+                isVerified: false
+            },
+            {
+                name: "Verma Science Academy",
+                teacherName: "Er. Amit Verma",
+                phone: "9812345678",
+                city: "Muzaffarnagar",
+                area: "New Mandi",
+                address: "Near Water Tank, New Mandi, Muzaffarnagar",
+                tagline: "Physics & Chemistry Coaching for Board & NEET",
+                subjectsOffered: ["Physics", "Chemistry", "Biology"],
+                classesOffered: ["Class 9", "Class 10", "Class 11", "Class 12", "NEET"],
+                isPubliclyListed: true,
+                isVerified: false
+            }
+        ];
+        setBulkPayload(JSON.stringify(sample, null, 2));
+    };
+
+    const handleBulkImportSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!bulkPayload.trim()) {
+            alert('Please paste or load JSON payload first.');
+            return;
+        }
+        setIsSubmittingBulk(true);
+        try {
+            let parsed: any;
+            try {
+                parsed = JSON.parse(bulkPayload);
+            } catch {
+                alert('Invalid JSON format. Please verify JSON syntax.');
+                setIsSubmittingBulk(false);
+                return;
+            }
+            const payloadArray = Array.isArray(parsed) ? parsed : (parsed.institutes || [parsed]);
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${API_URL}/institutes/bulk-import`, { institutes: payloadArray }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data.success) {
+                alert(`Success! Imported ${res.data.count} coaching institutes into MathLogs.`);
+                setShowBulkImportModal(false);
+                setBulkPayload('');
+                fetchData();
+            }
+        } catch (error: unknown) {
+            alert(getAxiosErrorMessage(error, 'Failed to bulk import institutes'));
+        } finally {
+            setIsSubmittingBulk(false);
+        }
+    };
+
+    const handleToggleListingStatus = async (instituteId: string, isPubliclyListed?: boolean, isVerified?: boolean) => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.patch(`${API_URL}/institutes/${instituteId}/toggle-listing`, { isPubliclyListed, isVerified }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchData();
+        } catch {
+            alert('Failed to update listing status');
+        }
+    };
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -784,18 +867,27 @@ export default function SuperAdminDashboard() {
                 <div className="grid grid-cols-1 gap-8">
                     {/* Institute List */}
                     <div className="lg:col-span-2 space-y-6">
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center flex-wrap gap-3">
                             <h2 className="text-xl font-bold flex items-center gap-2 text-black">
                                 <School className="w-5 h-5" />
-                                Active Institutes
+                                Active Institutes & Directory
                             </h2>
-                            <button
-                                onClick={() => setShowOnboardForm(true)}
-                                className="bg-black hover:bg-gray-800 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-black/5 hover:shadow-black/10 transition-all active:scale-[0.98] flex items-center gap-2"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Onboard Institute
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setShowBulkImportModal(true)}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-[0.98] flex items-center gap-2 text-sm"
+                                >
+                                    <Database className="w-4 h-4" />
+                                    Bulk Import Directory
+                                </button>
+                                <button
+                                    onClick={() => setShowOnboardForm(true)}
+                                    className="bg-black hover:bg-gray-800 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-black/5 hover:shadow-black/10 transition-all active:scale-[0.98] flex items-center gap-2 text-sm"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Onboard Institute
+                                </button>
+                            </div>
                         </div>
 
                         <div className="grid gap-4">
@@ -830,6 +922,20 @@ export default function SuperAdminDashboard() {
                                                         Active
                                                     </span>
                                                 )}
+                                                <button
+                                                    onClick={() => handleToggleListingStatus(inst.id, !(inst as any).isPubliclyListed, undefined)}
+                                                    className={`px-2 py-1 rounded-md text-xs font-bold border transition-colors ${(inst as any).isPubliclyListed !== false ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}
+                                                    title="Toggle Public Marketplace Listing"
+                                                >
+                                                    {(inst as any).isPubliclyListed !== false ? '🌐 Public' : '🔒 Private'}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleToggleListingStatus(inst.id, undefined, !(inst as any).isVerified)}
+                                                    className={`px-2 py-1 rounded-md text-xs font-bold border transition-colors ${(inst as any).isVerified ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}
+                                                    title="Toggle Verified Badge"
+                                                >
+                                                    {(inst as any).isVerified ? '✓ Verified' : 'Directory'}
+                                                </button>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
@@ -1332,13 +1438,81 @@ export default function SuperAdminDashboard() {
                                     <code className="block w-full bg-white border border-green-200 p-3 rounded-xl text-xs text-green-800 break-all font-mono select-all">
                                         {inviteLink}
                                     </code>
-                                    <p className="text-[10px] text-green-600 mt-2 font-medium">Share this link. The coaching center will fill in details, choose billing cycle, pay, and set up their account.</p>
+                                     <p className="text-[10px] text-green-600 mt-2 font-medium">Share this link. The coaching center will fill in details, choose billing cycle, pay, and set up their account.</p>
                                 </div>
                             )}
                         </div>
                     </div>
                 )
             }
-        </div >
+
+            {/* Bulk Import Directory Modal */}
+            {showBulkImportModal && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-amber-50/50">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                    <Database className="w-5 h-5 text-amber-600" />
+                                    Bulk Import Coaching Institutes & Teachers
+                                </h3>
+                                <p className="text-xs text-gray-500 font-medium">Add coaching centers from public data to populate MathLogs Marketplace</p>
+                            </div>
+                            <button onClick={() => setShowBulkImportModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleBulkImportSubmit} className="p-6 space-y-4">
+                            <div className="flex justify-between items-center">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">JSON Payload (Paste Array of Institutes)</label>
+                                <button
+                                    type="button"
+                                    onClick={loadSampleBulkTemplate}
+                                    className="text-xs font-bold text-amber-700 hover:text-amber-900 underline"
+                                >
+                                    Load Sample JSON Template
+                                </button>
+                            </div>
+
+                            <textarea
+                                value={bulkPayload}
+                                onChange={(e) => setBulkPayload(e.target.value)}
+                                placeholder={`Paste JSON array of institutes e.g.:\n[\n  {\n    "name": "Sharma Classes",\n    "teacherName": "Prof. Sharma",\n    "phone": "9876543210",\n    "city": "Muzaffarnagar",\n    "area": "Civil Lines",\n    "subjectsOffered": ["Mathematics"],\n    "classesOffered": ["Class 9", "Class 10", "Class 11", "Class 12"]\n  }\n]`}
+                                className="w-full h-80 font-mono text-xs bg-gray-50 border border-gray-200 rounded-2xl p-4 focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                            />
+
+                            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl text-xs text-blue-800 space-y-1">
+                                <p className="font-bold">ℹ️ Public Listing Rules:</p>
+                                <p>• Institutes imported via bulk import are set to <code className="font-mono bg-blue-100 px-1 py-0.5 rounded">isPubliclyListed: true</code> and <code className="font-mono bg-blue-100 px-1 py-0.5 rounded">isVerified: false</code> by default.</p>
+                                <p>• They appear on MathLogs Marketplace with class & subject tags so students in your city can discover them.</p>
+                                <p>• Owners can click "Claim Profile" on their listing to take full control of their account.</p>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowBulkImportModal(false)}
+                                    className="px-5 py-2.5 text-gray-600 font-bold text-xs hover:bg-gray-100 rounded-xl"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingBulk}
+                                    className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {isSubmittingBulk ? (
+                                        <Loader2 className="w-4 h-4 animate-spin font-bold" />
+                                    ) : (
+                                        <>Import Institutes <ArrowRight className="w-4 h-4" /></>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

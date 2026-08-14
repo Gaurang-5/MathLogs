@@ -4,6 +4,7 @@ import { apiRequest } from '../utils/api';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, GraduationCap, ChevronRight, Loader, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { useMetaTags } from '../hooks/useMetaTags';
 
 interface Branding {
     name: string;
@@ -14,6 +15,11 @@ interface Branding {
 export default function StudentPortalLogin() {
     const { instituteSlug } = useParams<{ instituteSlug: string }>();
     const navigate = useNavigate();
+
+    useMetaTags({
+        title: branding?.name ? `${branding.name} - Student Portal | MathLogs` : 'Student Portal - MathLogs',
+        description: 'Log in to your student portal to access your batch schedule, test marks, fee receipts, and online quizzes on MathLogs.'
+    });
 
     const [mobileNumber, setMobileNumber] = useState('');
     const [otp, setOtp] = useState('');
@@ -264,10 +270,10 @@ export default function StudentPortalLogin() {
 
                         {/* ─── Form Card ─── */}
                         <motion.div
-                            initial={{ opacity: 0, y: 16 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                            className="w-full bg-app-surface-opaque rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/60 p-6 sm:p-8 backdrop-blur-md"
+                            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 350, damping: 30, delay: 0.1 }}
+                            className="w-full bg-white/80 backdrop-blur-2xl rounded-3xl shadow-xl border border-white/60 p-6 sm:p-8"
                         >
                             <div className="text-center mb-6">
                                 <h2 className="text-xl font-black text-app-text mb-2">{step === 'otp' ? 'Verify WhatsApp OTP' : 'Welcome Back!'}</h2>

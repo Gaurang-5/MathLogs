@@ -203,12 +203,17 @@ export default function StudentPaymentPortal() {
     };
 
     if (!slug || instituteError) return (
-        <div className="min-h-screen flex items-center justify-center bg-app-bg p-6">
-            <div className="bg-app-surface-opaque p-8 rounded-3xl shadow-sm border border-app-border max-w-md w-full text-center">
-                <AlertCircle className="w-12 h-12 text-danger mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-app-text">Invalid Link</h2>
-                <p className="text-app-text-secondary mt-2">This payment link is not valid or the institute could not be found.</p>
-            </div>
+        <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-6 font-sans selection:bg-neutral-900 selection:text-white">
+            <motion.div
+                initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                className="bg-white/80 backdrop-blur-2xl p-8 rounded-3xl shadow-xl border border-white/60 max-w-md w-full text-center"
+            >
+                <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
+                <h2 className="text-xl font-extrabold text-neutral-900 tracking-[-0.02em]">Invalid Link</h2>
+                <p className="text-neutral-500 text-sm mt-2 font-medium">This payment link is not valid or the institute could not be found.</p>
+            </motion.div>
         </div>
     );
 

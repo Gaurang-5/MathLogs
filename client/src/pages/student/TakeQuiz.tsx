@@ -5,6 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import CountUp from 'react-countup';
+import { useMetaTags } from '../../hooks/useMetaTags';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -36,6 +37,7 @@ interface QuizQuestion {
     questionText: string;
     options: string[];
     marks: number;
+    allowMultiple?: boolean;
 }
 interface Quiz {
     id: string;
@@ -51,7 +53,7 @@ interface Quiz {
 interface Submission {
     id: string;
     score: number | null;
-    autoSavedAnswers?: Record<string, string> | null;
+    autoSavedAnswers?: Record<string, AnswerValue> | null;
     startedAt: string;
     submittedAt: string | null;
     cheatingWarnings?: number;
@@ -74,6 +76,27 @@ interface QuizResult {
     }[];
 }
 type QState = 'unanswered' | 'answered' | 'skipped' | 'active';
+type AnswerValue = string | string[];
+
+function parseAnswerList(value: unknown): string[] {
+    if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
+    if (typeof value !== 'string' || !value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [value];
+    } catch {
+        return [value];
+    }
+}
+
+function formatAnswerValue(value: unknown): string {
+    const answers = parseAnswerList(value);
+    return answers.length > 0 ? answers.join(', ') : 'Skipped';
+}
+
+function isMultiAnswerQuestion(question: QuizQuestion): boolean {
+    return question.allowMultiple === true;
+}
 
 function formatSeconds(s: number) {
     const t = Math.max(0, s);
@@ -140,13 +163,18 @@ export default function TakeQuiz() {
     const { instituteSlug, quizId } = useParams<{ instituteSlug: string; quizId: string }>();
     const navigate = useNavigate();
 
+    useMetaTags({
+        title: quiz?.title ? `${quiz.title} - Online Quiz | MathLogs` : 'Online Quiz & Test - MathLogs',
+        description: 'Attempt your assigned online quiz, submit answers, and receive instant score analytics on MathLogs.'
+    });
+
     const [phase, setPhase] = useState<'loading' | 'instructions' | 'quiz' | 'result' | 'public_registration'>('loading');
     const [submitting, setSubmitting] = useState(false);
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [submission, setSubmission] = useState<Submission | null>(null);
     const [studentData, setStudentData] = useState<{ name: string; phone: string } | null>(null);
     const [result, setResult] = useState<QuizResult | null>(null);
-    const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
     const [visited, setVisited] = useState<Set<string>>(new Set());
     const [currentIndex, setCurrentIndex] = useState(0);
     const [remaining, setRemaining] = useState(9999);
@@ -792,10 +820,10 @@ export default function TakeQuiz() {
                                         <div className="min-w-0 flex-1">
                                             <p className="font-semibold text-sm text-gray-900">Q{i + 1}. {a.question.questionText}</p>
                                             <p className="text-xs text-gray-400 mt-1.5">
-                                                Your answer: <span className="font-bold text-gray-700">{a.selectedOption || 'Skipped'}</span>
+                                                Your answer: <span className="font-bold text-gray-700">{formatAnswerValue(a.selectedOption)}</span>
                                             </p>
                                             {!a.isCorrect && (
-                                                <p className="text-xs text-green-600 mt-0.5 font-semibold">Correct: {a.question.correctOption}</p>
+                                                <p className="text-xs text-green-600 mt-0.5 font-semibold">Correct: {formatAnswerValue(a.question.correctOption)}</p>
                                             )}
                                         </div>
                                         <span className="text-xs font-bold text-gray-400 shrink-0">{a.marksObtained}/{a.question.marks}</span>
@@ -1446,15 +1474,45 @@ export default function TakeQuiz() {
                                     {q.marks} {q.marks === 1 ? 'mark' : 'marks'}
                                 </span>
                             </div>
+
+                            {/* ── Figure image (if any) ── */}
+                            {(q.imageUrl || q.figureUrl) && (
+                                <div className="px-3.5 sm:px-4 py-3 border-b border-gray-50 flex justify-center bg-gray-50">
+                                    <img
+                                        src={q.imageUrl || q.figureUrl}
+                                        alt="Question figure"
+                                        className="max-h-64 w-auto rounded-xl border border-gray-200 object-contain shadow-sm"
+                                    />
+                                </div>
+                            )}
+
                             <div className="p-2.5 sm:p-3 space-y-2">
                                 {(Array.isArray(q.options) ? q.options : []).map((opt, oi) => {
-                                    const selected = answers[q.id] === opt;
+                                    const multiAnswer = isMultiAnswerQuestion(q);
+                                    const selectedAnswers = parseAnswerList(answers[q.id]);
+                                    const selected = selectedAnswers.includes(opt);
                                     return (
                                         <button
                                             key={`${q.id}-${oi}`}
                                             onClick={() => {
                                                 if (timeExpired) return;
-                                                setAnswers(prev => ({ ...prev, [q.id]: opt }));
+                                                setAnswers(prev => {
+                                                    if (!multiAnswer) {
+                                                        return { ...prev, [q.id]: opt };
+                                                    }
+
+                                                    const currentAnswers = parseAnswerList(prev[q.id]);
+                                                    const nextAnswers = currentAnswers.includes(opt)
+                                                        ? currentAnswers.filter(answer => answer !== opt)
+                                                        : [...currentAnswers, opt];
+                                                    const next = { ...prev };
+                                                    if (nextAnswers.length > 0) {
+                                                        next[q.id] = nextAnswers;
+                                                    } else {
+                                                        delete next[q.id];
+                                                    }
+                                                    return next;
+                                                });
                                                 setVisited(prev => new Set([...prev, q.id]));
                                             }}
                                             disabled={timeExpired}
@@ -1467,7 +1525,7 @@ export default function TakeQuiz() {
                                             <span className={`w-7 h-7 rounded-lg border text-[11px] font-black flex items-center justify-center shrink-0 transition-all ${
                                                 selected ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-gray-300 text-gray-500'
                                             }`}>
-                                                {String.fromCharCode(65 + oi)}
+                                                {multiAnswer && selected ? <CheckCircle2 className="w-3.5 h-3.5" /> : String.fromCharCode(65 + oi)}
                                             </span>
                                             <span className={`font-semibold text-[15px] sm:text-sm leading-snug flex-1 text-left ${selected ? 'text-gray-900' : 'text-gray-700'}`}>{opt}</span>
                                             {selected && <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />}

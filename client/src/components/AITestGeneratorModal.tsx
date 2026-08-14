@@ -58,7 +58,7 @@ interface GeneratedQuestion {
     questionText: string;
     marks: number;
     options: string[];
-    correctAnswer: string;
+    correctAnswer: string | string[];
     kept?: boolean;
     variantGroup?: string; // Non-null = this question is part of a sibling pair
 }
@@ -70,6 +70,17 @@ function getErrorMessage(error: unknown, fallback: string) {
 function formatLocalDateTimeInput(date: Date) {
     const offsetMs = date.getTimezoneOffset() * 60 * 1000;
     return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function getCorrectAnswers(value: string | string[] | undefined): string[] {
+    if (Array.isArray(value)) return value;
+    if (!value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [value];
+    } catch {
+        return [value];
+    }
 }
 
 const difficultyOptions = [
@@ -144,7 +155,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
         setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
         toast.success('New questions confirmed.');
     };
-    const [saving, setSaving] = useState(false);
+    const [savingMode, setSavingMode] = useState<'draft' | 'publish' | null>(null);
 
     const [generating, setGenerating] = useState(false);
     const [withVariants, setWithVariants] = useState(true); // default ON for anti-cheat
@@ -172,7 +183,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                 options: Array.isArray(q.options)
                     ? q.options
                     : (typeof q.options === 'string' ? JSON.parse(q.options) : []),
-                correctAnswer: q.correctOption || q.correctAnswer || '',
+                correctAnswer: getCorrectAnswers(q.correctOption || q.correctAnswer || ''),
                 variantGroup: q.variantGroup || undefined,
                 kept: false
             }));
@@ -477,69 +488,60 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
         }
     };
 
-    const handleSaveTest = async () => {
-        if (!generatedTest || (!isQuizOnly && batchIds.length === 0)) {
+    const handleSaveTest = async (saveAsDraft = false) => {
+        if (!generatedTest || (!saveAsDraft && !isQuizOnly && batchIds.length === 0)) {
             toast.error('Please assign the quiz to at least one batch.');
             return;
         }
 
-        if (!availableFrom || !availableUntil) {
+        if (!saveAsDraft && (!availableFrom || !availableUntil)) {
             toast.error('Please set the quiz availability window');
             return;
         }
 
         const fromDate = new Date(availableFrom);
         const untilDate = new Date(availableUntil);
-        if (Number.isNaN(fromDate.getTime()) || Number.isNaN(untilDate.getTime()) || untilDate <= fromDate) {
+        if (!saveAsDraft && (Number.isNaN(fromDate.getTime()) || Number.isNaN(untilDate.getTime()) || untilDate <= fromDate)) {
             toast.error('Quiz end time must be after the start time');
             return;
         }
 
-        setSaving(true);
+        setSavingMode(saveAsDraft ? 'draft' : 'publish');
         try {
+            const payload = {
+                title: generatedTest.title,
+                topic,
+                difficulty,
+                timeLimitMins: parseInt(timeLimitMins) || 30,
+                totalMarks: generatedTest.totalMarks,
+                availableFrom: saveAsDraft ? null : fromDate.toISOString(),
+                availableUntil: saveAsDraft ? null : untilDate.toISOString(),
+                batchIds,
+                isPublic: isQuizOnly,
+                isDraft: saveAsDraft,
+                questions: generatedTest.questions,
+                studentQuestionCount: parseInt(questionCount) || null
+            };
+
             if (quizToEdit) {
-                await api.put(`/tests/online/${quizToEdit.id}`, {
-                    title: generatedTest.title,
-                    topic,
-                    difficulty,
-                    timeLimitMins: parseInt(timeLimitMins) || 30,
-                    totalMarks: generatedTest.totalMarks,
-                    availableFrom: fromDate.toISOString(),
-                    availableUntil: untilDate.toISOString(),
-                    batchIds,
-                    isPublic: isQuizOnly,
-                    questions: generatedTest.questions,
-                    studentQuestionCount: parseInt(questionCount) || null
-                });
-                toast.success('Online Quiz updated successfully!');
+                await api.put(`/tests/online/${quizToEdit.id}`, payload);
+                toast.success(saveAsDraft ? 'Quiz draft saved!' : 'Online Quiz updated successfully!');
             } else {
-                await api.post('/tests/online', {
-                    title: generatedTest.title,
-                    topic,
-                    difficulty,
-                    timeLimitMins: parseInt(timeLimitMins) || 30,
-                    totalMarks: generatedTest.totalMarks,
-                    availableFrom: fromDate.toISOString(),
-                    availableUntil: untilDate.toISOString(),
-                    batchIds,
-                    isPublic: isQuizOnly,
-                    questions: generatedTest.questions,
-                    studentQuestionCount: parseInt(questionCount) || null
-                });
+                await api.post('/tests/online', payload);
                 
-                if (isQuizOnly) {
+                if (isQuizOnly && !saveAsDraft) {
                     const currentCredits = parseInt(localStorage.getItem('quizCredits') || '0', 10);
                     localStorage.setItem('quizCredits', Math.max(0, currentCredits - 1).toString());
                     window.dispatchEvent(new Event('storage')); // trigger update across tabs/components
                 }
-                toast.success('Online Quiz saved successfully!');
+                toast.success(saveAsDraft ? 'Quiz draft saved!' : 'Online Quiz saved successfully!');
             }
             onSaved();
             onClose();
         } catch (error) {
-            toast.error(getErrorMessage(error, quizToEdit ? 'Failed to update quiz.' : 'Failed to save quiz.'));
+            toast.error(getErrorMessage(error, saveAsDraft ? 'Failed to save draft.' : (quizToEdit ? 'Failed to update quiz.' : 'Failed to save quiz.')));
         } finally {
-            setSaving(false);
+            setSavingMode(null);
         }
     };
 
@@ -861,8 +863,11 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                                                                 const updatedOptions = q.options.map((o: string, oidx: number) =>
                                                                                     oidx === oi ? e.target.value : o
                                                                                 );
+                                                                                const updatedCorrect = getCorrectAnswers(q.correctAnswer).map(answer =>
+                                                                                    answer === opt ? e.target.value : answer
+                                                                                );
                                                                                 const updatedQuestions = generatedTest.questions.map((item, idx) =>
-                                                                                    idx === i ? { ...item, options: updatedOptions } : item
+                                                                                    idx === i ? { ...item, options: updatedOptions, correctAnswer: updatedCorrect } : item
                                                                                 );
                                                                                 setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
                                                                             }}
@@ -879,14 +884,18 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                                             {q.options && q.options.length > 0 ? (
                                                                 <div className="grid grid-cols-1 gap-2">
                                                                     {q.options.map((opt: string, oi: number) => {
-                                                                        const selected = q.correctAnswer === opt;
+                                                                        const selectedAnswers = getCorrectAnswers(q.correctAnswer);
+                                                                        const selected = selectedAnswers.includes(opt);
                                                                         return (
                                                                             <button
                                                                                 key={`${i}-answer-${oi}`}
                                                                                 type="button"
                                                                                 onClick={() => {
+                                                                                    const nextAnswers = selected
+                                                                                        ? selectedAnswers.filter(answer => answer !== opt)
+                                                                                        : [...selectedAnswers, opt];
                                                                                     const updatedQuestions = generatedTest.questions.map((item, idx) =>
-                                                                                        idx === i ? { ...item, correctAnswer: opt } : item
+                                                                                        idx === i ? { ...item, correctAnswer: nextAnswers } : item
                                                                                     );
                                                                                     setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
                                                                                 }}
@@ -914,12 +923,12 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                                                     Add options above to choose the correct answer.
                                                                 </p>
                                                             )}
-                                                            {q.correctAnswer && q.options?.length > 0 && !q.options.includes(q.correctAnswer) && (
+                                                            {getCorrectAnswers(q.correctAnswer).length > 0 && q.options?.length > 0 && getCorrectAnswers(q.correctAnswer).some(answer => !q.options.includes(answer)) && (
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => {
                                                                         const updatedQuestions = generatedTest.questions.map((item, idx) =>
-                                                                            idx === i ? { ...item, correctAnswer: q.options[0] || '' } : item
+                                                                            idx === i ? { ...item, correctAnswer: q.options[0] ? [q.options[0]] : [] } : item
                                                                         );
                                                                         setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
                                                                     }}
@@ -1062,12 +1071,20 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                             </button>
                                         )}
                                         <button
-                                            onClick={handleSaveTest}
-                                            disabled={saving || (!isQuizOnly && batchIds.length === 0)}
+                                            onClick={() => handleSaveTest(true)}
+                                            disabled={savingMode !== null}
+                                            className="flex-1 min-h-11 bg-white border border-neutral-300 text-neutral-900 font-bold py-3 rounded-xl hover:bg-neutral-50 flex justify-center items-center gap-2 disabled:opacity-50"
+                                        >
+                                            {savingMode === 'draft' ? <Loader className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
+                                            {savingMode === 'draft' ? 'Saving Draft...' : 'Save as Draft'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleSaveTest(false)}
+                                            disabled={savingMode !== null || (!isQuizOnly && batchIds.length === 0)}
                                             className="flex-1 min-h-11 bg-neutral-900 text-white font-bold py-3 rounded-xl hover:bg-neutral-800 flex justify-center items-center gap-2 disabled:opacity-50"
                                         >
-                                            {saving ? <Loader className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
-                                            {saving ? 'Saving...' : (quizToEdit ? 'Save Changes' : 'Save & Publish Quiz')}
+                                            {savingMode === 'publish' ? <Loader className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
+                                            {savingMode === 'publish' ? 'Saving...' : (quizToEdit ? 'Save & Publish' : 'Save & Publish Quiz')}
                                         </button>
                                     </div>
                                 </div>

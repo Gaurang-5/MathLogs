@@ -1,5 +1,6 @@
-import 'dotenv/config';
+import 'dotenv/config'; // Updated marketplace schema
 import path from 'path';
+import fs from 'fs';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
@@ -143,6 +144,7 @@ export function createApp() {
     app.use(express.static(path.join(__dirname, '../../client/dist')));
     app.use('/api', apiRoutes);
     app.use('/api/student-portal', require('./routes/studentPortalRoutes').default);
+    app.use('/api/marketplace', require('./routes/marketplaceRoutes').default);
 
     // Sentry error handler MUST be registered after all routes and BEFORE other error handlers
     if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
@@ -176,8 +178,57 @@ export function createApp() {
         }
     });
 
+    let cachedIndexHtml: string | null = null;
+
     app.get(/.*/, (req, res) => {
-        res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
+        const indexPath = path.join(__dirname, '../../client/dist/index.html');
+        if (!fs.existsSync(indexPath)) {
+            return res.sendFile(indexPath);
+        }
+
+        if (!cachedIndexHtml || process.env.NODE_ENV !== 'production') {
+            try {
+                cachedIndexHtml = fs.readFileSync(indexPath, 'utf-8');
+            } catch {
+                return res.sendFile(indexPath);
+            }
+        }
+
+        let title = "MathLogs | Modern Coaching Management & AI Grading Software";
+        let description = "Manage your coaching center efficiently with MathLogs. Automate WhatsApp alerts, use instant AI test scanning, track fees, and handle student onboarding seamlessly.";
+        let ogTitle = title;
+        let ogDesc = description;
+
+        const pathUrl = req.path.toLowerCase();
+
+        if (pathUrl.includes('/student/quiz/') || pathUrl.includes('/take-quiz')) {
+            title = "Online Quiz & Test - MathLogs Student Portal";
+            description = "Attempt your assigned online quiz, submit answers, and receive instant score analytics on MathLogs.";
+            ogTitle = "Online Quiz & Test | MathLogs";
+            ogDesc = description;
+        } else if (pathUrl.endsWith('/student') || pathUrl.includes('/student/dashboard') || pathUrl.includes('/student-portal')) {
+            title = "Student Portal - MathLogs";
+            description = "Log in to your student portal to access your batch schedule, test marks, fee receipts, and online quizzes on MathLogs.";
+            ogTitle = "Student Portal | MathLogs";
+            ogDesc = description;
+        } else if (pathUrl.startsWith('/coaching')) {
+            title = "Find Top Coaching Institutes - MathLogs Marketplace";
+            description = "Explore top verified coaching centers, courses offered, fee structures, reviews, and direct WhatsApp contact in your city.";
+            ogTitle = "Find Best Coaching Institutes | MathLogs Marketplace";
+            ogDesc = description;
+        }
+
+        let html = cachedIndexHtml
+            .replace(/<title>.*?<\/title>/gi, `<title>${title}</title>`)
+            .replace(/<meta name="title" content=".*?" \/>/gi, `<meta name="title" content="${title}" />`)
+            .replace(/<meta name="description" content=".*?" \/>/gi, `<meta name="description" content="${description}" />`)
+            .replace(/<meta property="og:title" content=".*?" \/>/gi, `<meta property="og:title" content="${ogTitle}" />`)
+            .replace(/<meta property="og:description" content=".*?" \/>/gi, `<meta property="og:description" content="${ogDesc}" />`)
+            .replace(/<meta property="twitter:title" content=".*?" \/>/gi, `<meta property="twitter:title" content="${ogTitle}" />`)
+            .replace(/<meta property="twitter:description" content=".*?" \/>/gi, `<meta property="twitter:description" content="${ogDesc}" />`);
+
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
     });
 
     return app;
@@ -208,7 +259,8 @@ function startServer() {
                 const cleanConnStr = (process.env.DATABASE_URL || '').replace(/([?&])sslmode=[^&]*/, '$1').replace(/\?$/, '');
                 const pgClient = new Client({
                     connectionString: cleanConnStr,
-                    ssl: { rejectUnauthorized: false }
+                    ssl: { rejectUnauthorized: false },
+                    connectionTimeoutMillis: 5000
                 });
                 let isProcessing = false;
 
@@ -264,7 +316,8 @@ function startServer() {
         secureLogger.info(`Metrics: http://localhost:${PORT}/metrics`);
     });
 }
-
+// tsx runs as CJS but require.main may be undefined in some loader modes.
+// Safe check: start server unless we're in test mode or explicitly imported as a library.
 if (process.env.NODE_ENV !== 'test') {
     startServer();
 }
