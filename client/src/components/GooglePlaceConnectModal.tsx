@@ -50,7 +50,9 @@ export const GooglePlaceConnectModal: React.FC<GooglePlaceConnectModalProps> = (
         setSearchResults([]);
 
         try {
-            const res = await fetch(`/api/marketplace/google-place/search?q=${encodeURIComponent(searchQuery.trim())}`);
+            const res = await fetch(`/api/marketplace/google-place/search?q=${encodeURIComponent(searchQuery.trim())}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             const json = await res.json();
             if (json.success && Array.isArray(json.data)) {
                 setSearchResults(json.data);

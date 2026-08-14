@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import { Star, MapPin, Phone, MessageCircle, CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, Send, Loader2, MessageSquarePlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { GooglePlaceConnectModal } from '../components/GooglePlaceConnectModal';
 import { useMetaTags } from '../hooks/useMetaTags';
 
 interface GoogleReviewItem {
@@ -126,7 +125,6 @@ export default function CoachingProfile() {
 
   // Review Modal state
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [reviewerName, setReviewerName] = useState('');
   const [reviewerRole, setReviewerRole] = useState('Student');
   const [reviewRating, setReviewRating] = useState(5);
@@ -259,7 +257,7 @@ export default function CoachingProfile() {
 
       const data = await res.json();
       if (data.success) {
-        toast.success('Thank you! Your review has been submitted.');
+        toast.success('Thank you! Your review was sent for approval.');
         setShowReviewModal(false);
         setReviewerName('');
         setReviewComment('');
@@ -548,7 +546,8 @@ export default function CoachingProfile() {
               </button>
             </div>
 
-            {/* Google Business Profile Banner & Verified Reviews Showcase */}
+            {/* Synced Google data is display-only on the public marketplace. */}
+            {profile.googlePlaceId && (
             <div className="p-6 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white rounded-3xl border border-blue-200/80 mb-8 shadow-xs">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-blue-100">
                 <div className="flex items-center gap-3.5">
@@ -566,11 +565,11 @@ export default function CoachingProfile() {
                       <div className="flex items-center text-amber-400">
                         <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
                         <span className="ml-1 text-sm font-black text-slate-900">
-                          {profile.googleRating || 4.9}
+                          {profile.googleRating ?? '—'}
                         </span>
                       </div>
                       <span className="text-xs text-slate-500 font-semibold">
-                        • {profile.googleReviewCount || 120}+ Google Reviews
+                        • {profile.googleReviewCount || 0} Google Reviews
                       </span>
                     </div>
                   </div>
@@ -588,13 +587,6 @@ export default function CoachingProfile() {
                       <span>↗</span>
                     </a>
                   )}
-                  <button
-                    onClick={() => setShowGoogleModal(true)}
-                    className="px-3.5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200 shadow-2xs transition-colors flex items-center justify-center gap-1"
-                    title="Connect or Sync Google Business Profile"
-                  >
-                    <span>⚙️ Sync Google</span>
-                  </button>
                 </div>
               </div>
 
@@ -652,6 +644,7 @@ export default function CoachingProfile() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Rating Summary Bar */}
             <div className="p-6 bg-amber-50/60 rounded-2xl border border-amber-200/60 mb-6 flex flex-col sm:flex-row items-center gap-6">
@@ -939,32 +932,6 @@ export default function CoachingProfile() {
             </form>
           </div>
         </div>
-      )}
-
-      {/* Google Business Profile Connect / Sync Modal */}
-      {profile && (
-        <GooglePlaceConnectModal
-          isOpen={showGoogleModal}
-          onClose={() => setShowGoogleModal(false)}
-          instituteId={profile.id}
-          currentPlaceId={profile.googlePlaceId}
-          currentRating={profile.googleRating}
-          currentReviewCount={profile.googleReviewCount}
-          currentMapsUrl={profile.googleMapsUrl}
-          onSyncSuccess={(updatedData) => {
-            setProfile(prev => prev ? {
-              ...prev,
-              googlePlaceId: updatedData.googlePlaceId,
-              googleMapsUrl: updatedData.googleMapsUrl,
-              googleRating: updatedData.googleRating,
-              googleReviewCount: updatedData.googleReviewCount,
-              googleReviews: updatedData.googleReviews,
-              googlePhotos: updatedData.googlePhotos,
-              googleLastSyncedAt: updatedData.googleLastSyncedAt
-            } : null);
-            fetchProfile();
-          }}
-        />
       )}
 
       {/* Claim Profile Modal */}

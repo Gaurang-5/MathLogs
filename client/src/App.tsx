@@ -22,6 +22,7 @@ const Billing = lazy(() => import('./pages/Billing'));
 const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
+const SuperAdminMarketplace = lazy(() => import('./pages/SuperAdminMarketplace'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
@@ -90,6 +91,11 @@ function App() {
             <Route path="/super-admin" element={
               <RoleRoute allowedRole="SUPER_ADMIN">
                 <SuperAdminDashboard />
+              </RoleRoute>
+            } />
+            <Route path="/super-admin/marketplace" element={
+              <RoleRoute allowedRole="SUPER_ADMIN">
+                <SuperAdminMarketplace />
               </RoleRoute>
             } />
 

@@ -350,6 +350,9 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
         googleMapsUrl: institute.googleMapsUrl || null,
         googleRating: institute.googleRating || null,
         googleReviewCount: institute.googleReviewCount || 0,
+        googleReviews: Array.isArray(institute.googleReviews) ? institute.googleReviews : [],
+        googlePhotos: Array.isArray(institute.googlePhotos) ? institute.googlePhotos : [],
+        googleLastSyncedAt: institute.googleLastSyncedAt || null,
         subjectsOffered: (institute.subjectsOffered as string[]) || [],
         classesOffered: (institute.classesOffered as string[]) || [],
         isExclusive: false,
@@ -400,13 +403,13 @@ export async function submitReview(req: Request, res: Response) {
         reviewerRole: (reviewerRole || 'Student').trim(),
         rating: ratingNum,
         comment: comment.trim(),
-        status: 'APPROVED'
+        status: 'PENDING'
       }
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Review submitted successfully',
+      message: 'Review submitted for moderation',
       data: review
     });
   } catch (error: any) {
@@ -646,8 +649,6 @@ export async function updateMarketplaceProfile(req: any, res: Response) {
       aboutUs,
       logoUrl,
       googleMapsUrl,
-      googleRating,
-      googleReviewCount,
       subjectsOffered,
       classesOffered,
       isPubliclyListed
@@ -666,8 +667,6 @@ export async function updateMarketplaceProfile(req: any, res: Response) {
     if (aboutUs !== undefined) updateData.aboutUs = aboutUs.trim();
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl.trim();
     if (googleMapsUrl !== undefined) updateData.googleMapsUrl = googleMapsUrl.trim();
-    if (googleRating !== undefined) updateData.googleRating = parseFloat(googleRating) || null;
-    if (googleReviewCount !== undefined) updateData.googleReviewCount = parseInt(googleReviewCount, 10) || 0;
     if (subjectsOffered !== undefined) updateData.subjectsOffered = subjectsOffered;
     if (classesOffered !== undefined) updateData.classesOffered = classesOffered;
     if (isPubliclyListed !== undefined) updateData.isPubliclyListed = Boolean(isPubliclyListed);
@@ -735,11 +734,153 @@ export async function getInstituteLeads(req: any, res: Response) {
   }
 }
 
+function requireSuperAdmin(req: any, res: Response): boolean {
+  if (req.user?.role !== 'SUPER_ADMIN') {
+    res.status(403).json({ success: false, message: 'Superadmin privileges required' });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Marketplace operations overview for the Superadmin control center.
+ * GET /api/marketplace/super-admin/overview
+ */
+export async function getMarketplaceSuperAdminOverview(req: any, res: Response) {
+  if (!requireSuperAdmin(req, res)) return;
+
+  try {
+    const [institutes, pendingReviews, newLeads, claimRequests] = await Promise.all([
+      prisma.institute.findMany({
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          teacherName: true,
+          city: true,
+          area: true,
+          logoUrl: true,
+          status: true,
+          plan: true,
+          isPubliclyListed: true,
+          isVerified: true,
+          publicPhone: true,
+          tagline: true,
+          aboutUs: true,
+          subjectsOffered: true,
+          classesOffered: true,
+          googlePlaceId: true,
+          googleMapsUrl: true,
+          googleRating: true,
+          googleReviewCount: true,
+          googleLastSyncedAt: true,
+          updatedAt: true,
+          _count: { select: { reviews: true, leadInquiries: true } }
+        }
+      }),
+      prisma.review.count({ where: { status: 'PENDING' } }),
+      prisma.leadInquiry.count({
+        where: { status: 'NEW', NOT: { studentName: { startsWith: '[CLAIM REQUEST]' } } }
+      }),
+      prisma.leadInquiry.count({ where: { studentName: { startsWith: '[CLAIM REQUEST]' } } })
+    ]);
+
+    const listings = institutes.map((institute) => {
+      const completenessFields = [
+        institute.name,
+        institute.teacherName,
+        institute.city,
+        institute.area,
+        institute.publicPhone,
+        institute.tagline,
+        institute.aboutUs,
+        institute.logoUrl,
+        Array.isArray(institute.subjectsOffered) && institute.subjectsOffered.length > 0,
+        Array.isArray(institute.classesOffered) && institute.classesOffered.length > 0
+      ];
+      const profileCompleteness = Math.round(
+        (completenessFields.filter(Boolean).length / completenessFields.length) * 100
+      );
+
+      return { ...institute, profileCompleteness };
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        metrics: {
+          totalListings: listings.length,
+          publishedListings: listings.filter((item) => item.isPubliclyListed).length,
+          verifiedListings: listings.filter((item) => item.isVerified).length,
+          googleConnected: listings.filter((item) => Boolean(item.googlePlaceId)).length,
+          pendingReviews,
+          newLeads,
+          claimRequests
+        },
+        listings
+      }
+    });
+  } catch (error: any) {
+    console.error('Error loading marketplace superadmin overview:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load marketplace operations' });
+  }
+}
+
+/** GET /api/marketplace/super-admin/reviews */
+export async function getMarketplaceSuperAdminReviews(req: any, res: Response) {
+  if (!requireSuperAdmin(req, res)) return;
+
+  try {
+    const reviews = await prisma.review.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      select: {
+        id: true,
+        reviewerName: true,
+        reviewerRole: true,
+        rating: true,
+        comment: true,
+        source: true,
+        status: true,
+        createdAt: true,
+        institute: { select: { id: true, name: true, slug: true } }
+      }
+    });
+    return res.json({ success: true, data: reviews });
+  } catch (error: any) {
+    console.error('Error loading marketplace reviews:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load marketplace reviews' });
+  }
+}
+
+/** PATCH /api/marketplace/super-admin/reviews/:id */
+export async function updateMarketplaceReviewStatus(req: any, res: Response) {
+  if (!requireSuperAdmin(req, res)) return;
+
+  const status = String(req.body?.status || '').toUpperCase();
+  if (!['APPROVED', 'PENDING', 'REJECTED'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Invalid review status' });
+  }
+
+  try {
+    const review = await prisma.review.update({
+      where: { id: String(req.params.id) },
+      data: { status }
+    });
+    return res.json({ success: true, data: review });
+  } catch (error: any) {
+    console.error('Error updating marketplace review:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update review' });
+  }
+}
+
 /**
  * Search Google Places API for Coaching Centers
  * GET /api/marketplace/google-place/search?q=...
  */
-export async function searchGooglePlacesHandler(req: Request, res: Response) {
+export async function searchGooglePlacesHandler(req: any, res: Response) {
+  if (!requireSuperAdmin(req, res)) return;
   try {
     const q = req.query.q as string;
     if (!q || q.trim().length === 0) {
@@ -766,11 +907,10 @@ export async function syncGooglePlaceHandler(req: any, res: Response) {
     const { id } = req.params;
     const { placeId } = req.body;
 
-    const userInstituteId = req.user?.instituteId;
     const userRole = req.user?.role;
 
-    if (userRole !== 'SUPER_ADMIN' && userInstituteId !== id) {
-      return res.status(403).json({ success: false, message: 'Unauthorized to modify this institute profile' });
+    if (userRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Superadmin privileges required' });
     }
 
     if (!placeId) {
@@ -825,11 +965,10 @@ export async function unlinkGooglePlaceHandler(req: any, res: Response) {
   try {
     const { id } = req.params;
 
-    const userInstituteId = req.user?.instituteId;
     const userRole = req.user?.role;
 
-    if (userRole !== 'SUPER_ADMIN' && userInstituteId !== id) {
-      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    if (userRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Superadmin privileges required' });
     }
 
     const updated = await prisma.institute.update({
@@ -894,5 +1033,3 @@ export async function submitClaimRequest(req: Request, res: Response) {
     return res.status(500).json({ success: false, message: 'Failed to submit claim request.' });
   }
 }
-
-

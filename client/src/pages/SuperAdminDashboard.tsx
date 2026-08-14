@@ -785,6 +785,13 @@ export default function SuperAdminDashboard() {
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/super-admin/marketplace')}
+                        className="hidden sm:flex items-center gap-2 px-4 py-2 bg-black text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-colors"
+                    >
+                        <Globe size={16} />
+                        Marketplace
+                    </button>
                     <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full border border-green-100">
                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                         <span className="text-xs font-medium">System Operational</span>
