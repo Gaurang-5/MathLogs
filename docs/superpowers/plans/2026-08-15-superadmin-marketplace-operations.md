@@ -125,18 +125,18 @@ SELECT COUNT(*) FROM "Institute" i WHERE NOT EXISTS (SELECT 1 FROM "Admin" a WHE
 
 - [ ] **Step 5: Generate Prisma, validate, apply locally, and rerun the persistence test**
 
-Run:
+The repository's checked-in migration history is not bootstrap-complete, so do not run `migrate deploy` against the disposable fresh database. Run:
 
 ```bash
 cd server
 npx prisma format
 npx prisma validate
 npx prisma generate
-npx prisma migrate deploy
+npx prisma db push --force-reset
 JWT_SECRET=test-secret NODE_ENV=test npx tsx --test tests/marketplaceSchema.test.ts
 ```
 
-Expected: schema validation succeeds and the test passes.
+Expected: schema validation succeeds, the disposable local database is rebuilt from the current schema, and the test passes. The new production SQL migration remains committed and reviewed separately; `db push --force-reset` is never used with a remote database.
 
 - [ ] **Step 6: Commit the persistence slice**
 
