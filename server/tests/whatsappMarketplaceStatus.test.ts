@@ -1,7 +1,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { prisma } from '../src/prisma';
-import { processWhatsappJob } from '../src/utils/whatsappWorker';
+import * as whatsappWorker from '../src/utils/whatsappWorker';
 import { enqueueWhatsApp, enqueueWhatsAppTracked } from '../src/utils/whatsapp';
 
 const instituteIds: string[] = [];
@@ -31,7 +31,7 @@ test('successful WhatsApp delivery synchronizes a linked claim to SENT', async (
     data: { instituteId: institute.id, claimantName: 'Riya', phone: '9876543210', normalizedPhone: '9876543210', communicationStatus: 'QUEUED', whatsappJobId: job.id }
   });
 
-  await processWhatsappJob(job, async () => ({ data: { messages: [{ id: 'meta-1' }] } }) as any);
+  await whatsappWorker.processWhatsappJob(job, async () => ({ data: { messages: [{ id: 'meta-1' }] } }) as any);
 
   const updatedJob = await prisma.whatsappJob.findUniqueOrThrow({ where: { id: job.id } });
   const updatedClaim = await prisma.marketplaceClaim.findUniqueOrThrow({ where: { id: claim.id } });
@@ -54,7 +54,7 @@ test('durable job tracking repairs an orphaned claim link after delivery', async
     } as any
   });
 
-  await processWhatsappJob(job, async () => ({ data: { messages: [{ id: 'meta-orphan' }] } }) as any);
+  await whatsappWorker.processWhatsappJob(job, async () => ({ data: { messages: [{ id: 'meta-orphan' }] } }) as any);
 
   const updatedClaim = await prisma.marketplaceClaim.findUniqueOrThrow({ where: { id: claim.id } });
   assert.equal(updatedClaim.communicationStatus, 'SENT');
@@ -71,7 +71,7 @@ test('exhausted WhatsApp delivery synchronizes a linked lead to FAILED with a bo
     data: { instituteId: institute.id, studentName: 'Aman', phone: '9988776655', deliveryStatus: 'QUEUED', notificationJobId: job.id }
   });
 
-  await processWhatsappJob(job, async () => { throw new Error('x'.repeat(700)); });
+  await whatsappWorker.processWhatsappJob(job, async () => { throw new Error('x'.repeat(700)); });
 
   const updatedJob = await prisma.whatsappJob.findUniqueOrThrow({ where: { id: job.id } });
   const updatedLead = await prisma.leadInquiry.findUniqueOrThrow({ where: { id: lead.id } });
@@ -89,7 +89,7 @@ test('non-exhausted delivery failure requeues both job and linked marketplace re
   const lead = await prisma.leadInquiry.create({
     data: { instituteId: institute.id, studentName: 'Aman', phone: '9988776655', deliveryStatus: 'QUEUED', notificationJobId: job.id }
   });
-  await processWhatsappJob(job, async () => { throw new Error('temporary'); });
+  await whatsappWorker.processWhatsappJob(job, async () => { throw new Error('temporary'); });
   assert.equal((await prisma.whatsappJob.findUniqueOrThrow({ where: { id: job.id } })).status, 'PENDING');
   assert.equal((await prisma.leadInquiry.findUniqueOrThrow({ where: { id: lead.id } })).deliveryStatus, 'QUEUED');
   await prisma.whatsappJob.delete({ where: { id: job.id } });
@@ -103,4 +103,14 @@ test('tracked enqueue returns a job ID while the compatibility wrapper remains b
   const compatible = await enqueueWhatsApp('9876543210', 'test-template', ['two'], institute.id);
   assert.equal(compatible, true);
   await prisma.whatsappJob.deleteMany({ where: { instituteId: institute.id } });
+});
+
+test('worker credential diagnostics expose configuration state without credential values', () => {
+  assert.equal(typeof (whatsappWorker as any).getWhatsAppCredentialLogState, 'function');
+  const state = (whatsappWorker as any).getWhatsAppCredentialLogState('phone-id-secret', 'access-token-secret');
+  assert.deepEqual(state, {
+    phoneNumberIdConfigured: true,
+    accessTokenConfigured: true
+  });
+  assert.doesNotMatch(JSON.stringify(state), /phone-id-secret|access-token-secret/);
 });

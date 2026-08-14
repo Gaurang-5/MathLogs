@@ -24,7 +24,15 @@ const META_API_VERSION = 'v22.0';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 
-secureLogger.info(`[Worker Boot] Loaded Access Token starting with: ${WHATSAPP_ACCESS_TOKEN ? WHATSAPP_ACCESS_TOKEN.substring(0, 15) : 'UNDEFINED'}`);
+export const getWhatsAppCredentialLogState = (
+    phoneNumberId = WHATSAPP_PHONE_NUMBER_ID,
+    accessToken = WHATSAPP_ACCESS_TOKEN
+) => ({
+    phoneNumberIdConfigured: Boolean(phoneNumberId),
+    accessTokenConfigured: Boolean(accessToken)
+});
+
+secureLogger.info('[Worker Boot] WhatsApp API configuration', getWhatsAppCredentialLogState());
 
 const BATCH_SIZE = 25; // Safely increased to 25 for higher throughput without hitting rate limits
 
