@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { Store, Sparkles, MapPin, Phone, MessageCircle, Save, Loader2, Globe, CheckCircle2, User, Building2, BookOpen, ExternalLink, GraduationCap, ArrowRight, Plus } from 'lucide-react';
+import { Store, Sparkles, MapPin, Phone, MessageCircle, Save, Loader2, Globe, CheckCircle2, Building2, BookOpen, ExternalLink, GraduationCap, ArrowRight, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { ownerLeadStatusLabel, ownerLeadStatuses, type OwnerLeadStatus } from '../features/superadmin-marketplace/ownerLeadState';
 
 interface MarketplaceProfileData {
   id: string;
@@ -33,7 +34,7 @@ interface LeadInquiry {
   subject?: string;
   classGrade?: string;
   message?: string;
-  status: string;
+  status: OwnerLeadStatus;
   createdAt: string;
 }
 
@@ -54,6 +55,7 @@ export default function MarketplaceSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'leads'>('profile');
+  const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
 
   // Form Fields
   const [name, setName] = useState('');
@@ -74,10 +76,6 @@ export default function MarketplaceSettings() {
   const [customSubjects, setCustomSubjects] = useState<string[]>([]);
 
   const isPageOnly = localStorage.getItem('isPageOnly') === 'true';
-
-  useEffect(() => {
-    fetchProfileAndLeads();
-  }, []);
 
   const fetchProfileAndLeads = async () => {
     setLoading(true);
@@ -116,13 +114,17 @@ export default function MarketplaceSettings() {
       if (leadsData.success) {
         setLeads(leadsData.data || []);
       }
-    } catch (err) {
-      console.error('Error fetching marketplace profile & leads:', err);
+    } catch (error) {
+      console.error('Error fetching marketplace profile & leads:', error);
       toast.error('Failed to load marketplace settings');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void fetchProfileAndLeads();
+  }, []);
 
   const toggleSubject = (sub: string) => {
     setSelectedSubjects(prev =>
@@ -184,10 +186,30 @@ export default function MarketplaceSettings() {
       } else {
         toast.error(data.message || 'Failed to update profile');
       }
-    } catch (err) {
+    } catch {
       toast.error('Network error. Please try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateLeadStatus = async (leadId: string, status: OwnerLeadStatus) => {
+    setUpdatingLeadId(leadId);
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`/api/marketplace/admin/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Failed to update lead status');
+      setLeads(current => current.map(lead => lead.id === leadId ? { ...lead, status: data.data?.status || status } : lead));
+      toast.success(`Lead marked ${ownerLeadStatusLabel(status).toLowerCase()}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update lead status');
+    } finally {
+      setUpdatingLeadId(null);
     }
   };
 
@@ -576,7 +598,7 @@ export default function MarketplaceSettings() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-neutral-900 text-sm">{lead.studentName}</h4>
-                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">New Lead</span>
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">{ownerLeadStatusLabel(lead.status)}</span>
                         </div>
                         <p className="text-xs text-neutral-600 font-semibold flex items-center gap-3">
                           <span>Phone: {lead.phone}</span>
@@ -611,6 +633,19 @@ export default function MarketplaceSettings() {
                           <Phone className="w-3.5 h-3.5" />
                           <span>Call</span>
                         </a>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 sm:w-full sm:justify-end">
+                        {ownerLeadStatuses.map(status => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => void updateLeadStatus(lead.id, status)}
+                            disabled={updatingLeadId === lead.id || lead.status === status}
+                            className={`rounded-full px-2.5 py-1.5 text-[10px] font-bold transition-colors disabled:opacity-50 ${lead.status === status ? 'bg-neutral-900 text-white' : 'border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-100'}`}
+                          >
+                            {ownerLeadStatusLabel(status)}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   );
