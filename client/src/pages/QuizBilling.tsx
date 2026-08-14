@@ -106,9 +106,9 @@ export default function QuizBilling({ institute, fetchInstituteDetails, isChecko
                 
                 <div className="bg-black text-white rounded-3xl p-8 relative overflow-hidden mb-8">
                     <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl translate-y-1/3 translate-x-1/3 pointer-events-none" />
-                    <p className="text-sm font-bold uppercase tracking-widest opacity-70 mb-2 relative z-10">Available Credits</p>
-                    <h4 className="text-5xl font-black relative z-10">{institute?.quizCredits || 0} <span className="text-xl opacity-70 font-semibold ml-2">Credits</span></h4>
-                    <p className="opacity-70 mt-3 text-sm relative z-10">1 Credit = 1 Generated AI Quiz</p>
+                    <p className="text-sm font-bold uppercase tracking-widest text-white/60 mb-2 relative z-10">Available Credits</p>
+                    <h4 className="text-5xl font-black relative z-10 text-white">{institute?.quizCredits || 0} <span className="text-xl text-white/60 font-semibold ml-2">Credits</span></h4>
+                    <p className="text-white/60 mt-3 text-sm relative z-10">1 Credit = 1 Generated AI Quiz</p>
                 </div>
             </div>
 
