@@ -19,6 +19,24 @@ import { secureLogger } from './utils/secureLogger';
 
 
 const PORT = process.env.PORT || 3001;
+const PUBLIC_SITE_URL = 'https://mathlogs.app';
+
+function escapeHtml(value: unknown): string {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function escapeXml(value: unknown): string {
+    return escapeHtml(value);
+}
+
+function safeJsonLd(value: Record<string, unknown> | Record<string, unknown>[]): string {
+    return JSON.stringify(value).replace(/</g, '\\u003c');
+}
 
 // CORS Configuration - Security hardened
 // SECURITY: Strict allowlist — no substring matching (prevents evilmathlogs.app attacks)
@@ -141,6 +159,54 @@ export function createApp() {
         });
     }
 
+    let sitemapCache: { xml: string; expiresAt: number } | null = null;
+    app.get('/sitemap.xml', async (_req, res) => {
+        try {
+            if (sitemapCache && sitemapCache.expiresAt > Date.now()) {
+                res.type('application/xml').send(sitemapCache.xml);
+                return;
+            }
+
+            const institutes = await prisma.institute.findMany({
+                where: { isPubliclyListed: true, status: 'ACTIVE', slug: { not: null } },
+                select: { slug: true, updatedAt: true },
+                orderBy: { updatedAt: 'desc' }
+            });
+            const staticUrls = [
+                ['/', '1.0', 'weekly'],
+                ['/coaching', '0.9', 'daily'],
+                ['/ai-quiz-generator', '0.9', 'weekly'],
+                ['/onboarding', '0.7', 'monthly'],
+                ['/about', '0.5', 'monthly'],
+                ['/privacy-policy', '0.3', 'yearly'],
+                ['/terms', '0.3', 'yearly']
+            ];
+            const urlEntries = staticUrls.map(([url, priority, changefreq]) =>
+                `  <url><loc>${PUBLIC_SITE_URL}${url}</loc><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`
+            );
+            institutes.forEach(item => {
+                if (!item.slug) return;
+                urlEntries.push(`  <url><loc>${PUBLIC_SITE_URL}/coaching/${escapeXml(item.slug)}</loc><lastmod>${item.updatedAt.toISOString()}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`);
+            });
+
+            const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries.join('\n')}\n</urlset>`;
+            sitemapCache = { xml, expiresAt: Date.now() + 60 * 60 * 1000 };
+            res.type('application/xml').send(xml);
+        } catch (error) {
+            secureLogger.error('[SEO] Failed to generate sitemap', { error });
+            const fallbackSitemap = path.join(__dirname, '../../client/dist/sitemap.xml');
+            if (fs.existsSync(fallbackSitemap)) {
+                res.type('application/xml').sendFile(fallbackSitemap);
+                return;
+            }
+            res.status(500).type('text/plain').send('Unable to generate sitemap');
+        }
+    });
+
+    // The marketplace currently serves Muzaffarnagar only. Keep one canonical
+    // search page and permanently consolidate the former location URL into it.
+    app.get('/coaching-in/:citySlug', (_req, res) => res.redirect(301, '/coaching'));
+
     app.use(express.static(path.join(__dirname, '../../client/dist')));
     app.use('/api', apiRoutes);
     app.use('/api/student-portal', require('./routes/studentPortalRoutes').default);
@@ -180,7 +246,7 @@ export function createApp() {
 
     let cachedIndexHtml: string | null = null;
 
-    app.get(/.*/, (req, res) => {
+    app.get(/.*/, async (req, res) => {
         const indexPath = path.join(__dirname, '../../client/dist/index.html');
         if (!fs.existsSync(indexPath)) {
             return res.sendFile(indexPath);
@@ -194,12 +260,23 @@ export function createApp() {
             }
         }
 
-        let title = "MathLogs | Modern Coaching Management & AI Grading Software";
-        let description = "Manage your coaching center efficiently with MathLogs. Automate WhatsApp alerts, use instant AI test scanning, track fees, and handle student onboarding seamlessly.";
+        let title = 'MathLogs | Coaching Marketplace & AI Quiz Generator';
+        let description = 'Find coaching institutes, generate AI-powered online quizzes, and manage attendance, fees, tests and parent communication with MathLogs.';
         let ogTitle = title;
         let ogDesc = description;
+        let canonicalUrl = `${PUBLIC_SITE_URL}${req.path === '/' ? '/' : req.path.replace(/\/$/, '')}`;
+        let robots = 'index, follow, max-image-preview:large';
+        let structuredData: Record<string, unknown> | Record<string, unknown>[] | null = null;
 
         const pathUrl = req.path.toLowerCase();
+        const privatePathPrefixes = [
+            '/login', '/setup', '/dashboard', '/batches', '/tests', '/quizzes', '/scan',
+            '/students', '/fees', '/settings', '/marketplace-settings', '/billing', '/approvals',
+            '/super-admin', '/register/', '/kiosk/', '/check-status/', '/pay/'
+        ];
+        if (privatePathPrefixes.some(prefix => pathUrl === prefix || pathUrl.startsWith(prefix))) {
+            robots = 'noindex, nofollow';
+        }
 
         if (pathUrl.includes('/student/quiz/') || pathUrl.includes('/take-quiz')) {
             title = "Online Quiz & Test - MathLogs Student Portal";
@@ -211,21 +288,91 @@ export function createApp() {
             description = "Log in to your student portal to access your batch schedule, test marks, fee receipts, and online quizzes on MathLogs.";
             ogTitle = "Student Portal | MathLogs";
             ogDesc = description;
-        } else if (pathUrl.startsWith('/coaching')) {
-            title = "Find Top Coaching Institutes - MathLogs Marketplace";
-            description = "Explore top verified coaching centers, courses offered, fee structures, reviews, and direct WhatsApp contact in your city.";
-            ogTitle = "Find Best Coaching Institutes | MathLogs Marketplace";
+        } else if (pathUrl === '/ai-quiz-generator') {
+            title = 'AI Quiz Generator for Teachers & Coaching Institutes | MathLogs';
+            description = 'Create MCQ quizzes with AI, publish online tests, automatically grade answers, and analyze student performance. Built for teachers and coaching institutes.';
+            ogTitle = title;
             ogDesc = description;
+            structuredData = {
+                '@context': 'https://schema.org',
+                '@type': 'SoftwareApplication',
+                name: 'MathLogs AI Quiz Generator',
+                applicationCategory: 'EducationalApplication',
+                operatingSystem: 'Web',
+                url: canonicalUrl,
+                description
+            };
+        } else if (pathUrl.startsWith('/coaching/')) {
+            const rawSlug = req.path.slice('/coaching/'.length);
+            let slug = rawSlug;
+            try { slug = decodeURIComponent(rawSlug); } catch { /* Keep the raw slug for a safe no-match lookup. */ }
+            try {
+                const institute = await prisma.institute.findFirst({
+                    where: { OR: [{ slug }, { id: slug }], isPubliclyListed: true, status: 'ACTIVE' },
+                    select: {
+                        name: true, slug: true, city: true, area: true, address: true, tagline: true,
+                        aboutUs: true, logoUrl: true, publicPhone: true, phoneNumber: true,
+                        subjectsOffered: true, googleMapsUrl: true, googleRating: true, googleReviewCount: true
+                    }
+                });
+                if (institute) {
+                    const city = institute.city || 'India';
+                    title = `${institute.name} in ${city} | Reviews, Courses & Contact`;
+                    description = `${institute.name}${institute.area ? ` in ${institute.area}` : ''}, ${city}. View subjects, classes, ratings, student reviews, batch details and direct contact information.`;
+                    ogTitle = title;
+                    ogDesc = description;
+                    canonicalUrl = `${PUBLIC_SITE_URL}/coaching/${institute.slug || slug}`;
+                    structuredData = {
+                        '@context': 'https://schema.org',
+                        '@type': 'EducationalOrganization',
+                        name: institute.name,
+                        url: canonicalUrl,
+                        description: institute.tagline || institute.aboutUs || description,
+                        image: institute.logoUrl || `${PUBLIC_SITE_URL}/logo-64.webp`,
+                        telephone: institute.publicPhone || institute.phoneNumber || undefined,
+                        address: {
+                            '@type': 'PostalAddress',
+                            streetAddress: institute.address || institute.area || undefined,
+                            addressLocality: city,
+                            addressCountry: 'IN'
+                        },
+                        areaServed: city,
+                        knowsAbout: institute.subjectsOffered,
+                        sameAs: institute.googleMapsUrl ? [institute.googleMapsUrl] : undefined,
+                        ...(institute.googleRating && institute.googleReviewCount ? {
+                            aggregateRating: {
+                                '@type': 'AggregateRating', ratingValue: institute.googleRating,
+                                reviewCount: institute.googleReviewCount, bestRating: 5, worstRating: 1
+                            }
+                        } : {})
+                    };
+                } else {
+                    robots = 'noindex, follow';
+                }
+            } catch (error) {
+                secureLogger.warn('[SEO] Profile metadata lookup failed', { slug, error });
+            }
+        } else if (pathUrl === '/coaching') {
+            title = 'Best Coaching Institutes in Muzaffarnagar | Reviews & Contact';
+            description = 'Find and compare coaching institutes in Muzaffarnagar. Explore subjects, classes, verified profiles, student reviews, ratings, locations and direct contact details.';
+            ogTitle = title;
+            ogDesc = description;
+            structuredData = { '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Best coaching institutes in Muzaffarnagar', url: canonicalUrl, description, about: { '@type': 'City', name: 'Muzaffarnagar' } };
         }
 
         let html = cachedIndexHtml
-            .replace(/<title>.*?<\/title>/gi, `<title>${title}</title>`)
-            .replace(/<meta name="title" content=".*?" \/>/gi, `<meta name="title" content="${title}" />`)
-            .replace(/<meta name="description" content=".*?" \/>/gi, `<meta name="description" content="${description}" />`)
-            .replace(/<meta property="og:title" content=".*?" \/>/gi, `<meta property="og:title" content="${ogTitle}" />`)
-            .replace(/<meta property="og:description" content=".*?" \/>/gi, `<meta property="og:description" content="${ogDesc}" />`)
-            .replace(/<meta property="twitter:title" content=".*?" \/>/gi, `<meta property="twitter:title" content="${ogTitle}" />`)
-            .replace(/<meta property="twitter:description" content=".*?" \/>/gi, `<meta property="twitter:description" content="${ogDesc}" />`);
+            .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`)
+            .replace(/<meta\s+name="title"[^>]*>/i, `<meta name="title" content="${escapeHtml(title)}" />`)
+            .replace(/<meta\s+name="description"[^>]*>/i, `<meta name="description" content="${escapeHtml(description)}" />`)
+            .replace(/<meta\s+property="og:title"[^>]*>/i, `<meta property="og:title" content="${escapeHtml(ogTitle)}" />`)
+            .replace(/<meta\s+property="og:description"[^>]*>/i, `<meta property="og:description" content="${escapeHtml(ogDesc)}" />`)
+            .replace(/<meta\s+property="og:url"[^>]*>/i, `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`)
+            .replace(/<meta\s+property="twitter:title"[^>]*>/i, `<meta property="twitter:title" content="${escapeHtml(ogTitle)}" />`)
+            .replace(/<meta\s+property="twitter:description"[^>]*>/i, `<meta property="twitter:description" content="${escapeHtml(ogDesc)}" />`)
+            .replace(/<meta\s+property="twitter:url"[^>]*>/i, `<meta property="twitter:url" content="${escapeHtml(canonicalUrl)}" />`)
+            .replace(/<link\s+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`)
+            .replace(/<meta\s+name="robots"[^>]*>/i, `<meta name="robots" content="${robots}" />`)
+            .replace('</head>', `${structuredData ? `<script type="application/ld+json">${safeJsonLd(structuredData)}</script>` : ''}</head>`);
 
         res.setHeader('Content-Type', 'text/html');
         res.send(html);

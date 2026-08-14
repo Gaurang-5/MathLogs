@@ -49,11 +49,6 @@ export default function StudentPortalDashboard() {
     const { instituteSlug } = useParams<{ instituteSlug: string }>();
     const navigate = useNavigate();
 
-    useMetaTags({
-        title: data?.student?.instituteName ? `${data.student.instituteName} - Student Portal | MathLogs` : 'Student Dashboard - MathLogs',
-        description: 'View your batch updates, test performance, fee receipts, and assigned quizzes on MathLogs.'
-    });
-
     const [loading, setLoading] = useState(!sessionStorage.getItem(`student_dash_${instituteSlug}`));
     const [data, setData] = useState<any>(() => {
         const cached = sessionStorage.getItem(`student_dash_${instituteSlug}`);
@@ -71,6 +66,12 @@ export default function StudentPortalDashboard() {
     const [activeTab, setActiveTab] = useState<Tab>('performance');
     const [profileOpen, setProfileOpen] = useState(false);
     const [lockedQuizTitle, setLockedQuizTitle] = useState<string | null>(null);
+
+    useMetaTags({
+        title: data?.student?.instituteName ? `${data.student.instituteName} - Student Portal | MathLogs` : 'Student Dashboard - MathLogs',
+        description: 'View your batch updates, test performance, fee receipts, and assigned quizzes on MathLogs.',
+        robots: 'noindex, nofollow'
+    });
 
     useEffect(() => {
         const fetchDashboard = async () => {

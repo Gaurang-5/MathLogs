@@ -2,5 +2,13 @@ User-agent: *
 Allow: /
 Disallow: /super-admin/
 Disallow: /api/
+Disallow: /dashboard
+Disallow: /batches
+Disallow: /tests
+Disallow: /quizzes
+Disallow: /fees
+Disallow: /settings
+Disallow: /billing
+Disallow: /approvals
 
 Sitemap: https://mathlogs.app/sitemap.xml

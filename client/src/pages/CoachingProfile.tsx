@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Star, MapPin, Phone, MessageCircle, CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, Send, Loader2, MessageSquarePlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -70,9 +70,50 @@ export default function CoachingProfile() {
   const [profile, setProfile] = useState<CoachingProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const structuredData = useMemo(() => {
+    if (!profile) return undefined;
+    const data: Record<string, unknown> = {
+      '@context': 'https://schema.org',
+      '@type': 'EducationalOrganization',
+      name: profile.name,
+      url: `https://mathlogs.app/coaching/${profile.slug}`,
+      description: profile.tagline || profile.aboutUs || `${profile.name} coaching institute in ${profile.city}`,
+      image: profile.logoUrl || 'https://mathlogs.app/logo-512.webp',
+      telephone: profile.phone || undefined,
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: profile.address || profile.area || undefined,
+        addressLocality: profile.city,
+        addressCountry: 'IN'
+      },
+      areaServed: profile.city,
+      knowsAbout: profile.subjectsOffered,
+      sameAs: profile.googleMapsUrl ? [profile.googleMapsUrl] : undefined
+    };
+    if (profile.avgRating > 0 && profile.reviewCount > 0) {
+      data.aggregateRating = {
+        '@type': 'AggregateRating',
+        ratingValue: profile.avgRating,
+        reviewCount: profile.reviewCount,
+        bestRating: 5,
+        worstRating: 1
+      };
+    }
+    return data;
+  }, [profile]);
+
   useMetaTags({
-    title: profile?.name ? `${profile.name} - Coaching Profile | MathLogs Marketplace` : 'Coaching Institute Profile - MathLogs Marketplace',
-    description: profile?.tagline || profile?.aboutUs || 'View courses, batch timings, fee details, location map, and contact info for this coaching institute on MathLogs.'
+    title: profile?.name
+      ? `${profile.name} in ${profile.city} | Reviews, Courses & Contact`
+      : 'Coaching Institute Profile | MathLogs Marketplace',
+    description: profile?.name
+      ? `${profile.name}${profile.area ? ` in ${profile.area}` : ''}, ${profile.city}. View subjects, classes, ratings, student reviews, batch details and direct contact information.`
+      : 'View subjects, classes, ratings, student reviews, batch details and contact information for this coaching institute.',
+    canonicalPath: `/coaching/${profile?.slug || slug || ''}`,
+    image: profile?.logoUrl || 'https://mathlogs.app/dashboard.webp',
+    type: 'profile',
+    robots: profile ? 'index, follow, max-image-preview:large' : 'noindex, follow',
+    structuredData
   });
 
   // Inquiry Form state

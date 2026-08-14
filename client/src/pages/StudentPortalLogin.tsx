@@ -16,11 +16,6 @@ export default function StudentPortalLogin() {
     const { instituteSlug } = useParams<{ instituteSlug: string }>();
     const navigate = useNavigate();
 
-    useMetaTags({
-        title: branding?.name ? `${branding.name} - Student Portal | MathLogs` : 'Student Portal - MathLogs',
-        description: 'Log in to your student portal to access your batch schedule, test marks, fee receipts, and online quizzes on MathLogs.'
-    });
-
     const [mobileNumber, setMobileNumber] = useState('');
     const [otp, setOtp] = useState('');
     const [step, setStep] = useState<'mobile' | 'otp'>('mobile');
@@ -32,6 +27,12 @@ export default function StudentPortalLogin() {
     const [branding, setBranding] = useState<Branding | null>(() => {
         const cached = sessionStorage.getItem(`branding_${instituteSlug}`);
         return cached ? JSON.parse(cached) : null;
+    });
+
+    useMetaTags({
+        title: branding?.name ? `${branding.name} - Student Portal | MathLogs` : 'Student Portal - MathLogs',
+        description: 'Log in to your student portal to access your batch schedule, test marks, fee receipts, and online quizzes on MathLogs.',
+        robots: 'noindex, nofollow'
     });
 
     useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, MapPin, Sparkles, SlidersHorizontal, GraduationCap, Star,
@@ -23,10 +23,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function MarketplaceHome() {
-  useMetaTags({
-    title: 'Find Top Coaching Institutes & Tutors - MathLogs Marketplace',
-    description: 'Explore top verified coaching centers, courses offered, fee structures, reviews, and direct WhatsApp contact in your city.'
-  });
+  const canonicalPath = '/coaching';
   const [coachings, setCoachings] = useState<CoachingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,6 +34,31 @@ export default function MarketplaceHome() {
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+
+  const structuredData = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Best coaching institutes in Muzaffarnagar',
+    url: `https://mathlogs.app${canonicalPath}`,
+    description: 'Compare coaching institutes in Muzaffarnagar by subjects, classes, student reviews, ratings and location.',
+    mainEntity: {
+      '@type': 'ItemList',
+      name: 'Coaching institutes in Muzaffarnagar',
+      itemListElement: coachings.map((coaching, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: `https://mathlogs.app/coaching/${coaching.slug}`,
+        name: coaching.name
+      }))
+    }
+  }), [canonicalPath, coachings]);
+
+  useMetaTags({
+    title: 'Best Coaching Institutes in Muzaffarnagar | Reviews & Contact',
+    description: 'Find and compare coaching institutes in Muzaffarnagar. Explore subjects, classes, verified profiles, student reviews, ratings, locations and direct contact details.',
+    canonicalPath,
+    structuredData
+  });
 
   const fetchMarketplaceData = useCallback(async () => {
     setLoading(true);
@@ -158,14 +180,14 @@ export default function MarketplaceHome() {
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-50 text-amber-800 border border-amber-200/80 text-xs font-bold rounded-full mb-4 shadow-2xs">
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Find Best Coaching Institutes</span>
+            <span>Compare Coaching in Muzaffarnagar</span>
           </div>
 
           <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-neutral-900 tracking-tight leading-tight mb-3">
-            Discover Top Coaching Centers & Faculty
+            Best Coaching Institutes in Muzaffarnagar
           </h1>
           <p className="text-sm sm:text-base text-neutral-500 font-medium max-w-xl mx-auto mb-8">
-            Compare verified coaching profiles, student reviews, offered subjects, and contact teachers directly.
+            Compare coaching centers in Muzaffarnagar by subjects, classes, student reviews, ratings and location, then contact teachers directly.
           </p>
 
           {/* Desktop Search Box */}
@@ -457,6 +479,11 @@ export default function MarketplaceHome() {
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
+        <nav aria-label="Popular coaching locations" className="max-w-7xl mx-auto mt-7 pt-6 border-t border-neutral-100 flex flex-wrap items-center gap-3 text-xs font-semibold text-neutral-500">
+          <span className="font-extrabold text-neutral-800">Popular searches:</span>
+          <Link to="/coaching" className="hover:text-neutral-900 underline underline-offset-4">Best coaching in Muzaffarnagar</Link>
+          <Link to="/ai-quiz-generator" className="hover:text-neutral-900 underline underline-offset-4">AI quiz generator for teachers</Link>
+        </nav>
       </footer>
 
       {/* ── Public Mobile Floating Bottom Navigation ──────────────────────────── */}

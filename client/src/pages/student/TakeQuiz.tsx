@@ -163,11 +163,6 @@ export default function TakeQuiz() {
     const { instituteSlug, quizId } = useParams<{ instituteSlug: string; quizId: string }>();
     const navigate = useNavigate();
 
-    useMetaTags({
-        title: quiz?.title ? `${quiz.title} - Online Quiz | MathLogs` : 'Online Quiz & Test - MathLogs',
-        description: 'Attempt your assigned online quiz, submit answers, and receive instant score analytics on MathLogs.'
-    });
-
     const [phase, setPhase] = useState<'loading' | 'instructions' | 'quiz' | 'result' | 'public_registration'>('loading');
     const [submitting, setSubmitting] = useState(false);
     const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -195,6 +190,12 @@ export default function TakeQuiz() {
     const [regStep, setRegStep] = useState<'phone' | 'confirm' | 'new_name'>('phone');
     const [foundStudent, setFoundStudent] = useState<{ studentId: string; name: string } | null>(null);
     const [lookingUp, setLookingUp] = useState(false);
+
+    useMetaTags({
+        title: quiz?.title ? `${quiz.title} - Online Quiz | MathLogs` : 'Online Quiz & Test - MathLogs',
+        description: 'Attempt your assigned online quiz, submit answers, and receive instant score analytics on MathLogs.',
+        robots: 'noindex, nofollow'
+    });
 
     const lookupPhone = async () => {
         const clean = publicPhone.replace(/\D/g, '');

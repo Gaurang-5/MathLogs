@@ -9,6 +9,29 @@ import {
     Download, FileText, Printer, Wallet, Plus, Minus,
     Sparkles
 } from 'lucide-react';
+import { useMetaTags } from '../hooks/useMetaTags';
+
+const HOME_STRUCTURED_DATA = [
+    {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: 'MathLogs',
+        url: 'https://mathlogs.app/',
+        logo: 'https://mathlogs.app/logo-64.webp',
+        description: 'Coaching marketplace, AI quiz generator and coaching management software for educators.'
+    },
+    {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'MathLogs',
+        url: 'https://mathlogs.app/',
+        potentialAction: {
+            '@type': 'SearchAction',
+            target: 'https://mathlogs.app/coaching?query={search_term_string}',
+            'query-input': 'required name=search_term_string'
+        }
+    }
+];
 
 /** Static data outside components to prevent recreation on every render */
 const ONBOARDING_STEPS = [
@@ -197,6 +220,13 @@ export default function Home() {
     
     const isFreeTrial = true;
 
+    useMetaTags({
+        title: 'MathLogs | Coaching Marketplace, AI Quiz Generator & Management Software',
+        description: 'Find coaching institutes, generate AI-powered online quizzes, and manage attendance, fees, tests and parent communication with MathLogs.',
+        canonicalPath: '/',
+        structuredData: HOME_STRUCTURED_DATA
+    });
+
     // Auto-scroll logic for mobile carousel
     useEffect(() => {
         if (!expandedFeature || (expandedFeature !== 'whatsapp' && expandedFeature !== 'scan')) return;
@@ -341,6 +371,7 @@ export default function Home() {
                             <span>Find Coaching</span>
                             <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-extrabold">NEW</span>
                         </Link>
+                        <Link to="/ai-quiz-generator" className="hover:text-neutral-900 transition-colors">AI Quiz Generator</Link>
                         <a href="#features" className="hover:text-neutral-900 transition-colors">Features</a>
                         <a href="#pricing" className="hover:text-neutral-900 transition-colors">Pricing</a>
                         <a href="https://wa.me/919557940807?text=Hi%20MathLogs%2C%20I%20would%20like%20to%20inquire%20about%20your%20coaching%20management%20platform." target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 transition-colors">Contact Us</a>
@@ -403,6 +434,7 @@ export default function Home() {
                                 <span>Find Coaching Marketplace</span>
                                 <span className="text-[10px] bg-indigo-600 text-white font-extrabold px-2.5 py-0.5 rounded-full">EXPLORE</span>
                             </Link>
+                            <Link to="/ai-quiz-generator" onClick={() => setMobileMenuOpen(false)} className="px-6 py-3.5 text-base font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors">AI Quiz Generator</Link>
                             <a href="#features" onClick={() => setMobileMenuOpen(false)} className="px-6 py-3.5 text-base font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors">Features</a>
                             <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="px-6 py-4 text-base font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors">Pricing</a>
                             <a href="https://wa.me/919557940807?text=Hi%20MathLogs%2C%20I%20would%20like%20to%20inquire%20about%20your%20coaching%20management%20platform." target="_blank" rel="noopener noreferrer" onClick={() => setMobileMenuOpen(false)} className="px-6 py-4 text-base font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors">Contact Us</a>
@@ -1297,6 +1329,8 @@ export default function Home() {
                             <span className="text-[12px] text-slate-100 font-bold tracking-wider uppercase">Product</span>
                             <div className="flex flex-col gap-4">
                                 <Link to="/" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Home</Link>
+                                <Link to="/coaching" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Coaching in Muzaffarnagar</Link>
+                                <Link to="/ai-quiz-generator" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">AI Quiz Generator</Link>
                                 <a href="#features" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Features</a>
                                 <a href="#pricing" className="text-[13px] font-medium text-slate-400 hover:text-neutral-300 transition-colors duration-300">Pricing</a>
                             </div>

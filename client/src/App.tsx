@@ -34,6 +34,7 @@ const MarketplaceHome = lazy(() => import('./pages/MarketplaceHome'));
 const CoachingProfile = lazy(() => import('./pages/CoachingProfile'));
 const TeacherRegistration = lazy(() => import('./pages/TeacherRegistration'));
 const MarketplaceSettings = lazy(() => import('./pages/MarketplaceSettings'));
+const AIQuizGenerator = lazy(() => import('./pages/AIQuizGenerator'));
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
@@ -114,8 +115,10 @@ function App() {
 
             {/* Marketplace Routes */}
             <Route path="/coaching" element={<MarketplaceHome />} />
+            <Route path="/coaching-in/:citySlug" element={<Navigate to="/coaching" replace />} />
             <Route path="/coaching/:slug" element={<CoachingProfile />} />
             <Route path="/list-coaching" element={<Navigate to="/onboarding" replace />} />
+            <Route path="/ai-quiz-generator" element={<AIQuizGenerator />} />
 
             <Route path="/:instituteSlug/student" element={<StudentPortalLogin />} />
             <Route path="/:instituteSlug/student/dashboard" element={<StudentPortalDashboard />} />
