@@ -105,9 +105,11 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
+          motion: ['framer-motion'],
           ui: ['lucide-react'],
           charts: ['recharts'],
-          utils: ['html5-qrcode', 'react-qr-code']
+          utils: ['html5-qrcode', 'react-qr-code'],
+          telemetry: ['@sentry/react', 'posthog-js']
         }
       }
     }

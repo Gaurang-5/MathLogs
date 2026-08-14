@@ -44,10 +44,17 @@ export function calculateStudentFeeSnapshot(student: StudentFeeSnapshotInput): S
     
     const isBatchInstallmentActive = (student.batch?.feeInstallments || []).some((fi) => !fi.studentId);
     
-    // Valid installments: those that are explicitly assigned to this student
     const assignedIds = new Set((student.feeAssignments || []).map((a) => a.installmentId));
     const sortedInstallments = (student.batch?.feeInstallments || [])
-        .filter((installment) => assignedIds.has(installment.id))
+        .filter((installment) => {
+            // Custom invoice: only applies to the specific student it was created for
+            if (installment.studentId) return installment.studentId === (student.id ?? null);
+            // Global installment: applicable when created on/after join date, or if there
+            // is already a payment/explicit assignment for it (backwards compat)
+            const instTime = new Date(installment.createdAt).getTime();
+            const joinTime = studentJoinDate.getTime();
+            return instTime >= joinTime || paidInstallmentIds.has(installment.id) || assignedIds.has(installment.id);
+        })
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         
     const globalInstallmentsTotal = sortedInstallments

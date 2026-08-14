@@ -10,9 +10,12 @@ const tls = redisUrl.startsWith('rediss://')
     : {};
 
 export const redis = new Redis(redisUrl, {
-    maxRetriesPerRequest: 3,
+    maxRetriesPerRequest: process.env.NODE_ENV === 'test' ? 0 : 3,
+    lazyConnect: process.env.NODE_ENV === 'test',
+    enableOfflineQueue: process.env.NODE_ENV !== 'test',
     ...tls,
     retryStrategy(times) {
+        if (process.env.NODE_ENV === 'test') return null;
         const delay = Math.min(times * 50, 2000);
         return delay;
     }
