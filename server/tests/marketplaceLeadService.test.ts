@@ -19,10 +19,9 @@ before(async () => {
 
 after(async () => {
   if (instituteIds.length) {
-    const jobs = await prisma.leadInquiry.findMany({ where: { instituteId: { in: instituteIds } }, select: { notificationJobId: true } });
     await prisma.marketplaceAuditLog.deleteMany({ where: { instituteId: { in: instituteIds } } });
     await prisma.leadInquiry.deleteMany({ where: { instituteId: { in: instituteIds } } });
-    await prisma.whatsappJob.deleteMany({ where: { id: { in: jobs.flatMap((item) => item.notificationJobId ? [item.notificationJobId] : []) } } });
+    await prisma.whatsappJob.deleteMany({ where: { instituteId: { in: instituteIds } } });
     await prisma.institute.deleteMany({ where: { id: { in: instituteIds } } });
   }
   if (actorAdminId) await prisma.admin.delete({ where: { id: actorAdminId } });
@@ -116,4 +115,81 @@ test('retry requires a failed delivery and does not change owner sales status', 
   assert.equal(retried.deliveryStatus, 'QUEUED');
   assert.equal(retried.notificationRetryCount, 1);
   assert.equal(retried.status, 'NEW');
+});
+
+test('retry repairs a queued delivery that has no durable job', async () => {
+  const inst = await institute('CLAIMED');
+  const lead = await prisma.leadInquiry.create({
+    data: {
+      instituteId: inst.id,
+      studentName: 'Crash recovery',
+      phone: '9988776655',
+      deliveryStatus: 'QUEUED',
+      notificationJobId: null
+    }
+  });
+
+  const recovered = await retryMarketplaceLeadNotification(
+    { leadId: lead.id, actorAdminId },
+    async () => ({ queued: true, jobId: 'recovered-job' })
+  );
+
+  assert.equal(recovered.deliveryStatus, 'QUEUED');
+  assert.equal(recovered.notificationJobId, 'recovered-job');
+  assert.equal(recovered.notificationRetryCount, 1);
+});
+
+test('concurrent failed-delivery retries enqueue and audit exactly once', async () => {
+  const inst = await institute('CLAIMED');
+  const created = await createMarketplaceLead(leadInput(inst.id), async () => ({ queued: false, error: 'offline' }));
+  process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+  process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+  process.env.WHATSAPP_TEMPLATE_MARKETPLACE_LEAD = 'marketplace-lead';
+
+  try {
+    const results = await Promise.allSettled([
+      retryMarketplaceLeadNotification({ leadId: created.lead.id, actorAdminId }),
+      retryMarketplaceLeadNotification({ leadId: created.lead.id, actorAdminId })
+    ]);
+
+    assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
+    assert.equal(await prisma.whatsappJob.count({
+      where: { marketplaceEntityType: 'LeadInquiry', marketplaceEntityId: created.lead.id }
+    }), 1);
+    assert.equal(await prisma.marketplaceAuditLog.count({
+      where: { entityId: created.lead.id, action: 'LEAD_MESSAGE_RETRIED' }
+    }), 1);
+  } finally {
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_TEMPLATE_MARKETPLACE_LEAD;
+  }
+});
+
+test('concurrent held-lead releases enqueue and audit exactly once', async () => {
+  const inst = await institute('UNCLAIMED');
+  const created = await createMarketplaceLead(leadInput(inst.id));
+  await prisma.institute.update({ where: { id: inst.id }, data: { ownershipStatus: 'CLAIMED' } });
+  process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+  process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+  process.env.WHATSAPP_TEMPLATE_MARKETPLACE_LEAD = 'marketplace-lead';
+
+  try {
+    const results = await Promise.allSettled([
+      releaseMarketplaceLead({ leadId: created.lead.id, actorAdminId }),
+      releaseMarketplaceLead({ leadId: created.lead.id, actorAdminId })
+    ]);
+
+    assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
+    assert.equal(await prisma.whatsappJob.count({
+      where: { marketplaceEntityType: 'LeadInquiry', marketplaceEntityId: created.lead.id }
+    }), 1);
+    assert.equal(await prisma.marketplaceAuditLog.count({
+      where: { entityId: created.lead.id, action: 'LEAD_RELEASED' }
+    }), 1);
+  } finally {
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_TEMPLATE_MARKETPLACE_LEAD;
+  }
 });

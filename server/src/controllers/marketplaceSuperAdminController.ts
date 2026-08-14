@@ -16,6 +16,13 @@ import {
 } from '../services/marketplaceLeadService';
 import { writeMarketplaceAudit } from '../services/marketplaceAuditService';
 import { fetchGooglePlaceDetails, searchGooglePlaces } from '../services/googlePlacesService';
+import {
+  enqueueWhatsAppTracked,
+  type MarketplaceWhatsAppTracking,
+  type TrackedWhatsAppEnqueueResult
+} from '../utils/whatsapp';
+
+const LEGACY_CLAIM_MARKER = '[CLAIM REQUEST]';
 
 const claimSelect = {
   id: true,
@@ -119,7 +126,7 @@ function withCompleteness<T>(listing: T): T & { profileCompleteness: number } {
 
 function statusForError(error: any): number {
   if (['CLAIM_NOT_FOUND', 'LEAD_NOT_FOUND'].includes(error?.message)) return 404;
-  if (['CLAIM_ALREADY_DECIDED', 'LEAD_NOT_RETRYABLE', 'LEAD_NOT_HELD', 'INSTITUTE_NOT_CLAIMED'].includes(error?.message)) return 409;
+  if (['CLAIM_ALREADY_DECIDED', 'CLAIM_NOT_DECIDED', 'CLAIM_MESSAGE_NOT_RETRYABLE', 'LEAD_NOT_RETRYABLE', 'LEAD_NOT_HELD', 'INSTITUTE_NOT_CLAIMED'].includes(error?.message)) return 409;
   if (['VERIFICATION_NOTE_REQUIRED', 'REJECTION_REASON_REQUIRED', 'INVALID_PHONE', 'OWNER_PHONE_MISSING'].includes(error?.message)) return 400;
   return 500;
 }
@@ -187,16 +194,80 @@ export async function contactMarketplaceClaim(req: any, res: Response) {
   }
 }
 
-async function persistClaimNotification(claimId: string, result: { queued: boolean; jobId?: string; error?: string }, retry: boolean) {
-  return prisma.marketplaceClaim.update({
-    where: { id: claimId },
-    data: {
-      communicationStatus: result.queued ? 'QUEUED' : 'FAILED',
-      whatsappJobId: result.jobId || null,
-      communicationError: result.queued ? null : (result.error || 'WHATSAPP_ENQUEUE_FAILED').slice(0, 500),
-      ...(retry ? { communicationRetryCount: { increment: 1 } } : {})
-    },
-    select: claimSelect
+async function dispatchClaimNotification(input: {
+  claimId: string;
+  actorAdminId: string;
+  retry: boolean;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.marketplaceClaim.findUnique({
+      where: { id: input.claimId },
+      include: { institute: true }
+    });
+    if (!before) throw new Error('CLAIM_NOT_FOUND');
+    if (!['APPROVED', 'REJECTED'].includes(before.status)) throw new Error('CLAIM_NOT_DECIDED');
+
+    const claimed = await tx.marketplaceClaim.updateMany({
+      where: {
+        id: before.id,
+        OR: [
+          { communicationStatus: { in: ['NOT_SENT', 'FAILED'] } },
+          { communicationStatus: 'QUEUED', whatsappJobId: null }
+        ]
+      },
+      data: {
+        communicationStatus: 'QUEUED',
+        whatsappJobId: null,
+        communicationError: null,
+        ...(input.retry ? { communicationRetryCount: { increment: 1 } } : {})
+      }
+    });
+    if (claimed.count === 0) throw new Error('CLAIM_MESSAGE_NOT_RETRYABLE');
+
+    const queuedClaim = await tx.marketplaceClaim.findUniqueOrThrow({ where: { id: before.id } });
+    if (input.retry) {
+      await writeMarketplaceAudit(tx, {
+        action: 'CLAIM_MESSAGE_RETRIED', entityType: 'MarketplaceClaim', entityId: before.id,
+        actorAdminId: input.actorAdminId, instituteId: before.instituteId,
+        before: { communicationStatus: before.communicationStatus, retryCount: before.communicationRetryCount },
+        after: { communicationStatus: 'QUEUED', retryCount: queuedClaim.communicationRetryCount }
+      });
+    }
+
+    const enqueueInTransaction = (
+      mobileNumber: string,
+      templateName: string,
+      componentValues: string[],
+      instituteId?: string,
+      tracking?: MarketplaceWhatsAppTracking
+    ) => enqueueWhatsAppTracked(mobileNumber, templateName, componentValues, instituteId, tracking, tx);
+
+    let result: TrackedWhatsAppEnqueueResult;
+    try {
+      const clientUrl = (process.env.CLIENT_URL || 'https://mathlogs.app').replace(/\/$/, '');
+      result = before.status === 'APPROVED'
+        ? await sendClaimApprovalNotification({
+            phone: before.phone, claimantName: before.claimantName, instituteName: before.institute.name,
+            loginUrl: `${clientUrl}/login`, instituteId: before.instituteId, claimId: before.id
+          }, enqueueInTransaction)
+        : await sendClaimRejectionNotification({
+            phone: before.phone, claimantName: before.claimantName, instituteName: before.institute.name,
+            rejectionReason: before.rejectionReason || 'Ownership could not be verified',
+            supportUrl: `${clientUrl}/contact`, instituteId: before.instituteId, claimId: before.id
+          }, enqueueInTransaction);
+    } catch (error: any) {
+      result = { queued: false, error: error?.message || 'WHATSAPP_ENQUEUE_FAILED' };
+    }
+
+    return tx.marketplaceClaim.update({
+      where: { id: before.id },
+      data: {
+        communicationStatus: result.queued ? 'QUEUED' : 'FAILED',
+        whatsappJobId: result.jobId || null,
+        communicationError: result.queued ? null : (result.error || 'WHATSAPP_ENQUEUE_FAILED').slice(0, 500)
+      },
+      select: claimSelect
+    });
   });
 }
 
@@ -206,15 +277,13 @@ export async function approveClaim(req: any, res: Response) {
     const current = await prisma.marketplaceClaim.findUnique({ where: { id: claimId }, select: claimSelect });
     if (!current) return res.status(404).json({ success: false, message: 'Claim not found' });
     if (current.status === 'APPROVED') return res.json({ success: true, data: current, idempotent: true });
-    const decision = await approveMarketplaceClaim({
+    await approveMarketplaceClaim({
       claimId, actorAdminId: req.user.id, verificationNote: String(req.body?.verificationNote || '')
     });
-    const clientUrl = (process.env.CLIENT_URL || 'https://mathlogs.app').replace(/\/$/, '');
-    const result = await sendClaimApprovalNotification({
-      phone: decision.claim.phone, claimantName: decision.claim.claimantName, instituteName: decision.institute.name,
-      loginUrl: `${clientUrl}/login`, instituteId: decision.institute.id
+    return res.json({
+      success: true,
+      data: await dispatchClaimNotification({ claimId, actorAdminId: req.user.id, retry: false })
     });
-    return res.json({ success: true, data: await persistClaimNotification(claimId, result, false) });
   } catch (error: any) {
     return failure(res, error, 'Failed to approve claim');
   }
@@ -226,16 +295,14 @@ export async function rejectClaim(req: any, res: Response) {
     const current = await prisma.marketplaceClaim.findUnique({ where: { id: claimId }, select: claimSelect });
     if (!current) return res.status(404).json({ success: false, message: 'Claim not found' });
     if (current.status === 'REJECTED') return res.json({ success: true, data: current, idempotent: true });
-    const decision = await rejectMarketplaceClaim({
+    await rejectMarketplaceClaim({
       claimId, actorAdminId: req.user.id,
       verificationNote: String(req.body?.verificationNote || ''), rejectionReason: String(req.body?.rejectionReason || '')
     });
-    const clientUrl = (process.env.CLIENT_URL || 'https://mathlogs.app').replace(/\/$/, '');
-    const result = await sendClaimRejectionNotification({
-      phone: decision.claim.phone, claimantName: decision.claim.claimantName, instituteName: decision.institute.name,
-      rejectionReason: String(req.body.rejectionReason).trim(), supportUrl: `${clientUrl}/contact`, instituteId: decision.institute.id
+    return res.json({
+      success: true,
+      data: await dispatchClaimNotification({ claimId, actorAdminId: req.user.id, retry: false })
     });
-    return res.json({ success: true, data: await persistClaimNotification(claimId, result, false) });
   } catch (error: any) {
     return failure(res, error, 'Failed to reject claim');
   }
@@ -243,27 +310,9 @@ export async function rejectClaim(req: any, res: Response) {
 
 export async function resendClaimNotification(req: any, res: Response) {
   try {
-    const claim = await prisma.marketplaceClaim.findUnique({ where: { id: String(req.params.id) }, include: { institute: true } });
-    if (!claim) return res.status(404).json({ success: false, message: 'Claim not found' });
-    if (!['APPROVED', 'REJECTED'].includes(claim.status)) return res.status(409).json({ success: false, message: 'CLAIM_NOT_DECIDED' });
-    if (claim.communicationStatus !== 'FAILED') return res.status(409).json({ success: false, message: 'CLAIM_MESSAGE_NOT_FAILED' });
-    const clientUrl = (process.env.CLIENT_URL || 'https://mathlogs.app').replace(/\/$/, '');
-    const result = claim.status === 'APPROVED'
-      ? await sendClaimApprovalNotification({
-          phone: claim.phone, claimantName: claim.claimantName, instituteName: claim.institute.name,
-          loginUrl: `${clientUrl}/login`, instituteId: claim.instituteId
-        })
-      : await sendClaimRejectionNotification({
-          phone: claim.phone, claimantName: claim.claimantName, instituteName: claim.institute.name,
-          rejectionReason: claim.rejectionReason || 'Ownership could not be verified', supportUrl: `${clientUrl}/contact`, instituteId: claim.instituteId
-        });
-    const updated = await persistClaimNotification(claim.id, result, true);
-    await prisma.$transaction(async (tx) => writeMarketplaceAudit(tx, {
-      action: 'CLAIM_MESSAGE_RETRIED', entityType: 'MarketplaceClaim', entityId: claim.id,
-      actorAdminId: req.user.id, instituteId: claim.instituteId,
-      before: { communicationStatus: claim.communicationStatus, retryCount: claim.communicationRetryCount },
-      after: { communicationStatus: updated.communicationStatus, retryCount: updated.communicationRetryCount }
-    }));
+    const updated = await dispatchClaimNotification({
+      claimId: String(req.params.id), actorAdminId: req.user.id, retry: true
+    });
     return res.json({ success: true, data: updated });
   } catch (error: any) {
     return failure(res, error, 'Failed to resend claim notification');
@@ -275,9 +324,9 @@ export async function getMarketplaceOverview(_req: Request, res: Response) {
     prisma.institute.findMany({ select: listingSelect, orderBy: { updatedAt: 'desc' } }),
     prisma.marketplaceClaim.count({ where: { status: { in: ['NEW', 'CONTACTED'] } } }),
     prisma.review.count({ where: { status: 'PENDING', source: 'MATHLOGS' } }),
-    prisma.leadInquiry.count({ where: { status: 'NEW' } }),
-    prisma.leadInquiry.count({ where: { deliveryStatus: 'HELD' } }),
-    prisma.leadInquiry.count({ where: { deliveryStatus: 'FAILED' } }),
+    prisma.leadInquiry.count({ where: { status: 'NEW', NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } } } }),
+    prisma.leadInquiry.count({ where: { deliveryStatus: 'HELD', NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } } } }),
+    prisma.leadInquiry.count({ where: { deliveryStatus: 'FAILED', NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } } } }),
     prisma.marketplaceAuditLog.findMany({ select: activitySelect, orderBy: { createdAt: 'desc' }, take: 20 })
   ]);
   const enriched = listings.map(withCompleteness);
@@ -426,6 +475,7 @@ export async function listMarketplaceLeads(req: Request, res: Response) {
   if (deliveryStatus && !['HELD', 'QUEUED', 'DELIVERED', 'FAILED'].includes(deliveryStatus)) return res.status(400).json({ success: false, message: 'Invalid delivery status' });
   const data = await prisma.leadInquiry.findMany({
     where: {
+      NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } },
       ...(deliveryStatus ? { deliveryStatus } : {}),
       ...(query ? { OR: [
         { studentName: { contains: query, mode: 'insensitive' } }, { phone: { contains: query } },

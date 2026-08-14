@@ -108,6 +108,23 @@ export const processWhatsappQueue = async () => {
 type MetaPost = typeof axios.post;
 
 export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) => {
+    const claimLinkWhere = {
+        OR: [
+            { whatsappJobId: job.id },
+            ...(job.marketplaceEntityType === 'MarketplaceClaim' && job.marketplaceEntityId
+                ? [{ id: job.marketplaceEntityId }]
+                : [])
+        ]
+    };
+    const leadLinkWhere = {
+        OR: [
+            { notificationJobId: job.id },
+            ...(job.marketplaceEntityType === 'LeadInquiry' && job.marketplaceEntityId
+                ? [{ id: job.marketplaceEntityId }]
+                : [])
+        ]
+    };
+
     try {
         if (!job.recipient || !job.templateId) {
             throw new Error('Missing recipient or template ID');
@@ -228,12 +245,18 @@ export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) 
                 data: { status: 'COMPLETED', messageId, error: null }
             }),
             prisma.marketplaceClaim.updateMany({
-                where: { whatsappJobId: job.id },
-                data: { communicationStatus: 'SENT', communicationSentAt: sentAt, communicationError: null }
+                where: claimLinkWhere,
+                data: {
+                    whatsappJobId: job.id,
+                    communicationStatus: 'SENT', communicationSentAt: sentAt, communicationError: null
+                }
             }),
             prisma.leadInquiry.updateMany({
-                where: { notificationJobId: job.id },
-                data: { deliveryStatus: 'DELIVERED', notificationSentAt: sentAt, notificationError: null }
+                where: leadLinkWhere,
+                data: {
+                    notificationJobId: job.id,
+                    deliveryStatus: 'DELIVERED', notificationSentAt: sentAt, notificationError: null
+                }
             })
         ]);
 
@@ -249,12 +272,18 @@ export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) 
         await prisma.$transaction([
             prisma.whatsappJob.update({ where: { id: job.id }, data: { status, error: boundedError } }),
             prisma.marketplaceClaim.updateMany({
-                where: { whatsappJobId: job.id },
-                data: { communicationStatus: isExhausted ? 'FAILED' : 'QUEUED', communicationError: boundedError }
+                where: claimLinkWhere,
+                data: {
+                    whatsappJobId: job.id,
+                    communicationStatus: isExhausted ? 'FAILED' : 'QUEUED', communicationError: boundedError
+                }
             }),
             prisma.leadInquiry.updateMany({
-                where: { notificationJobId: job.id },
-                data: { deliveryStatus: isExhausted ? 'FAILED' : 'QUEUED', notificationError: boundedError }
+                where: leadLinkWhere,
+                data: {
+                    notificationJobId: job.id,
+                    deliveryStatus: isExhausted ? 'FAILED' : 'QUEUED', notificationError: boundedError
+                }
             })
         ]);
     }

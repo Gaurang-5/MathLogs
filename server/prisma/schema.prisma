@@ -344,22 +344,25 @@ model EmailJob {
 }
 
 model WhatsappJob {
-  id          String    @id @default(uuid())
-  recipient   String
-  templateId  String
-  data        Json
-  status      JobStatus @default(PENDING)
-  attempts    Int       @default(0)
-  maxAttempts Int       @default(3)
-  error       String?
-  messageId   String?
-  instituteId String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                    String    @id @default(uuid())
+  recipient             String
+  templateId            String
+  data                  Json
+  status                JobStatus @default(PENDING)
+  attempts              Int       @default(0)
+  maxAttempts           Int       @default(3)
+  error                 String?
+  messageId             String?
+  instituteId           String?
+  marketplaceEntityType String?
+  marketplaceEntityId   String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([status])
   @@index([createdAt])
   @@index([status, attempts, createdAt], map: "idx_whatsapp_queue")
+  @@index([marketplaceEntityType, marketplaceEntityId, createdAt], map: "idx_whatsapp_marketplace_entity")
 }
 
 model OcrScanCache {

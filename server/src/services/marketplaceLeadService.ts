@@ -3,9 +3,18 @@ import { prisma } from '../prisma';
 import { normalizeMarketplacePhone } from './marketplaceClaimService';
 import { sendLeadNotification, type LeadNotificationInput } from './marketplaceNotificationService';
 import { writeMarketplaceAudit } from './marketplaceAuditService';
-import type { TrackedWhatsAppEnqueueResult } from '../utils/whatsapp';
+import {
+  enqueueWhatsAppTracked,
+  type MarketplaceWhatsAppTracking,
+  type TrackedWhatsAppEnqueueResult
+} from '../utils/whatsapp';
 
-type LeadNotifier = (input: LeadNotificationInput) => Promise<TrackedWhatsAppEnqueueResult>;
+type LeadNotifier = (
+  input: LeadNotificationInput,
+  enqueue?: typeof enqueueWhatsAppTracked
+) => Promise<TrackedWhatsAppEnqueueResult>;
+
+const LEGACY_CLAIM_MARKER = '[CLAIM REQUEST]';
 
 export type CreateMarketplaceLeadInput = {
   instituteId: string;
@@ -40,29 +49,98 @@ function notificationInput(lead: LeadInquiry, institute: {
     studentName: lead.studentName,
     classSubjectSummary: summary,
     settingsUrl: `${clientUrl}/marketplace-settings`,
-    instituteId: institute.id
+    instituteId: institute.id,
+    leadId: lead.id
   };
 }
 
-async function queueLead(
-  lead: LeadInquiry,
-  institute: Parameters<typeof notificationInput>[1],
+async function queueLead(input: {
+  leadId: string;
+  mode: 'CREATE' | 'RETRY' | 'RELEASE';
+  actorAdminId?: string;
+},
   notify: LeadNotifier
 ): Promise<LeadInquiry> {
-  let result: TrackedWhatsAppEnqueueResult;
-  try {
-    result = await notify(notificationInput(lead, institute));
-  } catch (error: any) {
-    result = { queued: false, error: error?.message || 'MARKETPLACE_LEAD_ENQUEUE_FAILED' };
-  }
-  return prisma.leadInquiry.update({
-    where: { id: lead.id },
-    data: {
-      deliveryStatus: result.queued ? 'QUEUED' : 'FAILED',
-      destinationPhone: institute.whatsappPhone || institute.phoneNumber,
-      notificationJobId: result.jobId || null,
-      notificationError: result.queued ? null : (result.error || 'MARKETPLACE_LEAD_ENQUEUE_FAILED').slice(0, 500)
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.leadInquiry.findFirst({
+      where: { id: input.leadId, NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } } },
+      include: {
+        institute: {
+          select: {
+            id: true, name: true, teacherName: true, whatsappPhone: true,
+            phoneNumber: true, ownershipStatus: true
+          }
+        }
+      }
+    });
+    if (!before) throw leadError('LEAD_NOT_FOUND');
+    if (before.institute.ownershipStatus !== 'CLAIMED') throw leadError('INSTITUTE_NOT_CLAIMED');
+
+    const eligibility = input.mode === 'RELEASE'
+      ? { deliveryStatus: 'HELD' }
+      : {
+          OR: [
+            { deliveryStatus: 'FAILED' },
+            { deliveryStatus: 'QUEUED', notificationJobId: null }
+          ]
+        };
+    const transition = await tx.leadInquiry.updateMany({
+      where: { id: before.id, ...eligibility },
+      data: {
+        deliveryStatus: 'QUEUED',
+        destinationPhone: before.institute.whatsappPhone || before.institute.phoneNumber,
+        notificationJobId: null,
+        notificationError: null,
+        ...(input.mode === 'RETRY' ? { notificationRetryCount: { increment: 1 } } : {}),
+        ...(input.mode === 'RELEASE' ? { releasedAt: new Date() } : {})
+      }
+    });
+    if (transition.count === 0) {
+      throw leadError(input.mode === 'RELEASE' ? 'LEAD_NOT_HELD' : 'LEAD_NOT_RETRYABLE');
     }
+
+    const queued = await tx.leadInquiry.findUniqueOrThrow({ where: { id: before.id } });
+    if (input.actorAdminId && input.mode !== 'CREATE') {
+      await writeMarketplaceAudit(tx, {
+        action: input.mode === 'RELEASE' ? 'LEAD_RELEASED' : 'LEAD_MESSAGE_RETRIED',
+        entityType: 'LeadInquiry', entityId: before.id,
+        actorAdminId: input.actorAdminId, instituteId: before.instituteId,
+        before: {
+          deliveryStatus: before.deliveryStatus,
+          retryCount: before.notificationRetryCount
+        },
+        after: {
+          deliveryStatus: 'QUEUED',
+          retryCount: queued.notificationRetryCount
+        }
+      });
+    }
+
+    const enqueueInTransaction = (
+      mobileNumber: string,
+      templateName: string,
+      componentValues: string[],
+      instituteId?: string,
+      tracking?: MarketplaceWhatsAppTracking
+    ) => enqueueWhatsAppTracked(mobileNumber, templateName, componentValues, instituteId, tracking, tx);
+
+    let result: TrackedWhatsAppEnqueueResult;
+    try {
+      result = await notify(notificationInput(queued, before.institute), enqueueInTransaction);
+    } catch (error: any) {
+      result = { queued: false, error: error?.message || 'MARKETPLACE_LEAD_ENQUEUE_FAILED' };
+    }
+
+    return tx.leadInquiry.update({
+      where: { id: before.id },
+      data: {
+        deliveryStatus: result.queued ? 'QUEUED' : 'FAILED',
+        notificationJobId: result.jobId || null,
+        notificationError: result.queued
+          ? null
+          : (result.error || 'MARKETPLACE_LEAD_ENQUEUE_FAILED').slice(0, 500)
+      }
+    });
   });
 }
 
@@ -81,6 +159,7 @@ export async function createMarketplaceLead(
     where: {
       instituteId: input.instituteId,
       phone: normalizedPhone,
+      NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } },
       createdAt: { gte: new Date(Date.now() - 15 * 60_000) }
     },
     orderBy: { createdAt: 'asc' }
@@ -102,7 +181,9 @@ export async function createMarketplaceLead(
     }
   });
 
-  if (institute.ownershipStatus === 'CLAIMED') lead = await queueLead(lead, institute, notify);
+  if (institute.ownershipStatus === 'CLAIMED') {
+    lead = await queueLead({ leadId: lead.id, mode: 'CREATE' }, notify);
+  }
   return { lead };
 }
 
@@ -110,45 +191,12 @@ export async function retryMarketplaceLeadNotification(
   input: { leadId: string; actorAdminId: string },
   notify: LeadNotifier = sendLeadNotification
 ): Promise<LeadInquiry> {
-  const lead = await prisma.leadInquiry.findUnique({
-    where: { id: input.leadId },
-    include: { institute: { select: { id: true, name: true, teacherName: true, whatsappPhone: true, phoneNumber: true, ownershipStatus: true } } }
-  });
-  if (!lead) throw leadError('LEAD_NOT_FOUND');
-  if (lead.institute.ownershipStatus !== 'CLAIMED') throw leadError('INSTITUTE_NOT_CLAIMED');
-  if (lead.deliveryStatus !== 'FAILED') throw leadError('LEAD_NOT_RETRYABLE');
-
-  const queued = await queueLead(lead, lead.institute, notify);
-  const updated = await prisma.leadInquiry.update({
-    where: { id: lead.id },
-    data: { notificationRetryCount: { increment: 1 } }
-  });
-  await prisma.$transaction(async (tx) => writeMarketplaceAudit(tx, {
-    action: 'LEAD_MESSAGE_RETRIED', entityType: 'LeadInquiry', entityId: lead.id,
-    actorAdminId: input.actorAdminId, instituteId: lead.instituteId,
-    before: { deliveryStatus: lead.deliveryStatus }, after: { deliveryStatus: queued.deliveryStatus }
-  }));
-  return updated;
+  return queueLead({ leadId: input.leadId, mode: 'RETRY', actorAdminId: input.actorAdminId }, notify);
 }
 
 export async function releaseMarketplaceLead(
   input: { leadId: string; actorAdminId: string },
   notify: LeadNotifier = sendLeadNotification
 ): Promise<LeadInquiry> {
-  const lead = await prisma.leadInquiry.findUnique({
-    where: { id: input.leadId },
-    include: { institute: { select: { id: true, name: true, teacherName: true, whatsappPhone: true, phoneNumber: true, ownershipStatus: true } } }
-  });
-  if (!lead) throw leadError('LEAD_NOT_FOUND');
-  if (lead.institute.ownershipStatus !== 'CLAIMED') throw leadError('INSTITUTE_NOT_CLAIMED');
-  if (lead.deliveryStatus !== 'HELD') throw leadError('LEAD_NOT_HELD');
-
-  const released = await prisma.leadInquiry.update({ where: { id: lead.id }, data: { releasedAt: new Date() } });
-  const queued = await queueLead(released, lead.institute, notify);
-  await prisma.$transaction(async (tx) => writeMarketplaceAudit(tx, {
-    action: 'LEAD_RELEASED', entityType: 'LeadInquiry', entityId: lead.id,
-    actorAdminId: input.actorAdminId, instituteId: lead.instituteId,
-    before: { deliveryStatus: 'HELD' }, after: { deliveryStatus: queued.deliveryStatus }
-  }));
-  return queued;
+  return queueLead({ leadId: input.leadId, mode: 'RELEASE', actorAdminId: input.actorAdminId }, notify);
 }

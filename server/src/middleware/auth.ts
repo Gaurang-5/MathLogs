@@ -49,6 +49,32 @@ export const invalidateAuthCache = (userId: string) => {
     authCache.delete(userId);
 };
 
+function isPageOnlyAllowedRequest(req: Request): boolean {
+    const path = req.originalUrl.split('?')[0].replace(/\/$/, '');
+    const method = req.method.toUpperCase();
+
+    if (path === '/api/marketplace/admin/profile') {
+        return method === 'GET' || method === 'PUT';
+    }
+    if (path === '/api/marketplace/admin/leads') {
+        return method === 'GET';
+    }
+    if (/^\/api\/marketplace\/admin\/leads\/[^/]+$/.test(path)) {
+        return method === 'PATCH';
+    }
+    if (path === '/api/institute/me') {
+        return method === 'GET';
+    }
+    if (path === '/api/billing/create' || path === '/api/billing/verify') {
+        return method === 'POST';
+    }
+    if (path === '/api/billing/cancel') {
+        return method === 'DELETE';
+    }
+
+    return false;
+}
+
 export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -121,6 +147,14 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 
             const institute = dbUser.institute;
             const isQuizOnlyInst = institute?.isQuizOnly === true || (institute?.config as any)?.planName === 'QUIZ_ONLY' || (institute?.config as any)?.isQuizOnly === true;
+            const isPageOnlyInst = ['PAGE_ONLY', 'listing'].includes((institute?.config as any)?.planName);
+
+            if (isPageOnlyInst && dbUser.role !== 'SUPER_ADMIN' && !isPageOnlyAllowedRequest(req)) {
+                return res.status(403).json({
+                    error: 'PAGE_ONLY_ACCESS_RESTRICTED',
+                    message: 'This account can access marketplace listing, leads, and upgrade features only.'
+                });
+            }
 
             // Quiz-Only accounts operate on a credit-based model (quizCredits) and must not be blocked by ERP plan expiry.
             if (institute && !isQuizOnlyInst && (institute.planExpiryDate || institute.plan === 'NO_PLAN')) {

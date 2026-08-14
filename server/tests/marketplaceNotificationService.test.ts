@@ -9,19 +9,27 @@ import {
 const envKeys = [
   'WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED',
   'WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_REJECTED',
-  'WHATSAPP_TEMPLATE_MARKETPLACE_LEAD'
+  'WHATSAPP_TEMPLATE_MARKETPLACE_LEAD',
+  'WHATSAPP_PHONE_NUMBER_ID',
+  'WHATSAPP_ACCESS_TOKEN'
 ] as const;
+
+function configureMetaCredentials() {
+  process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+  process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+}
 
 afterEach(() => {
   for (const key of envKeys) delete process.env[key];
 });
 
 test('claim approval queues the configured template with ordered parameters', async () => {
+  configureMetaCredentials();
   process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED = 'claim-approved';
   const calls: unknown[][] = [];
   const result = await sendClaimApprovalNotification({
     phone: '9876543210', claimantName: 'Riya', instituteName: 'Apex',
-    loginUrl: 'https://mathlogs.app/login', instituteId: 'inst-1'
+    loginUrl: 'https://mathlogs.app/login', instituteId: 'inst-1', claimId: 'claim-1'
   }, async (...args: unknown[]) => {
     calls.push(args);
     return { queued: true, jobId: 'job-1' };
@@ -30,7 +38,8 @@ test('claim approval queues the configured template with ordered parameters', as
   assert.deepEqual(result, { queued: true, jobId: 'job-1' });
   assert.deepEqual(calls, [[
     '9876543210', 'claim-approved',
-    ['Riya', 'Apex', 'https://mathlogs.app/login'], 'inst-1'
+    ['Riya', 'Apex', 'https://mathlogs.app/login'], 'inst-1',
+    { marketplaceEntityType: 'MarketplaceClaim', marketplaceEntityId: 'claim-1' }
   ]]);
 });
 
@@ -38,7 +47,7 @@ test('missing claim approval template reports a configuration failure without en
   let called = false;
   const result = await sendClaimApprovalNotification({
     phone: '9876543210', claimantName: 'Riya', instituteName: 'Apex',
-    loginUrl: 'https://mathlogs.app/login', instituteId: 'inst-1'
+    loginUrl: 'https://mathlogs.app/login', instituteId: 'inst-1', claimId: 'claim-1'
   }, async () => {
     called = true;
     return { queued: true, jobId: 'unexpected' };
@@ -48,7 +57,24 @@ test('missing claim approval template reports a configuration failure without en
   assert.equal(called, false);
 });
 
+test('missing Meta credentials reports a marketplace configuration failure without enqueueing', async () => {
+  process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED = 'claim-approved';
+  let called = false;
+
+  const result = await sendClaimApprovalNotification({
+    phone: '9876543210', claimantName: 'Riya', instituteName: 'Apex',
+    loginUrl: 'https://mathlogs.app/login', instituteId: 'inst-1', claimId: 'claim-1'
+  }, async () => {
+    called = true;
+    return { queued: true, jobId: 'unexpected' };
+  });
+
+  assert.deepEqual(result, { queued: false, error: 'WHATSAPP_CREDENTIALS_NOT_CONFIGURED' });
+  assert.equal(called, false);
+});
+
 test('rejection and lead notifications use their complete ordered template inputs', async () => {
+  configureMetaCredentials();
   process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_REJECTED = 'claim-rejected';
   process.env.WHATSAPP_TEMPLATE_MARKETPLACE_LEAD = 'marketplace-lead';
   const calls: unknown[][] = [];
@@ -59,16 +85,18 @@ test('rejection and lead notifications use their complete ordered template input
 
   await sendClaimRejectionNotification({
     phone: '9876543210', claimantName: 'Riya', instituteName: 'Apex',
-    rejectionReason: 'Details did not match', supportUrl: 'https://mathlogs.app/support', instituteId: 'inst-1'
+    rejectionReason: 'Details did not match', supportUrl: 'https://mathlogs.app/support', instituteId: 'inst-1', claimId: 'claim-2'
   }, enqueue);
   await sendLeadNotification({
     phone: '9876543210', ownerName: 'Riya', instituteName: 'Apex', studentName: 'Aman',
     classSubjectSummary: 'Class 10 · Mathematics', settingsUrl: 'https://mathlogs.app/marketplace-settings',
-    instituteId: 'inst-1'
+    instituteId: 'inst-1', leadId: 'lead-1'
   }, enqueue);
 
   assert.deepEqual(calls, [
-    ['9876543210', 'claim-rejected', ['Riya', 'Apex', 'Details did not match', 'https://mathlogs.app/support'], 'inst-1'],
-    ['9876543210', 'marketplace-lead', ['Riya', 'Apex', 'Aman', 'Class 10 · Mathematics', 'https://mathlogs.app/marketplace-settings'], 'inst-1']
+    ['9876543210', 'claim-rejected', ['Riya', 'Apex', 'Details did not match', 'https://mathlogs.app/support'], 'inst-1',
+      { marketplaceEntityType: 'MarketplaceClaim', marketplaceEntityId: 'claim-2' }],
+    ['9876543210', 'marketplace-lead', ['Riya', 'Apex', 'Aman', 'Class 10 · Mathematics', 'https://mathlogs.app/marketplace-settings'], 'inst-1',
+      { marketplaceEntityType: 'LeadInquiry', marketplaceEntityId: 'lead-1' }]
   ]);
 });

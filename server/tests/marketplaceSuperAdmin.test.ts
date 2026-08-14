@@ -2,6 +2,7 @@ import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createApp } from '../src/index';
@@ -13,8 +14,11 @@ let superAdminId: string;
 let instituteAdminId: string;
 let instituteId: string;
 let foreignInstituteId: string;
+let pageOnlyAdminId: string;
+let pageOnlyInstituteId: string;
 let superToken: string;
 let instituteToken: string;
+let pageOnlyToken: string;
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
 
@@ -32,12 +36,19 @@ before(async () => {
   instituteId = institute.id;
   const foreign = await prisma.institute.create({ data: { name: `Foreign ${suffix}`, ownershipStatus: 'UNCLAIMED' } });
   foreignInstituteId = foreign.id;
+  const pageOnlyInstitute = await prisma.institute.create({
+    data: { name: `Page only ${suffix}`, ownershipStatus: 'CLAIMED', config: { planName: 'PAGE_ONLY' } }
+  });
+  pageOnlyInstituteId = pageOnlyInstitute.id;
   const superAdmin = await prisma.admin.create({ data: { username: `super-${suffix}`, password, role: 'SUPER_ADMIN' } });
   superAdminId = superAdmin.id;
   const instituteAdmin = await prisma.admin.create({ data: { username: `owner-${suffix}`, password, role: 'INSTITUTE_ADMIN', instituteId } });
   instituteAdminId = instituteAdmin.id;
+  const pageOnlyAdmin = await prisma.admin.create({ data: { username: `page-owner-${suffix}`, password, role: 'INSTITUTE_ADMIN', instituteId: pageOnlyInstituteId } });
+  pageOnlyAdminId = pageOnlyAdmin.id;
   superToken = jwt.sign({ id: superAdmin.id, role: superAdmin.role, passwordVersion: 1 }, 'test-secret');
   instituteToken = jwt.sign({ id: instituteAdmin.id, role: instituteAdmin.role, instituteId, passwordVersion: 1 }, 'test-secret');
+  pageOnlyToken = jwt.sign({ id: pageOnlyAdmin.id, role: pageOnlyAdmin.role, instituteId: pageOnlyInstituteId, passwordVersion: 1 }, 'test-secret');
 
   const app = createApp();
   await new Promise<void>((resolve) => { server = app.listen(0, resolve); });
@@ -45,12 +56,14 @@ before(async () => {
 });
 
 after(async () => {
-  await prisma.marketplaceAuditLog.deleteMany({ where: { instituteId: { in: [instituteId, foreignInstituteId] } } });
-  await prisma.marketplaceClaim.deleteMany({ where: { instituteId: { in: [instituteId, foreignInstituteId] } } });
-  await prisma.leadInquiry.deleteMany({ where: { instituteId: { in: [instituteId, foreignInstituteId] } } });
-  await prisma.review.deleteMany({ where: { instituteId: { in: [instituteId, foreignInstituteId] } } });
-  await prisma.admin.deleteMany({ where: { OR: [{ id: { in: [superAdminId, instituteAdminId] } }, { instituteId: { in: [instituteId, foreignInstituteId] } }] } });
-  await prisma.institute.deleteMany({ where: { id: { in: [instituteId, foreignInstituteId] } } });
+  const allInstituteIds = [instituteId, foreignInstituteId, pageOnlyInstituteId];
+  await prisma.marketplaceAuditLog.deleteMany({ where: { instituteId: { in: allInstituteIds } } });
+  await prisma.marketplaceClaim.deleteMany({ where: { instituteId: { in: allInstituteIds } } });
+  await prisma.leadInquiry.deleteMany({ where: { instituteId: { in: allInstituteIds } } });
+  await prisma.review.deleteMany({ where: { instituteId: { in: allInstituteIds } } });
+  await prisma.whatsappJob.deleteMany({ where: { instituteId: { in: allInstituteIds } } });
+  await prisma.admin.deleteMany({ where: { OR: [{ id: { in: [superAdminId, instituteAdminId, pageOnlyAdminId] } }, { instituteId: { in: allInstituteIds } }] } });
+  await prisma.institute.deleteMany({ where: { id: { in: allInstituteIds } } });
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   await prisma.$disconnect();
 });
@@ -58,6 +71,86 @@ after(async () => {
 test('superadmin endpoints reject anonymous and institute-admin callers', async () => {
   assert.equal((await fetch(`${baseUrl}/api/marketplace/super-admin/claims`)).status, 401);
   assert.equal((await fetch(`${baseUrl}/api/marketplace/super-admin/claims`, { headers: auth(instituteToken) })).status, 403);
+});
+
+test('page-only owners can use marketplace and upgrade reads but cannot mutate ERP data', async () => {
+  const lead = await prisma.leadInquiry.create({
+    data: { instituteId: pageOnlyInstituteId, studentName: 'Page owner lead', phone: '9888877777', deliveryStatus: 'DELIVERED' }
+  });
+
+  const profile = await fetch(`${baseUrl}/api/marketplace/admin/profile`, { headers: auth(pageOnlyToken) });
+  assert.equal(profile.status, 200);
+  const leads = await fetch(`${baseUrl}/api/marketplace/admin/leads`, { headers: auth(pageOnlyToken) });
+  assert.equal(leads.status, 200);
+  assert.ok(((await leads.json()) as any).data.some((item: any) => item.id === lead.id));
+  const profileUpdate = await fetch(`${baseUrl}/api/marketplace/admin/profile`, {
+    method: 'PUT', headers: auth(pageOnlyToken), body: JSON.stringify({ tagline: 'Marketplace owner profile' })
+  });
+  assert.equal(profileUpdate.status, 200);
+  const leadUpdate = await fetch(`${baseUrl}/api/marketplace/admin/leads/${lead.id}`, {
+    method: 'PATCH', headers: auth(pageOnlyToken), body: JSON.stringify({ status: 'CONTACTED' })
+  });
+  assert.equal(leadUpdate.status, 200);
+  const instituteForUpgrade = await fetch(`${baseUrl}/api/institute/me`, { headers: auth(pageOnlyToken) });
+  assert.equal(instituteForUpgrade.status, 200);
+
+  const erpMutation = await fetch(`${baseUrl}/api/students/manual`, {
+    method: 'POST', headers: auth(pageOnlyToken), body: '{}'
+  });
+  assert.equal(erpMutation.status, 403);
+  assert.equal(((await erpMutation.json()) as any).error, 'PAGE_ONLY_ACCESS_RESTRICTED');
+
+  const paidMutation = await fetch(`${baseUrl}/api/students/manual`, {
+    method: 'POST', headers: auth(instituteToken), body: '{}'
+  });
+  assert.notEqual(paidMutation.status, 403);
+
+  const orderId = 'page-only-upgrade-order';
+  const paymentId = 'page-only-upgrade-payment';
+  const signature = crypto
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'dummy_secret')
+    .update(`${orderId}|${paymentId}`)
+    .digest('hex');
+  const upgrade = await fetch(`${baseUrl}/api/billing/verify`, {
+    method: 'POST',
+    headers: auth(pageOnlyToken),
+    body: JSON.stringify({
+      razorpay_order_id: orderId,
+      razorpay_payment_id: paymentId,
+      razorpay_signature: signature,
+      planId: 'all_inclusive',
+      billingCycle: 'yearly'
+    })
+  });
+  assert.equal(upgrade.status, 200);
+  const upgradedMutation = await fetch(`${baseUrl}/api/students/manual`, {
+    method: 'POST', headers: auth(pageOnlyToken), body: '{}'
+  });
+  assert.notEqual(upgradedMutation.status, 403);
+});
+
+test('owner and superadmin lead APIs never expose legacy claim marker rows', async () => {
+  const marker = await prisma.leadInquiry.create({
+    data: {
+      instituteId: pageOnlyInstituteId,
+      studentName: '[CLAIM REQUEST] Legacy Owner',
+      phone: '9777766666',
+      message: 'legacy claim payload',
+      deliveryStatus: 'DELIVERED'
+    }
+  });
+
+  const ownerList = await fetch(`${baseUrl}/api/marketplace/admin/leads`, { headers: auth(pageOnlyToken) });
+  assert.equal(ownerList.status, 200);
+  assert.equal(((await ownerList.json()) as any).data.some((item: any) => item.id === marker.id), false);
+  const ownerMutation = await fetch(`${baseUrl}/api/marketplace/admin/leads/${marker.id}`, {
+    method: 'PATCH', headers: auth(pageOnlyToken), body: JSON.stringify({ status: 'CONTACTED' })
+  });
+  assert.equal(ownerMutation.status, 404);
+
+  const superList = await fetch(`${baseUrl}/api/marketplace/super-admin/leads`, { headers: auth(superToken) });
+  assert.equal(superList.status, 200);
+  assert.equal(((await superList.json()) as any).data.some((item: any) => item.id === marker.id), false);
 });
 
 test('claim API lists, contacts, rejects, and records notification failure independently', async () => {
@@ -111,6 +204,66 @@ test('claim approval is idempotent and failed communication can be retried witho
   assert.equal(resend.status, 200);
   assert.equal(((await resend.json()) as any).data.communicationRetryCount, 1);
   assert.equal(await prisma.marketplaceAuditLog.count({ where: { entityId: claim.id, action: 'CLAIM_MESSAGE_RETRIED' } }), 1);
+});
+
+test('concurrent claim resends enqueue and audit exactly once', async () => {
+  const claim = await prisma.marketplaceClaim.create({
+    data: {
+      instituteId, claimantName: 'Concurrent', phone: '9654321098', normalizedPhone: '9654321098',
+      status: 'APPROVED', communicationStatus: 'FAILED'
+    }
+  });
+  process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+  process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+  process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED = 'claim-approved';
+
+  try {
+    const responses = await Promise.all([
+      fetch(`${baseUrl}/api/marketplace/super-admin/claims/${claim.id}/resend`, { method: 'POST', headers: auth(superToken), body: '{}' }),
+      fetch(`${baseUrl}/api/marketplace/super-admin/claims/${claim.id}/resend`, { method: 'POST', headers: auth(superToken), body: '{}' })
+    ]);
+
+    assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409]);
+    assert.equal(await prisma.whatsappJob.count({
+      where: { marketplaceEntityType: 'MarketplaceClaim', marketplaceEntityId: claim.id } as any
+    }), 1);
+    assert.equal(await prisma.marketplaceAuditLog.count({
+      where: { entityId: claim.id, action: 'CLAIM_MESSAGE_RETRIED' }
+    }), 1);
+  } finally {
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED;
+  }
+});
+
+test('claim resend repairs NOT_SENT and QUEUED-without-job crash windows', async () => {
+  process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+  process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+  process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED = 'claim-approved';
+
+  try {
+    for (const [index, communicationStatus] of ['NOT_SENT', 'QUEUED'].entries()) {
+      const claim = await prisma.marketplaceClaim.create({
+        data: {
+          instituteId, claimantName: `Recovery ${communicationStatus}`, phone: `965432109${index}`,
+          normalizedPhone: `965432109${index}`, status: 'APPROVED', communicationStatus,
+          whatsappJobId: null
+        }
+      });
+      const response = await fetch(`${baseUrl}/api/marketplace/super-admin/claims/${claim.id}/resend`, {
+        method: 'POST', headers: auth(superToken), body: '{}'
+      });
+      assert.equal(response.status, 200);
+      const updated: any = (await response.json() as any).data;
+      assert.equal(updated.communicationStatus, 'QUEUED');
+      assert.ok(updated.whatsappJobId);
+    }
+  } finally {
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED;
+  }
 });
 
 test('listing update protects Google data, detects stale edits, and writes audit history', async () => {

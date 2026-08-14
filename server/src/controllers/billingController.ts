@@ -6,6 +6,7 @@ import { Tier } from '@prisma/client';
 import { secureLogger } from '../utils/secureLogger';
 import { getRazorpayConfig } from '../utils/env';
 import { addPurchasedQuizCredits } from '../utils/quizCredits';
+import { invalidateAuthCache } from '../middleware/auth';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -246,13 +247,21 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
             ? Math.max(currentCredits, 5)
             : currentCredits;
 
+        const nextConfig = { ...currentConfig, maxStudents };
+        if (
+            ['all_inclusive', 'pro', 'custom'].includes(planId) &&
+            ['PAGE_ONLY', 'listing'].includes(nextConfig.planName)
+        ) {
+            delete nextConfig.planName;
+        }
+
         const updateData: any = {
             plan: tier,
             planExpiryDate: newExpiryDate,
             quizCredits: updatedCredits,
             razorpaySubscriptionId: razorpay_subscription_id || null,
             razorpayOrderId: razorpay_order_id || null,
-            config: { ...currentConfig, maxStudents },
+            config: nextConfig,
             areRegistrationsPaused: false
         };
 
@@ -265,6 +274,7 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
             where: { id: admin.institute.id },
             data: updateData
         });
+        invalidateAuthCache(adminId);
 
         res.json({
             success: true,

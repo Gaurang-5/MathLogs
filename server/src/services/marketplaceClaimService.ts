@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import type { Institute, MarketplaceClaim, Prisma } from '@prisma/client';
+import { Prisma, type Institute, type MarketplaceClaim } from '@prisma/client';
 import { prisma } from '../prisma';
 import { writeMarketplaceAudit } from './marketplaceAuditService';
 
@@ -56,32 +56,57 @@ export async function submitMarketplaceClaim(
 ): Promise<MarketplaceClaim> {
   const normalizedPhone = normalizeMarketplacePhone(input.phone);
 
-  return prisma.$transaction(async (tx) => {
-    const existingClaim = await tx.marketplaceClaim.findFirst({
-      where: {
-        instituteId: input.instituteId,
-        normalizedPhone,
-        status: { in: OPEN_CLAIM_STATUSES }
-      },
-      orderBy: { createdAt: 'asc' }
-    });
+  try {
+    return await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT TRUE AS locked
+        FROM (
+          SELECT pg_advisory_xact_lock(
+            hashtext(${input.instituteId}),
+            hashtext(${normalizedPhone})
+          )
+        ) AS claim_lock
+      `;
 
-    if (existingClaim) {
-      return existingClaim;
-    }
+      const existingClaim = await tx.marketplaceClaim.findFirst({
+        where: {
+          instituteId: input.instituteId,
+          normalizedPhone,
+          status: { in: OPEN_CLAIM_STATUSES }
+        },
+        orderBy: { createdAt: 'asc' }
+      });
 
-    return tx.marketplaceClaim.create({
-      data: {
-        instituteId: input.instituteId,
-        claimantName: input.claimantName,
-        phone: input.phone,
-        normalizedPhone,
-        email: input.email?.trim() || null,
-        proofNote: input.proofNote?.trim() || null,
-        notes: input.notes
+      if (existingClaim) {
+        return existingClaim;
       }
+
+      return tx.marketplaceClaim.create({
+        data: {
+          instituteId: input.instituteId,
+          claimantName: input.claimantName,
+          phone: input.phone,
+          normalizedPhone,
+          email: input.email?.trim() || null,
+          proofNote: input.proofNote?.trim() || null,
+          notes: input.notes
+        }
+      });
     });
-  });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const existingClaim = await prisma.marketplaceClaim.findFirst({
+        where: {
+          instituteId: input.instituteId,
+          normalizedPhone,
+          status: { in: OPEN_CLAIM_STATUSES }
+        },
+        orderBy: { createdAt: 'asc' }
+      });
+      if (existingClaim) return existingClaim;
+    }
+    throw error;
+  }
 }
 
 export async function markMarketplaceClaimContacted(

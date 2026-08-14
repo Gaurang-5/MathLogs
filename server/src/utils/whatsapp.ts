@@ -1,5 +1,6 @@
 import { prisma } from '../prisma';
 import { secureLogger } from './secureLogger';
+import type { Prisma } from '@prisma/client';
 
 
 /**
@@ -117,12 +118,18 @@ export interface AttendanceAbsentWAData {
  * @param componentValues Positional string parameters stringified in array [] format
  */
 export type TrackedWhatsAppEnqueueResult = { queued: boolean; jobId?: string; error?: string };
+export type MarketplaceWhatsAppTracking = {
+    marketplaceEntityType: 'MarketplaceClaim' | 'LeadInquiry';
+    marketplaceEntityId: string;
+};
 
 export const enqueueWhatsAppTracked = async (
     mobileNumber: string,
     templateName: string,
     componentValues: string[],
-    instituteId?: string
+    instituteId?: string,
+    tracking?: MarketplaceWhatsAppTracking,
+    db: Pick<Prisma.TransactionClient, 'whatsappJob'> = prisma
 ): Promise<TrackedWhatsAppEnqueueResult> => {
     if (!templateName) {
         secureLogger.warn('[WhatsApp] Dropped: No template configured.');
@@ -135,13 +142,15 @@ export const enqueueWhatsAppTracked = async (
             formattedMobile = `91${formattedMobile}`;
         }
 
-        const job = await prisma.whatsappJob.create({
+        const job = await db.whatsappJob.create({
             data: {
                 recipient: formattedMobile,
                 templateId: templateName,
                 data: componentValues,
                 status: 'PENDING',
-                instituteId: instituteId || null
+                instituteId: instituteId || null,
+                marketplaceEntityType: tracking?.marketplaceEntityType || null,
+                marketplaceEntityId: tracking?.marketplaceEntityId || null
             }
         });
 

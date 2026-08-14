@@ -41,6 +41,27 @@ test('successful WhatsApp delivery synchronizes a linked claim to SENT', async (
   await prisma.whatsappJob.delete({ where: { id: job.id } });
 });
 
+test('durable job tracking repairs an orphaned claim link after delivery', async () => {
+  const institute = await fixture();
+  const claim = await prisma.marketplaceClaim.create({
+    data: { instituteId: institute.id, claimantName: 'Riya', phone: '9876543210', normalizedPhone: '9876543210', communicationStatus: 'QUEUED' }
+  });
+  const job = await prisma.whatsappJob.create({
+    data: {
+      recipient: '919876543210', templateId: 'claim-approved', data: ['Riya', 'Apex', 'https://mathlogs.app/login'],
+      status: 'PROCESSING', attempts: 1, instituteId: institute.id,
+      marketplaceEntityType: 'MarketplaceClaim', marketplaceEntityId: claim.id
+    } as any
+  });
+
+  await processWhatsappJob(job, async () => ({ data: { messages: [{ id: 'meta-orphan' }] } }) as any);
+
+  const updatedClaim = await prisma.marketplaceClaim.findUniqueOrThrow({ where: { id: claim.id } });
+  assert.equal(updatedClaim.communicationStatus, 'SENT');
+  assert.equal(updatedClaim.whatsappJobId, job.id);
+  await prisma.whatsappJob.delete({ where: { id: job.id } });
+});
+
 test('exhausted WhatsApp delivery synchronizes a linked lead to FAILED with a bounded error', async () => {
   const institute = await fixture();
   const job = await prisma.whatsappJob.create({

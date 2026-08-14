@@ -5,6 +5,8 @@ import jwt from 'jsonwebtoken';
 import { normalizeMarketplacePhone, submitMarketplaceClaim } from '../services/marketplaceClaimService';
 import { createMarketplaceLead } from '../services/marketplaceLeadService';
 
+const LEGACY_CLAIM_MARKER = '[CLAIM REQUEST]';
+
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
 // Utility to generate a slug from a string
@@ -727,7 +729,11 @@ export async function getInstituteLeads(req: any, res: Response) {
     }
 
     const leads = await prisma.leadInquiry.findMany({
-      where: { instituteId, deliveryStatus: { not: 'HELD' } },
+      where: {
+        instituteId,
+        deliveryStatus: { not: 'HELD' },
+        NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } }
+      },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -751,7 +757,12 @@ export async function updateInstituteLeadStatus(req: any, res: Response) {
   }
   try {
     const result = await prisma.leadInquiry.updateMany({
-      where: { id: String(req.params.id), instituteId, deliveryStatus: { not: 'HELD' } },
+      where: {
+        id: String(req.params.id),
+        instituteId,
+        deliveryStatus: { not: 'HELD' },
+        NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } }
+      },
       data: { status }
     });
     if (!result.count) return res.status(404).json({ success: false, message: 'Lead not found' });

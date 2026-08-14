@@ -90,6 +90,41 @@ test('returns an existing open claim for the same institute and phone', async ()
   assert.equal(await prisma.marketplaceClaim.count({ where: { instituteId: institute.id } }), 1);
 });
 
+test('concurrent open-claim submissions return one durable claim', async () => {
+  const institute = await createInstitute();
+  const suffix = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const functionName = `test_delay_claim_insert_${suffix}`;
+  const triggerName = `test_delay_claim_insert_${suffix}`;
+
+  await prisma.$executeRawUnsafe(`
+    CREATE FUNCTION "${functionName}"() RETURNS trigger AS $$
+    BEGIN
+      PERFORM pg_sleep(0.15);
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TRIGGER "${triggerName}"
+    BEFORE INSERT ON "MarketplaceClaim"
+    FOR EACH ROW EXECUTE FUNCTION "${functionName}"()
+  `);
+
+  try {
+    const claims = await Promise.all(Array.from({ length: 6 }, () => submitMarketplaceClaim({
+      instituteId: institute.id,
+      claimantName: 'Riya Sharma',
+      phone: '+91 98765-43210'
+    })));
+
+    assert.equal(new Set(claims.map((claim) => claim.id)).size, 1);
+    assert.equal(await prisma.marketplaceClaim.count({ where: { instituteId: institute.id } }), 1);
+  } finally {
+    await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "${triggerName}" ON "MarketplaceClaim"`);
+    await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${functionName}"()`);
+  }
+});
+
 test('marks a new claim as contacted and records its contact time', async () => {
   const institute = await createInstitute();
   const claim = await submitMarketplaceClaim({
