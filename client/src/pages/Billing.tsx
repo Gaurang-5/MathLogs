@@ -1,11 +1,11 @@
 /* eslint-disable */
 import { useState, useEffect, useRef } from 'react';
-import { CreditCard, Sparkles, Building, Check, CalendarCheck, CalendarOff, Info, AlertCircle, Crown } from 'lucide-react';
+import { CreditCard, Sparkles, Building, Check, CalendarCheck, CalendarOff, Info, AlertCircle, Crown, Store } from 'lucide-react';
 import Layout from '../components/Layout';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 import QuizBilling from './QuizBilling';
-type PlanId = 'basic' | 'pro';
+type PlanId = 'listing' | 'quiz' | 'all_inclusive' | 'basic' | 'pro';
 type BillingCycle = 'monthly' | 'yearly';
 
 interface BillingConfig {
@@ -101,27 +101,39 @@ const loadScript = (src: string): Promise<boolean> => {
 
 const pricingPlans = [
     {
-        id: 'basic',
-        name: 'Basic Plan',
-        icon: Building,
-        monthlyPrice: 999,
-        yearlyPrice: 9999,
-        period: '/ month',
-        description: 'Perfect for independent tutors starting their journey.',
-        limit: 'Up to 100 Students',
-        features: ['Unlimited Batches', 'Automated Grading', 'WhatsApp Alerts'],
+        id: 'listing',
+        name: 'Listing',
+        icon: Store,
+        monthlyPrice: 99,
+        yearlyPrice: 99,
+        period: 'one-time',
+        description: 'Marketplace listing and public page management.',
+        limit: 'Public Listing',
+        features: ['Marketplace Listing', 'Public Profile Page', 'Student Enquiries', 'Google Maps Link'],
         popular: false,
     },
     {
-        id: 'pro',
-        name: 'Pro Plan',
+        id: 'quiz',
+        name: 'Quiz',
         icon: Sparkles,
-        monthlyPrice: 1999,
-        yearlyPrice: 19999,
+        monthlyPrice: 250,
+        yearlyPrice: 2500,
         period: '/ month',
-        description: 'For growing coaching centers that need advanced tools.',
-        limit: 'Up to 250 Students',
-        features: ['Unlimited Batches', 'Automated Grading', 'WhatsApp Alerts'],
+        description: 'Create and assign online quizzes with 5 monthly credits.',
+        limit: '5 Credits/mo',
+        features: ['5 Quiz Credits / Month', 'Quiz Builder', 'Auto-Grading', 'Marketplace Listing'],
+        popular: false,
+    },
+    {
+        id: 'all_inclusive',
+        name: 'All Inclusive',
+        icon: Building,
+        monthlyPrice: 500,
+        yearlyPrice: 5000,
+        period: '/ month',
+        description: 'Complete ERP suite for your coaching center.',
+        limit: 'Full Access',
+        features: ['Full Student ERP', 'Unlimited Batches', 'Fee Management', 'Quiz Credits', 'WhatsApp Alerts', 'Marketplace Listing'],
         popular: true,
     }
 ];

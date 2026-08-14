@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { Store, Sparkles, MapPin, Phone, MessageCircle, Save, Loader2, Globe, CheckCircle2, User, Building2, BookOpen, ExternalLink, GraduationCap, ArrowRight } from 'lucide-react';
+import { Store, Sparkles, MapPin, Phone, MessageCircle, Save, Loader2, Globe, CheckCircle2, User, Building2, BookOpen, ExternalLink, GraduationCap, ArrowRight, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -70,6 +70,8 @@ export default function MarketplaceSettings() {
   const [isPubliclyListed, setIsPubliclyListed] = useState(true);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [customSubjectInput, setCustomSubjectInput] = useState('');
+  const [customSubjects, setCustomSubjects] = useState<string[]>([]);
 
   const isPageOnly = localStorage.getItem('isPageOnly') === 'true';
 
@@ -126,6 +128,18 @@ export default function MarketplaceSettings() {
     setSelectedSubjects(prev =>
       prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
     );
+  };
+
+  const addCustomSubject = () => {
+    const trimmed = customSubjectInput.trim();
+    if (!trimmed) return;
+    if ([...SUBJECT_OPTIONS, ...customSubjects].some(s => s.toLowerCase() === trimmed.toLowerCase())) {
+      setCustomSubjectInput('');
+      return;
+    }
+    setCustomSubjects(prev => [...prev, trimmed]);
+    setSelectedSubjects(prev => [...prev, trimmed]);
+    setCustomSubjectInput('');
   };
 
   const toggleClass = (cls: string) => {
@@ -225,11 +239,6 @@ export default function MarketplaceSettings() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-extrabold text-[#1A1F36] tracking-tight">Marketplace Page & Leads</h1>
-                {profile?.isExclusive && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold">
-                    <Sparkles className="w-3 h-3 fill-amber-400" /> Exclusive
-                  </span>
-                )}
               </div>
               <p className="text-xs text-neutral-500 font-medium mt-0.5">
                 Manage your public coaching profile, subjects offered, and view student inquiries.
@@ -447,7 +456,7 @@ export default function MarketplaceSettings() {
               <div>
                 <label className="block text-xs font-bold text-neutral-700 mb-2">Select Subjects Taught</label>
                 <div className="flex flex-wrap gap-2">
-                  {SUBJECT_OPTIONS.map((sub) => {
+                  {[...SUBJECT_OPTIONS, ...customSubjects].map((sub) => {
                     const active = selectedSubjects.includes(sub);
                     return (
                       <button
@@ -465,6 +474,23 @@ export default function MarketplaceSettings() {
                       </button>
                     );
                   })}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={customSubjectInput}
+                    onChange={e => setCustomSubjectInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomSubject())}
+                    placeholder="Add a subject not listed above..."
+                    className="flex-1 px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium outline-none focus:border-black transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomSubject}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-neutral-900 text-white text-xs font-bold hover:bg-neutral-700 transition-all"
+                  >
+                    <Plus className="w-3 h-3" /> Add
+                  </button>
                 </div>
               </div>
 

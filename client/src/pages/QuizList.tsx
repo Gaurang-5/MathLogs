@@ -19,10 +19,13 @@ import {
     Edit3,
     CalendarDays,
     X,
-    Link2
+    Link2,
+    Copy,
+    Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AITestGeneratorModal from '../components/AITestGeneratorModal';
+import ManualQuizModal from '../components/ManualQuizModal';
 import QuizAnalytics from '../components/QuizAnalytics';
 import QuizLiveMonitor from '../components/QuizLiveMonitor';
 import toast from 'react-hot-toast';
@@ -107,14 +110,42 @@ function hasSubmissions(quiz: OnlineQuiz): boolean {
     return (quiz._count?.submissions || 0) > 0;
 }
 
+// A quiz is a draft when it is not finalized AND has no scheduled time window
+function isDraftQuiz(quiz: OnlineQuiz): boolean {
+    return !quiz.isFinalized && !quiz.availableFrom;
+}
+
+// Heuristic: quiz was manually created if it has no variantGroup questions and no studentQuestionCount
+function isManualQuiz(quiz: OnlineQuiz): boolean {
+    if (quiz.studentQuestionCount) return false;
+    if (!quiz.questions || quiz.questions.length === 0) return false;
+    return !quiz.questions.some((q: any) => q.variantGroup);
+}
+
 export default function QuizList() {
     const [onlineQuizzes, setOnlineQuizzes] = useState<OnlineQuiz[]>([]);
     const [batches, setBatches] = useState<Batch[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAIModal, setShowAIModal] = useState(false);
+    const [showManualModal, setShowManualModal] = useState(false);
     const [finalizingQuizId, setFinalizingQuizId] = useState<string | null>(null);
     const [instituteSlug, setInstituteSlug] = useState<string | null>(null);
     const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
+
+    const handleDuplicateQuiz = (e: React.MouseEvent, quiz: OnlineQuiz) => {
+        e.stopPropagation();
+        const cloned = {
+            ...quiz,
+            id: undefined,
+            title: `${quiz.title} (Copy)`,
+            isFinalized: false,
+            submissions: [],
+            _count: { submissions: 0 }
+        };
+        setQuizToEdit(cloned);
+        setShowManualModal(true);
+        toast.success(`Cloned "${quiz.title}". Edit and save to publish.`);
+    };
 
     // Active Selected Quiz & Current Cockpit Tab
     const [activeQuiz, setActiveQuiz] = useState<OnlineQuiz | null>(null);
@@ -400,6 +431,7 @@ export default function QuizList() {
         const completedPct = enrolled > 0 ? (completed / enrolled) * 100 : 0;
         const activePct = enrolled > 0 ? (active / enrolled) * 100 : 0;
         const unattemptedPct = enrolled > 0 ? (unattempted / enrolled) * 100 : 100;
+        const isDraft = isDraftQuiz(quiz);
 
         return (
             <div
@@ -407,29 +439,65 @@ export default function QuizList() {
                     changeActiveQuiz(quiz);
                     setActiveTab('monitor');
                 }}
-                className="bg-white border-[1.5px] border-neutral-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-emerald-500/35 transition-all duration-300 cursor-pointer flex flex-col justify-between group"
+                className={`bg-white border-[1.5px] rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between group ${
+                    isDraft
+                        ? 'border-dashed border-neutral-300 hover:border-neutral-400'
+                        : 'border-neutral-200 hover:border-emerald-500/35'
+                }`}
             >
                 <div>
                     <div className="flex items-start justify-between gap-4 mb-4">
-                        <div className="p-3 bg-neutral-50 border border-neutral-250 rounded-xl group-hover:bg-emerald-50/50 group-hover:border-emerald-100 transition-colors">
-                            <Sparkles className="w-5 h-5 text-emerald-600 animate-pulse-subtle" />
+                        <div className={`p-3 border rounded-xl transition-colors ${
+                            isDraft
+                                ? 'bg-neutral-50 border-neutral-200'
+                                : 'bg-neutral-50 border-neutral-250 group-hover:bg-emerald-50/50 group-hover:border-emerald-100'
+                        }`}>
+                            <Sparkles className={`w-5 h-5 animate-pulse-subtle ${
+                                isDraft ? 'text-neutral-400' : 'text-emerald-600'
+                            }`} />
                         </div>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${quiz.isFinalized
-                                ? 'bg-slate-50 text-slate-700 border-slate-200'
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                            }`}>
-                            {quiz.isFinalized ? 'Finalized' : 'Published'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                title="Duplicate Quiz"
+                                onClick={(e) => handleDuplicateQuiz(e, quiz)}
+                                className="p-1.5 rounded-lg text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors"
+                            >
+                                <Copy className="w-4 h-4" />
+                            </button>
+                            {isDraft ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-neutral-100 text-neutral-600 border-neutral-200 flex items-center gap-1">
+                                    <FileText className="w-3 h-3" />
+                                    Draft
+                                </span>
+                            ) : quiz.isFinalized ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-100">
+                                    Finalized
+                                </span>
+                            ) : (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-amber-50 text-amber-700 border-amber-100">
+                                    Published
+                                </span>
+                            )}
+                        </div>
                     </div>
-                    <h3 className="text-lg font-black text-app-text mb-1 truncate group-hover:text-emerald-700 transition-colors" title={quiz.title}>
+                    <h3 className={`text-lg font-black mb-1 truncate transition-colors ${
+                        isDraft ? 'text-neutral-500 group-hover:text-neutral-700' : 'text-app-text group-hover:text-emerald-700'
+                    }`} title={quiz.title}>
                         {quiz.title}
                     </h3>
                     <p className="text-sm text-app-text-secondary font-medium truncate">
-                        {quiz.batch?.name || 'Batch'}{quiz.topic ? ` • ${quiz.topic}` : ''}
+                        {quiz.batch?.name || (isDraft ? 'No batch assigned' : 'Batch')}{quiz.topic ? ` • ${quiz.topic}` : ''}
                     </p>
-                    <p className="mt-2 text-xs text-app-text-tertiary font-semibold">
-                        {quiz.availableFrom ? new Date(quiz.availableFrom).toLocaleString() : 'Available now'}
-                        {quiz.availableUntil ? ` → ${new Date(quiz.availableUntil).toLocaleString()}` : ''}
+                    <p className="mt-2 text-xs font-semibold">
+                        {isDraft ? (
+                            <span className="text-neutral-400 italic">Not scheduled — edit to publish</span>
+                        ) : (
+                            <span className="text-app-text-tertiary">
+                                {quiz.availableFrom ? new Date(quiz.availableFrom).toLocaleString() : 'Available now'}
+                                {quiz.availableUntil ? ` → ${new Date(quiz.availableUntil).toLocaleString()}` : ''}
+                            </span>
+                        )}
                     </p>
 
                     <div className="mt-4 pt-4 border-t border-black/5 grid grid-cols-2 gap-3 text-xs font-bold text-app-text-tertiary">
@@ -511,13 +579,28 @@ export default function QuizList() {
                             <div>
                                 <p className="text-sm sm:text-base text-app-text-secondary">Generate, monitor, and analyze AI-powered quizzes for your batches.</p>
                             </div>
-                            <button
-                                onClick={() => setShowAIModal(true)}
-                                className="min-h-12 bg-neutral-900 hover:bg-neutral-850 text-white shadow-lg px-5 py-3 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center text-sm gap-2 shrink-0"
-                            >
-                                <Sparkles className="w-4.5 h-4.5 text-emerald-400 animate-pulse-subtle" />
-                                Generate with AI
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        setQuizToEdit(null);
+                                        setShowManualModal(true);
+                                    }}
+                                    className="min-h-12 bg-white border-2 border-black hover:bg-neutral-100 text-black px-4 py-3 rounded-xl font-bold transition-all text-sm flex items-center justify-center gap-2 shrink-0"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Manual Quiz</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setQuizToEdit(null);
+                                        setShowAIModal(true);
+                                    }}
+                                    className="min-h-12 bg-neutral-900 hover:bg-neutral-850 text-white shadow-lg px-5 py-3 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center text-sm gap-2 shrink-0"
+                                >
+                                    <Sparkles className="w-4.5 h-4.5 text-emerald-400 animate-pulse-subtle" />
+                                    Generate with AI
+                                </button>
+                            </div>
                         </div>
 
                         {loading ? (
@@ -573,7 +656,12 @@ export default function QuizList() {
                                         <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded">
                                             Online Workspace
                                         </span>
-                                        {activeQuiz.isFinalized && (
+                                        {isDraftQuiz(activeQuiz) ? (
+                                            <span className="text-[10px] font-bold uppercase tracking-widest bg-neutral-100 text-neutral-600 border border-neutral-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                                <FileText className="w-2.5 h-2.5" />
+                                                Draft — Not Published
+                                            </span>
+                                        ) : activeQuiz.isFinalized && (
                                             <span className="text-[10px] font-bold uppercase tracking-widest bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded">
                                                 Locked & Finalized
                                             </span>
@@ -602,7 +690,12 @@ export default function QuizList() {
                                             <button
                                                 onClick={() => {
                                                     setQuizToEdit(activeQuiz);
-                                                    setShowAIModal(true);
+                                                    // Route to correct modal: manual quizzes → ManualModal, AI quizzes → AIModal
+                                                    if (isManualQuiz(activeQuiz)) {
+                                                        setShowManualModal(true);
+                                                    } else {
+                                                        setShowAIModal(true);
+                                                    }
                                                 }}
                                                 disabled={disableEdit}
                                                 title={locked ? 'Cannot edit within 10 minutes of start time' : hasSubs ? 'Cannot edit after students have started' : 'Edit Quiz'}
@@ -989,6 +1082,18 @@ export default function QuizList() {
                 isOpen={showAIModal}
                 onClose={() => {
                     setShowAIModal(false);
+                    setQuizToEdit(null);
+                }}
+                batches={batches}
+                onSaved={refreshOnlineQuizzes}
+                quizToEdit={quizToEdit}
+            />
+
+            {/* Manual Quiz Creation Modal */}
+            <ManualQuizModal
+                isOpen={showManualModal}
+                onClose={() => {
+                    setShowManualModal(false);
                     setQuizToEdit(null);
                 }}
                 batches={batches}

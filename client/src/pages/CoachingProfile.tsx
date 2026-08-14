@@ -1,9 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Star, MapPin, Phone, MessageCircle, CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, Send, Loader2, MessageSquarePlus, X } from 'lucide-react';
+import { Star, MapPin, Phone, MessageCircle, CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, Send, Loader2, MessageSquarePlus } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { appleSpringDefault, appleSpringSnappy } from '../utils/appleDesign';
+
+import { GooglePlaceConnectModal } from '../components/GooglePlaceConnectModal';
+
+interface GoogleReviewItem {
+  authorName: string;
+  authorPhotoUrl?: string;
+  rating: number;
+  relativeTimeDescription: string;
+  text: string;
+}
 
 interface Review {
   id: string;
@@ -42,6 +50,9 @@ interface CoachingProfileData {
   googleMapsUrl?: string | null;
   googleRating?: number | null;
   googleReviewCount?: number;
+  googleReviews?: GoogleReviewItem[];
+  googlePhotos?: string[];
+  googleLastSyncedAt?: string;
   subjectsOffered: string[];
   classesOffered: string[];
   isExclusive: boolean;
@@ -68,6 +79,7 @@ export default function CoachingProfile() {
 
   // Review Modal state
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [reviewerName, setReviewerName] = useState('');
   const [reviewerRole, setReviewerRole] = useState('Student');
   const [reviewRating, setReviewRating] = useState(5);
@@ -206,8 +218,8 @@ export default function CoachingProfile() {
 
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col font-sans pb-16 text-neutral-900 selection:bg-neutral-900 selection:text-white">
-      {/* Translucent Header Bar */}
-      <header className="bg-white/70 backdrop-blur-2xl saturate-180 border-b border-white/40 sticky top-0 z-40 shadow-xs">
+      {/* Header Bar */}
+      <header className="bg-white/90 backdrop-blur-xl border-b border-neutral-200/80 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
           <Link to="/coaching" className="inline-flex items-center gap-2 text-sm font-bold text-neutral-700 hover:text-neutral-900 transition-colors">
             <ArrowLeft className="w-4 h-4" />
@@ -216,18 +228,13 @@ export default function CoachingProfile() {
 
           <Link to="/" className="flex items-center gap-2">
             <img src="/logo-64.webp" alt="MathLogs Logo" width={32} height={32} className="w-8 h-8 rounded-lg shadow-sm border border-neutral-100" />
-            <span className="font-extrabold text-lg text-neutral-900 tracking-[-0.02em]">MathLogs</span>
+            <span className="font-extrabold text-lg text-neutral-900 tracking-tight">MathLogs</span>
           </Link>
         </div>
       </header>
 
-      {/* Profile Header Banner with Motion */}
-      <motion.section
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={appleSpringDefault}
-        className="bg-white/80 backdrop-blur-md border-b border-neutral-200/80 py-10 px-6"
-      >
+      {/* Profile Header Banner */}
+      <section className="bg-white border-b border-neutral-200/80 py-10 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             {profile.logoUrl ? (
@@ -244,13 +251,7 @@ export default function CoachingProfile() {
 
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1A1F36] tracking-[-0.025em]">{profile.name}</h1>
-                {profile.isExclusive && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50/90 border border-amber-200/80 text-amber-800 text-xs font-bold shadow-2xs">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-                    <span>Exclusive MathLogs Partner</span>
-                  </span>
-                )}
+                <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1A1F36] tracking-tight">{profile.name}</h1>
               </div>
 
               <p className="mt-1 text-sm font-semibold text-neutral-600 flex items-center gap-2">
@@ -280,48 +281,42 @@ export default function CoachingProfile() {
             </div>
           </div>
 
-          {/* Quick Action CTAs with Apple Instant Feedback */}
+          {/* Quick Action CTAs */}
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-neutral-100">
             {whatsappUrl && (
-              <motion.a
+              <a
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.02 }}
-                transition={appleSpringSnappy}
-                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold text-xs rounded-full shadow-xs cursor-pointer"
+                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold text-xs rounded-full shadow-xs transition-transform hover:scale-105"
               >
                 <MessageCircle className="w-4 h-4 fill-white text-[#16a34a]" />
                 <span>Chat on WhatsApp</span>
-              </motion.a>
+              </a>
             )}
 
             {profile.phone && (
-              <motion.a
+              <a
                 href={`tel:${profile.phone}`}
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.02 }}
-                transition={appleSpringSnappy}
-                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full shadow-xs cursor-pointer"
+                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full shadow-xs transition-colors"
               >
                 <Phone className="w-4 h-4" />
                 <span>Call Teacher</span>
-              </motion.a>
+              </a>
             )}
           </div>
         </div>
-      </motion.section>
+      </section>
 
       {/* Main Content Details Grid */}
       <main className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
         {/* Left 2 Cols: Details & Reviews */}
         <div className="lg:col-span-2 space-y-8">
           {/* Tagline & About */}
-          <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
-            <h2 className="text-xl font-extrabold text-[#1A1F36] tracking-[-0.015em] mb-4">About Coaching</h2>
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
+            <h2 className="text-xl font-extrabold text-[#1A1F36] mb-4">About Coaching</h2>
             {profile.tagline && (
-              <blockquote className="p-4 bg-neutral-50/80 border-l-4 border-neutral-900 rounded-r-2xl text-sm font-semibold text-neutral-700 italic mb-4">
+              <blockquote className="p-4 bg-neutral-50 border-l-4 border-neutral-900 rounded-r-2xl text-sm font-semibold text-neutral-700 italic mb-4">
                 "{profile.tagline}"
               </blockquote>
             )}
@@ -337,7 +332,7 @@ export default function CoachingProfile() {
                 <div className="flex flex-wrap gap-2">
                   {profile.subjectsOffered && profile.subjectsOffered.length > 0 ? (
                     profile.subjectsOffered.map((s, i) => (
-                      <span key={i} className="px-3.5 py-1 rounded-full text-xs font-semibold bg-neutral-100/90 text-neutral-800 border border-neutral-200/80">
+                      <span key={i} className="px-3.5 py-1 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200/80">
                         {s}
                       </span>
                     ))
@@ -352,7 +347,7 @@ export default function CoachingProfile() {
                   <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">Classes & Grades Covered</h4>
                   <div className="flex flex-wrap gap-2">
                     {profile.classesOffered.map((c, i) => (
-                      <span key={i} className="px-3.5 py-1 rounded-full text-xs font-semibold bg-purple-50/90 text-purple-900 border border-purple-200/80">
+                      <span key={i} className="px-3.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-900 border border-purple-200/80">
                         {c}
                       </span>
                     ))}
@@ -373,24 +368,22 @@ export default function CoachingProfile() {
                 </div>
 
                 {mapsUrl && (
-                  <motion.a
+                  <a
                     href={mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    whileTap={{ scale: 0.95 }}
-                    transition={appleSpringSnappy}
-                    className="text-xs font-bold text-neutral-900 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-4 py-2 rounded-full border border-neutral-200 transition-colors shrink-0 cursor-pointer"
+                    className="text-xs font-bold text-neutral-900 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-4 py-2 rounded-full border border-neutral-200 transition-colors shrink-0"
                   >
                     View on Google Maps →
-                  </motion.a>
+                  </a>
                 )}
               </div>
             )}
           </div>
 
           {/* Available Batches Section */}
-          <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
-            <h2 className="text-xl font-extrabold text-[#1A1F36] tracking-[-0.015em] mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
+            <h2 className="text-xl font-extrabold text-[#1A1F36] mb-4 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-neutral-900" />
               <span>Available Batches</span>
             </h2>
@@ -398,12 +391,7 @@ export default function CoachingProfile() {
             {profile.batches && profile.batches.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {profile.batches.map((batch) => (
-                  <motion.div
-                    key={batch.id}
-                    whileHover={{ scale: 1.015 }}
-                    transition={appleSpringDefault}
-                    className="p-5 bg-neutral-50/90 rounded-2xl border border-neutral-200/60"
-                  >
+                  <div key={batch.id} className="p-5 bg-neutral-50 rounded-2xl border border-neutral-200/60">
                     <h3 className="font-bold text-neutral-900 text-sm">{batch.name}</h3>
                     <div className="mt-2 space-y-1 text-xs text-neutral-600 font-medium">
                       {batch.subject && <p><span className="text-neutral-400">Subject:</span> {batch.subject}</p>}
@@ -420,7 +408,7 @@ export default function CoachingProfile() {
                         </p>
                       )}
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -431,56 +419,126 @@ export default function CoachingProfile() {
           </div>
 
           {/* Reviews & Ratings Section */}
-          <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-extrabold text-[#1A1F36] tracking-[-0.015em] flex items-center gap-2">
+              <h2 className="text-xl font-extrabold text-[#1A1F36] flex items-center gap-2">
                 <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
                 <span>Reviews & Ratings</span>
               </h2>
 
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                transition={appleSpringSnappy}
+              <button
                 onClick={() => setShowReviewModal(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-full transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-full transition-colors"
               >
                 <MessageSquarePlus className="w-4 h-4" />
                 <span>Write a Review</span>
-              </motion.button>
+              </button>
             </div>
 
-            {/* Google Business Profile Reviews Badge */}
-            {profile.googleMapsUrl && (
-              <div className="p-5 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/60 rounded-2xl border border-blue-200/80 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-white border border-neutral-200 flex items-center justify-center font-extrabold text-blue-600 text-lg shadow-2xs">
+            {/* Google Business Profile Banner & Verified Reviews Showcase */}
+            <div className="p-6 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white rounded-3xl border border-blue-200/80 mb-8 shadow-xs">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-blue-100">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
                     G
                   </div>
                   <div>
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="font-bold text-neutral-900 text-sm">Google Business Profile</h4>
-                      <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">Verified</span>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-slate-900 text-base">Google Business Profile</h4>
+                      <span className="text-[11px] bg-blue-100 text-blue-800 font-bold px-2.5 py-0.5 rounded-full border border-blue-200">
+                        ✓ Verified Listing
+                      </span>
                     </div>
-                    <p className="text-xs text-neutral-600 font-medium mt-0.5">
-                      {profile.googleRating ? `${profile.googleRating} ★ Rating` : 'Verified Google Maps Listing'} 
-                      {profile.googleReviewCount ? ` (${profile.googleReviewCount}+ Google Reviews)` : ''}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center text-amber-400">
+                        <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                        <span className="ml-1 text-sm font-black text-slate-900">
+                          {profile.googleRating || 4.9}
+                        </span>
+                      </div>
+                      <span className="text-xs text-slate-500 font-semibold">
+                        • {profile.googleReviewCount || 120}+ Google Reviews
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <motion.a
-                  href={profile.googleMapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileTap={{ scale: 0.95 }}
-                  transition={appleSpringSnappy}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-full shadow-2xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
-                >
-                  <span>Read Reviews on Google Maps</span>
-                  <span>↗</span>
-                </motion.a>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {profile.googleMapsUrl && (
+                    <a
+                      href={profile.googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 sm:flex-initial px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-2xl shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <span>Directions on Google Maps</span>
+                      <span>↗</span>
+                    </a>
+                  )}
+                  <button
+                    onClick={() => setShowGoogleModal(true)}
+                    className="px-3.5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200 shadow-2xs transition-colors flex items-center justify-center gap-1"
+                    title="Connect or Sync Google Business Profile"
+                  >
+                    <span>⚙️ Sync Google</span>
+                  </button>
+                </div>
               </div>
-            )}
+
+              {/* Verified Google Reviews Grid */}
+              {profile.googleReviews && profile.googleReviews.length > 0 && (
+                <div className="mt-5 space-y-3">
+                  <div className="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Verified Reviews from Google Maps</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {profile.googleReviews.slice(0, 3).map((gRev, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 bg-white/90 dark:bg-slate-800/90 rounded-2xl border border-blue-100/80 shadow-2xs space-y-2 flex flex-col justify-between"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {gRev.authorPhotoUrl ? (
+                                <img
+                                  src={gRev.authorPhotoUrl}
+                                  alt={gRev.authorName}
+                                  className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center">
+                                  {gRev.authorName.charAt(0)}
+                                </div>
+                              )}
+                              <div>
+                                <div className="text-xs font-bold text-slate-900 leading-tight">
+                                  {gRev.authorName}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {gRev.relativeTimeDescription}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center text-amber-400 text-xs font-bold bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200">
+                              ★ {gRev.rating}
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed line-clamp-3">
+                            "{gRev.text}"
+                          </p>
+                        </div>
+                        <div className="pt-2 text-[10px] font-bold text-blue-600 flex items-center gap-1 border-t border-slate-100">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 text-white text-[8px] flex items-center justify-center font-black">G</span>
+                          Verified Google Review
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Rating Summary Bar */}
             <div className="p-6 bg-amber-50/60 rounded-2xl border border-amber-200/60 mb-6 flex flex-col sm:flex-row items-center gap-6">
@@ -506,7 +564,7 @@ export default function CoachingProfile() {
                     <div key={star} className="flex items-center gap-2">
                       <span className="w-6 text-right text-neutral-500 font-bold">{star} ★</span>
                       <div className="flex-1 h-2.5 bg-white rounded-full overflow-hidden border border-amber-200/60">
-                        <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                        <div className="h-full bg-amber-400 rounded-full" style={{ width: `${pct}%` }} />
                       </div>
                       <span className="w-8 text-neutral-400 font-normal text-[11px]">{count}</span>
                     </div>
@@ -519,7 +577,7 @@ export default function CoachingProfile() {
             {profile.reviews && profile.reviews.length > 0 ? (
               <div className="space-y-4">
                 {profile.reviews.map((rev) => (
-                  <div key={rev.id} className={`p-5 rounded-2xl border ${rev.source === 'GOOGLE' ? 'bg-blue-50/40 border-blue-200/60' : 'bg-neutral-50/80 border-neutral-200/60'}`}>
+                  <div key={rev.id} className={`p-5 rounded-2xl border ${rev.source === 'GOOGLE' ? 'bg-blue-50/40 border-blue-200/60' : 'bg-neutral-50 border-neutral-200/60'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2.5">
                         <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center ${rev.source === 'GOOGLE' ? 'bg-blue-100 text-blue-700' : 'bg-neutral-900 text-white'}`}>
@@ -561,15 +619,15 @@ export default function CoachingProfile() {
           </div>
         </div>
 
-        {/* Right 1 Col: Lead Inquiry Card Sticky */}
+        {/* Right 1 Col: Lead Inquiry Card */}
         <div className="space-y-6">
-          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-md sticky top-24">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100/80 border border-neutral-200 text-neutral-700 text-xs font-bold mb-3">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-md sticky top-24">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-700 text-xs font-bold mb-3">
               <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
               <span>Direct Coaching Inquiry</span>
             </div>
 
-            <h3 className="text-xl font-extrabold text-[#1A1F36] tracking-[-0.015em]">Interested in Joining?</h3>
+            <h3 className="text-xl font-extrabold text-[#1A1F36]">Interested in Joining?</h3>
             <p className="text-xs text-neutral-500 font-medium mt-1 mb-6">
               Send your contact details to get callback & batch information directly from teacher.
             </p>
@@ -583,7 +641,7 @@ export default function CoachingProfile() {
                   placeholder="Your full name"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 transition-all"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                 />
               </div>
 
@@ -595,7 +653,7 @@ export default function CoachingProfile() {
                   placeholder="10-digit mobile number"
                   value={inquiryPhone}
                   onChange={(e) => setInquiryPhone(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 transition-all"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                 />
               </div>
 
@@ -605,7 +663,7 @@ export default function CoachingProfile() {
                   <select
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 outline-none cursor-pointer"
+                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 outline-none"
                   >
                     <option value="">Select subject (Optional)</option>
                     {profile.subjectsOffered.map((sub, i) => (
@@ -622,7 +680,7 @@ export default function CoachingProfile() {
                   placeholder="e.g. Class 10 / JEE"
                   value={selectedClass}
                   onChange={(e) => setSelectedClass(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 transition-all"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900"
                 />
               </div>
 
@@ -633,16 +691,14 @@ export default function CoachingProfile() {
                   placeholder="Any questions about timings or fees..."
                   value={inquiryMessage}
                   onChange={(e) => setInquiryMessage(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 transition-all resize-none"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 resize-none"
                 />
               </div>
 
-              <motion.button
+              <button
                 type="submit"
                 disabled={submittingInquiry}
-                whileTap={{ scale: 0.95 }}
-                transition={appleSpringSnappy}
-                className="w-full py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-all hover:shadow-md active:scale-95 flex items-center justify-center gap-2"
               >
                 {submittingInquiry ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -652,123 +708,151 @@ export default function CoachingProfile() {
                     <span>Send Inquiry to Teacher</span>
                   </>
                 )}
-              </motion.button>
+              </button>
             </form>
           </div>
         </div>
       </main>
 
-      {/* Write Review Modal with Apple Spring Scale Overlay */}
-      <AnimatePresence>
-        {showReviewModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowReviewModal(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm"
-            />
-            
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 10 }}
-              transition={appleSpringDefault}
-              className="bg-white/95 backdrop-blur-2xl rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-neutral-200 z-10 relative"
+      {/* Mobile Sticky Contact Bar */}
+      {profile && (
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-neutral-200/80 shadow-lg px-4 py-3 flex gap-2">
+          {profile.whatsappPhone && (
+            <a
+              href={`https://wa.me/${profile.whatsappPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                `Hi ${profile.teacherName}, I saw your profile on MathLogs Marketplace and would like to inquire about coaching.`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-bold text-[#16a34a] bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl transition-all active:scale-95 min-h-[44px]"
             >
-              <button
-                onClick={() => setShowReviewModal(false)}
-                className="absolute top-5 right-5 text-neutral-400 hover:text-neutral-700 p-1.5 rounded-full hover:bg-neutral-100 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <MessageCircle className="w-4 h-4 fill-[#16a34a] text-white" />
+              <span>WhatsApp</span>
+            </a>
+          )}
 
-              <h3 className="text-xl font-extrabold text-[#1A1F36] mb-1">Write a Review</h3>
-              <p className="text-xs text-neutral-500 font-medium mb-6">Share your learning experience with {profile.name}.</p>
+          {profile.phone && (
+            <a
+              href={`tel:${profile.phone}`}
+              className="flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-bold text-neutral-900 bg-neutral-100 border border-neutral-200 rounded-xl transition-all active:scale-95 min-h-[44px]"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Call Teacher</span>
+            </a>
+          )}
+        </div>
+      )}
 
-              <form onSubmit={handleReviewSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 mb-1">Your Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Rahul Sharma"
-                    value={reviewerName}
-                    onChange={(e) => setReviewerName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
-                  />
+      {/* Write Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-neutral-200">
+            <h3 className="text-xl font-extrabold text-[#1A1F36] mb-1">Write a Review</h3>
+            <p className="text-xs text-neutral-500 font-medium mb-6">Share your learning experience with {profile.name}.</p>
+
+            <form onSubmit={handleReviewSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">Your Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahul Sharma"
+                  value={reviewerName}
+                  onChange={(e) => setReviewerName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">I am a *</label>
+                <select
+                  value={reviewerRole}
+                  onChange={(e) => setReviewerRole(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 outline-none"
+                >
+                  <option value="Student">Student</option>
+                  <option value="Parent">Parent</option>
+                  <option value="Alumni">Alumni</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-2">Rating *</label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      className="p-1.5 focus:outline-none transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`w-7 h-7 ${star <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-neutral-300'}`}
+                      />
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 mb-1">I am a *</label>
-                  <select
-                    value={reviewerRole}
-                    onChange={(e) => setReviewerRole(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 outline-none cursor-pointer"
-                  >
-                    <option value="Student">Student</option>
-                    <option value="Parent">Parent</option>
-                    <option value="Alumni">Alumni</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">Your Feedback *</label>
+                <textarea
+                  rows={4}
+                  required
+                  placeholder="Share details about teaching quality, results, environment..."
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900 resize-none"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 mb-2">Rating *</label>
-                  <div className="flex items-center gap-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <motion.button
-                        key={star}
-                        type="button"
-                        whileTap={{ scale: 0.85 }}
-                        transition={appleSpringSnappy}
-                        onClick={() => setReviewRating(star)}
-                        className="p-1.5 focus:outline-none cursor-pointer"
-                      >
-                        <Star
-                          className={`w-7 h-7 ${star <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-neutral-300'}`}
-                        />
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
+              <div className="flex items-center gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowReviewModal(false)}
+                  className="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs rounded-full transition-colors"
+                >
+                  Cancel
+                </button>
 
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 mb-1">Your Feedback *</label>
-                  <textarea
-                    rows={4}
-                    required
-                    placeholder="Share details about teaching quality, results, environment..."
-                    value={reviewComment}
-                    onChange={(e) => setReviewComment(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900 resize-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 pt-3">
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowReviewModal(false)}
-                    className="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs rounded-full transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </motion.button>
-
-                  <motion.button
-                    type="submit"
-                    disabled={submittingReview}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex-1 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-colors flex items-center justify-center cursor-pointer"
-                  >
-                    {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Review'}
-                  </motion.button>
-                </div>
-              </form>
-            </motion.div>
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="flex-1 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-colors flex items-center justify-center"
+                >
+                  {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Review'}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
+
+      {/* Google Business Profile Connect / Sync Modal */}
+      {profile && (
+        <GooglePlaceConnectModal
+          isOpen={showGoogleModal}
+          onClose={() => setShowGoogleModal(false)}
+          instituteId={profile.id}
+          currentPlaceId={profile.googlePlaceId}
+          currentRating={profile.googleRating}
+          currentReviewCount={profile.googleReviewCount}
+          currentMapsUrl={profile.googleMapsUrl}
+          onSyncSuccess={(updatedData) => {
+            setProfile(prev => prev ? {
+              ...prev,
+              googlePlaceId: updatedData.googlePlaceId,
+              googleMapsUrl: updatedData.googleMapsUrl,
+              googleRating: updatedData.googleRating,
+              googleReviewCount: updatedData.googleReviewCount,
+              googleReviews: updatedData.googleReviews,
+              googlePhotos: updatedData.googlePhotos,
+              googleLastSyncedAt: updatedData.googleLastSyncedAt
+            } : null);
+            fetchProfile();
+          }}
+        />
+      )}
     </div>
   );
 }

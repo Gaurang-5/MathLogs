@@ -115,7 +115,7 @@ function App() {
             {/* Marketplace Routes */}
             <Route path="/coaching" element={<MarketplaceHome />} />
             <Route path="/coaching/:slug" element={<CoachingProfile />} />
-            <Route path="/list-coaching" element={<TeacherRegistration />} />
+            <Route path="/list-coaching" element={<Navigate to="/onboarding" replace />} />
 
             <Route path="/:instituteSlug/student" element={<StudentPortalLogin />} />
             <Route path="/:instituteSlug/student/dashboard" element={<StudentPortalDashboard />} />

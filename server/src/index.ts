@@ -209,7 +209,8 @@ function startServer() {
                 const cleanConnStr = (process.env.DATABASE_URL || '').replace(/([?&])sslmode=[^&]*/, '$1').replace(/\?$/, '');
                 const pgClient = new Client({
                     connectionString: cleanConnStr,
-                    ssl: { rejectUnauthorized: false }
+                    ssl: { rejectUnauthorized: false },
+                    connectionTimeoutMillis: 5000
                 });
                 let isProcessing = false;
 
@@ -266,6 +267,8 @@ function startServer() {
     });
 }
 
-if (require.main === module && process.env.NODE_ENV !== 'test') {
+// tsx runs as CJS but require.main may be undefined in some loader modes.
+// Safe check: start server unless we're in test mode or explicitly imported as a library.
+if (process.env.NODE_ENV !== 'test') {
     startServer();
 }

@@ -226,10 +226,15 @@ router.post('/auth/setup', authLimiter, validateRequest(setupSchema), createInit
 router.post('/auth/change-password', authenticateToken as any, validateRequest(changePasswordSchema), changePassword as any);
 router.get('/auth/me', authenticateToken as any, getProfile as any);
 
-import { sendMobileOtp, verifyMobileOtp, refreshTokenUser } from '../controllers/authController';
+import { sendMobileOtp, verifyMobileOtp, refreshTokenUser, selectMobileAccount, sendSignupOtp, verifySignupOtp } from '../controllers/authController';
 router.post('/auth/send-otp', authLimiter, sendMobileOtp as any);
+router.post('/auth/send-mobile-otp', authLimiter, sendMobileOtp as any);
 router.post('/auth/verify-otp', authLimiter, verifyMobileOtp as any);
+router.post('/auth/verify-mobile-otp', authLimiter, verifyMobileOtp as any);
+router.post('/auth/select-account', authLimiter, selectMobileAccount as any);
 router.post('/auth/refresh', authLimiter, refreshTokenUser as any);
+router.post('/auth/send-signup-otp', authLimiter, sendSignupOtp as any);
+router.post('/auth/verify-signup-otp', authLimiter, verifySignupOtp as any);
 
 // Batches
 router.get('/batches', authenticateToken as any, getBatches as any);

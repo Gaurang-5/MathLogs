@@ -32,4 +32,4 @@ echo ""
 echo "=== SERVER STARTED AT $(date) ===" | tee -a "$LOG_FILE"
 echo "" | tee -a "$LOG_FILE"
 
-npm run dev 2>&1 | tee -a "$LOG_FILE"
+npm run start:dev 2>&1 | tee -a "$LOG_FILE"

@@ -56,6 +56,9 @@ model Institute {
   googleMapsUrl           String?
   googleRating            Float?
   googleReviewCount       Int?
+  googleReviews           Json?
+  googlePhotos            Json?
+  googleLastSyncedAt      DateTime?
   reviews                 Review[]
   leadInquiries           LeadInquiry[]
 }

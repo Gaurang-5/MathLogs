@@ -7,6 +7,7 @@ import { sendOtpEmail } from '../utils/email';
 import { sendOtpWhatsApp } from '../utils/whatsapp';
 import { invalidateAuthCache } from '../middleware/auth';
 import { secureLogger } from '../utils/secureLogger';
+import { getOrResetQuizCredits } from '../utils/quizCredits';
 
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -88,9 +89,14 @@ export const loginAdmin = async (req: Request, res: Response) => {
 
         const tokens = await generateAuthTokens(admin);
 
+        let quizCredits = 0;
+        if (admin.institute?.id) {
+            const creditStatus = await getOrResetQuizCredits(admin.institute.id);
+            quizCredits = creditStatus.totalCredits;
+        }
+
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
         const isPageOnly = admin.institute?.plan === 'FREE' && !isQuizOnly && !admin.institute?.isExclusive;
-        const quizCredits = admin.institute?.quizCredits || 0;
 
         res.json({
             success: true,
@@ -249,7 +255,8 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
             }
         }
 
-        const admin: any = await prisma.admin.findFirst({
+        // Search Admin or Institute by phone/email
+        let admin: any = await prisma.admin.findFirst({
             where: {
                 OR: [
                     { username: cleanIdentifier },
@@ -263,8 +270,28 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
             include: { institute: true }
         });
 
+        let targetPhone = admin?.institute?.phoneNumber || ( /^\d{10}$/.test(cleanIdentifier) ? cleanIdentifier : null );
+        let targetEmail = admin?.institute?.email || (cleanIdentifier.includes('@') ? cleanIdentifier : null);
+
+        // If no Admin found, check if an Institute exists for this phone/email
         if (!admin) {
-            return res.status(404).json({ error: 'No account found with this credential' });
+            const institute = await prisma.institute.findFirst({
+                where: {
+                    OR: [
+                        { phoneNumber: cleanIdentifier },
+                        { phoneNumber: identifier },
+                        { email: cleanIdentifier },
+                        { email: identifier }
+                    ]
+                }
+            });
+
+            if (!institute) {
+                return res.status(404).json({ error: 'No coaching account found with this mobile number.' });
+            }
+
+            targetPhone = institute.phoneNumber;
+            targetEmail = institute.email;
         }
 
         // Enforce 30-second cooldown on OTP resends
@@ -303,21 +330,18 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
         const dispatchPromises = [];
         const dispatchMethods = [];
         
-        const waPhone = admin.institute?.phoneNumber || ( /^\d{10}$/.test(cleanIdentifier) ? cleanIdentifier : null );
-        if (waPhone) {
-            dispatchPromises.push(sendOtpWhatsApp(waPhone, otpCode).catch(e => console.error('WA OTP Failed:', e)));
+        if (targetPhone) {
+            dispatchPromises.push(sendOtpWhatsApp(targetPhone, otpCode).catch(e => console.error('WA OTP Failed:', e)));
             dispatchMethods.push('WhatsApp');
         }
 
-        const email = admin.institute?.email || (cleanIdentifier.includes('@') ? cleanIdentifier : null);
-        if (email) {
-            dispatchPromises.push(sendOtpEmail(email, otpCode).catch(e => console.error('Email OTP Failed:', e)));
+        if (targetEmail) {
+            dispatchPromises.push(sendOtpEmail(targetEmail, otpCode).catch(e => console.error('Email OTP Failed:', e)));
             dispatchMethods.push('Email');
         }
 
         if (dispatchPromises.length === 0) {
-            // Silent failure fix: Abort if no channels exist
-            return res.status(400).json({ error: 'No phone number or email is configured to receive the OTP for this account.' });
+            return res.status(400).json({ error: 'No phone number or email is configured to receive OTP for this account.' });
         }
 
         await Promise.allSettled(dispatchPromises);
@@ -326,14 +350,14 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
             secureLogger.info(`\n========================================`);
             secureLogger.info(`🔑 OTP DISPATCH FIRED:`);
             secureLogger.info(`🆔 FOR: ${cleanIdentifier}`);
-            secureLogger.info(`💬 WA?: ${!!waPhone} | 📧 EMAIL?: ${!!email}`);
+            secureLogger.info(`💬 WA?: ${!!targetPhone} | 📧 EMAIL?: ${!!targetEmail}`);
             secureLogger.info(`🔒 YOUR CODE IS: ${otpCode}`);
             secureLogger.info(`========================================\n`);
         } else {
-            secureLogger.info(`[OTP] Dispatched to ${cleanIdentifier} via WA:${!!waPhone} Email:${!!email}`);
+            secureLogger.info(`[OTP] Dispatched to ${cleanIdentifier} via WA:${!!targetPhone} Email:${!!targetEmail}`);
         }
 
-        res.json({ success: true, message: `OTP sent successfully to your ${dispatchMethods.join(' and ')}.` });
+        res.json({ success: true, message: `OTP sent successfully to your WhatsApp (${targetPhone || cleanIdentifier}).` });
     } catch (error) {
         console.error('Send OTP Error:', error);
         res.status(500).json({ error: 'Failed to send OTP' });
@@ -383,7 +407,7 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
         // Delete OTP atomically (prevents reuse)
         await prisma.otpToken.delete({ where: { identifier: cleanIdentifier } });
 
-        const admin = await prisma.admin.findFirst({
+        let admins: any[] = await prisma.admin.findMany({
             where: {
                 OR: [
                     { username: cleanIdentifier },
@@ -397,8 +421,125 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
             include: { institute: true }
         });
 
+        // Auto-provision Admin record if Institute exists but Admin not created yet
+        if (admins.length === 0) {
+            const institute = await prisma.institute.findFirst({
+                where: {
+                    OR: [
+                        { phoneNumber: cleanIdentifier },
+                        { phoneNumber: phone.trim() },
+                        { email: cleanIdentifier },
+                        { email: phone.trim() }
+                    ]
+                }
+            });
+
+            if (!institute) {
+                return res.status(404).json({ error: 'Account not found' });
+            }
+
+            const randomPassword = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
+            const newAdmin = await prisma.admin.create({
+                data: {
+                    username: cleanIdentifier,
+                    password: randomPassword,
+                    instituteId: institute.id,
+                    role: 'INSTITUTE_ADMIN'
+                },
+                include: { institute: true }
+            });
+            admins.push(newAdmin);
+        }
+
+        if (admins.length > 1) {
+            // Multiple accounts found. Issue a short-lived token to select one.
+            const tempAuthToken = jwt.sign({ verifiedPhone: cleanIdentifier }, JWT_SECRET, { expiresIn: '5m' });
+            
+            const accounts = admins.map(a => ({
+                adminId: a.id,
+                instituteName: a.institute?.name || 'Super Admin Portal',
+                teacherName: a.institute?.teacherName || a.username,
+                role: a.role,
+                status: a.institute?.status || 'ACTIVE'
+            }));
+
+            return res.json({
+                success: true,
+                multipleAccounts: true,
+                tempAuthToken,
+                accounts,
+                message: "Multiple accounts found. Please select one."
+            });
+        }
+
+        const admin = admins[0];
+
+        if (admin.institute && admin.institute.status === 'SUSPENDED') {
+            return res.status(403).json({
+                error: 'Your institute account has been suspended.',
+                reason: admin.institute.suspensionReason
+            });
+        }
+
+        const tokens = await generateAuthTokens(admin);
+
+        const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
+        const isPageOnly = admin.institute?.plan === 'FREE' && !isQuizOnly && !admin.institute?.isExclusive;
+        const quizCredits = admin.institute?.quizCredits || 0;
+
+        return res.json({
+            success: true,
+            adminId: admin.id,
+            token: tokens.token,
+            refreshToken: tokens.refreshToken,
+            role: admin.role,
+            isQuizOnly,
+            isPageOnly,
+            quizCredits,
+            message: "Login successful"
+        });
+    } catch (error) {
+        console.error('Verify OTP Error:', error);
+        return res.status(500).json({ error: 'Failed to verify OTP' });
+    }
+};
+
+export const selectMobileAccount = async (req: Request, res: Response) => {
+    const { adminId, tempAuthToken } = req.body;
+
+    if (!adminId || !tempAuthToken) {
+        return res.status(400).json({ error: 'adminId and tempAuthToken are required' });
+    }
+
+    try {
+        let decoded: any;
+        try {
+            decoded = jwt.verify(tempAuthToken, JWT_SECRET);
+        } catch (err) {
+            return res.status(401).json({ error: 'Session expired. Please request a new OTP.' });
+        }
+
+        const verifiedPhone = decoded.verifiedPhone;
+        
+        const admin: any = await prisma.admin.findUnique({
+            where: { id: adminId },
+            include: { institute: true }
+        });
+
         if (!admin) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'Selected account not found' });
+        }
+
+        // Validate that this admin belongs to the verified phone
+        const adminMatchesPhone = 
+            admin.username === verifiedPhone ||
+            admin.institute?.phoneNumber === verifiedPhone ||
+            admin.institute?.email === verifiedPhone ||
+            (admin.username && admin.username.replace(/\D/g, '') === verifiedPhone.replace(/\D/g, '')) ||
+            (admin.institute?.phoneNumber && admin.institute.phoneNumber.replace(/\D/g, '') === verifiedPhone.replace(/\D/g, ''));
+            
+        if (!adminMatchesPhone) {
+            return res.status(403).json({ error: 'Unauthorized to access this account' });
         }
 
         if (admin.institute && admin.institute.status === 'SUSPENDED') {
@@ -410,10 +551,24 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
 
         const tokens = await generateAuthTokens(admin);
 
-        res.json({ success: true, adminId: admin.id, token: tokens.token, refreshToken: tokens.refreshToken, role: admin.role, message: "Login successful" });
+        const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
+        const isPageOnly = admin.institute?.plan === 'FREE' && !isQuizOnly && !admin.institute?.isExclusive;
+        const quizCredits = admin.institute?.quizCredits || 0;
+
+        return res.json({
+            success: true,
+            adminId: admin.id,
+            token: tokens.token,
+            refreshToken: tokens.refreshToken,
+            role: admin.role,
+            isQuizOnly,
+            isPageOnly,
+            quizCredits,
+            message: "Login successful"
+        });
     } catch (error) {
-        console.error('Verify OTP Error:', error);
-        res.status(500).json({ error: 'Failed to verify OTP' });
+        console.error('Select Account Error:', error);
+        return res.status(500).json({ error: 'Failed to select account' });
     }
 };
 
@@ -460,3 +615,128 @@ export const refreshTokenUser = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to refresh token' });
     }
 };
+
+/**
+ * Send OTP for signup (no existing account required).
+ * Accepts any 10-digit mobile number and dispatches a WhatsApp OTP.
+ */
+export const sendSignupOtp = async (req: Request, res: Response) => {
+    const { phone } = req.body;
+
+    if (!phone) {
+        return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    try {
+        let cleanPhone = phone.trim().replace(/\D/g, '');
+        if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+            cleanPhone = cleanPhone.slice(2);
+        }
+
+        if (!/^\d{10}$/.test(cleanPhone)) {
+            return res.status(400).json({ error: 'Please enter a valid 10-digit Indian mobile number.' });
+        }
+
+        // Enforce 30-second cooldown
+        const existingOtp = await prisma.otpToken.findUnique({
+            where: { identifier: cleanPhone }
+        });
+
+        if (existingOtp) {
+            const timeSinceCreated = Date.now() - new Date(existingOtp.createdAt).getTime();
+            if (timeSinceCreated < 30_000) {
+                const remainingSecs = Math.ceil((30_000 - timeSinceCreated) / 1000);
+                return res.status(429).json({ error: `Please wait ${remainingSecs} seconds before requesting a new OTP.` });
+            }
+        }
+
+        const otpCode = crypto.randomInt(100000, 1000000).toString();
+
+        await prisma.otpToken.upsert({
+            where: { identifier: cleanPhone },
+            update: {
+                otp: otpCode,
+                createdAt: new Date(),
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+                verified: false
+            },
+            create: {
+                identifier: cleanPhone,
+                otp: otpCode,
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+            }
+        });
+
+        await sendOtpWhatsApp(cleanPhone, otpCode).catch(e => console.error('Signup WA OTP Failed:', e));
+
+        if (process.env.NODE_ENV !== 'production') {
+            secureLogger.info(`\n========================================`);
+            secureLogger.info(`🔑 SIGNUP OTP DISPATCH FIRED:`);
+            secureLogger.info(`🆔 FOR: ${cleanPhone}`);
+            secureLogger.info(`🔒 YOUR CODE IS: ${otpCode}`);
+            secureLogger.info(`========================================\n`);
+        }
+
+        return res.json({ success: true, message: `OTP sent to ${cleanPhone} via WhatsApp.` });
+    } catch (error) {
+        console.error('Send Signup OTP Error:', error);
+        return res.status(500).json({ error: 'Failed to send OTP' });
+    }
+};
+
+/**
+ * Verify signup OTP — does NOT create any account or issue auth tokens.
+ * Simply validates the OTP and returns a short-lived signed proof of verification.
+ */
+export const verifySignupOtp = async (req: Request, res: Response) => {
+    const { phone, otp } = req.body;
+
+    if (!phone || !otp) {
+        return res.status(400).json({ error: 'Phone and OTP are required' });
+    }
+
+    try {
+        let cleanPhone = phone.trim().replace(/\D/g, '');
+        if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+            cleanPhone = cleanPhone.slice(2);
+        }
+
+        const storedOtp = await prisma.otpToken.findUnique({
+            where: { identifier: cleanPhone }
+        });
+
+        if (!storedOtp) {
+            return res.status(400).json({ error: 'OTP expired or not requested' });
+        }
+
+        if (storedOtp.expiresAt < new Date()) {
+            await prisma.otpToken.delete({ where: { identifier: cleanPhone } }).catch(() => {});
+            return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+        }
+
+        const isDevBypass = process.env.NODE_ENV !== 'production' && otp === '000000';
+        if (storedOtp.otp !== otp && !isDevBypass) {
+            return res.status(400).json({ error: 'Invalid OTP code' });
+        }
+
+        // Delete OTP atomically to prevent reuse
+        await prisma.otpToken.delete({ where: { identifier: cleanPhone } });
+
+        // Issue a short-lived proof token (10 minutes) — client includes this when submitting signup form
+        const verificationToken = jwt.sign(
+            { verifiedPhone: cleanPhone, purpose: 'signup' },
+            JWT_SECRET,
+            { expiresIn: '10m' }
+        );
+
+        return res.json({
+            success: true,
+            verificationToken,
+            message: 'Phone number verified successfully!'
+        });
+    } catch (error) {
+        console.error('Verify Signup OTP Error:', error);
+        return res.status(500).json({ error: 'Failed to verify OTP' });
+    }
+};
+

@@ -74,6 +74,9 @@ export const processWhatsappQueue = async () => {
             return await tx.whatsappJob.findMany({
                 where: { id: { in: ids } }
             });
+        }, {
+            maxWait: 10000,
+            timeout: 20000
         });
 
         if (claimedJobs.length === 0) return 0;

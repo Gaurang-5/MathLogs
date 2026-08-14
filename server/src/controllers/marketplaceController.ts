@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { searchGooglePlaces, fetchGooglePlaceDetails } from '../services/googlePlacesService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -26,8 +27,7 @@ export async function searchMarketplace(req: Request, res: Response) {
       subject,
       city,
       area,
-      exclusiveOnly,
-      sortBy = 'exclusive',
+      sortBy = 'rating',
       page = '1',
       limit = '12'
     } = req.query;
@@ -40,13 +40,6 @@ export async function searchMarketplace(req: Request, res: Response) {
       isPubliclyListed: true,
       status: 'ACTIVE',
     };
-
-    if (exclusiveOnly === 'true') {
-      where.OR = [
-        { isExclusive: true },
-        { plan: { not: 'FREE' } }
-      ];
-    }
 
     if (q) {
       const searchTerm = (q as string).trim();
@@ -148,25 +141,17 @@ export async function searchMarketplace(req: Request, res: Response) {
         googleReviewCount: inst.googleReviewCount || 0,
         subjectsOffered: (inst.subjectsOffered as string[]) || [],
         classesOffered: (inst.classesOffered as string[]) || [],
-        isExclusive: isSubscribedExclusive,
-        isVerified: inst.isVerified || isSubscribedExclusive,
+        isExclusive: false,
+        isVerified: inst.isVerified || false,
         avgRating: displayRating,
         reviewCount: totalReviewsCount
       };
     });
 
-    // Sort: Exclusive first (default), rating, or newest
+    // Sort by rating (default) or review count
     mapped.sort((a, b) => {
-      if (sortBy === 'rating') {
-        if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
-        return b.reviewCount - a.reviewCount;
-      }
-      
-      // Default: Exclusive priority first, then highest rating
-      if (a.isExclusive !== b.isExclusive) {
-        return a.isExclusive ? -1 : 1;
-      }
-      return b.avgRating - a.avgRating;
+      if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
+      return b.reviewCount - a.reviewCount;
     });
 
     // Pagination
@@ -209,13 +194,13 @@ export async function searchMarketplace(req: Request, res: Response) {
  */
 export async function getCoachingPublicProfile(req: Request, res: Response) {
   try {
-    const { slug } = req.params;
+    const slugStr = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
 
-    const institute = await prisma.institute.findFirst({
+    const institute: any = await prisma.institute.findFirst({
       where: {
         OR: [
-          { slug: slug },
-          { id: slug }
+          { slug: slugStr },
+          { id: slugStr }
         ],
         isPubliclyListed: true,
         status: 'ACTIVE'
@@ -238,6 +223,9 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
         googleMapsUrl: true,
         googleRating: true,
         googleReviewCount: true,
+        googleReviews: true,
+        googlePhotos: true,
+        googleLastSyncedAt: true,
         subjectsOffered: true,
         classesOffered: true,
         plan: true,
@@ -278,14 +266,14 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
 
     const mathlogsReviewCount = institute.reviews.length;
     const mathlogsAvgRating = mathlogsReviewCount > 0
-      ? Number((institute.reviews.reduce((acc, r) => acc + r.rating, 0) / mathlogsReviewCount).toFixed(1))
+      ? Number((institute.reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / mathlogsReviewCount).toFixed(1))
       : 0;
 
     const displayRating = institute.googleRating || mathlogsAvgRating;
     const totalReviewsCount = (institute.googleReviewCount || 0) + mathlogsReviewCount;
 
     const ratingBreakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    institute.reviews.forEach(r => {
+    institute.reviews.forEach((r: any) => {
       if (r.rating >= 1 && r.rating <= 5) {
         ratingBreakdown[r.rating as 1 | 2 | 3 | 4 | 5]++;
       }
@@ -314,8 +302,8 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
         googleReviewCount: institute.googleReviewCount || 0,
         subjectsOffered: (institute.subjectsOffered as string[]) || [],
         classesOffered: (institute.classesOffered as string[]) || [],
-        isExclusive: isSubscribedExclusive,
-        isVerified: institute.isVerified || isSubscribedExclusive,
+        isExclusive: false,
+        isVerified: institute.isVerified || false,
         batches: institute.batches,
         avgRating: displayRating,
         reviewCount: totalReviewsCount,
@@ -335,11 +323,11 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
  */
 export async function submitReview(req: Request, res: Response) {
   try {
-    const { id } = req.params;
-    const { reviewerName, reviewerRole = 'Student', rating, comment } = req.body;
+    const id = req.params.id as string;
+    const { reviewerName, reviewerRole, rating, comment } = req.body;
 
     if (!reviewerName || !rating || !comment) {
-      return res.status(400).json({ success: false, message: 'Name, rating, and review comment are required' });
+      return res.status(400).json({ success: false, message: 'Reviewer name, rating, and comment are required' });
     }
 
     const ratingNum = parseInt(rating, 10);
@@ -383,7 +371,7 @@ export async function submitReview(req: Request, res: Response) {
  */
 export async function submitInquiry(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { studentName, phone, subject, classGrade, message } = req.body;
 
     if (!studentName || !phone) {
@@ -696,3 +684,122 @@ export async function getInstituteLeads(req: any, res: Response) {
     return res.status(500).json({ success: false, message: 'Failed to fetch student leads', error: error.message });
   }
 }
+
+/**
+ * Search Google Places API for Coaching Centers
+ * GET /api/marketplace/google-place/search?q=...
+ */
+export async function searchGooglePlacesHandler(req: Request, res: Response) {
+  try {
+    const q = req.query.q as string;
+    if (!q || q.trim().length === 0) {
+      return res.status(400).json({ success: false, message: 'Search query is required' });
+    }
+
+    const results = await searchGooglePlaces(q);
+    return res.json({
+      success: true,
+      data: results
+    });
+  } catch (error: any) {
+    console.error('Error in searchGooglePlacesHandler:', error);
+    return res.status(500).json({ success: false, message: 'Failed to search Google Places', error: error.message });
+  }
+}
+
+/**
+ * Sync Google Business Profile Details & Reviews with Coaching Profile
+ * POST /api/marketplace/coaching/:id/sync-google-place
+ */
+export async function syncGooglePlaceHandler(req: any, res: Response) {
+  try {
+    const { id } = req.params;
+    const { placeId } = req.body;
+
+    const userInstituteId = req.user?.instituteId;
+    const userRole = req.user?.role;
+
+    if (userRole !== 'SUPER_ADMIN' && userInstituteId !== id) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to modify this institute profile' });
+    }
+
+    if (!placeId) {
+      return res.status(400).json({ success: false, message: 'Google Place ID is required' });
+    }
+
+    const details = await fetchGooglePlaceDetails(placeId);
+
+    const updated = await prisma.institute.update({
+      where: { id },
+      data: {
+        googlePlaceId: details.placeId,
+        googleMapsUrl: details.mapsUrl,
+        googleRating: details.rating,
+        googleReviewCount: details.userRatingsTotal,
+        googleReviews: details.reviews as any,
+        googlePhotos: details.photos as any,
+        googleLastSyncedAt: new Date()
+      },
+      select: {
+        id: true,
+        name: true,
+        googlePlaceId: true,
+        googleMapsUrl: true,
+        googleRating: true,
+        googleReviewCount: true,
+        googleReviews: true,
+        googlePhotos: true,
+        googleLastSyncedAt: true
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: 'Google Business Profile details & reviews synced successfully!',
+      data: updated
+    });
+  } catch (error: any) {
+    console.error('Error in syncGooglePlaceHandler:', error);
+    return res.status(500).json({ success: false, message: 'Failed to sync Google Place details', error: error.message });
+  }
+}
+
+/**
+ * Unlink Google Business Profile
+ * POST /api/marketplace/coaching/:id/unlink-google-place
+ */
+export async function unlinkGooglePlaceHandler(req: any, res: Response) {
+  try {
+    const { id } = req.params;
+
+    const userInstituteId = req.user?.instituteId;
+    const userRole = req.user?.role;
+
+    if (userRole !== 'SUPER_ADMIN' && userInstituteId !== id) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const updated = await prisma.institute.update({
+      where: { id },
+      data: {
+        googlePlaceId: null,
+        googleMapsUrl: null,
+        googleRating: null,
+        googleReviewCount: null,
+        googleReviews: null,
+        googlePhotos: null,
+        googleLastSyncedAt: null
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: 'Google Business Profile unlinked successfully',
+      data: updated
+    });
+  } catch (error: any) {
+    console.error('Error in unlinkGooglePlaceHandler:', error);
+    return res.status(500).json({ success: false, message: 'Failed to unlink Google Place', error: error.message });
+  }
+}
+

@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { Tier } from '@prisma/client';
 import { secureLogger } from '../utils/secureLogger';
 import { getRazorpayConfig } from '../utils/env';
+import { addPurchasedQuizCredits } from '../utils/quizCredits';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -193,16 +194,11 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
             else {
                 return res.status(400).json({ success: false, error: 'Invalid plan selected' });
             }
-            await prisma.institute.update({
-                where: { id: admin.institute.id },
-                data: {
-                    quizCredits: { increment: addedCredits }
-                }
-            });
+            await addPurchasedQuizCredits(admin.institute.id, addedCredits);
 
             return res.json({
                 success: true,
-                message: `Payment verified successfully. Added ${addedCredits} quiz credits.`
+                message: `Payment verified successfully. Added ${addedCredits} lifetime quiz credits.`
             });
         }
 

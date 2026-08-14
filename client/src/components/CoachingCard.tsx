@@ -1,8 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Star, MapPin, Phone, CheckCircle2, MessageCircle, Sparkles } from 'lucide-react';
-import { appleSpringDefault, appleSpringSnappy } from '../utils/appleDesign';
+import { Star, MapPin, Phone, CheckCircle2, MessageCircle, ChevronRight } from 'lucide-react';
 
 export interface CoachingItem {
   id: string;
@@ -32,6 +30,19 @@ interface CoachingCardProps {
   coaching: CoachingItem;
 }
 
+const SUBJECT_COLORS: Record<string, string> = {
+  Mathematics: 'bg-blue-50 text-blue-700 border-blue-200',
+  Physics: 'bg-violet-50 text-violet-700 border-violet-200',
+  Chemistry: 'bg-rose-50 text-rose-700 border-rose-200',
+  Biology: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Science: 'bg-teal-50 text-teal-700 border-teal-200',
+  English: 'bg-amber-50 text-amber-700 border-amber-200',
+  Commerce: 'bg-orange-50 text-orange-700 border-orange-200',
+};
+
+const getSubjectColor = (sub: string) =>
+  SUBJECT_COLORS[sub] || 'bg-neutral-100 text-neutral-700 border-neutral-200/80';
+
 export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
   const whatsappUrl = coaching.whatsappPhone
     ? `https://wa.me/${coaching.whatsappPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
@@ -39,166 +50,148 @@ export const CoachingCard: React.FC<CoachingCardProps> = ({ coaching }) => {
       )}`
     : null;
 
+  const rating = coaching.googleRating ?? (coaching.avgRating > 0 ? coaching.avgRating : null);
+  const reviewCount = coaching.googleReviewCount ?? coaching.reviewCount;
+  const isGoogle = !!coaching.googleRating;
+  const locationStr = coaching.area ? `${coaching.area}, ${coaching.city}` : coaching.city;
+
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      whileHover={{ y: -3, scale: 1.012 }}
-      transition={appleSpringDefault}
-      className="bg-white/80 backdrop-blur-md rounded-3xl border border-neutral-200/80 p-6 shadow-xs hover:shadow-xl transition-shadow duration-300 group flex flex-col justify-between relative overflow-hidden"
-    >
-      {/* Exclusive Gold Top Accent Line */}
+    <div className="group bg-white rounded-2xl border border-neutral-200/80 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 flex flex-col overflow-hidden relative">
+      {/* Exclusive Badge */}
       {coaching.isExclusive && (
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500" />
+        <div className="absolute top-3.5 right-3.5 z-10 bg-gradient-to-r from-amber-500 to-orange-400 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+          ⭐ Featured
+        </div>
       )}
 
-      <div>
-        {/* Top Header Row */}
-        <div className="flex items-start justify-between gap-3 mb-3.5">
-          <div className="flex items-center gap-3">
-            {coaching.logoUrl ? (
-              <img
-                src={coaching.logoUrl}
-                alt={coaching.name}
-                className="w-12 h-12 rounded-2xl object-cover border border-neutral-100 shadow-xs"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-2xl bg-neutral-100 border border-neutral-200/80 flex items-center justify-center text-neutral-900 font-extrabold text-lg shadow-2xs">
-                {coaching.name.substring(0, 2).toUpperCase()}
-              </div>
-            )}
-
-            <div>
-              <Link to={`/coaching/${coaching.slug}`} className="group-hover:text-neutral-700 transition-colors">
-                <h3 className="font-bold text-[#1A1F36] text-base leading-snug tracking-[-0.015em] line-clamp-1">
-                  {coaching.name}
-                </h3>
-              </Link>
-              <p className="text-xs text-neutral-500 font-medium flex items-center gap-1 mt-0.5">
-                <span>By {coaching.teacherName}</span>
-                {coaching.isVerified && (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 inline shrink-0" title="Verified Teacher" />
-                )}
-              </p>
+      {/* Card Header / Hero */}
+      <div className="p-5 pb-0 flex items-start gap-3.5">
+        {/* Logo / Avatar */}
+        <div className="shrink-0">
+          {coaching.logoUrl ? (
+            <img
+              src={coaching.logoUrl}
+              alt={coaching.name}
+              className="w-14 h-14 rounded-2xl object-cover border border-neutral-100 shadow-sm"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-neutral-900 to-neutral-700 flex items-center justify-center text-white font-black text-xl shadow-sm">
+              {coaching.name.substring(0, 2).toUpperCase()}
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Exclusive Partner Badge */}
-        {coaching.isExclusive && (
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={appleSpringSnappy}
-            className="mb-3.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50/90 border border-amber-200/80 text-[11px] font-bold text-amber-800 shadow-2xs"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400 shrink-0" />
-            <span>Exclusive MathLogs Partner</span>
-          </motion.div>
-        )}
-
-        {/* Tagline */}
-        {coaching.tagline && (
-          <p className="text-xs text-neutral-500 italic mt-1 mb-3 line-clamp-2 bg-neutral-50/70 p-2.5 rounded-xl border border-neutral-100/80">
-            "{coaching.tagline}"
+        {/* Name & Teacher */}
+        <div className="flex-1 min-w-0 pt-0.5">
+          <Link to={`/coaching/${coaching.slug}`} className="block">
+            <h3 className="font-extrabold text-[#1A1F36] text-[15px] leading-snug line-clamp-1 group-hover:text-neutral-600 transition-colors">
+              {coaching.name}
+            </h3>
+          </Link>
+          <p className="text-xs text-neutral-500 font-medium flex items-center gap-1.5 mt-0.5">
+            <span className="truncate">By {coaching.teacherName}</span>
+            {coaching.isVerified && (
+              <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" title="Verified Teacher" />
+            )}
           </p>
-        )}
 
-        {/* Location & Rating */}
-        <div className="mt-3 flex items-center justify-between text-xs text-neutral-600 border-t border-neutral-100 pt-3">
-          <div className="flex items-center gap-1.5 text-neutral-500 font-medium line-clamp-1">
-            <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-            <span>{coaching.area ? `${coaching.area}, ${coaching.city}` : coaching.city}</span>
-          </div>
-
-          <div className="flex items-center gap-1 font-bold text-neutral-800 bg-amber-50/80 px-2.5 py-1 rounded-full border border-amber-200/80">
-            {coaching.googleRating ? (
-              <span className="flex items-center gap-1">
-                <span className="font-extrabold text-blue-600 text-[10px]">G</span>
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-                <span>{coaching.googleRating}</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1">
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-                <span>{coaching.avgRating > 0 ? coaching.avgRating : 'New'}</span>
-              </span>
-            )}
-            {coaching.reviewCount > 0 && (
-              <span className="text-neutral-400 font-normal text-[11px]">({coaching.reviewCount})</span>
-            )}
+          {/* Location */}
+          <div className="flex items-center gap-1 mt-1.5 text-neutral-400">
+            <MapPin className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-[12px] font-medium line-clamp-1">{locationStr}</span>
           </div>
         </div>
 
-        {/* Subjects Badges */}
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {coaching.subjectsOffered && coaching.subjectsOffered.length > 0 ? (
-            coaching.subjectsOffered.slice(0, 4).map((sub, i) => (
+        {/* Rating Pill */}
+        {rating !== null && (
+          <div className={`shrink-0 flex flex-col items-center justify-center rounded-xl px-2.5 py-1.5 min-w-[52px] border ${
+            isGoogle 
+              ? 'bg-gradient-to-b from-blue-50 to-white border-blue-200/90 shadow-2xs' 
+              : 'bg-amber-50 border-amber-200/80'
+          }`}>
+            {isGoogle ? (
+              <div className="flex items-center gap-1">
+                <span className="w-3.5 h-3.5 rounded-full bg-blue-600 text-white font-extrabold text-[8px] flex items-center justify-center">G</span>
+                <span className="text-[10px] font-extrabold text-blue-700">VERIFIED</span>
+              </div>
+            ) : null}
+            <div className="flex items-center gap-0.5 mt-0.5">
+              <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+              <span className="text-xs font-black text-neutral-800">{typeof rating === 'number' ? rating.toFixed(1) : rating}</span>
+            </div>
+            {reviewCount > 0 && (
+              <span className="text-[10px] text-neutral-400 font-medium leading-none mt-0.5">{reviewCount} rev</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Tagline */}
+      {coaching.tagline && (
+        <p className="mx-5 mt-3 text-xs text-neutral-500 italic line-clamp-2 bg-neutral-50 px-3 py-2 rounded-xl border border-neutral-100">
+          "{coaching.tagline}"
+        </p>
+      )}
+
+      {/* Subjects */}
+      <div className="px-5 mt-3 flex flex-wrap gap-1.5">
+        {coaching.subjectsOffered && coaching.subjectsOffered.length > 0 ? (
+          <>
+            {coaching.subjectsOffered.slice(0, 3).map((sub, i) => (
               <span
                 key={i}
-                className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100/90 text-neutral-700 border border-neutral-200/60"
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getSubjectColor(sub)}`}
               >
                 {sub}
               </span>
-            ))
-          ) : (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-500">
-              General Coaching
-            </span>
-          )}
-          {coaching.subjectsOffered && coaching.subjectsOffered.length > 4 && (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-500">
-              +{coaching.subjectsOffered.length - 4} more
-            </span>
-          )}
-        </div>
+            ))}
+            {coaching.subjectsOffered.length > 3 && (
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-500 border border-neutral-200/80">
+                +{coaching.subjectsOffered.length - 3} more
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-500 border border-neutral-200/80">
+            General Coaching
+          </span>
+        )}
       </div>
 
-      {/* Action Footer with Apple Instant Feedback on Touch */}
-      <div className="mt-5 pt-3.5 border-t border-neutral-100 flex items-center gap-2">
+      {/* Action Footer */}
+      <div className="mt-4 px-5 pb-5 flex items-center gap-2">
         <Link
           to={`/coaching/${coaching.slug}`}
-          className="flex-1"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-700 rounded-xl transition-all active:scale-95 min-h-[44px]"
         >
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            transition={appleSpringSnappy}
-            className="w-full text-center px-4 py-2.5 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 rounded-full transition-colors cursor-pointer"
-          >
-            View Profile
-          </motion.button>
+          <span>View Profile</span>
+          <ChevronRight className="w-3.5 h-3.5" />
         </Link>
 
         {whatsappUrl && (
-          <motion.a
+          <a
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            whileTap={{ scale: 0.94 }}
-            transition={appleSpringSnappy}
-            className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-[#16a34a] bg-[#effdf4] hover:bg-[#dcfce7] border border-[#bbf7d0] rounded-full transition-colors cursor-pointer"
             title="Chat on WhatsApp"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-bold text-[#16a34a] bg-[#f0fdf4] hover:bg-[#dcfce7] border border-[#bbf7d0] rounded-xl transition-colors active:scale-95 min-h-[44px] min-w-[44px]"
           >
             <MessageCircle className="w-4 h-4 fill-[#16a34a] text-white" />
             <span className="hidden sm:inline">WhatsApp</span>
-          </motion.a>
+          </a>
         )}
 
         {coaching.phone && (
-          <motion.a
+          <a
             href={`tel:${coaching.phone}`}
-            whileTap={{ scale: 0.94 }}
-            transition={appleSpringSnappy}
-            className="p-2.5 text-neutral-700 bg-white border border-neutral-200/80 rounded-full hover:bg-neutral-100 transition-colors cursor-pointer"
             title={`Call ${coaching.phone}`}
+            className="flex items-center justify-center p-2.5 text-neutral-700 bg-white border border-neutral-200/80 rounded-xl hover:bg-neutral-100 transition-colors active:scale-95 min-h-[44px] min-w-[44px]"
           >
             <Phone className="w-4 h-4 text-neutral-700" />
-          </motion.a>
+          </a>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 };
 

@@ -1,24 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Search, MapPin, Sparkles, SlidersHorizontal, GraduationCap, Star, ArrowRight, Loader2, BookOpen, ChevronRight } from 'lucide-react';
+import {
+  Search, MapPin, Sparkles, SlidersHorizontal, GraduationCap, Star,
+  ArrowRight, Loader2, BookOpen, ChevronRight, X, Filter, Phone, MessageCircle
+} from 'lucide-react';
 import CoachingCard, { type CoachingItem } from '../components/CoachingCard';
-import { appleSpringDefault, appleSpringSnappy, appleStaggerContainer, appleItemReveal } from '../utils/appleDesign';
 
-const FEATURED_SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Science', 'English', 'Commerce'];
+const FEATURED_SUBJECTS = [
+  'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Science',
+  'English', 'Hindi', 'Commerce', 'Computer Science'
+];
+
+const SORT_OPTIONS = [
+  { value: 'rating', label: 'Highest Rated' },
+  { value: 'reviews', label: 'Most Reviewed' },
+  { value: 'newest', label: 'Newest First' },
+];
 
 export default function MarketplaceHome() {
-  const prefersReducedMotion = useReducedMotion();
   const [coachings, setCoachings] = useState<CoachingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
-  const [selectedArea, setSelectedArea] = useState('');
-  const [exclusiveOnly, setExclusiveOnly] = useState(false);
-  const [sortBy, setSortBy] = useState('exclusive');
-
+  const [sortBy, setSortBy] = useState('rating');
   const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   const fetchMarketplaceData = useCallback(async () => {
     setLoading(true);
@@ -27,8 +35,6 @@ export default function MarketplaceHome() {
       if (searchTerm) queryParams.append('q', searchTerm);
       if (selectedSubject) queryParams.append('subject', selectedSubject);
       if (selectedCity) queryParams.append('city', selectedCity);
-      if (selectedArea) queryParams.append('area', selectedArea);
-      if (exclusiveOnly) queryParams.append('exclusiveOnly', 'true');
       if (sortBy) queryParams.append('sortBy', sortBy);
 
       const res = await fetch(`/api/marketplace/search?${queryParams.toString()}`);
@@ -45,7 +51,7 @@ export default function MarketplaceHome() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, selectedSubject, selectedCity, selectedArea, exclusiveOnly, sortBy]);
+  }, [searchTerm, selectedSubject, selectedCity, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -54,99 +60,107 @@ export default function MarketplaceHome() {
     return () => clearTimeout(timer);
   }, [fetchMarketplaceData]);
 
+  // Close drawer on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filterOpen && drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [filterOpen]);
+
   const handleSubjectClick = (subj: string) => {
     setSelectedSubject(prev => (prev === subj ? '' : subj));
+    setFilterOpen(false);
   };
 
-  const exclusivePartners = coachings.filter(c => c.isExclusive);
+  const hasActiveFilters = selectedSubject || selectedCity;
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedSubject('');
+    setSelectedCity('');
+    setSortBy('rating');
+  };
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col font-sans text-neutral-900 selection:bg-neutral-900 selection:text-white relative overflow-x-hidden">
-      {/* Soft Ambient Background Glows */}
-      <div className="absolute top-0 left-0 w-full min-h-[100vh] pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-[-10%] right-[-5%] w-[65vw] h-[65vw] bg-gradient-to-bl from-neutral-200/60 via-neutral-100/40 to-transparent rounded-full blur-[120px]" />
-        <div className="absolute top-[15%] left-[-10%] w-[55vw] h-[55vw] bg-gradient-to-br from-neutral-200/50 via-neutral-100/30 to-transparent rounded-full blur-[120px]" />
-      </div>
+    <div className="min-h-screen bg-[#F8F9FB] flex flex-col font-sans text-neutral-900 selection:bg-neutral-900 selection:text-white relative overflow-x-hidden">
 
-      {/* Translucent Apple Glass Header */}
-      <header className="sticky top-0 z-40 bg-white/70 backdrop-blur-2xl saturate-180 border-b border-white/40 shadow-xs">
-        <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <motion.img
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              src="/logo-64.webp"
-              alt="MathLogs Logo"
-              width={36}
-              height={36}
-              className="w-9 h-9 rounded-xl shadow-xs border border-white/60 object-cover"
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-[22px] font-extrabold tracking-[-0.025em] text-neutral-900">MathLogs</span>
-            </div>
+      {/* ── Sticky Nav ─────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-neutral-200/60 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+          <Link to="/" className="flex items-center gap-2.5 shrink-0">
+            <img src="/logo-64.webp" alt="MathLogs Logo" width={34} height={34} className="w-[34px] h-[34px] rounded-xl shadow-md border border-neutral-100 object-cover" />
+            <span className="text-[18px] font-extrabold tracking-tight text-neutral-900 hidden sm:block">MathLogs</span>
           </Link>
 
-          <div className="flex items-center gap-3">
-            <Link to="/list-coaching">
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.02 }}
-                transition={appleSpringSnappy}
-                className="hidden sm:inline-flex items-center gap-1.5 px-5 py-2.5 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-full transition-colors shadow-xs cursor-pointer"
-              >
-                <GraduationCap className="w-4 h-4" />
-                <span>List Your Coaching Free</span>
-              </motion.button>
+          {/* Center: Mobile search pill */}
+          <div className="flex-1 max-w-md">
+            <div className="flex items-center gap-2 bg-neutral-100 rounded-full px-4 py-2 border border-neutral-200/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-neutral-900 transition-all">
+              <Search className="w-4 h-4 text-neutral-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search coachings, teachers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-transparent text-sm text-neutral-900 font-medium outline-none placeholder:text-neutral-400"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="shrink-0 text-neutral-400 hover:text-neutral-700">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Filter button (mobile) */}
+            <button
+              onClick={() => setFilterOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-bold transition-all sm:hidden ${hasActiveFilters ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200/80 hover:border-neutral-400'}`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              {hasActiveFilters ? 'Filtered' : 'Filter'}
+            </button>
+
+            <Link
+              to="/onboarding"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 rounded-full transition-all hover:shadow-md active:scale-95"
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span>List Coaching Free</span>
             </Link>
             <Link
               to="/login"
-              className="text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors px-3 py-2"
+              className="text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition-colors px-2 py-2 hidden sm:block"
             >
-              Teacher Sign in
+              Sign In
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative z-10 pt-12 pb-14 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={appleSpringDefault}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-neutral-200/80 shadow-2xs text-neutral-700 text-xs font-bold mb-6"
-          >
-            <Sparkles className="w-4 h-4 text-amber-500 fill-amber-400" />
-            <span>Find Verified Local Teachers & Coaching Classes</span>
-          </motion.div>
+      {/* ── Hero Section ───────────────────────────────────────────────────── */}
+      <section className="relative z-10 pt-10 pb-8 px-4 sm:px-6 bg-white border-b border-neutral-200/60">
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold mb-5 shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+            <span>Find Verified Local Teachers &amp; Coaching Classes</span>
+          </div>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...appleSpringDefault, delay: 0.05 }}
-            className="text-4xl sm:text-6xl font-extrabold tracking-[-0.03em] text-[#1A1F36] leading-[1.05]"
-          >
-            Discover Top Coaching Classes & Teachers in Your City
-          </motion.h1>
-          
-          <motion.p
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...appleSpringDefault, delay: 0.1 }}
-            className="mt-4 text-lg sm:text-xl text-neutral-500 font-medium max-w-2xl mx-auto leading-relaxed"
-          >
-            Search by subject, teacher name, locality, or review ratings. Connect directly via WhatsApp or phone.
-          </motion.p>
+          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tighter text-[#1A1F36] leading-tight">
+            Discover Top Coaching Classes<br className="hidden sm:block" />
+            &amp; Teachers Near You
+          </h1>
+          <p className="mt-3 text-sm sm:text-base text-neutral-500 font-medium max-w-xl mx-auto">
+            Search by subject, teacher name, or city. Connect directly via WhatsApp or phone call.
+          </p>
 
-          {/* Search Box with Fluid Motion */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ ...appleSpringDefault, delay: 0.15 }}
-            className="mt-10 bg-white/90 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-lg border border-neutral-200/80 flex flex-col md:flex-row gap-2 max-w-3xl mx-auto"
-          >
-            <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-neutral-50/80 rounded-[1.8rem] border border-neutral-200/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-neutral-900 transition-all">
+          {/* Desktop Search Bar */}
+          <div className="mt-7 hidden md:flex bg-white p-2.5 rounded-[2rem] shadow-md border border-neutral-200/80 gap-2 max-w-3xl mx-auto">
+            <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-neutral-50 rounded-[1.5rem] border border-neutral-200/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-neutral-900 transition-all">
               <Search className="w-5 h-5 text-neutral-400 shrink-0" />
               <input
                 type="text"
@@ -156,211 +170,255 @@ export default function MarketplaceHome() {
                 className="w-full bg-transparent text-sm text-neutral-900 font-medium outline-none placeholder:text-neutral-400"
               />
             </div>
-
-            <div className="flex gap-2">
-              {/* City Filter */}
-              <div className="flex-1 md:w-48 flex items-center gap-2 px-4 py-3 bg-neutral-50/80 rounded-[1.8rem] border border-neutral-200/60">
-                <MapPin className="w-4 h-4 text-neutral-500 shrink-0" />
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="w-full bg-transparent text-sm font-semibold text-neutral-800 outline-none cursor-pointer"
-                >
-                  <option value="">All Cities</option>
-                  {availableCities.map((city) => (
-                    <option key={city} value={city}>{city}</option>
-                  ))}
-                </select>
-              </div>
-
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.02 }}
-                transition={appleSpringSnappy}
-                onClick={fetchMarketplaceData}
-                className="px-7 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm rounded-full transition-all shrink-0 flex items-center gap-2 cursor-pointer"
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-neutral-50 rounded-[1.5rem] border border-neutral-200/60 min-w-[140px]">
+              <MapPin className="w-4 h-4 text-neutral-500 shrink-0" />
+              <select
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                className="w-full bg-transparent text-sm font-semibold text-neutral-800 outline-none cursor-pointer"
               >
-                <span>Search</span>
-                <ChevronRight className="w-4 h-4" />
-              </motion.button>
+                <option value="">All Cities</option>
+                {availableCities.map((city) => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
             </div>
-          </motion.div>
+            <button
+              onClick={fetchMarketplaceData}
+              className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm rounded-full transition-all hover:shadow-md active:scale-95 flex items-center gap-2"
+            >
+              <span>Search</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
 
-          {/* Quick Subject Chips with Apple Spring LayoutId */}
-          <div className="mt-8 flex flex-wrap justify-center gap-2 items-center">
-            <span className="text-xs text-neutral-400 font-bold uppercase tracking-wider mr-2">Popular Subjects:</span>
+          {/* Subject Pills */}
+          <div className="mt-6 flex gap-2 items-center overflow-x-auto pb-1 scrollbar-hide justify-start sm:justify-center">
+            <span className="text-xs text-neutral-400 font-bold uppercase tracking-wider shrink-0 mr-1">Subjects:</span>
             {FEATURED_SUBJECTS.map((subj) => {
               const active = selectedSubject === subj;
               return (
-                <motion.button
+                <button
                   key={subj}
-                  whileTap={{ scale: 0.94 }}
-                  transition={appleSpringSnappy}
                   onClick={() => handleSubjectClick(subj)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors border relative cursor-pointer ${
-                    active
-                      ? 'bg-neutral-900 text-white border-neutral-900 shadow-sm'
-                      : 'bg-white/80 backdrop-blur-sm text-neutral-700 hover:bg-neutral-100 border-neutral-200/80'
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold shrink-0 transition-all border ${active
+                    ? 'bg-neutral-900 text-white border-neutral-900 shadow-sm scale-105'
+                    : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-200/80'
                   }`}
                 >
                   {subj}
-                </motion.button>
+                </button>
               );
             })}
           </div>
         </div>
       </section>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-6 pb-20 flex-1 w-full relative z-10">
-        {/* Filters Bar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-neutral-200/80">
+      {/* ── Main Content ───────────────────────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-28 sm:pb-16 flex-1 w-full relative z-10">
+        {/* Results Bar */}
+        <div className="flex items-center justify-between gap-3 py-5 border-b border-neutral-200/60">
           <div>
-            <h2 className="text-2xl font-bold text-[#1A1F36] tracking-[-0.02em] flex items-center gap-2.5">
+            <h2 className="text-base sm:text-xl font-extrabold text-[#1A1F36] tracking-tight flex items-center gap-2">
               <span>Coaching Classes</span>
-              <span className="text-sm font-semibold text-neutral-400 bg-neutral-100 px-3 py-0.5 rounded-full border border-neutral-200/60">
+              <span className="text-xs font-semibold text-neutral-500 bg-white px-2.5 py-0.5 rounded-full border border-neutral-200/60">
                 {coachings.length} found
               </span>
             </h2>
-            {selectedSubject && (
-              <p className="text-xs text-neutral-600 font-semibold mt-1 flex items-center gap-2">
-                <span>Filtering by subject: <strong className="text-neutral-900">{selectedSubject}</strong></span>
-                <button onClick={() => setSelectedSubject('')} className="text-neutral-400 hover:text-neutral-700 font-bold cursor-pointer">✕ Clear</button>
-              </p>
+            {hasActiveFilters && (
+              <div className="flex items-center gap-2 mt-1">
+                {selectedSubject && (
+                  <span className="text-[11px] bg-neutral-900 text-white font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    {selectedSubject}
+                    <button onClick={() => setSelectedSubject('')}><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {selectedCity && (
+                  <span className="text-[11px] bg-neutral-900 text-white font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    {selectedCity}
+                    <button onClick={() => setSelectedCity('')}><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                <button onClick={clearFilters} className="text-[11px] text-neutral-400 hover:text-neutral-700 font-semibold">Clear all</button>
+              </div>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Exclusive Filter Toggle */}
-            <motion.label
-              whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-2 text-xs font-bold text-amber-900 bg-amber-50/80 border border-amber-200/80 px-4 py-2 rounded-full cursor-pointer hover:bg-amber-100/60 transition-colors shadow-2xs"
+          {/* Desktop Sort */}
+          <div className="hidden sm:flex items-center gap-2 bg-white border border-neutral-200/80 px-4 py-2 rounded-full text-xs shadow-xs">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-neutral-400" />
+            <span className="text-neutral-400 font-semibold">Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-transparent font-bold text-neutral-800 outline-none cursor-pointer"
             >
-              <input
-                type="checkbox"
-                checked={exclusiveOnly}
-                onChange={(e) => setExclusiveOnly(e.target.checked)}
-                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-              />
-              <Sparkles className="w-3.5 h-3.5 text-amber-600 fill-amber-400" />
-              <span>Exclusive MathLogs Partners Only</span>
-            </motion.label>
-
-            {/* Sort Dropdown */}
-            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md border border-neutral-200/80 px-4 py-2 rounded-full text-xs shadow-2xs">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-neutral-400" />
-              <span className="text-neutral-400 font-semibold">Sort:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="bg-transparent font-bold text-neutral-800 outline-none cursor-pointer"
-              >
-                <option value="exclusive">Exclusive Priority</option>
-                <option value="rating">Highest Rated</option>
-              </select>
-            </div>
+              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
           </div>
         </div>
 
-        {/* Featured Exclusive Partners Banner Section */}
-        {!exclusiveOnly && exclusivePartners.length > 0 && !selectedSubject && !searchTerm && (
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={appleSpringDefault}
-            className="mt-8 mb-12 bg-gradient-to-r from-amber-50/70 via-amber-100/40 to-amber-50/70 border border-amber-200/70 backdrop-blur-md rounded-[2.5rem] p-6 sm:p-8 relative overflow-hidden shadow-2xs"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-400 text-amber-950 flex items-center justify-center shadow-xs font-bold">
-                  <Sparkles className="w-4 h-4 fill-amber-950" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-[#1A1F36] text-xl tracking-tight">Featured Exclusive MathLogs Partners</h3>
-                  <p className="text-xs text-neutral-500 font-medium">Verified institutes using MathLogs ERP for digital attendance, fees & tests</p>
-                </div>
-              </div>
-              <span className="hidden sm:inline-flex text-xs font-bold text-amber-800 bg-amber-100/80 px-3.5 py-1 rounded-full border border-amber-200">
-                Verified Software Partners
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {exclusivePartners.slice(0, 3).map((coaching) => (
-                <CoachingCard key={`featured-${coaching.id}`} coaching={coaching} />
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Results Grid with Apple Spring Stagger */}
+        {/* Results Grid */}
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center text-neutral-400">
             <Loader2 className="w-10 h-10 animate-spin text-neutral-900 mb-3" />
             <p className="text-sm font-semibold">Searching coaching classes...</p>
           </div>
         ) : coachings.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={appleSpringDefault}
-            className="py-20 text-center bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-neutral-200/80 p-8 my-8 shadow-xs"
-          >
+          <div className="py-20 text-center bg-white rounded-2xl border border-neutral-200/80 p-8 my-8 shadow-xs">
             <BookOpen className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
             <h3 className="text-xl font-bold text-neutral-900">No coaching classes found</h3>
             <p className="text-sm text-neutral-500 mt-1 max-w-md mx-auto">
-              Try resetting your subject filter or search keywords to explore more teachers in your city.
+              Try resetting your filters or search keywords to explore more teachers.
             </p>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                setSearchTerm('');
-                setSelectedSubject('');
-                setSelectedCity('');
-                setExclusiveOnly(false);
-              }}
-              className="mt-5 px-6 py-2.5 bg-neutral-900 text-white font-bold text-xs rounded-full hover:bg-neutral-800 transition-colors cursor-pointer"
+            <button
+              onClick={clearFilters}
+              className="mt-5 px-6 py-2.5 bg-neutral-900 text-white font-bold text-xs rounded-full hover:bg-neutral-800 transition-colors"
             >
               Reset All Filters
-            </motion.button>
-          </motion.div>
+            </button>
+          </div>
         ) : (
-          <motion.div
-            variants={prefersReducedMotion ? undefined : appleStaggerContainer}
-            initial="hidden"
-            animate="show"
-            className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            <AnimatePresence mode="popLayout">
-              {coachings.map((coaching) => (
-                <CoachingCard key={coaching.id} coaching={coaching} />
-              ))}
-            </AnimatePresence>
-          </motion.div>
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            {coachings.map((coaching) => (
+              <CoachingCard key={coaching.id} coaching={coaching} />
+            ))}
+          </div>
         )}
       </main>
 
-      {/* Footer CTA */}
-      <footer className="bg-white/80 backdrop-blur-md border-t border-neutral-200/80 py-12 px-6">
+      {/* ── Mobile Fixed CTA Bar ────────────────────────────────────────────── */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-neutral-200/80 shadow-lg px-4 py-3 flex gap-3">
+        <Link
+          to="/onboarding"
+          className="flex-1 flex items-center justify-center gap-2 py-3 bg-neutral-900 text-white font-bold text-xs rounded-xl transition-all active:scale-95"
+        >
+          <GraduationCap className="w-4 h-4" />
+          List Coaching Free
+        </Link>
+        <button
+          onClick={() => setFilterOpen(true)}
+          className={`flex items-center justify-center gap-1.5 px-4 py-3 font-bold text-xs rounded-xl border transition-all active:scale-95 ${hasActiveFilters ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200/80'}`}
+        >
+          <Filter className="w-4 h-4" />
+          Filters
+        </button>
+      </div>
+
+      {/* ── Filter Drawer (Mobile Bottom Sheet) ───────────────────────────── */}
+      {filterOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end" aria-modal="true">
+          <div ref={drawerRef} className="w-full bg-white rounded-t-3xl max-h-[85vh] overflow-y-auto">
+            {/* Handle */}
+            <div className="flex justify-center pt-4 pb-2">
+              <div className="w-10 h-1 bg-neutral-200 rounded-full" />
+            </div>
+            <div className="px-5 pb-8">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-base font-extrabold text-[#1A1F36] tracking-tight">Filters & Sort</h3>
+                <button onClick={() => setFilterOpen(false)} className="p-2 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-colors">
+                  <X className="w-4 h-4 text-neutral-700" />
+                </button>
+              </div>
+
+              {/* City */}
+              <div className="mb-5">
+                <p className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2.5 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" /> City
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedCity('')}
+                    className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${!selectedCity ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200/80'}`}
+                  >
+                    All Cities
+                  </button>
+                  {availableCities.map(city => (
+                    <button
+                      key={city}
+                      onClick={() => setSelectedCity(city)}
+                      className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${selectedCity === city ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200/80'}`}
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Subject */}
+              <div className="mb-5">
+                <p className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2.5 flex items-center gap-1.5">
+                  <Star className="w-3.5 h-3.5" /> Subject
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedSubject('')}
+                    className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${!selectedSubject ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200/80'}`}
+                  >
+                    All Subjects
+                  </button>
+                  {FEATURED_SUBJECTS.map(subj => (
+                    <button
+                      key={subj}
+                      onClick={() => handleSubjectClick(subj)}
+                      className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${selectedSubject === subj ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200/80'}`}
+                    >
+                      {subj}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sort */}
+              <div className="mb-6">
+                <p className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2.5 flex items-center gap-1.5">
+                  <SlidersHorizontal className="w-3.5 h-3.5" /> Sort By
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SORT_OPTIONS.map(o => (
+                    <button
+                      key={o.value}
+                      onClick={() => setSortBy(o.value)}
+                      className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${sortBy === o.value ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200/80'}`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={clearFilters} className="flex-1 py-3 border border-neutral-200/80 bg-white text-neutral-700 font-bold text-xs rounded-xl hover:bg-neutral-100 transition-colors">
+                  Clear All
+                </button>
+                <button
+                  onClick={() => { fetchMarketplaceData(); setFilterOpen(false); }}
+                  className="flex-1 py-3 bg-neutral-900 text-white font-bold text-xs rounded-xl hover:bg-neutral-800 transition-colors"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      <footer className="hidden sm:block bg-white border-t border-neutral-200/60 py-10 px-6">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
           <div className="flex items-center gap-3">
             <img src="/logo-64.webp" alt="MathLogs Logo" width={32} height={32} className="w-8 h-8 rounded-lg shadow-sm border border-neutral-100" />
             <div>
-              <span className="font-extrabold text-base text-neutral-900">Are you a teacher or coaching owner?</span>
-              <p className="text-xs text-neutral-500">List your institute on MathLogs Marketplace in under 2 minutes.</p>
+              <span className="font-extrabold text-sm text-neutral-900">Are you a teacher or coaching owner?</span>
+              <p className="text-xs text-emerald-600 font-bold mt-0.5">⚡ Limited Time Offer: List your institute on MathLogs Marketplace for FREE!</p>
             </div>
           </div>
-
-          <Link to="/list-coaching">
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              whileHover={{ scale: 1.03 }}
-              transition={appleSpringSnappy}
-              className="px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full shadow-xs inline-flex items-center gap-2 cursor-pointer"
-            >
-              <span>List Your Coaching Free</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </motion.button>
+          <Link
+            to="/onboarding"
+            className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full transition-all hover:shadow-md active:scale-95 inline-flex items-center gap-2"
+          >
+            <span>List Coaching Free</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
       </footer>

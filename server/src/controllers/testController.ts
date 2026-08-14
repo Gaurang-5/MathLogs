@@ -6,7 +6,31 @@ import { addMathLogsHeader } from '../utils/pdfUtils';
 import { generateTest, generateSingleQuestion, generateTestWithVariants, generateVariantQuestion } from '../utils/ai/test-generator';
 import { sendQuizMarksBroadcast, sendQuizScheduleBroadcast } from '../utils/quizBroadcasts';
 import { secureLogger } from '../utils/secureLogger';
+import { getOrResetQuizCredits, deductQuizCredit } from '../utils/quizCredits';
 
+function normalizeCorrectAnswer(value: unknown): string | string[] {
+    if (Array.isArray(value)) {
+        return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+    }
+
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+            }
+        } catch {
+            // Existing quizzes store a single plain string.
+        }
+    }
+
+    return typeof value === 'string' ? value : '';
+}
+
+function formatCorrectAnswer(value: unknown): string {
+    const normalized = normalizeCorrectAnswer(value);
+    return Array.isArray(normalized) ? normalized.join(', ') : normalized;
+}
 
 export const createTest = async (req: Request, res: Response) => {
     const { name, subject, date, maxMarks, className, batchId, batchIds } = req.body;
@@ -722,7 +746,7 @@ export const generateVariantQuestionRoute = async (req: Request, res: Response) 
 
 export const saveOnlineQuiz = async (req: Request, res: Response) => {
     try {
-        const { title, topic, difficulty, timeLimitMins, totalMarks, batchId, batchIds, studentQuestionCount, questions, availableFrom, availableUntil, isPublic } = req.body;
+        const { title, topic, difficulty, timeLimitMins, totalMarks, batchId, batchIds, studentQuestionCount, questions, availableFrom, availableUntil, isPublic, isDraft } = req.body;
         const teacherId = req.user?.id;
         const instituteId = req.user?.instituteId;
 
@@ -735,54 +759,75 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
         const config = institute.config as any;
         const isQuizOnly = institute.isQuizOnly === true || config?.isQuizOnly === true || config?.planName === 'QUIZ_ONLY';
 
-        if (!title || (!isPublic && finalBatchIds.length === 0) || !Array.isArray(questions) || questions.length === 0 || !instituteId || !availableFrom || !availableUntil) {
-            return res.status(400).json({ error: 'Missing required fields' });
+        // Draft: only requires a title (everything else can be empty/incomplete)
+        if (isDraft === true) {
+            if (!title) {
+                return res.status(400).json({ error: 'Please provide a quiz title to save as draft' });
+            }
+        } else {
+            if (!title || (!isPublic && finalBatchIds.length === 0) || !Array.isArray(questions) || questions.length === 0 || !instituteId || !availableFrom || !availableUntil) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            const creditStatus = await getOrResetQuizCredits(instituteId!);
+            if (creditStatus.totalCredits <= 0) {
+                return res.status(403).json({ error: 'Insufficient quiz credits. You have used your 5 free monthly quiz credits. Please purchase extra lifetime credits.' });
+            }
         }
 
-        if (isQuizOnly && (institute.quizCredits || 0) <= 0) {
-            return res.status(403).json({ error: 'Insufficient quiz credits. Please purchase more credits to generate quizzes.' });
+        // Validate teacher ownership of any selected batches; drafts just do not require one.
+        let batches: { id: string }[] = [];
+        if (finalBatchIds.length > 0) {
+            const batchRecords = await prisma.batch.findMany({
+                where: {
+                    id: { in: finalBatchIds },
+                    teacherId,
+                    instituteId
+                },
+                select: { id: true }
+            });
+
+            if (batchRecords.length !== finalBatchIds.length) {
+                return res.status(404).json({ error: 'One or more batches not found or unauthorized' });
+            }
+            batches = batchRecords;
+        }
+        let availableFromDate: Date | null = null;
+        let availableUntilDate: Date | null = null;
+
+        if (!isDraft) {
+            availableFromDate = new Date(availableFrom);
+            availableUntilDate = new Date(availableUntil);
+
+            if (Number.isNaN(availableFromDate.getTime()) || Number.isNaN((availableUntilDate as Date).getTime())) {
+                return res.status(400).json({ error: 'Invalid quiz schedule' });
+            }
+
+            if ((availableUntilDate as Date) <= availableFromDate) {
+                return res.status(400).json({ error: 'Quiz end time must be after start time' });
+            }
         }
 
-        const availableFromDate = new Date(availableFrom);
-        const availableUntilDate = new Date(availableUntil);
-
-        if (Number.isNaN(availableFromDate.getTime()) || Number.isNaN(availableUntilDate.getTime())) {
-            return res.status(400).json({ error: 'Invalid quiz schedule' });
-        }
-
-        if (availableUntilDate <= availableFromDate) {
-            return res.status(400).json({ error: 'Quiz end time must be after start time' });
-        }
-
-        // Validate teacher ownership of all batches
-        const batches = await prisma.batch.findMany({
-            where: {
-                id: { in: finalBatchIds },
-                teacherId,
-                instituteId
-            },
-            select: { id: true }
-        });
-
-        if (batches.length !== finalBatchIds.length) {
-            return res.status(404).json({ error: 'One or more batches not found or unauthorized' });
-        }
-
-        const normalizedQuestions = questions.map((q: any, index: number) => {
+        const normalizedQuestions = isDraft && (!Array.isArray(questions) || questions.length === 0)
+            ? []
+            : (questions as any[]).map((q: any, index: number) => {
             const options = Array.isArray(q.options) ? q.options.filter((option: unknown) => typeof option === 'string' && option.trim()) : [];
-            const correctOption = q.correctAnswer || q.correctOption;
+            const correctOption = normalizeCorrectAnswer(q.correctAnswer || q.correctOption);
 
-            if (!q.questionText || options.length < 2 || !correctOption) {
+            const correctOptions = Array.isArray(correctOption) ? correctOption : [correctOption];
+            if (!q.questionText || options.length < 2 || correctOptions.length === 0 || correctOptions.some(option => !options.includes(option))) {
                 throw new Error(`Question ${index + 1} is missing text, options, or answer`);
             }
+
+            const imageUrl = q.imageUrl || q.figureUrl || q.image || null;
 
             return {
                 questionText: String(q.questionText),
                 orderIndex: index,
                 options,
-                correctOption: String(correctOption),
+                correctOption: Array.isArray(correctOption) ? JSON.stringify(correctOption) : correctOption,
                 marks: Number(q.marks) > 0 ? Number(q.marks) : 1,
-                // Preserve variant pairing if present (non-null, non-empty string)
+                ...(imageUrl ? { imageUrl: String(imageUrl) } : {}),
                 ...(q.variantGroup ? { variantGroup: String(q.variantGroup) } : {})
             };
         });
@@ -805,6 +850,7 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
                     totalMarks: finalTotalMarks,
                     availableFrom: availableFromDate,
                     availableUntil: availableUntilDate,
+                    isFinalized: isDraft !== true,
                     batchId: finalBatchIds.length > 0 ? finalBatchIds[0] : null, // Backwards compatibility field
                     teacherId,
                     instituteId,
@@ -825,17 +871,14 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
                 }
             });
 
-            if (isQuizOnly) {
-                await tx.institute.update({
-                    where: { id: instituteId! },
-                    data: { quizCredits: { decrement: 1 } }
-                });
+            if (!isDraft) {
+                await deductQuizCredit(instituteId!);
             }
 
             return createdQuiz;
         });
 
-        if (process.env.NODE_ENV !== 'test') {
+        if (!isDraft && process.env.NODE_ENV !== 'test') {
             void sendQuizScheduleBroadcast(quiz.id).catch((error) => {
                 console.error(`[Quiz Schedule Broadcast] Failed for quiz ${quiz.id}:`, error);
             });
@@ -940,7 +983,7 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
         const quizId = String(req.params.id);
         const teacherId = req.user?.id;
         const instituteId = req.user?.instituteId;
-        const { title, topic, difficulty, timeLimitMins, totalMarks, batchIds, studentQuestionCount, questions, availableFrom, availableUntil } = req.body;
+        const { title, topic, difficulty, timeLimitMins, totalMarks, batchIds, studentQuestionCount, questions, availableFrom, availableUntil, isPublic, isDraft } = req.body;
         let normalizedQuestions: any[] | undefined = undefined;
 
         const quiz = await prisma.onlineQuiz.findFirst({
@@ -965,22 +1008,31 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Cannot edit quiz after students have already started/submitted attempts' });
         }
 
-        const availableFromDate = new Date(availableFrom);
-        const availableUntilDate = new Date(availableUntil);
-
-        if (Number.isNaN(availableFromDate.getTime()) || Number.isNaN(availableUntilDate.getTime())) {
-            return res.status(400).json({ error: 'Invalid quiz schedule' });
+        if (isDraft === true && !title) {
+            return res.status(400).json({ error: 'Please provide a quiz title to save as draft' });
         }
 
-        // New start time must be at least 10 minutes from now
-        const nowCheck = new Date();
-        const tenMinsFromNow = new Date(nowCheck.getTime() + 10 * 60 * 1000);
-        if (availableFromDate <= tenMinsFromNow) {
-            return res.status(400).json({ error: 'New start time must be at least 10 minutes from now' });
-        }
+        let availableFromDate: Date | null = null;
+        let availableUntilDate: Date | null = null;
 
-        if (availableUntilDate <= availableFromDate) {
-            return res.status(400).json({ error: 'Quiz end time must be after start time' });
+        if (!isDraft) {
+            availableFromDate = new Date(availableFrom);
+            availableUntilDate = new Date(availableUntil);
+
+            if (Number.isNaN(availableFromDate.getTime()) || Number.isNaN(availableUntilDate.getTime())) {
+                return res.status(400).json({ error: 'Invalid quiz schedule' });
+            }
+
+            // New start time must be at least 10 minutes from now
+            const nowCheck = new Date();
+            const tenMinsFromNow = new Date(nowCheck.getTime() + 10 * 60 * 1000);
+            if (availableFromDate <= tenMinsFromNow) {
+                return res.status(400).json({ error: 'New start time must be at least 10 minutes from now' });
+            }
+
+            if (availableUntilDate <= availableFromDate) {
+                return res.status(400).json({ error: 'Quiz end time must be after start time' });
+            }
         }
 
         let connectBatches: { id: string }[] = [];
@@ -1001,12 +1053,13 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
             finalBatchId = batchIds[0];
         }
 
-        if (Array.isArray(questions) && questions.length > 0) {
+        if (Array.isArray(questions)) {
             normalizedQuestions = questions.map((q: any, index: number) => {
                 const options = Array.isArray(q.options) ? q.options.filter((option: unknown) => typeof option === 'string' && option.trim()) : [];
-                const correctOption = q.correctAnswer || q.correctOption;
+                const correctOption = normalizeCorrectAnswer(q.correctAnswer || q.correctOption);
 
-                if (!q.questionText || options.length < 2 || !correctOption) {
+                const correctOptions = Array.isArray(correctOption) ? correctOption : [correctOption];
+                if (!q.questionText || options.length < 2 || correctOptions.length === 0 || correctOptions.some(option => !options.includes(option))) {
                     throw new Error(`Question ${index + 1} is missing text, options, or answer`);
                 }
 
@@ -1014,8 +1067,9 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
                     questionText: String(q.questionText),
                     orderIndex: index,
                     options,
-                    correctOption: String(correctOption),
+                    correctOption: Array.isArray(correctOption) ? JSON.stringify(correctOption) : correctOption,
                     marks: Number(q.marks) > 0 ? Number(q.marks) : 1,
+                    ...(q.imageUrl ? { imageUrl: String(q.imageUrl) } : {}),
                     ...(q.variantGroup ? { variantGroup: String(q.variantGroup) } : {})
                 };
             });
@@ -1045,6 +1099,8 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
                         totalMarks: finalTotalMarks,
                         availableFrom: availableFromDate,
                         availableUntil: availableUntilDate,
+                        isFinalized: isDraft !== true,
+                        isPublic: typeof isPublic === 'boolean' ? isPublic : quiz.isPublic,
                         batchId: finalBatchId,
                         studentQuestionCount: sqCount,
                         ...(connectBatches.length > 0 ? {
@@ -1075,6 +1131,8 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
                     totalMarks: finalTotalMarks,
                     availableFrom: availableFromDate,
                     availableUntil: availableUntilDate,
+                    isFinalized: isDraft !== true,
+                    isPublic: typeof isPublic === 'boolean' ? isPublic : quiz.isPublic,
                     batchId: finalBatchId,
                     studentQuestionCount: sqCount,
                     ...(connectBatches.length > 0 ? {
@@ -1444,7 +1502,7 @@ export const downloadOnlineQuizQuestionsPdf = async (req: Request, res: Response
 
             const boxY = doc.y;
             doc.rect(50, boxY, 495, 22).fillColor('#f5f5f5').fill();
-            doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9.5).text(`Correct Answer: ${q.correctOption}`, 65, boxY + 6);
+            doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9.5).text(`Correct Answer: ${formatCorrectAnswer(q.correctOption)}`, 65, boxY + 6);
             doc.moveDown(1.5);
         });
 

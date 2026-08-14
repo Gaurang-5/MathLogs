@@ -195,7 +195,6 @@ export default function Home() {
     const carouselRef = useRef<HTMLDivElement>(null);
     
     const isFreeTrial = true;
-    const [planType, setPlanType] = useState<'quiz_only' | 'with_quiz'>('with_quiz');
 
     // Auto-scroll logic for mobile carousel
     useEffect(() => {
@@ -953,169 +952,119 @@ export default function Home() {
                             Simple, transparent pricing
                         </h2>
                         <p className="text-xl text-neutral-500 max-w-2xl mx-auto mb-10">
-                            Choose the plan that fits your coaching center. No hidden fees or surprise charges.
+                            Choose the plan that fits your coaching center. Every plan includes 5 free monthly quiz credits.
                         </p>
-
-                        {/* Plan Type Toggle */}
-                        <div className="flex items-center justify-center">
-                            <div className="bg-white border border-neutral-200 p-1.5 rounded-full inline-flex shadow-sm">
-                                <button
-                                    onClick={() => setPlanType('quiz_only')}
-                                    className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all ${
-                                        planType === 'quiz_only'
-                                            ? 'bg-neutral-900 text-white shadow-md'
-                                            : 'text-neutral-500 hover:text-neutral-900'
-                                    }`}
-                                >
-                                    Quiz Only
-                                </button>
-                                <button
-                                    onClick={() => setPlanType('with_quiz')}
-                                    className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all ${
-                                        planType === 'with_quiz'
-                                            ? 'bg-neutral-900 text-white shadow-md'
-                                            : 'text-neutral-500 hover:text-neutral-900'
-                                    }`}
-                                >
-                                    Full Platform
-                                </button>
-                            </div>
-                        </div>
                     </div>
 
-                    {planType === 'quiz_only' ? (
-                        <div className="max-w-md mx-auto">
-                            <div className="bg-white rounded-3xl p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200 relative transform md:-translate-y-4">
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-green-500 text-white text-xs font-bold uppercase tracking-wider py-1.5 px-3 rounded-full flex items-center gap-1">
-                                    <Sparkles className="w-3 h-3" /> Special Offer
-                                </div>
-                                <h3 className="text-2xl font-bold text-neutral-900 mb-2 text-center">Quiz Starter Pack</h3>
-                                <p className="text-neutral-500 text-sm mb-6 text-center">Get started with our credit-based quiz system.</p>
-                                <div className="mb-8 flex flex-col items-center">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-xl font-bold text-neutral-400 line-through">₹1000</span>
-                                        <span className="text-5xl font-extrabold text-neutral-900">₹500</span>
+                    <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
+                        {/* Listing Tier */}
+                        <div className="bg-white rounded-3xl p-8 border-2 border-emerald-500 shadow-md transition-transform hover:-translate-y-1 hover:shadow-lg flex flex-col justify-between relative">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-600 text-white text-[11px] font-bold uppercase tracking-wider py-1 px-3 rounded-full flex items-center gap-1 shadow-sm">
+                                <Sparkles className="w-3 h-3 fill-emerald-300" /> Limited Time Offer
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Marketplace Listing</h3>
+                                <p className="text-neutral-500 text-sm mb-4 h-10">Get discovered by local students in your city for free.</p>
+                                <div className="mb-6 flex flex-col">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xl font-bold text-neutral-400 line-through">₹99</span>
+                                        <span className="text-4xl font-extrabold text-neutral-900">FREE</span>
                                     </div>
-                                    <span className="text-green-600 font-bold text-sm bg-green-50 px-3 py-1 rounded-full mt-2">50% OFF One-Time Payment</span>
+                                    <span className="text-emerald-600 font-bold text-xs mt-1">100% Free Limited Time Offer</span>
                                 </div>
-                                <Link to="/onboarding?type=quiz_only" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-900 text-white font-bold hover:bg-neutral-800 transition-colors mb-8 shadow-md">
-                                    Buy 10 Credits Now
+                                <Link to="/onboarding?plan=listing" className="block w-full text-center py-3 px-4 rounded-full bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors mb-8 shadow-sm">
+                                    List Coaching Free
                                 </Link>
                                 <ul className="space-y-4">
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-900 font-medium">10 Quiz Credits Included</span>
+                                        <span className="text-neutral-600">Marketplace Directory Listing</span>
                                     </li>
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Create & Assign Online Quizzes</span>
+                                        <span className="text-neutral-600">Public Profile & Page Management</span>
                                     </li>
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Instant Automated Grading</span>
+                                        <span className="text-neutral-600">Student Lead Enquiries & WhatsApp</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Google Maps Location Link</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        {/* Quiz Tier */}
+                        <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md flex flex-col justify-between">
+                            <div>
+                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Quiz Starter</h3>
+                                <p className="text-neutral-500 text-sm mb-6 h-10">Regular student testing and AI question generation.</p>
+                                <div className="mb-8">
+                                    <span className="text-4xl font-extrabold text-neutral-900">₹250</span>
+                                    <span className="text-neutral-500"> /mo</span>
+                                </div>
+                                <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-100 text-neutral-900 font-bold hover:bg-neutral-200 transition-colors mb-8">
+                                    Get Started
+                                </Link>
+                                <ul className="space-y-4">
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-900 font-medium">5 Quiz Credits / Month (Reset Monthly)</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Quiz Builder & Auto-Grading</span>
                                     </li>
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
                                         <span className="text-neutral-600">Performance Analytics</span>
                                     </li>
+                                    <li className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
+                                        <span className="text-neutral-600">Buy Extra Credits Valid for Lifetime</span>
+                                    </li>
                                 </ul>
                             </div>
                         </div>
-                    ) : (
-                        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-start">
-                            {/* Basic Tier */}
-                            <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Basic</h3>
-                                <p className="text-neutral-500 text-sm mb-6 h-10">Perfect for independent tutors starting their journey.</p>
-                                <div className="mb-8">
-                                    <span className="text-4xl font-extrabold text-neutral-900">₹999</span>
-                                    <span className="text-neutral-500"> /mo</span>
-                                </div>
-                                <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-100 text-neutral-900 font-bold hover:bg-neutral-200 transition-colors mb-8">
-                                    {isFreeTrial ? 'Start 14-Day Free Trial' : 'Get Started'}
-                                </Link>
-                                <ul className="space-y-4">
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Up to 100 students</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Unlimited Quizzes</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Batch Management</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Fee Collection</span>
-                                    </li>
-                                </ul>
-                            </div>
 
-                            {/* Pro Tier (Most Popular) */}
-                            <div className="bg-white rounded-3xl p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200 relative transform md:-translate-y-4">
+                        {/* All Inclusive Tier (Most Popular) */}
+                        <div className="bg-white rounded-3xl p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200 relative transform md:-translate-y-4 flex flex-col justify-between">
+                            <div>
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider py-1.5 px-3 rounded-full">
                                     Most Popular
                                 </div>
-                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Pro</h3>
-                                <p className="text-neutral-500 text-sm mb-6 h-10">For growing coaching centers with more students.</p>
+                                <h3 className="text-xl font-bold text-neutral-900 mb-2">All Inclusive</h3>
+                                <p className="text-neutral-500 text-sm mb-6 h-10">Complete ERP suite for coaching institutes.</p>
                                 <div className="mb-8">
-                                    <span className="text-4xl font-extrabold text-neutral-900">₹1,999</span>
+                                    <span className="text-4xl font-extrabold text-neutral-900">₹500</span>
                                     <span className="text-neutral-500"> /mo</span>
                                 </div>
                                 <Link to="/onboarding" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-900 text-white font-bold hover:bg-neutral-800 transition-colors mb-8 shadow-md">
-                                    {isFreeTrial ? 'Start 14-Day Free Trial' : 'Try Pro Today'}
+                                    Start Free Trial
                                 </Link>
                                 <ul className="space-y-4">
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-900 font-medium">Up to 250 students</span>
+                                        <span className="text-neutral-900 font-medium">Full Student Management ERP</span>
                                     </li>
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Unlimited Quizzes</span>
+                                        <span className="text-neutral-600">Unlimited Batches & Fee Alerts</span>
                                     </li>
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Automated Grading</span>
+                                        <span className="text-neutral-900 font-medium">5 Quiz Credits / Month (Reset Monthly)</span>
                                     </li>
                                     <li className="flex items-start gap-3">
                                         <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">WhatsApp Alerts</span>
-                                    </li>
-                                </ul>
-                            </div>
-
-                            {/* Enterprise Tier */}
-                            <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                                <h3 className="text-xl font-bold text-neutral-900 mb-2">Enterprise</h3>
-                                <p className="text-neutral-500 text-sm mb-6 h-10">Custom deployment & limits for large coaching networks.</p>
-                                <div className="mb-8">
-                                    <span className="text-4xl font-extrabold text-neutral-900">Custom</span>
-                                    <span className="text-neutral-500"> pricing</span>
-                                </div>
-                                <a href="https://docs.google.com/forms/d/e/1FAIpQLSf_iZpFA8pDCv5ESQ8OwESB7YzlMjWETwwRirk-MV6LddQBeQ/viewform" target="_blank" rel="noopener noreferrer" className="block w-full text-center py-3 px-4 rounded-full bg-neutral-100 text-neutral-900 font-bold hover:bg-neutral-200 transition-colors mb-8">
-                                    Request Demo
-                                </a>
-                                <ul className="space-y-4">
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Unlimited students</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">White-label branding</span>
-                                    </li>
-                                    <li className="flex items-start gap-3">
-                                        <CheckCircle className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
-                                        <span className="text-neutral-600">Dedicated account manager</span>
+                                        <span className="text-neutral-600">Buy Extra Credits Valid for Lifetime</span>
                                     </li>
                                 </ul>
                             </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </section>
 
