@@ -8,6 +8,20 @@ import type { Breadcrumb } from '@sentry/react';
 
 const IS_PRODUCTION = import.meta.env.PROD;
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
+let sentryInitialized = false;
+
+// Public student flows must not depend on, or send personal data to, telemetry.
+// These pages are commonly opened on shared devices and classroom networks.
+const isPublicStudentFlow = () => {
+    if (typeof window === 'undefined') return false;
+
+    const path = window.location.pathname;
+    return /^\/register\/[^/]+/.test(path)
+        || /^\/kiosk\/register\/[^/]+/.test(path)
+        || /^\/check-status\/[^/]+/.test(path)
+        || /^\/pay\/[^/]+/.test(path)
+        || /^\/[^/]+\/student(?:\/|$)/.test(path);
+};
 
 export const initializeSentry = () => {
     if (!SENTRY_DSN) {
@@ -16,23 +30,25 @@ export const initializeSentry = () => {
         }
         return;
     }
+    if (isPublicStudentFlow()) return;
 
-    Sentry.init({
-        dsn: SENTRY_DSN,
-        environment: IS_PRODUCTION ? 'production' : 'development',
+    try {
+        Sentry.init({
+            dsn: SENTRY_DSN,
+            environment: IS_PRODUCTION ? 'production' : 'development',
+            sendDefaultPii: false,
 
-        // Performance Monitoring
-        integrations: [
-            Sentry.browserTracingIntegration(),
-            Sentry.replayIntegration({
-                maskAllText: true, // GDPR: Mask all text
-                blockAllMedia: true, // GDPR: Block all media
-            }),
-            Sentry.captureConsoleIntegration({ levels: ["log", "warn", "error"] }),
-        ],
+            // Performance Monitoring
+            integrations: [
+                Sentry.browserTracingIntegration(),
+                Sentry.replayIntegration({
+                    maskAllText: true, // GDPR: Mask all text
+                    blockAllMedia: true, // GDPR: Block all media
+                }),
+            ],
 
-        // Enable logs to be sent to Sentry
-        enableLogs: true,
+            // Console payloads can contain form context. Keep them local.
+            enableLogs: false,
 
         // Performance traces sample rate
         tracesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,
@@ -46,6 +62,9 @@ export const initializeSentry = () => {
 
         // PII filtering
         beforeSend(event) {
+            // Also protects client-side navigation into a public student flow.
+            if (isPublicStudentFlow()) return null;
+
             // Remove PII from URLs
             if (event.request?.url) {
                 event.request.url = event.request.url.replace(
@@ -72,6 +91,10 @@ export const initializeSentry = () => {
             return event;
         },
 
+        beforeSendTransaction(event) {
+            return isPublicStudentFlow() ? null : event;
+        },
+
         // Ignore specific errors
         ignoreErrors: [
             'ResizeObserver loop limit exceeded', // Common browser warning
@@ -84,9 +107,14 @@ export const initializeSentry = () => {
             'Importing a module script failed',
             'error loading dynamically imported module',
         ],
-    });
+        });
+        sentryInitialized = true;
 
-    console.log('[SENTRY] Frontend initialized');
+        console.log('[SENTRY] Frontend initialized');
+    } catch (error) {
+        // Monitoring is optional and must never prevent the application mounting.
+        console.warn('[SENTRY] Initialization skipped', error);
+    }
 };
 
 // Helper to capture custom errors
@@ -95,7 +123,7 @@ export const captureException = (error: Error, context?: {
     page?: string;
     action?: string;
 }) => {
-    if (!SENTRY_DSN) return;
+    if (!sentryInitialized || isPublicStudentFlow()) return;
 
     Sentry.captureException(error, {
         tags: {
@@ -110,7 +138,7 @@ export const captureException = (error: Error, context?: {
 
 // Helper to add breadcrumbs
 export const addBreadcrumb = (message: string, category: string, data?: Breadcrumb['data']) => {
-    if (!SENTRY_DSN) return;
+    if (!sentryInitialized || isPublicStudentFlow()) return;
 
     Sentry.addBreadcrumb({
         message,

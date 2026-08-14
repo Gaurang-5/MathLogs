@@ -20,6 +20,24 @@ const DEFAULT_FORM_FIELDS = [
     { id: 'parentEmail', label: 'Parent Email (Optional)', type: 'email', required: false, system: true }
 ];
 
+const REQUIRED_SYSTEM_FIELD_IDS = new Set(['studentName', 'parentName', 'parentWhatsapp']);
+
+function getRegistrationFormFields(configuredFields?: typeof DEFAULT_FORM_FIELDS) {
+    const fields = configuredFields?.length ? configuredFields : DEFAULT_FORM_FIELDS;
+    const configuredIds = new Set(fields.map(field => field.id));
+    const missingRequiredFields = DEFAULT_FORM_FIELDS.filter(
+        field => REQUIRED_SYSTEM_FIELD_IDS.has(field.id) && !configuredIds.has(field.id)
+    );
+
+    return [
+        ...missingRequiredFields,
+        ...fields.map(field => REQUIRED_SYSTEM_FIELD_IDS.has(field.id)
+            ? { ...field, required: true, system: true }
+            : field
+        )
+    ];
+}
+
 interface BatchStatus {
     error?: boolean;
     name?: string;
@@ -57,6 +75,9 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
     const [isPhoneLocked, setIsPhoneLocked] = useState(false);
+    const registrationFields = getRegistrationFormFields(
+        batchStatus?.institute?.config?.registrationForm?.fields
+    );
 
     useEffect(() => {
         if (token) {
@@ -133,13 +154,10 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
             clearTimeout(feedback30s);
         };
 
-        const studentName = formData['studentName'] || '';
-        
         try {
             const additionalData: Record<string, string> = {};
-            const formFields = batchStatus?.institute?.config?.registrationForm?.fields || DEFAULT_FORM_FIELDS;
             
-            formFields.forEach(f => {
+            registrationFields.forEach(f => {
                 if (!f.system) {
                     additionalData[f.id] = formData[f.id] || '';
                 }
@@ -161,8 +179,6 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
             const latencyMs = Date.now() - startTime;
             console.log('[REGISTRATION_LATENCY]', {
                 latency: latencyMs,
-                studentName,
-                humanId: student.humanId,
                 timestamp: new Date().toISOString()
             });
 
@@ -170,7 +186,6 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                 console.warn('[SLOW_REGISTRATION]', {
                     latency: latencyMs,
                     threshold: '30s',
-                    studentName,
                     message: 'Registration took longer than expected - monitor server load'
                 });
             }
@@ -190,7 +205,6 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
             const latencyMs = Date.now() - startTime;
             console.error('[REGISTRATION_ERROR_LATENCY]', {
                 latency: latencyMs,
-                studentName,
                 error: error instanceof Error ? error.message : 'Unknown error',
                 timestamp: new Date().toISOString()
             });
@@ -480,7 +494,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                     <p className="text-sm text-app-text-tertiary mb-6">Fill in the details below to enroll.</p>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
-                        {(batchStatus?.institute?.config?.registrationForm?.fields || DEFAULT_FORM_FIELDS).map((field) => (
+                        {registrationFields.map((field) => (
                             <div key={field.id}>
                                 <label className="block text-sm font-bold text-app-text-secondary mb-1.5 ml-0.5">
                                     {field.label} {!field.required && <span className="text-app-text-tertiary font-normal">(Optional)</span>}

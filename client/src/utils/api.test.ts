@@ -69,4 +69,14 @@ describe('apiRequest', () => {
 
         await expect(apiRequest('/fees/pay-installment', 'POST', { amount: -1 })).rejects.toThrow('Invalid amount');
     });
+
+    it('surfaces field-level validation details instead of a generic error', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+            error: 'Validation failed',
+            details: [{ path: ['body', 'parentWhatsapp'], message: 'Invalid phone number (10-15 digits)' }],
+        }, { status: 400 }));
+
+        await expect(apiRequest('/public/register', 'POST', {}))
+            .rejects.toThrow('Invalid phone number (10-15 digits)');
+    });
 });

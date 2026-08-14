@@ -169,8 +169,16 @@ async function request<T = unknown>(
             // Extract error message from response
             let serverMessage = 'Request failed';
             try {
-                const errorData = await parseJsonResponse<{ error?: string; message?: string }>(res);
-                serverMessage = errorData.error || errorData.message || serverMessage;
+                const errorData = await parseJsonResponse<{
+                    error?: string;
+                    message?: string;
+                    details?: Array<{ path?: Array<string | number>; message?: string }>;
+                }>(res);
+                const validationMessage = errorData.details
+                    ?.map(detail => detail.message?.trim())
+                    .filter((message): message is string => Boolean(message))
+                    .join(' ');
+                serverMessage = validationMessage || errorData.error || errorData.message || serverMessage;
             } catch (e) {
                 // Ignore JSON parse errors for error responses, just use default message
             }
