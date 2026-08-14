@@ -8,10 +8,13 @@ import {
   startSupportSession,
   verifyReauthOtp
 } from '../controllers/superAdminSecurityController';
+import { getHome, searchInstitutes } from '../controllers/superAdminHomeController';
 
 const router = Router();
 
 router.use(authenticateToken, requireSuperAdmin);
+router.get('/home', getHome);
+router.get('/search', searchInstitutes);
 router.post('/security/reauth/send', authLimiter, sendReauthOtp);
 router.post('/security/reauth/verify', authLimiter, verifyReauthOtp);
 router.post('/support-sessions', (req, res, next) => {
