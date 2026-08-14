@@ -38,6 +38,7 @@ test('persists marketplace claim and audit state', async () => {
 
   assert.equal(claim.status, 'NEW');
   assert.equal(claim.communicationStatus, 'NOT_SENT');
+  assert.equal(claim.communicationSentAt, null);
 
   const actor = await prisma.admin.create({
     data: {

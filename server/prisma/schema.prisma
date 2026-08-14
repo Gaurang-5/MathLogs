@@ -681,12 +681,17 @@ model MarketplaceClaim {
   claimantName            String
   phone                   String
   normalizedPhone         String
+  email                   String?
+  proofNote               String?   @db.Text
   notes                   String?   @db.Text
   status                  String    @default("NEW")
+  verificationNote        String?   @db.Text
+  rejectionReason         String?   @db.Text
   contactedAt             DateTime?
   decidedAt               DateTime?
   decidedByAdminId        String?
   communicationStatus     String    @default("NOT_SENT")
+  communicationSentAt     DateTime?
   communicationError      String?   @db.Text
   communicationRetryCount Int       @default(0)
   whatsappJobId           String?

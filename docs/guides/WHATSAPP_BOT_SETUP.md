@@ -45,3 +45,25 @@ Now, set up the answers for "1", "2", and "3".
 -   You (or an automation tool) reply with the saved shortcut `/1`.
 
 > **Note:** For *fully* automated replies (where the bot replies to "1" without you touching it), you need a third-party tool like **Wati**, **Interakt**, or **WABox**. The WhatsApp Business App requires you to tap the Quick Reply manually.
+
+## Marketplace operations templates
+
+The server-side Meta WhatsApp queue requires these approved template names:
+
+```env
+WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED=
+WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_REJECTED=
+WHATSAPP_TEMPLATE_MARKETPLACE_LEAD=
+```
+
+Template parameters are positional and must remain in this order:
+
+1. Claim approved: `claimant_name`, `institute_name`, `login_url`.
+2. Claim rejected: `claimant_name`, `institute_name`, `rejection_reason`, `support_url`.
+3. Marketplace lead: `owner_name`, `institute_name`, `student_name`, `class_subject_summary`, `settings_url`.
+
+If a template has a dynamic URL button, use the final URL parameter for that button: `login_url`, `support_url`, or `settings_url`. The worker passes Meta the URL suffix expected by a dynamic button.
+
+Marketplace messages are queued and tracked by job ID. `QUEUED` means the database job was accepted; only the worker changes the related claim to `SENT` or the lead to `DELIVERED`. Exhausted worker retries set the related record to `FAILED` and retain a bounded error. Superadmin retry actions create a new tracked job and increment the marketplace retry counter.
+
+Claim approval and rejection are committed before notification queueing. Missing template configuration or queue failure therefore leaves the saved decision intact and exposes a retryable `FAILED` communication state.

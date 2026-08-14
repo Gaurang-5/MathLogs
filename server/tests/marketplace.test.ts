@@ -51,6 +51,8 @@ before(async () => {
 after(async () => {
   if (testInstituteId) {
     await prisma.review.deleteMany({ where: { instituteId: testInstituteId } });
+    await prisma.marketplaceAuditLog.deleteMany({ where: { instituteId: testInstituteId } });
+    await prisma.marketplaceClaim.deleteMany({ where: { instituteId: testInstituteId } });
     await prisma.leadInquiry.deleteMany({ where: { instituteId: testInstituteId } });
     await prisma.institute.delete({ where: { id: testInstituteId } });
   }
@@ -123,6 +125,29 @@ test('POST /api/marketplace/coaching/:id/inquire should submit lead inquiry', as
   const body: any = await res.json();
   assert.equal(body.success, true);
   assert.equal(body.data.studentName, 'Ananya Gupta');
+  assert.equal(body.data.deliveryStatus, 'HELD');
+  assert.equal(body.data.destinationPhone, undefined);
+});
+
+test('POST /api/marketplace/coaching/:id/claim persists a dedicated claim and deduplicates open submissions', async () => {
+  const payload = { claimantName: 'Riya Sharma', phone: '+91 98765 43210', email: 'riya@example.com', proofNote: 'I run the center.' };
+  const first = await fetch(`${baseUrl}/api/marketplace/coaching/${testInstituteId}/claim`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  });
+  const firstBody: any = await first.json();
+  assert.equal(first.status, 201);
+  assert.equal(firstBody.data.status, 'NEW');
+  assert.equal(firstBody.data.email, undefined);
+  assert.equal(firstBody.data.proofNote, undefined);
+
+  const repeated = await fetch(`${baseUrl}/api/marketplace/coaching/${testInstituteId}/claim`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  });
+  const repeatedBody: any = await repeated.json();
+  assert.equal(repeated.status, 200);
+  assert.equal(repeatedBody.deduplicated, true);
+  assert.equal(repeatedBody.data.id, firstBody.data.id);
+  assert.equal(await prisma.leadInquiry.count({ where: { instituteId: testInstituteId, studentName: { startsWith: '[CLAIM REQUEST]' } } }), 0);
 });
 
 test('POST /api/marketplace/register-teacher should create new external listing', async () => {

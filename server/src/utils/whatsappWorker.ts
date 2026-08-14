@@ -92,7 +92,7 @@ export const processWhatsappQueue = async () => {
         const CONCURRENCY_LIMIT = 5;
         for (let i = 0; i < claimedJobs.length; i += CONCURRENCY_LIMIT) {
             const batch = claimedJobs.slice(i, i + CONCURRENCY_LIMIT);
-            await Promise.allSettled(batch.map(job => processJob(job)));
+            await Promise.allSettled(batch.map(job => processWhatsappJob(job)));
         }
 
         return claimedJobs.length;
@@ -105,7 +105,9 @@ export const processWhatsappQueue = async () => {
 /**
  * Processes a single claimed job (status is already PROCESSING when this runs)
  */
-const processJob = async (job: any) => {
+type MetaPost = typeof axios.post;
+
+export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) => {
     try {
         if (!job.recipient || !job.templateId) {
             throw new Error('Missing recipient or template ID');
@@ -120,7 +122,16 @@ const processJob = async (job: any) => {
             'onboarding_setup_link': { body: ['owner_name', 'tuition_name', 'setup_link'], buttonIndex: 2 },
             'fee_breakup_alert_1': { body: ['student_name', 'batch_name', 'fee_breakup', 'total_amount', 'upi_payment_link', 'institute_name'] },
             'mathlogs_login_otp': { body: ['otp'], buttonIndex: 0 },
-            'student_registration_link': { body: ['var_1', 'var_2', 'var_3'], buttonIndex: 2 }
+            'student_registration_link': { body: ['var_1', 'var_2', 'var_3'], buttonIndex: 2 },
+            ...(process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED
+                ? { [process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_APPROVED]: { body: ['claimant_name', 'institute_name', 'login_url'], buttonIndex: 2 } }
+                : {}),
+            ...(process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_REJECTED
+                ? { [process.env.WHATSAPP_TEMPLATE_MARKETPLACE_CLAIM_REJECTED]: { body: ['claimant_name', 'institute_name', 'rejection_reason', 'support_url'], buttonIndex: 3 } }
+                : {}),
+            ...(process.env.WHATSAPP_TEMPLATE_MARKETPLACE_LEAD
+                ? { [process.env.WHATSAPP_TEMPLATE_MARKETPLACE_LEAD]: { body: ['owner_name', 'institute_name', 'student_name', 'class_subject_summary', 'settings_url'], buttonIndex: 4 } }
+                : {})
         };
 
         const mapConfig = TEMPLATE_VAR_MAP[job.templateId];
@@ -195,7 +206,7 @@ const processJob = async (job: any) => {
             }
         };
 
-        const response = await axios.post(
+        const response = await post(
             `https://graph.facebook.com/${META_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
             payload,
             {
@@ -210,14 +221,21 @@ const processJob = async (job: any) => {
         const messageId = response.data.messages?.[0]?.id;
         secureLogger.info(`[WhatsApp Worker] Job ${job.id} Sent. MsgId: ${messageId}`);
 
-        await prisma.whatsappJob.update({
-            where: { id: job.id },
-            data: {
-                status: 'COMPLETED',
-                messageId: messageId,
-                error: null
-            }
-        });
+        const sentAt = new Date();
+        await prisma.$transaction([
+            prisma.whatsappJob.update({
+                where: { id: job.id },
+                data: { status: 'COMPLETED', messageId, error: null }
+            }),
+            prisma.marketplaceClaim.updateMany({
+                where: { whatsappJobId: job.id },
+                data: { communicationStatus: 'SENT', communicationSentAt: sentAt, communicationError: null }
+            }),
+            prisma.leadInquiry.updateMany({
+                where: { notificationJobId: job.id },
+                data: { deliveryStatus: 'DELIVERED', notificationSentAt: sentAt, notificationError: null }
+            })
+        ]);
 
     } catch (error: any) {
         const errorDetail = JSON.stringify(error.response?.data || error.message);
@@ -226,12 +244,18 @@ const processJob = async (job: any) => {
         // Note: attempts already incremented at claim time, so check current value
         const isExhausted = job.attempts >= 3; // job.attempts was incremented before this runs
 
-        await prisma.whatsappJob.update({
-            where: { id: job.id },
-            data: {
-                status: isExhausted ? 'FAILED' : 'PENDING',
-                error: errorDetail.substring(0, 500) // Truncate to prevent DB bloat
-            }
-        });
+        const boundedError = errorDetail.substring(0, 500);
+        const status = isExhausted ? 'FAILED' : 'PENDING';
+        await prisma.$transaction([
+            prisma.whatsappJob.update({ where: { id: job.id }, data: { status, error: boundedError } }),
+            prisma.marketplaceClaim.updateMany({
+                where: { whatsappJobId: job.id },
+                data: { communicationStatus: isExhausted ? 'FAILED' : 'QUEUED', communicationError: boundedError }
+            }),
+            prisma.leadInquiry.updateMany({
+                where: { notificationJobId: job.id },
+                data: { deliveryStatus: isExhausted ? 'FAILED' : 'QUEUED', notificationError: boundedError }
+            })
+        ]);
     }
 };

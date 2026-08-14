@@ -5,6 +5,9 @@ import { RedisStore } from 'rate-limit-redis';
 import { redis } from '../utils/redis';
 import { secureLogger } from '../utils/secureLogger';
 
+const rateLimitStore = (prefix: string) => process.env.NODE_ENV === 'test'
+    ? undefined
+    : new RedisStore({ sendCommand: (...args: string[]) => (redis as any).call(...args), prefix });
 
 export const configureSecurityHeaders = (app: Express) => {
     // Hardened Helmet configuration with strict CSP
@@ -71,10 +74,7 @@ export const configureSecurityHeaders = (app: Express) => {
 
 // General API Rate Limiter
 export const apiLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:api:',
-    }),
+    store: rateLimitStore('rl:api:'),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 1000, // Limit each IP to 1000 requests per windowMs
     standardHeaders: true,
@@ -94,10 +94,7 @@ export const apiLimiter = rateLimit({
 
 // Stricter Limiter for Auth Routes
 export const authLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:auth:',
-    }),
+    store: rateLimitStore('rl:auth:'),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: process.env.NODE_ENV === 'production' ? 20 : 500, // 500 in dev to prevent lockouts during hot reloads
     standardHeaders: true,
@@ -118,10 +115,7 @@ export const authLimiter = rateLimit({
 // Public Registration Rate Limiter (QR codes)
 // Increased to 500/hour to handle classroom Wi-Fi (NAT) scenarios where many students share one IP.
 export const publicLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:public:',
-    }),
+    store: rateLimitStore('rl:public:'),
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 500,
     standardHeaders: true,
@@ -155,10 +149,7 @@ export const publicLimiter = rateLimit({
 // ✅ HIGH-2 FIX: Payment Endpoint Rate Limiter
 // Prevents spam attacks on financial transactions
 export const paymentLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:payment:',
-    }),
+    store: rateLimitStore('rl:payment:'),
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 10, // Limit each user to 10 payment submissions per minute
     standardHeaders: true,
@@ -185,10 +176,7 @@ export const paymentLimiter = rateLimit({
 
 // ✅ HIGH-1: Dedicated Limiter for UPI Payment Flows
 export const upiPaymentLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:upi:',
-    }),
+    store: rateLimitStore('rl:upi:'),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 30, // Limit each IP to 30 requests per windowMs (allows retries)
     standardHeaders: true,
@@ -209,10 +197,7 @@ export const upiPaymentLimiter = rateLimit({
 // ✅ HIGH-1: Per-User OCR Rate Limiter
 // Protects against Gemini quota drain and cost spikes
 export const ocrLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:ocr:',
-    }),
+    store: rateLimitStore('rl:ocr:'),
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 15, // Limit each user to 15 scans per minute
     standardHeaders: true,
@@ -246,10 +231,7 @@ export const ocrLimiter = rateLimit({
 // Prevents teachers from accidentally sending duplicate bulk messages
 // by spamming "Send Invite" or "Send Results" buttons
 export const bulkNotifyLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:bulk_notify:',
-    }),
+    store: rateLimitStore('rl:bulk_notify:'),
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 5, // Max 5 bulk sends per minute per user
     standardHeaders: true,
@@ -279,10 +261,7 @@ export const bulkNotifyLimiter = rateLimit({
 
 // Student Portal: General Limiter for Dashboard and Read Routes
 export const studentPortalLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:student_portal:',
-    }),
+    store: rateLimitStore('rl:student_portal:'),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 1000, // Bumped to 1000 to handle 200 students on single Wi-Fi
     standardHeaders: true,
@@ -301,10 +280,7 @@ export const studentPortalLimiter = rateLimit({
 
 // Student Portal: Login Rate Limiter
 export const studentLoginLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:student_login:',
-    }),
+    store: rateLimitStore('rl:student_login:'),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 500, // 500 login attempts per IP per window (allows 200 students to login from same Wi-Fi)
     standardHeaders: true,
@@ -327,10 +303,7 @@ export const studentLoginLimiter = rateLimit({
 // Tuned for classroom NAT: up to 200+ students behind one IP, each sending heartbeat + autosave every ~15s
 // Math: 200 students × 4 req/min = 800 req/min. Limit is 1500 to be perfectly safe for 300+ students.
 export const quizActivityLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args: string[]) => (redis as any).call(...args),
-        prefix: 'rl:quiz_activity:',
-    }),
+    store: rateLimitStore('rl:quiz_activity:'),
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 1500, // 1500 req/min per IP
     standardHeaders: true,

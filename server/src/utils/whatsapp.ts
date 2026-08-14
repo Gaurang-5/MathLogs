@@ -116,10 +116,17 @@ export interface AttendanceAbsentWAData {
  * @param templateName The Template ID/Name registered in Meta Business Manager
  * @param componentValues Positional string parameters stringified in array [] format
  */
-export const enqueueWhatsApp = async (mobileNumber: string, templateName: string, componentValues: string[], instituteId?: string) => {
+export type TrackedWhatsAppEnqueueResult = { queued: boolean; jobId?: string; error?: string };
+
+export const enqueueWhatsAppTracked = async (
+    mobileNumber: string,
+    templateName: string,
+    componentValues: string[],
+    instituteId?: string
+): Promise<TrackedWhatsAppEnqueueResult> => {
     if (!templateName) {
         secureLogger.warn('[WhatsApp] Dropped: No template configured.');
-        return false;
+        return { queued: false, error: 'WHATSAPP_TEMPLATE_NOT_CONFIGURED' };
     }
 
     try {
@@ -128,7 +135,7 @@ export const enqueueWhatsApp = async (mobileNumber: string, templateName: string
             formattedMobile = `91${formattedMobile}`;
         }
 
-        await prisma.whatsappJob.create({
+        const job = await prisma.whatsappJob.create({
             data: {
                 recipient: formattedMobile,
                 templateId: templateName,
@@ -139,12 +146,19 @@ export const enqueueWhatsApp = async (mobileNumber: string, templateName: string
         });
 
         secureLogger.info(`[WhatsApp Queue] Enqueued template '${templateName}' for ${formattedMobile}`);
-        return true;
+        return { queued: true, jobId: job.id };
     } catch (error: any) {
         console.error("[WhatsApp Queue] DB Enqueue Failed:", error.message);
-        return false;
+        return { queued: false, error: error?.message || 'WHATSAPP_ENQUEUE_FAILED' };
     }
 };
+
+export const enqueueWhatsApp = async (
+    mobileNumber: string,
+    templateName: string,
+    componentValues: string[],
+    instituteId?: string
+) => (await enqueueWhatsAppTracked(mobileNumber, templateName, componentValues, instituteId)).queued;
 
 export const sendWelcomeWhatsApp = async (mobileNumber: string, data: WelcomeWAData) => {
     const WELCOME_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_WELCOME || 'welcome_approval_1';

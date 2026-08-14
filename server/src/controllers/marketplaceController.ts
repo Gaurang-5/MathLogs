@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { searchGooglePlaces, fetchGooglePlaceDetails } from '../services/googlePlacesService';
+import { normalizeMarketplacePhone, submitMarketplaceClaim } from '../services/marketplaceClaimService';
+import { createMarketplaceLead } from '../services/marketplaceLeadService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -179,7 +179,7 @@ export async function searchMarketplace(req: Request, res: Response) {
         googleReviewCount: inst.googleReviewCount || 0,
         subjectsOffered: (inst.subjectsOffered as string[]) || [],
         classesOffered: (inst.classesOffered as string[]) || [],
-        isExclusive: false,
+        isExclusive: isSubscribedExclusive,
         isVerified: inst.isVerified || false,
         avgRating: displayRating,
         reviewCount: totalReviewsCount
@@ -355,7 +355,7 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
         googleLastSyncedAt: institute.googleLastSyncedAt || null,
         subjectsOffered: (institute.subjectsOffered as string[]) || [],
         classesOffered: (institute.classesOffered as string[]) || [],
-        isExclusive: false,
+        isExclusive: isSubscribedExclusive,
         isVerified: institute.isVerified || false,
         batches: institute.batches,
         avgRating: displayRating,
@@ -427,37 +427,42 @@ export async function submitInquiry(req: Request, res: Response) {
     const id = req.params.id as string;
     const { studentName, phone, subject, classGrade, message } = req.body;
 
-    if (!studentName || !phone) {
+    if (typeof studentName !== 'string' || !studentName.trim() || typeof phone !== 'string' || !phone.trim()) {
       return res.status(400).json({ success: false, message: 'Student name and phone number are required' });
     }
 
-    const institute = await prisma.institute.findUnique({
-      where: { id }
+    const { lead } = await createMarketplaceLead({
+      instituteId: id, studentName, phone, subject, classGrade, message
     });
-
-    if (!institute) {
-      return res.status(404).json({ success: false, message: 'Coaching not found' });
-    }
-
-    const lead = await prisma.leadInquiry.create({
-      data: {
-        instituteId: id,
-        studentName: studentName.trim(),
-        phone: phone.trim(),
-        subject: subject ? subject.trim() : null,
-        classGrade: classGrade ? classGrade.trim() : null,
-        message: message ? message.trim() : null,
-        status: 'NEW'
-      }
-    });
+    const publicLead = {
+      id: lead.id,
+      instituteId: lead.instituteId,
+      studentName: lead.studentName,
+      phone: lead.phone,
+      subject: lead.subject,
+      classGrade: lead.classGrade,
+      message: lead.message,
+      status: lead.status,
+      deliveryStatus: lead.deliveryStatus,
+      possibleDuplicate: lead.possibleDuplicate,
+      createdAt: lead.createdAt
+    };
 
     return res.status(201).json({
       success: true,
-      message: 'Inquiry submitted successfully! The coaching teacher will contact you shortly.',
-      data: lead
+      message: lead.deliveryStatus === 'HELD'
+        ? "Inquiry received. It will be shared after this listing's ownership is verified."
+        : 'Inquiry submitted successfully! The coaching teacher will contact you shortly.',
+      data: publicLead
     });
   } catch (error: any) {
     console.error('Error in submitInquiry:', error);
+    if (error.message === 'INSTITUTE_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: 'Coaching not found' });
+    }
+    if (error.message === 'INVALID_PHONE') {
+      return res.status(400).json({ success: false, message: 'A valid phone number is required' });
+    }
     return res.status(500).json({ success: false, message: 'Failed to submit inquiry', error: error.message });
   }
 }
@@ -529,6 +534,9 @@ export async function registerExternalTeacher(req: Request, res: Response) {
           subjectsOffered: Array.isArray(subjectsOffered) ? subjectsOffered : (subjectsOffered ? [subjectsOffered] : []),
           classesOffered: Array.isArray(classesOffered) ? classesOffered : (classesOffered ? [classesOffered] : []),
           isPubliclyListed: true,
+          ownershipStatus: 'CLAIMED',
+          claimedPhone: phoneNumber.replace(/\D/g, ''),
+          claimedAt: new Date(),
           isExclusive: false,
           plan: 'FREE',
           status: 'ACTIVE'
@@ -549,6 +557,7 @@ export async function registerExternalTeacher(req: Request, res: Response) {
 
     const token = jwt.sign(
       {
+        id: result.admin.id,
         userId: result.admin.id,
         role: result.admin.role,
         instituteId: result.institute.id
@@ -648,7 +657,6 @@ export async function updateMarketplaceProfile(req: any, res: Response) {
       tagline,
       aboutUs,
       logoUrl,
-      googleMapsUrl,
       subjectsOffered,
       classesOffered,
       isPubliclyListed
@@ -666,7 +674,6 @@ export async function updateMarketplaceProfile(req: any, res: Response) {
     if (tagline !== undefined) updateData.tagline = tagline.trim();
     if (aboutUs !== undefined) updateData.aboutUs = aboutUs.trim();
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl.trim();
-    if (googleMapsUrl !== undefined) updateData.googleMapsUrl = googleMapsUrl.trim();
     if (subjectsOffered !== undefined) updateData.subjectsOffered = subjectsOffered;
     if (classesOffered !== undefined) updateData.classesOffered = classesOffered;
     if (isPubliclyListed !== undefined) updateData.isPubliclyListed = Boolean(isPubliclyListed);
@@ -720,7 +727,7 @@ export async function getInstituteLeads(req: any, res: Response) {
     }
 
     const leads = await prisma.leadInquiry.findMany({
-      where: { instituteId },
+      where: { instituteId, deliveryStatus: { not: 'HELD' } },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -734,269 +741,30 @@ export async function getInstituteLeads(req: any, res: Response) {
   }
 }
 
-function requireSuperAdmin(req: any, res: Response): boolean {
-  if (req.user?.role !== 'SUPER_ADMIN') {
-    res.status(403).json({ success: false, message: 'Superadmin privileges required' });
-    return false;
-  }
-  return true;
-}
-
-/**
- * Marketplace operations overview for the Superadmin control center.
- * GET /api/marketplace/super-admin/overview
- */
-export async function getMarketplaceSuperAdminOverview(req: any, res: Response) {
-  if (!requireSuperAdmin(req, res)) return;
-
-  try {
-    const [institutes, pendingReviews, newLeads, claimRequests] = await Promise.all([
-      prisma.institute.findMany({
-        orderBy: { updatedAt: 'desc' },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          teacherName: true,
-          city: true,
-          area: true,
-          logoUrl: true,
-          status: true,
-          plan: true,
-          isPubliclyListed: true,
-          isVerified: true,
-          publicPhone: true,
-          tagline: true,
-          aboutUs: true,
-          subjectsOffered: true,
-          classesOffered: true,
-          googlePlaceId: true,
-          googleMapsUrl: true,
-          googleRating: true,
-          googleReviewCount: true,
-          googleLastSyncedAt: true,
-          updatedAt: true,
-          _count: { select: { reviews: true, leadInquiries: true } }
-        }
-      }),
-      prisma.review.count({ where: { status: 'PENDING' } }),
-      prisma.leadInquiry.count({
-        where: { status: 'NEW', NOT: { studentName: { startsWith: '[CLAIM REQUEST]' } } }
-      }),
-      prisma.leadInquiry.count({ where: { studentName: { startsWith: '[CLAIM REQUEST]' } } })
-    ]);
-
-    const listings = institutes.map((institute) => {
-      const completenessFields = [
-        institute.name,
-        institute.teacherName,
-        institute.city,
-        institute.area,
-        institute.publicPhone,
-        institute.tagline,
-        institute.aboutUs,
-        institute.logoUrl,
-        Array.isArray(institute.subjectsOffered) && institute.subjectsOffered.length > 0,
-        Array.isArray(institute.classesOffered) && institute.classesOffered.length > 0
-      ];
-      const profileCompleteness = Math.round(
-        (completenessFields.filter(Boolean).length / completenessFields.length) * 100
-      );
-
-      return { ...institute, profileCompleteness };
-    });
-
-    return res.json({
-      success: true,
-      data: {
-        metrics: {
-          totalListings: listings.length,
-          publishedListings: listings.filter((item) => item.isPubliclyListed).length,
-          verifiedListings: listings.filter((item) => item.isVerified).length,
-          googleConnected: listings.filter((item) => Boolean(item.googlePlaceId)).length,
-          pendingReviews,
-          newLeads,
-          claimRequests
-        },
-        listings
-      }
-    });
-  } catch (error: any) {
-    console.error('Error loading marketplace superadmin overview:', error);
-    return res.status(500).json({ success: false, message: 'Failed to load marketplace operations' });
-  }
-}
-
-/** GET /api/marketplace/super-admin/reviews */
-export async function getMarketplaceSuperAdminReviews(req: any, res: Response) {
-  if (!requireSuperAdmin(req, res)) return;
-
-  try {
-    const reviews = await prisma.review.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-      select: {
-        id: true,
-        reviewerName: true,
-        reviewerRole: true,
-        rating: true,
-        comment: true,
-        source: true,
-        status: true,
-        createdAt: true,
-        institute: { select: { id: true, name: true, slug: true } }
-      }
-    });
-    return res.json({ success: true, data: reviews });
-  } catch (error: any) {
-    console.error('Error loading marketplace reviews:', error);
-    return res.status(500).json({ success: false, message: 'Failed to load marketplace reviews' });
-  }
-}
-
-/** PATCH /api/marketplace/super-admin/reviews/:id */
-export async function updateMarketplaceReviewStatus(req: any, res: Response) {
-  if (!requireSuperAdmin(req, res)) return;
-
+/** PATCH /api/marketplace/admin/leads/:id */
+export async function updateInstituteLeadStatus(req: any, res: Response) {
+  const instituteId = req.user?.instituteId;
+  if (!instituteId) return res.status(400).json({ success: false, message: 'Institute context missing' });
   const status = String(req.body?.status || '').toUpperCase();
-  if (!['APPROVED', 'PENDING', 'REJECTED'].includes(status)) {
-    return res.status(400).json({ success: false, message: 'Invalid review status' });
+  if (!['NEW', 'CONTACTED', 'ENROLLED', 'CLOSED'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Invalid lead status' });
   }
-
   try {
-    const review = await prisma.review.update({
-      where: { id: String(req.params.id) },
+    const result = await prisma.leadInquiry.updateMany({
+      where: { id: String(req.params.id), instituteId, deliveryStatus: { not: 'HELD' } },
       data: { status }
     });
-    return res.json({ success: true, data: review });
-  } catch (error: any) {
-    console.error('Error updating marketplace review:', error);
-    return res.status(500).json({ success: false, message: 'Failed to update review' });
+    if (!result.count) return res.status(404).json({ success: false, message: 'Lead not found' });
+    const lead = await prisma.leadInquiry.findFirstOrThrow({ where: { id: String(req.params.id), instituteId } });
+    return res.json({ success: true, data: lead });
+  } catch (error) {
+    console.error('Error updating marketplace lead:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update lead' });
   }
 }
 
 /**
- * Search Google Places API for Coaching Centers
- * GET /api/marketplace/google-place/search?q=...
- */
-export async function searchGooglePlacesHandler(req: any, res: Response) {
-  if (!requireSuperAdmin(req, res)) return;
-  try {
-    const q = req.query.q as string;
-    if (!q || q.trim().length === 0) {
-      return res.status(400).json({ success: false, message: 'Search query is required' });
-    }
-
-    const results = await searchGooglePlaces(q);
-    return res.json({
-      success: true,
-      data: results
-    });
-  } catch (error: any) {
-    console.error('Error in searchGooglePlacesHandler:', error);
-    return res.status(500).json({ success: false, message: 'Failed to search Google Places', error: error.message });
-  }
-}
-
-/**
- * Sync Google Business Profile Details & Reviews with Coaching Profile
- * POST /api/marketplace/coaching/:id/sync-google-place
- */
-export async function syncGooglePlaceHandler(req: any, res: Response) {
-  try {
-    const { id } = req.params;
-    const { placeId } = req.body;
-
-    const userRole = req.user?.role;
-
-    if (userRole !== 'SUPER_ADMIN') {
-      return res.status(403).json({ success: false, message: 'Superadmin privileges required' });
-    }
-
-    if (!placeId) {
-      return res.status(400).json({ success: false, message: 'Google Place ID is required' });
-    }
-
-    const details = await fetchGooglePlaceDetails(placeId);
-    if (!details) {
-      return res.status(404).json({ success: false, message: 'Google Place details not found' });
-    }
-
-    const updated = await prisma.institute.update({
-      where: { id },
-      data: {
-        googlePlaceId: details.placeId,
-        googleMapsUrl: details.mapsUrl || details.url,
-        googleRating: details.rating,
-        googleReviewCount: details.userRatingsTotal,
-        googleReviews: details.reviews as any,
-        googlePhotos: details.photos as any,
-        googleLastSyncedAt: new Date()
-      },
-      select: {
-        id: true,
-        name: true,
-        googlePlaceId: true,
-        googleMapsUrl: true,
-        googleRating: true,
-        googleReviewCount: true,
-        googleReviews: true,
-        googlePhotos: true,
-        googleLastSyncedAt: true
-      }
-    });
-
-    return res.json({
-      success: true,
-      message: 'Google Business Profile details & reviews synced successfully!',
-      data: updated
-    });
-  } catch (error: any) {
-    console.error('Error in syncGooglePlaceHandler:', error);
-    return res.status(500).json({ success: false, message: 'Failed to sync Google Place details', error: error.message });
-  }
-}
-
-/**
- * Unlink Google Business Profile
- * POST /api/marketplace/coaching/:id/unlink-google-place
- */
-export async function unlinkGooglePlaceHandler(req: any, res: Response) {
-  try {
-    const { id } = req.params;
-
-    const userRole = req.user?.role;
-
-    if (userRole !== 'SUPER_ADMIN') {
-      return res.status(403).json({ success: false, message: 'Superadmin privileges required' });
-    }
-
-    const updated = await prisma.institute.update({
-      where: { id },
-      data: {
-        googlePlaceId: null,
-        googleMapsUrl: null,
-        googleRating: null,
-        googleReviewCount: null,
-        googleReviews: Prisma.DbNull,
-        googlePhotos: Prisma.DbNull,
-        googleLastSyncedAt: null
-      }
-    });
-
-    return res.json({
-      success: true,
-      message: 'Google Business Profile unlinked successfully',
-      data: updated
-    });
-  } catch (error: any) {
-    console.error('Error in unlinkGooglePlaceHandler:', error);
-    return res.status(500).json({ success: false, message: 'Failed to unlink Google Place', error: error.message });
-  }
-}
-
-/**
- * Submit Claim Request for an unverified institute
+* Submit Claim Request for an unverified institute
  * POST /api/marketplace/coaching/:id/claim
  */
 export async function submitClaimRequest(req: Request, res: Response) {
@@ -1004,32 +772,32 @@ export async function submitClaimRequest(req: Request, res: Response) {
     const instId = String(req.params.id);
     const { claimantName, phone, email, proofNote } = req.body;
 
-    if (!claimantName || !phone) {
+    if (typeof claimantName !== 'string' || !claimantName.trim() || typeof phone !== 'string' || !phone.trim()) {
       return res.status(400).json({ success: false, message: 'Claimant name and phone number are required.' });
     }
 
-    const institute = await prisma.institute.findUnique({ where: { id: instId } });
+    const institute = await prisma.institute.findUnique({ where: { id: instId }, select: { id: true } });
     if (!institute) {
       return res.status(404).json({ success: false, message: 'Institute not found.' });
     }
 
-    const claimInquiry = await prisma.leadInquiry.create({
-      data: {
-        instituteId: instId,
-        studentName: `[CLAIM REQUEST] ${claimantName.trim()}`,
-        phone: phone.trim(),
-        message: `Claim Request submitted for ${institute.name}.\nContact Email: ${email || 'Not provided'}\nProof/Note: ${proofNote || 'None provided'}`,
-        status: 'NEW'
-      }
+    const normalizedPhone = normalizeMarketplacePhone(phone);
+    const existing = await prisma.marketplaceClaim.findFirst({
+      where: { instituteId: instId, normalizedPhone, status: { in: ['NEW', 'CONTACTED'] } },
+      select: { id: true }
     });
+    const claim = await submitMarketplaceClaim({ instituteId: instId, claimantName: claimantName.trim(), phone, email, proofNote });
+    const deduplicated = existing?.id === claim.id;
 
-    return res.json({
+    return res.status(deduplicated ? 200 : 201).json({
       success: true,
+      deduplicated,
       message: 'Claim request submitted! Our verification team will review your request and get in touch with you.',
-      data: claimInquiry
+      data: { id: claim.id, status: claim.status, createdAt: claim.createdAt }
     });
   } catch (error: any) {
     console.error('Error submitting claim request:', error);
+    if (error.message === 'INVALID_PHONE') return res.status(400).json({ success: false, message: 'A valid phone number is required.' });
     return res.status(500).json({ success: false, message: 'Failed to submit claim request.' });
   }
 }

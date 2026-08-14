@@ -10,6 +10,8 @@ export type SubmitMarketplaceClaimInput = {
   instituteId: string;
   claimantName: string;
   phone: string;
+  email?: string;
+  proofNote?: string;
   notes?: string;
 };
 
@@ -74,6 +76,8 @@ export async function submitMarketplaceClaim(
         claimantName: input.claimantName,
         phone: input.phone,
         normalizedPhone,
+        email: input.email?.trim() || null,
+        proofNote: input.proofNote?.trim() || null,
         notes: input.notes
       }
     });
@@ -114,6 +118,7 @@ export async function approveMarketplaceClaim(
       where: { id: input.claimId, status: { in: OPEN_CLAIM_STATUSES } },
       data: {
         status: 'APPROVED',
+        verificationNote: input.verificationNote.trim(),
         decidedAt,
         decidedByAdminId: input.actorAdminId
       }
@@ -228,6 +233,8 @@ export async function rejectMarketplaceClaim(input: RejectClaimInput): Promise<C
       where: { id: input.claimId, status: { in: OPEN_CLAIM_STATUSES } },
       data: {
         status: 'REJECTED',
+        verificationNote: input.verificationNote.trim(),
+        rejectionReason: input.rejectionReason.trim(),
         decidedAt,
         decidedByAdminId: input.actorAdminId
       }
