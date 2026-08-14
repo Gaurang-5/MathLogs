@@ -29,6 +29,7 @@ CREATE TABLE "MarketplaceClaim" (
     "normalizedPhone" TEXT NOT NULL,
     "notes" TEXT,
     "status" TEXT NOT NULL DEFAULT 'NEW',
+    "contactedAt" TIMESTAMP(3),
     "decidedAt" TIMESTAMP(3),
     "decidedByAdminId" TEXT,
     "communicationStatus" TEXT NOT NULL DEFAULT 'NOT_SENT',

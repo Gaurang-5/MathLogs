@@ -683,6 +683,7 @@ model MarketplaceClaim {
   normalizedPhone         String
   notes                   String?   @db.Text
   status                  String    @default("NEW")
+  contactedAt             DateTime?
   decidedAt               DateTime?
   decidedByAdminId        String?
   communicationStatus     String    @default("NOT_SENT")
