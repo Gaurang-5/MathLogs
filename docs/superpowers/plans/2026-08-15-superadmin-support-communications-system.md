@@ -82,7 +82,7 @@ assert.equal(preference.whatsappOperational, true);
 
 - [ ] **Step 2: Run RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminOperationsSchema.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminOperationsSchema.test.ts`
 
 Expected: missing Prisma delegates.
 
@@ -224,9 +224,9 @@ Run: `cd server && npx prisma validate`
 
 Run: `cd server && npx prisma generate`
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' npx prisma migrate deploy`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' npx prisma migrate deploy`
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminOperationsSchema.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminOperationsSchema.test.ts`
 
 Expected: PASS.
 
@@ -269,7 +269,7 @@ Test only allowed ticket transitions, required resolution summary, follow-up dat
 
 - [ ] **Step 2: Run RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSupport.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSupport.test.ts`
 
 Expected: 404.
 
@@ -301,7 +301,7 @@ Support list filters by status, priority, category, institute, overdue, and quer
 
 - [ ] **Step 6: Run GREEN and commit**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSupport.test.ts tests/superAdminHome.test.ts tests/superAdminInstitutes.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSupport.test.ts tests/superAdminHome.test.ts tests/superAdminInstitutes.test.ts`
 
 Run: `cd server && npm run build`
 
@@ -398,7 +398,7 @@ Test missing approved template, missing credentials, missing channel consent, ow
 
 - [ ] **Step 2: Run RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminCommunications.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminCommunications.test.ts`
 
 Expected: missing API/models integration.
 
@@ -430,7 +430,7 @@ Create send, recipients, audit, and jobs transactionally. Store generic Superadm
 
 - [ ] **Step 5: Run GREEN and commit**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminCommunications.test.ts tests/whatsappMarketplaceStatus.test.ts tests/marketplaceNotificationService.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminCommunications.test.ts tests/whatsappMarketplaceStatus.test.ts tests/marketplaceNotificationService.test.ts`
 
 Run: `cd server && npm run build`
 
@@ -525,7 +525,7 @@ Test job pagination, bounded errors, concurrent retries yielding one queued tran
 
 - [ ] **Step 2: Run RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSystem.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSystem.test.ts`
 
 Expected: 404.
 
@@ -549,7 +549,7 @@ Audit supports actor, institute, action, entity, correlation ID, support session
 
 - [ ] **Step 5: Run GREEN and commit**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSystem.test.ts tests/superAdminSecurity.test.ts tests/superAdminCommunications.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSystem.test.ts tests/superAdminSecurity.test.ts tests/superAdminCommunications.test.ts`
 
 Run: `cd server && npm run build`
 

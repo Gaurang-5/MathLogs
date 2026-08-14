@@ -68,9 +68,10 @@ Tasks within a plan execute in document order. Do not start a dependent plan unt
 - Start from clean local `main` in a Superpowers-created `.worktrees/` worktree.
 - Create branch `codex/superadmin-unified-operations`.
 - Copy only test-safe ignored environment configuration into the worktree; never move `.git` or `.venv`.
-- Start or reuse a disposable local PostgreSQL instance on loopback.
+- Start or reuse a disposable local PostgreSQL instance on loopback and use the isolated `mathlogs_superadmin_test` database.
 - Set the worktree `server/.env` to the disposable database and test-only credentials.
 - Confirm parsed database host is `127.0.0.1` or `localhost` before any schema mutation or integration test.
+- This repository's retained migrations begin after the original schema. For a brand-new empty local database only, create the current schema with `prisma db push`, mark the 15 pre-Superadmin migrations as the local baseline, then apply every new Superadmin migration with `prisma migrate deploy`. Never use this baseline procedure on an existing or production database.
 - Commit after every task using the message specified in the task.
 - Keep unrelated user changes and the existing safety stash untouched.
 
@@ -87,6 +88,8 @@ For each task:
 7. Commit the exact task files.
 
 At each plan checkpoint, run its focused cross-module suite. Before integration, compare the full server suite to the recorded baseline so unrelated historical failures are not confused with regressions.
+
+Recorded branch-start baseline (2026-08-15): client 30/30 passed; server 85/94 passed. The nine existing server failures are two stale login response-shape assertions, two stale quiz route/mock assertions, and five fee-security expectation/mocking failures. No new failure is acceptable; re-run the full suite at integration and compare test names, not only totals.
 
 ## One-release completion criteria
 

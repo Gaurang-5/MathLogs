@@ -75,7 +75,7 @@ Test wrong typed name, missing reason, cancellation, challenge consumption, requ
 
 - [ ] **Step 2: Run RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminDeletion.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminDeletion.test.ts`
 
 Expected: missing model/service and legacy route still active.
 
@@ -115,9 +115,9 @@ Remove `router.delete('/institutes/:id', ...)` from `server/src/routes/api.ts`. 
 
 Run: `cd server && npx prisma format && npx prisma validate && npx prisma generate`
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' npx prisma migrate deploy`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' npx prisma migrate deploy`
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminDeletion.test.ts tests/superAdminInstitutes.test.ts tests/superAdminSecurity.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminDeletion.test.ts tests/superAdminInstitutes.test.ts tests/superAdminSecurity.test.ts`
 
 Expected: PASS.
 
@@ -162,7 +162,7 @@ Test expiry worker idempotency, wrong institute, linked-ticket mismatch, mutatin
 
 - [ ] **Step 2: Run RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSupportSession.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSupportSession.test.ts`
 
 Run: `cd client && npm run test:run -- src/features/superadmin-shell/SupportSessionBanner.test.tsx`
 
@@ -310,7 +310,7 @@ Assert institute admins cannot call global institutes/analytics/onboarding-link 
 
 - [ ] **Step 2: Run RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminLegacyRoutes.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminLegacyRoutes.test.ts`
 
 Expected: legacy routes remain reachable with only generic authentication.
 
@@ -372,7 +372,7 @@ Run the full client test suite, targeted lint across all `superadmin-*` features
 
 - [ ] **Step 4: Run the full server baseline comparison**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/*.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/*.test.ts`
 
 Expected: no new failures relative to the recorded baseline. Fix every new Superadmin or Marketplace failure; document unchanged unrelated baseline failures exactly.
 

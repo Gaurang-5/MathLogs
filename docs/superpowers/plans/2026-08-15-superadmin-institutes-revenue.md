@@ -73,7 +73,7 @@ test('billing operation idempotency key is unique', async () => {
 
 - [ ] **Step 2: Run test to verify RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminBillingSchema.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminBillingSchema.test.ts`
 
 Expected: FAIL because the three operation delegates are missing.
 
@@ -150,9 +150,9 @@ Run: `cd server && npx prisma validate`
 
 Run: `cd server && npx prisma generate`
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' npx prisma migrate deploy`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' npx prisma migrate deploy`
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminBillingSchema.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminBillingSchema.test.ts`
 
 Expected: PASS.
 
@@ -195,7 +195,7 @@ Also assert institute-admin callers receive 403 and stale `expectedUpdatedAt` re
 
 - [ ] **Step 2: Run tests to verify RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminInstitutes.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminInstitutes.test.ts`
 
 Expected: 404 for new endpoints.
 
@@ -247,7 +247,7 @@ router.delete('/institutes/:id/admins/:adminId', requireSuperAdminReauth('ADMIN_
 router.patch('/institutes/:id/access', requireSuperAdminReauth('ADMIN_ACCESS_CHANGE'), updateInstituteAccess);
 ```
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminInstitutes.test.ts tests/marketplaceSuperAdmin.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminInstitutes.test.ts tests/marketplaceSuperAdmin.test.ts`
 
 Run: `cd server && npm run build`
 
@@ -289,7 +289,7 @@ Test invalid import rows return `{ row, field, code, message }[]` and commit doe
 
 - [ ] **Step 2: Run tests to verify RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminOnboarding.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminOnboarding.test.ts`
 
 Expected: 404.
 
@@ -314,7 +314,7 @@ Accept parsed JSON rows and CSV-normalized rows through the same validator. Prev
 
 - [ ] **Step 5: Run GREEN and commit**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminOnboarding.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminOnboarding.test.ts`
 
 Run: `cd server && npm run build`
 
@@ -354,7 +354,7 @@ Add tests for missing challenge, duplicate idempotency key, stale concurrent ope
 
 - [ ] **Step 2: Run tests to verify RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminRevenue.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminRevenue.test.ts`
 
 Expected: 404.
 
@@ -390,7 +390,7 @@ Use real institute plans, expiry dates, AdminOnboardingLink status, and `SuperAd
 
 - [ ] **Step 6: Run GREEN and commit**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminRevenue.test.ts tests/superAdminInstitutes.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminRevenue.test.ts tests/superAdminInstitutes.test.ts`
 
 Run: `cd server && npm run build`
 

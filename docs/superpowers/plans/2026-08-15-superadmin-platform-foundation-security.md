@@ -108,7 +108,7 @@ test('persists the Superadmin security foundation', async () => {
 
 - [ ] **Step 2: Run the schema test to verify RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecuritySchema.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecuritySchema.test.ts`
 
 Expected: FAIL because the six new Prisma delegates/relations do not exist.
 
@@ -229,13 +229,13 @@ Run: `cd server && npx prisma validate`
 
 Run: `cd server && npx prisma generate`
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' npx prisma migrate deploy`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' npx prisma migrate deploy`
 
 Expected: schema valid; client generated; additive migration (including audit immutability trigger) applied without reset.
 
 - [ ] **Step 5: Run the schema test to verify GREEN**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecuritySchema.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecuritySchema.test.ts`
 
 Expected: PASS.
 
@@ -306,7 +306,7 @@ test('correlates an audited mutation without exposing secrets', async () => {
 
 - [ ] **Step 2: Run tests to verify RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecurity.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecurity.test.ts`
 
 Expected: FAIL with missing router/service behavior.
 
@@ -365,7 +365,7 @@ Mount `correlationId` before authentication; accept a valid inbound `X-Correlati
 
 - [ ] **Step 6: Run tests and build**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecurity.test.ts tests/superAdminSecuritySchema.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecurity.test.ts tests/superAdminSecuritySchema.test.ts`
 
 Run: `cd server && npm run build`
 
@@ -400,7 +400,7 @@ assert.equal(search.data[0].instituteId, institute.id);
 
 - [ ] **Step 2: Run tests to verify RED**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminHome.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminHome.test.ts`
 
 Expected: 404 for both missing endpoints.
 
@@ -433,7 +433,7 @@ Search trims `q`, requires at least two characters, and uses case-insensitive na
 
 - [ ] **Step 5: Run tests and build**
 
-Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminHome.test.ts tests/marketplaceSuperAdmin.test.ts`
+Run: `cd server && DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminHome.test.ts tests/marketplaceSuperAdmin.test.ts`
 
 Run: `cd server && npm run build`
 
@@ -528,7 +528,7 @@ Run:
 
 ```bash
 cd server
-DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecuritySchema.test.ts tests/superAdminSecurity.test.ts tests/superAdminHome.test.ts tests/marketplaceSuperAdmin.test.ts
+DATABASE_URL='postgresql://mathlogs_test:mathlogs_test@127.0.0.1:55432/mathlogs_superadmin_test?schema=public' JWT_SECRET=test-secret NODE_ENV=test npx tsx --test --test-force-exit tests/superAdminSecuritySchema.test.ts tests/superAdminSecurity.test.ts tests/superAdminHome.test.ts tests/marketplaceSuperAdmin.test.ts
 npm run build
 ```
 
