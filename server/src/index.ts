@@ -14,6 +14,7 @@ import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } 
 import { emailWorker } from './utils/emailWorker';
 import { Client } from 'pg';
 import { secureLogger } from './utils/secureLogger';
+import { correlationId } from './middleware/correlationId';
 
 
 
@@ -100,11 +101,12 @@ export function createApp() {
         },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
-        exposedHeaders: ['Content-Disposition'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-Id', 'X-Superadmin-Challenge', 'Idempotency-Key'],
+        exposedHeaders: ['Content-Disposition', 'X-Correlation-Id'],
         maxAge: 86400
     }));
 
+    app.use(correlationId);
     app.use(express.json({ limit: '5mb' })); // Increased to 5MB to support base64 logo uploads
     app.use('/api', apiLimiter);
 

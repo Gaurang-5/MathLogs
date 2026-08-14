@@ -7,8 +7,11 @@ declare global {
         id: string;
         instituteId: string;
         username: string;
+        role: string;
         [key: string]: any;
       };
+      correlationId: string;
+      superAdminChallengeId?: string;
     }
   }
 }

@@ -126,7 +126,9 @@ test('POST /api/auth/login returns tokens for valid credentials', async () => {
     replaceMethod(bcrypt, 'compare', (async () => true) as typeof bcrypt.compare);
     replaceMethod(jwt, 'sign', (() => 'login-route-token' as never) as typeof jwt.sign);
     replaceMethod(crypto, 'randomBytes', (((size: number) => Buffer.alloc(size, 5)) as unknown) as typeof crypto.randomBytes);
+    replaceMethod(prisma.adminSession, 'create', (async () => ({ id: 'session-route-1' }) as never) as typeof prisma.adminSession.create);
     replaceMethod(prisma.refreshToken, 'create', (async () => ({ id: 'rt-route-1' }) as never) as typeof prisma.refreshToken.create);
+    replaceMethod(prisma.authenticationEvent, 'create', (async () => ({ id: 'auth-event-route-1' }) as never) as typeof prisma.authenticationEvent.create);
 
     const response = await postJson('/api/auth/login', {
         username: 'owner',
@@ -150,6 +152,9 @@ test('POST /api/auth/login returns tokens for valid credentials', async () => {
         token: 'login-route-token',
         refreshToken: Buffer.alloc(40, 5).toString('hex'),
         role: 'ADMIN',
+        isQuizOnly: false,
+        isPageOnly: false,
+        quizCredits: 0,
         message: 'Login successful',
     });
 });
@@ -158,6 +163,8 @@ test('POST /api/auth/refresh rotates tokens for a valid refresh token', async ()
     replaceMethod(prisma.refreshToken, 'findUnique', (async () => ({
         id: 'stored-token-id',
         token: 'stored-refresh-token',
+        sessionId: 'session-route-2',
+        session: { id: 'session-route-2', revokedAt: null, expiresAt: new Date(Date.now() + 60_000) },
         expiresAt: new Date(Date.now() + 60_000),
         admin: {
             id: 'admin-2',
@@ -169,7 +176,9 @@ test('POST /api/auth/refresh rotates tokens for a valid refresh token', async ()
         },
     }) as never) as typeof prisma.refreshToken.findUnique);
     replaceMethod(prisma.refreshToken, 'delete', (async () => ({ id: 'stored-token-id' }) as never) as typeof prisma.refreshToken.delete);
+    replaceMethod(prisma.adminSession, 'updateMany', (async () => ({ count: 1 }) as never) as typeof prisma.adminSession.updateMany);
     replaceMethod(prisma.refreshToken, 'create', (async () => ({ id: 'new-token-id' }) as never) as typeof prisma.refreshToken.create);
+    replaceMethod(prisma.authenticationEvent, 'create', (async () => ({ id: 'auth-event-route-2' }) as never) as typeof prisma.authenticationEvent.create);
     replaceMethod(jwt, 'sign', (() => 'refresh-route-token' as never) as typeof jwt.sign);
     replaceMethod(crypto, 'randomBytes', (((size: number) => Buffer.alloc(size, 6)) as unknown) as typeof crypto.randomBytes);
 

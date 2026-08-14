@@ -74,6 +74,8 @@ test('loginAdmin returns tokens for a valid admin', async () => {
     replaceMethod(bcrypt, 'compare', (async () => true) as typeof bcrypt.compare);
     replaceMethod(jwt, 'sign', (() => 'signed-access-token' as never) as typeof jwt.sign);
     replaceMethod(crypto, 'randomBytes', (((size: number) => Buffer.alloc(size, 7)) as unknown) as typeof crypto.randomBytes);
+    replaceMethod(prisma.adminSession, 'create', (async () => ({ id: 'session-1' }) as never) as typeof prisma.adminSession.create);
+    replaceMethod(prisma.authenticationEvent, 'create', (async () => ({ id: 'auth-event-1' }) as never) as typeof prisma.authenticationEvent.create);
 
     let refreshTokenCreateCalls = 0;
     replaceMethod(prisma.refreshToken, 'create', (async () => {
@@ -98,6 +100,9 @@ test('loginAdmin returns tokens for a valid admin', async () => {
         token: 'signed-access-token',
         refreshToken: Buffer.alloc(40, 7).toString('hex'),
         role: 'ADMIN',
+        isQuizOnly: false,
+        isPageOnly: false,
+        quizCredits: 0,
         message: 'Login successful',
     });
     assert.equal(refreshTokenCreateCalls, 1);
@@ -107,6 +112,8 @@ test('refreshTokenUser rotates the refresh token on success', async () => {
     replaceMethod(prisma.refreshToken, 'findUnique', (async () => ({
         id: 'old-token-id',
         token: 'refresh-token',
+        sessionId: 'session-2',
+        session: { id: 'session-2', revokedAt: null, expiresAt: new Date(Date.now() + 60_000) },
         expiresAt: new Date(Date.now() + 60_000),
         admin: {
             id: 'admin-2',
@@ -123,6 +130,8 @@ test('refreshTokenUser rotates the refresh token on success', async () => {
         refreshTokenDeleteCalls += 1;
         return { id: 'old-token-id' } as never;
     }) as typeof prisma.refreshToken.delete);
+    replaceMethod(prisma.adminSession, 'updateMany', (async () => ({ count: 1 }) as never) as typeof prisma.adminSession.updateMany);
+    replaceMethod(prisma.authenticationEvent, 'create', (async () => ({ id: 'auth-event-2' }) as never) as typeof prisma.authenticationEvent.create);
 
     let refreshTokenCreateCalls = 0;
     replaceMethod(prisma.refreshToken, 'create', (async () => {

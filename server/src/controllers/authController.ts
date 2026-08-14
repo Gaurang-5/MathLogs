@@ -8,6 +8,7 @@ import { sendOtpWhatsApp } from '../utils/whatsapp';
 import { invalidateAuthCache } from '../middleware/auth';
 import { secureLogger } from '../utils/secureLogger';
 import { getOrResetQuizCredits } from '../utils/quizCredits';
+import { hashRequestIp, recordAuthenticationEvent, safeDeviceLabel } from '../services/superAdminAuthEventService';
 
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -18,7 +19,7 @@ if (!JWT_SECRET) {
 /**
  * Helper to generate and store Short-Lived Access Token (1h) + Long-Lived Refresh Token (30d)
  */
-const generateAuthTokens = async (admin: any) => {
+const generateAuthTokens = async (admin: any, req?: Request, existingSessionId?: string | null) => {
     // Access Token: 1 hour expiry (reduced from 30 days for security)
     const token = jwt.sign({
         id: admin.id,
@@ -32,10 +33,30 @@ const generateAuthTokens = async (admin: any) => {
     const refreshTokenString = crypto.randomBytes(40).toString('hex');
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
+    let sessionId = existingSessionId || null;
+    if (sessionId) {
+        const active = await prisma.adminSession.updateMany({
+            where: { id: sessionId, adminId: admin.id, revokedAt: null, expiresAt: { gt: new Date() } },
+            data: { lastSeenAt: new Date() }
+        });
+        if (active.count !== 1) throw new Error('AUTH_SESSION_REVOKED');
+    } else {
+        const session = await prisma.adminSession.create({
+            data: {
+                adminId: admin.id,
+                deviceLabel: safeDeviceLabel(req?.get?.('user-agent')),
+                ipHash: hashRequestIp(req?.ip),
+                expiresAt
+            }
+        });
+        sessionId = session.id;
+    }
+
     await prisma.refreshToken.create({
         data: {
             token: refreshTokenString,
             adminId: admin.id,
+            sessionId,
             expiresAt
         }
     });
@@ -67,14 +88,16 @@ export const loginAdmin = async (req: Request, res: Response) => {
         }
 
         if (!admin) {
-            secureLogger.warn(`[Auth] Failed login attempt for identifier: ${username} (User not found)`);
+            secureLogger.warn('[Auth] Failed login attempt', { reason: 'NOT_FOUND' });
+            await recordAuthenticationEvent({ eventType: 'LOGIN_FAILED', success: false, ip: req.ip, userAgent: req.get?.('user-agent'), metadata: { reason: 'NOT_FOUND' } });
             res.status(404).json({ error: 'User not found' });
             return;
         }
 
         const isMatch = await bcrypt.compare(password, admin.password);
         if (!isMatch) {
-            secureLogger.warn(`[Auth] Failed login attempt for identifier: ${username} (Invalid password)`);
+            secureLogger.warn('[Auth] Failed login attempt', { reason: 'INVALID_PASSWORD' });
+            await recordAuthenticationEvent({ adminId: admin.id, eventType: 'LOGIN_FAILED', success: false, ip: req.ip, userAgent: req.get?.('user-agent'), metadata: { reason: 'INVALID_PASSWORD' } });
             res.status(401).json({ error: 'Incorrect password' });
             return;
         }
@@ -87,7 +110,8 @@ export const loginAdmin = async (req: Request, res: Response) => {
             });
         }
 
-        const tokens = await generateAuthTokens(admin);
+        const tokens = await generateAuthTokens(admin, req);
+        await recordAuthenticationEvent({ adminId: admin.id, eventType: 'LOGIN', success: true, ip: req.ip, userAgent: req.get?.('user-agent') });
 
         let quizCredits = 0;
         if (admin.institute?.id) {
@@ -167,6 +191,10 @@ export const changePassword = async (req: Request, res: Response) => {
             await tx.refreshToken.deleteMany({
                 where: { adminId }
             });
+            await tx.adminSession.updateMany({
+                where: { adminId, revokedAt: null },
+                data: { revokedAt: new Date() }
+            });
             return result;
         });
 
@@ -174,7 +202,7 @@ export const changePassword = async (req: Request, res: Response) => {
         invalidateAuthCache(adminId);
 
         // Generate new token directly so user doesn't have to re-login immediately
-        const tokens = await generateAuthTokens(updatedAdmin);
+        const tokens = await generateAuthTokens(updatedAdmin, req);
 
         res.json({ 
             success: true, 
@@ -346,16 +374,7 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
 
         await Promise.allSettled(dispatchPromises);
 
-        if (process.env.NODE_ENV !== 'production') {
-            secureLogger.info(`\n========================================`);
-            secureLogger.info(`🔑 OTP DISPATCH FIRED:`);
-            secureLogger.info(`🆔 FOR: ${cleanIdentifier}`);
-            secureLogger.info(`💬 WA?: ${!!targetPhone} | 📧 EMAIL?: ${!!targetEmail}`);
-            secureLogger.info(`🔒 YOUR CODE IS: ${otpCode}`);
-            secureLogger.info(`========================================\n`);
-        } else {
-            secureLogger.info(`[OTP] Dispatched to ${cleanIdentifier} via WA:${!!targetPhone} Email:${!!targetEmail}`);
-        }
+        secureLogger.info('[OTP] Dispatch completed', { whatsapp: Boolean(targetPhone), email: Boolean(targetEmail) });
 
         res.json({ success: true, message: `OTP sent successfully to your WhatsApp (${targetPhone || cleanIdentifier}).` });
     } catch (error) {
@@ -386,7 +405,7 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
         });
         
         if (!storedOtp) {
-            secureLogger.info(`[AUTH] OTP lookup failed for: ${cleanIdentifier} (raw: ${phone})`);
+            secureLogger.info('[AUTH] OTP lookup failed');
             return res.status(400).json({ error: 'OTP expired or not requested' });
         }
         
@@ -481,7 +500,7 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
             });
         }
 
-        const tokens = await generateAuthTokens(admin);
+        const tokens = await generateAuthTokens(admin, req);
 
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
         const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
@@ -549,7 +568,7 @@ export const selectMobileAccount = async (req: Request, res: Response) => {
             });
         }
 
-        const tokens = await generateAuthTokens(admin);
+        const tokens = await generateAuthTokens(admin, req);
 
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
         const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
@@ -582,7 +601,7 @@ export const refreshTokenUser = async (req: Request, res: Response) => {
     try {
         const storedToken = await prisma.refreshToken.findUnique({
             where: { token: refreshToken },
-            include: { admin: { include: { institute: true } } }
+            include: { admin: { include: { institute: true } }, session: true }
         });
 
         if (!storedToken) {
@@ -592,6 +611,11 @@ export const refreshTokenUser = async (req: Request, res: Response) => {
         if (storedToken.expiresAt < new Date()) {
             await prisma.refreshToken.delete({ where: { id: storedToken.id } });
             return res.status(401).json({ error: 'Refresh token expired' });
+        }
+
+        if (storedToken.session?.revokedAt || (storedToken.session && storedToken.session.expiresAt < new Date())) {
+            await prisma.refreshToken.deleteMany({ where: { sessionId: storedToken.sessionId } });
+            return res.status(401).json({ error: 'Session revoked' });
         }
 
         const admin = storedToken.admin;
@@ -607,12 +631,40 @@ export const refreshTokenUser = async (req: Request, res: Response) => {
         await prisma.refreshToken.delete({ where: { id: storedToken.id } });
 
         // Generate a fresh pair
-        const tokens = await generateAuthTokens(admin);
+        const tokens = await generateAuthTokens(admin, req, storedToken.sessionId);
+        await recordAuthenticationEvent({ adminId: admin.id, eventType: 'REFRESH', success: true, ip: req.ip, userAgent: req.get?.('user-agent') });
 
         res.json({ success: true, token: tokens.token, refreshToken: tokens.refreshToken });
     } catch (error) {
         console.error('Refresh Token Error:', error);
         res.status(500).json({ error: 'Failed to refresh token' });
+    }
+};
+
+export const logoutUser = async (req: Request, res: Response) => {
+    const refreshToken = String(req.body?.refreshToken || '').trim();
+    if (!refreshToken) return res.status(400).json({ error: 'Refresh token is required' });
+    try {
+        const stored = await prisma.refreshToken.findFirst({
+            where: { token: refreshToken, adminId: req.user.id },
+            select: { sessionId: true }
+        });
+        if (!stored) return res.status(401).json({ error: 'Invalid refresh token' });
+        await prisma.$transaction(async tx => {
+            if (stored.sessionId) {
+                await tx.adminSession.updateMany({
+                    where: { id: stored.sessionId, adminId: req.user.id, revokedAt: null },
+                    data: { revokedAt: new Date() }
+                });
+                await tx.refreshToken.deleteMany({ where: { sessionId: stored.sessionId } });
+            } else {
+                await tx.refreshToken.deleteMany({ where: { token: refreshToken, adminId: req.user.id } });
+            }
+        });
+        await recordAuthenticationEvent({ adminId: req.user.id, eventType: 'LOGOUT', success: true, ip: req.ip, userAgent: req.get?.('user-agent') });
+        return res.json({ success: true });
+    } catch (error) {
+        return res.status(500).json({ error: 'Failed to logout' });
     }
 };
 
@@ -669,13 +721,7 @@ export const sendSignupOtp = async (req: Request, res: Response) => {
 
         await sendOtpWhatsApp(cleanPhone, otpCode).catch(e => console.error('Signup WA OTP Failed:', e));
 
-        if (process.env.NODE_ENV !== 'production') {
-            secureLogger.info(`\n========================================`);
-            secureLogger.info(`🔑 SIGNUP OTP DISPATCH FIRED:`);
-            secureLogger.info(`🆔 FOR: ${cleanPhone}`);
-            secureLogger.info(`🔒 YOUR CODE IS: ${otpCode}`);
-            secureLogger.info(`========================================\n`);
-        }
+        secureLogger.info('[SIGNUP_OTP] Dispatch completed');
 
         return res.json({ success: true, message: `OTP sent to ${cleanPhone} via WhatsApp.` });
     } catch (error) {
@@ -739,4 +785,3 @@ export const verifySignupOtp = async (req: Request, res: Response) => {
         return res.status(500).json({ error: 'Failed to verify OTP' });
     }
 };
-

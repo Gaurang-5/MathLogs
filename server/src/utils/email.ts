@@ -111,7 +111,7 @@ export const sendEmail = async (to: string, subject: string, body: string, optio
 
     if (!config) {
         secureLogger.warn('[EMAIL WARNING] No email credentials configured for ' + senderType + '. Falling back to mock.');
-        secureLogger.debug('Email mock mode', { to, subject, senderType });
+        secureLogger.debug('Email mock mode', { recipientConfigured: Boolean(to), senderType });
         return { success: true };
     }
 
