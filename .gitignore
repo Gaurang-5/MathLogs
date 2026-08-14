@@ -24,3 +24,4 @@ coverage
 .agent/
 devtools/
 graphify-out/
+.worktrees/
