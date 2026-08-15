@@ -22,6 +22,7 @@ import { secureLogger } from '../utils/secureLogger';
 import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
 import superAdminRoutes from './superAdminRoutes';
 import { createInstituteTicket, getInstituteTicket, listInstituteTickets, replyInstituteTicket } from '../controllers/superAdminSupportController';
+import { getOwnPreference, updateOwnPreference } from '../controllers/superAdminCommunicationController';
 
 const router = Router();
 router.use('/super-admin', superAdminRoutes);
@@ -29,6 +30,8 @@ router.post('/support/tickets', authenticateToken as any, createInstituteTicket 
 router.get('/support/tickets', authenticateToken as any, listInstituteTickets as any);
 router.get('/support/tickets/:id', authenticateToken as any, getInstituteTicket as any);
 router.post('/support/tickets/:id/messages', authenticateToken as any, replyInstituteTicket as any);
+router.get('/communication-preferences', authenticateToken as any, getOwnPreference as any);
+router.patch('/communication-preferences', authenticateToken as any, updateOwnPreference as any);
 
 // ================= PUBLIC DOMAIN ROUTES =================
 // These routes do NOT require authentication and are used by parents/students.

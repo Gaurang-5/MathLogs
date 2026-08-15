@@ -156,6 +156,9 @@ export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) 
                 : {}),
             ...(process.env.WHATSAPP_TEMPLATE_MARKETPLACE_LEAD
                 ? { [process.env.WHATSAPP_TEMPLATE_MARKETPLACE_LEAD]: { body: ['owner_name', 'institute_name', 'student_name', 'class_subject_summary', 'settings_url'], buttonIndex: 4 } }
+                : {}),
+            ...(process.env.WHATSAPP_TEMPLATE_SUPERADMIN_OPERATIONAL
+                ? { [process.env.WHATSAPP_TEMPLATE_SUPERADMIN_OPERATIONAL]: { body: ['owner_name', 'institute_name', 'message_title'] } }
                 : {})
         };
 
@@ -265,6 +268,10 @@ export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) 
                     notificationJobId: job.id,
                     deliveryStatus: 'DELIVERED', notificationSentAt: sentAt, notificationError: null
                 }
+            }),
+            prisma.targetedCommunicationRecipient.updateMany({
+                where: { id: job.superAdminEntityType === 'TargetedCommunicationRecipient' ? job.superAdminEntityId || '__none__' : '__none__' },
+                data: { status: 'SENT', sentAt, error: null }
             })
         ]);
 
@@ -292,6 +299,10 @@ export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) 
                     notificationJobId: job.id,
                     deliveryStatus: isExhausted ? 'FAILED' : 'QUEUED', notificationError: boundedError
                 }
+            }),
+            prisma.targetedCommunicationRecipient.updateMany({
+                where: { id: job.superAdminEntityType === 'TargetedCommunicationRecipient' ? job.superAdminEntityId || '__none__' : '__none__' },
+                data: { status: isExhausted ? 'FAILED' : 'PENDING', error: boundedError }
             })
         ]);
     }

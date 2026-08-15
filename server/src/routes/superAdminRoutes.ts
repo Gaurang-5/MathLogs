@@ -29,6 +29,7 @@ import {
   revenueSubscriptions
 } from '../controllers/superAdminRevenueController';
 import { addCaseNote, addTicketMessage, createCase, getAnyTicket, getCase, listAllTickets, listCases, updateTicketStatus } from '../controllers/superAdminSupportController';
+import { dispatch, getPreference, history, preview, templates, updatePreference } from '../controllers/superAdminCommunicationController';
 
 const router = Router();
 
@@ -45,12 +46,18 @@ router.get('/support/cases', listCases);
 router.post('/support/cases', createCase);
 router.get('/support/cases/:id', getCase);
 router.post('/support/cases/:id/notes', addCaseNote);
+router.get('/communications/templates', templates);
+router.post('/communications/preview', preview);
+router.post('/communications/dispatch', requireSuperAdminReauth('TARGETED_COMMUNICATION'), dispatch);
+router.get('/communications/history', history);
 router.get('/institutes', listInstitutes);
 router.post('/institutes/onboarding/preview', previewOnboarding);
 router.post('/institutes/onboarding/commit', commitOnboarding);
 router.post('/institutes/import/preview', previewImport);
 router.post('/institutes/import/commit', commitImport);
 router.get('/institutes/:id', getInstitute);
+router.get('/institutes/:id/communication-preferences', getPreference);
+router.patch('/institutes/:id/communication-preferences', updatePreference);
 router.patch('/institutes/:id/details', updateInstituteDetails);
 router.patch('/institutes/:id/configuration', updateInstituteConfiguration);
 router.get('/institutes/:id/billing-history', billingHistory);

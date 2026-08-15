@@ -89,13 +89,14 @@ export class EmailWorker {
             const duration = Date.now() - start;
 
             if (result.success) {
-                await prisma.emailJob.update({
-                    where: { id: job.id },
-                    data: {
-                        status: 'COMPLETED',
-                        updatedAt: new Date()
-                    }
-                });
+                const sentAt = new Date();
+                await prisma.$transaction([
+                    prisma.emailJob.update({ where: { id: job.id }, data: { status: 'COMPLETED', updatedAt: sentAt } }),
+                    prisma.targetedCommunicationRecipient.updateMany({
+                        where: { id: job.superAdminEntityType === 'TargetedCommunicationRecipient' ? job.superAdminEntityId || '__none__' : '__none__' },
+                        data: { status: 'SENT', sentAt, error: null }
+                    })
+                ]);
                 secureLogger.info(`[EmailWorker] Job ${job.id} sent to ${job.recipient} in ${duration}ms`);
             } else {
                 throw new Error(result.error);
@@ -109,15 +110,13 @@ export class EmailWorker {
             // Exponential backoff could be implemented by updating 'createdAt' to future date, 
             // but current schema doesn't support 'scheduledAt'. PENDING will retry next cycle.
 
-            await prisma.emailJob.update({
-                where: { id: job.id },
-                data: {
-                    status,
-                    attempts,
-                    error: error.message,
-                    updatedAt: new Date()
-                }
-            });
+            await prisma.$transaction([
+                prisma.emailJob.update({ where: { id: job.id }, data: { status, attempts, error: error.message, updatedAt: new Date() } }),
+                prisma.targetedCommunicationRecipient.updateMany({
+                    where: { id: job.superAdminEntityType === 'TargetedCommunicationRecipient' ? job.superAdminEntityId || '__none__' : '__none__' },
+                    data: { status: status === 'FAILED' ? 'FAILED' : 'PENDING', error: error.message }
+                })
+            ]);
         }
     }
 }
