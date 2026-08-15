@@ -24,6 +24,9 @@ const SetupAccount = lazy(() => import('./pages/SetupAccount'));
 const SuperAdminMarketplace = lazy(() => import('./pages/SuperAdminMarketplace'));
 const SuperAdminRoute = lazy(() => import('./pages/superadmin/SuperAdminRoute'));
 const SuperAdminHome = lazy(() => import('./pages/superadmin/SuperAdminHome'));
+const SuperAdminInstitutes = lazy(() => import('./pages/superadmin/SuperAdminInstitutes'));
+const SuperAdminInstituteDetail = lazy(() => import('./pages/superadmin/SuperAdminInstituteDetail'));
+const SuperAdminInstituteNew = lazy(() => import('./pages/superadmin/SuperAdminInstituteNew'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
@@ -95,6 +98,9 @@ function App() {
               </RoleRoute>
             }>
               <Route index element={<SuperAdminHome />} />
+              <Route path="institutes" element={<SuperAdminInstitutes />} />
+              <Route path="institutes/new" element={<SuperAdminInstituteNew />} />
+              <Route path="institutes/:id/*" element={<SuperAdminInstituteDetail />} />
               <Route path="marketplace" element={<SuperAdminMarketplace />} />
             </Route>
 
