@@ -21,8 +21,9 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Billing = lazy(() => import('./pages/Billing'));
 const CheckStatus = lazy(() => import('./pages/CheckStatus'));
 const SetupAccount = lazy(() => import('./pages/SetupAccount'));
-const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const SuperAdminMarketplace = lazy(() => import('./pages/SuperAdminMarketplace'));
+const SuperAdminRoute = lazy(() => import('./pages/superadmin/SuperAdminRoute'));
+const SuperAdminHome = lazy(() => import('./pages/superadmin/SuperAdminHome'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
@@ -90,14 +91,12 @@ function App() {
             <Route path="/join/:token" element={<JoinOnboarding />} />
             <Route path="/super-admin" element={
               <RoleRoute allowedRole="SUPER_ADMIN">
-                <SuperAdminDashboard />
+                <SuperAdminRoute />
               </RoleRoute>
-            } />
-            <Route path="/super-admin/marketplace" element={
-              <RoleRoute allowedRole="SUPER_ADMIN">
-                <SuperAdminMarketplace />
-              </RoleRoute>
-            } />
+            }>
+              <Route index element={<SuperAdminHome />} />
+              <Route path="marketplace" element={<SuperAdminMarketplace />} />
+            </Route>
 
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
             <Route path="/batches" element={<PrivateRoute><BatchList /></PrivateRoute>} />
