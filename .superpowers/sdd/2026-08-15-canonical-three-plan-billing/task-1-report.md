@@ -42,3 +42,38 @@ Summary: both catalogue tests passed (`2` passed, `0` failed), and `npm run buil
 ## Concerns
 
 None.
+
+## Fix Round 1
+
+Addressed review findings by deeply freezing the authoritative catalogue and each feature array, keeping public catalogue results isolated, changing `resolvePlanPrice` to accept and validate unknown cycle input at the boundary, and expanding tests for all valid price/cycle pairings plus incompatible and invalid cycles.
+
+### RED evidence
+
+Command:
+
+```bash
+cd server && npx tsx --test tests/planCatalog.test.ts
+```
+
+The amended tests failed before the implementation fix: the authoritative immutability test reported a falsy `Object.isFrozen(PLAN_CATALOG)` assertion (3 passed, 1 failed, exit code 1).
+
+### GREEN evidence
+
+Command:
+
+```bash
+cd server && npx tsx --test tests/planCatalog.test.ts && npm run build
+```
+
+Summary: all four focused tests passed (`4` passed, `0` failed), and `npm run build` completed successfully with `tsc` exit code 0.
+
+### Self-review
+
+- `PLAN_CATALOG`, every authoritative plan object, and every authoritative feature array are runtime frozen.
+- `publicPlanCatalogue()` still returns fresh plan objects and feature arrays.
+- Invalid cycles now fail through `INVALID_BILLING_CYCLE`; incompatible known cycles fail through `INVALID_PLAN_CYCLE`.
+- Tests cover every non-null price and every incompatible pair.
+
+### Fix Round 1 commit
+
+The Fix Round 1 commit is reported in the task handoff after the final report amendment.

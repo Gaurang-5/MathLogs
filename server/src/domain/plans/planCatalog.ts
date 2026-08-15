@@ -14,11 +14,18 @@ export type PlanProduct = {
   features: readonly string[];
 };
 
-export const PLAN_CATALOG: readonly PlanProduct[] = [
+const PLAN_CATALOG_VALUES: readonly PlanProduct[] = [
   { id: 'MARKETPLACE', label: 'Marketplace', monthlyPricePaise: null, yearlyPricePaise: null, oneTimePricePaise: 9_900, promotionalPricePaise: 0, trialDays: 0, includedQuizCredits: 0, unlimitedStudents: true, features: ['Public Marketplace listing', 'Ownership and profile management', 'Student and parent leads'] },
   { id: 'QUIZ', label: 'Quiz', monthlyPricePaise: 24_900, yearlyPricePaise: 249_900, oneTimePricePaise: null, promotionalPricePaise: null, trialDays: 14, includedQuizCredits: 5, unlimitedStudents: true, features: ['Lifetime Marketplace access', 'Quiz creation and delivery', 'Five included quiz credits each month', 'Lifetime credit top-ups'] },
   { id: 'ENTERPRISE', label: 'Enterprise', monthlyPricePaise: 49_900, yearlyPricePaise: 499_900, oneTimePricePaise: null, promotionalPricePaise: null, trialDays: 14, includedQuizCredits: 5, unlimitedStudents: true, features: ['Lifetime Marketplace access', 'All quiz features', 'All coaching-management features', 'Five included quiz credits each month'] }
 ] as const;
+
+export const PLAN_CATALOG: readonly PlanProduct[] = Object.freeze(
+  PLAN_CATALOG_VALUES.map(plan => Object.freeze({
+    ...plan,
+    features: Object.freeze([...plan.features])
+  }))
+);
 
 const PLAN_ALIASES: Readonly<Record<string, CanonicalPlan>> = {
   MARKETPLACE: 'MARKETPLACE',
@@ -37,15 +44,21 @@ export function normalizePlanId(value: unknown): CanonicalPlan {
   return plan;
 }
 
-export function resolvePlanPrice(plan: unknown, cycle: BillingCycle): number {
+function normalizeBillingCycle(value: unknown): BillingCycle {
+  if (value === 'MONTHLY' || value === 'YEARLY' || value === 'ONE_TIME') return value;
+  throw new Error('INVALID_BILLING_CYCLE');
+}
+
+export function resolvePlanPrice(plan: unknown, cycle: unknown): number {
   const product = PLAN_CATALOG.find(candidate => candidate.id === normalizePlanId(plan));
   if (!product) throw new Error('INVALID_PLAN');
 
-  const price = cycle === 'MONTHLY'
+  const normalizedCycle = normalizeBillingCycle(cycle);
+  const price = normalizedCycle === 'MONTHLY'
     ? product.monthlyPricePaise
-    : cycle === 'YEARLY'
+    : normalizedCycle === 'YEARLY'
       ? product.yearlyPricePaise
-      : cycle === 'ONE_TIME'
+      : normalizedCycle === 'ONE_TIME'
         ? product.oneTimePricePaise
         : null;
   if (price === null) throw new Error('INVALID_PLAN_CYCLE');
