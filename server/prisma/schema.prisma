@@ -8,66 +8,70 @@ datasource db {
 }
 
 model Institute {
-  id                          String                       @id @default(uuid())
-  name                        String
-  createdAt                   DateTime                     @default(now())
-  updatedAt                   DateTime                     @updatedAt
-  slug                        String?                      @unique
-  aboutUs                     String?
-  websiteConfig               Json?
-  config                      Json?                        @default("{\"subjects\": [\"Math\", \"Science\"], \"allowedClasses\": [\"9\", \"10\"], \"requiresGrades\": true}")
-  plan                        Tier                         @default(FREE)
-  email                       String?
-  phoneNumber                 String?
-  teacherName                 String?
-  status                      String                       @default("ACTIVE")
-  suspensionReason            String?
-  planExpiryDate              DateTime?
-  planStartDate               DateTime?
-  razorpayOrderId             String?
-  razorpaySubscriptionId      String?
-  areRegistrationsPaused      Boolean                      @default(false)
-  admins                      Admin[]
-  batches                     Batch[]
-  invites                     InviteToken[]
-  students                    Student[]
-  tests                       Test[]
-  attendanceRecords           AttendanceRecord[]
-  attendanceSweepRuns         AttendanceSweepRun[]
-  studentLeads                StudentLead[]
-  systemLogs                  SystemLog[]
-  upiPaymentVerifications     UpiPaymentVerification[]
-  onlineQuizzes               OnlineQuiz[]
-  quizCredits                 Int                          @default(0)
-  isQuizOnly                  Boolean                      @default(false)
-  isPubliclyListed            Boolean                      @default(false)
-  isExclusive                 Boolean                      @default(false)
-  isVerified                  Boolean                      @default(false)
-  publicPhone                 String?
-  whatsappPhone               String?
-  city                        String?
-  area                        String?
-  address                     String?
-  tagline                     String?
-  subjectsOffered             Json?
-  classesOffered              Json?
-  logoUrl                     String?
-  googlePlaceId               String?
-  googleMapsUrl               String?
-  googleRating                Float?
-  googleReviewCount           Int?
-  googleReviews               Json?
-  googlePhotos                Json?
-  googleLastSyncedAt          DateTime?
-  reviews                     Review[]
-  leadInquiries               LeadInquiry[]
-  ownershipStatus             String                       @default("UNCLAIMED")
-  claimedPhone                String?
-  claimedAt                   DateTime?
-  marketplaceClaims           MarketplaceClaim[]
-  marketplaceAuditLogs        MarketplaceAuditLog[]
-  superAdminSupportSessions   SuperAdminSupportSession[]
-  superAdminBillingOperations SuperAdminBillingOperation[]
+  id                              String                            @id @default(uuid())
+  name                            String
+  createdAt                       DateTime                          @default(now())
+  updatedAt                       DateTime                          @updatedAt
+  slug                            String?                           @unique
+  aboutUs                         String?
+  websiteConfig                   Json?
+  config                          Json?                             @default("{\"subjects\": [\"Math\", \"Science\"], \"allowedClasses\": [\"9\", \"10\"], \"requiresGrades\": true}")
+  plan                            Tier                              @default(FREE)
+  email                           String?
+  phoneNumber                     String?
+  teacherName                     String?
+  status                          String                            @default("ACTIVE")
+  suspensionReason                String?
+  planExpiryDate                  DateTime?
+  planStartDate                   DateTime?
+  razorpayOrderId                 String?
+  razorpaySubscriptionId          String?
+  areRegistrationsPaused          Boolean                           @default(false)
+  admins                          Admin[]
+  batches                         Batch[]
+  invites                         InviteToken[]
+  students                        Student[]
+  tests                           Test[]
+  attendanceRecords               AttendanceRecord[]
+  attendanceSweepRuns             AttendanceSweepRun[]
+  studentLeads                    StudentLead[]
+  systemLogs                      SystemLog[]
+  upiPaymentVerifications         UpiPaymentVerification[]
+  onlineQuizzes                   OnlineQuiz[]
+  quizCredits                     Int                               @default(0)
+  isQuizOnly                      Boolean                           @default(false)
+  isPubliclyListed                Boolean                           @default(false)
+  isExclusive                     Boolean                           @default(false)
+  isVerified                      Boolean                           @default(false)
+  publicPhone                     String?
+  whatsappPhone                   String?
+  city                            String?
+  area                            String?
+  address                         String?
+  tagline                         String?
+  subjectsOffered                 Json?
+  classesOffered                  Json?
+  logoUrl                         String?
+  googlePlaceId                   String?
+  googleMapsUrl                   String?
+  googleRating                    Float?
+  googleReviewCount               Int?
+  googleReviews                   Json?
+  googlePhotos                    Json?
+  googleLastSyncedAt              DateTime?
+  reviews                         Review[]
+  leadInquiries                   LeadInquiry[]
+  ownershipStatus                 String                            @default("UNCLAIMED")
+  claimedPhone                    String?
+  claimedAt                       DateTime?
+  marketplaceClaims               MarketplaceClaim[]
+  marketplaceAuditLogs            MarketplaceAuditLog[]
+  superAdminSupportSessions       SuperAdminSupportSession[]
+  superAdminBillingOperations     SuperAdminBillingOperation[]
+  supportTickets                  SupportTicket[]
+  internalCases                   InternalCase[]
+  communicationPreference         InstituteCommunicationPreference?
+  targetedCommunicationRecipients TargetedCommunicationRecipient[]
 }
 
 model InviteToken {
@@ -103,6 +107,9 @@ model Admin {
   superAdminIdempotencyRecords   SuperAdminIdempotencyRecord[]
   superAdminBillingOperations    SuperAdminBillingOperation[]
   superAdminOnboardingOperations SuperAdminOnboardingOperation[]
+  supportMessages                SupportMessage[]
+  internalCaseNotes              InternalCaseNote[]
+  targetedCommunicationSends     TargetedCommunicationSend[]
 }
 
 model Batch {
@@ -336,21 +343,24 @@ model IdCounter {
 }
 
 model EmailJob {
-  id          String    @id @default(uuid())
-  recipient   String
-  subject     String
-  body        String
-  status      JobStatus @default(PENDING)
-  attempts    Int       @default(0)
-  maxAttempts Int       @default(3)
-  error       String?
-  options     Json?
-  instituteId String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                   String    @id @default(uuid())
+  recipient            String
+  subject              String
+  body                 String
+  status               JobStatus @default(PENDING)
+  attempts             Int       @default(0)
+  maxAttempts          Int       @default(3)
+  error                String?
+  options              Json?
+  instituteId          String?
+  superAdminEntityType String?
+  superAdminEntityId   String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@index([status])
   @@index([createdAt])
+  @@index([superAdminEntityType, superAdminEntityId, createdAt])
 }
 
 model WhatsappJob {
@@ -366,6 +376,8 @@ model WhatsappJob {
   instituteId           String?
   marketplaceEntityType String?
   marketplaceEntityId   String?
+  superAdminEntityType  String?
+  superAdminEntityId    String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -373,6 +385,7 @@ model WhatsappJob {
   @@index([createdAt])
   @@index([status, attempts, createdAt], map: "idx_whatsapp_queue")
   @@index([marketplaceEntityType, marketplaceEntityId, createdAt], map: "idx_whatsapp_marketplace_entity")
+  @@index([superAdminEntityType, superAdminEntityId, createdAt])
 }
 
 model OcrScanCache {
@@ -491,20 +504,154 @@ model SuperAdminReauthChallenge {
 }
 
 model SuperAdminSupportSession {
-  id          String    @id @default(uuid())
-  adminId     String
-  instituteId String
-  ticketId    String?
-  caseId      String?
-  reason      String
-  expiresAt   DateTime
-  endedAt     DateTime?
-  endReason   String?
-  createdAt   DateTime  @default(now())
-  admin       Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  institute   Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  id           String         @id @default(uuid())
+  adminId      String
+  instituteId  String
+  ticketId     String?
+  caseId       String?
+  reason       String
+  expiresAt    DateTime
+  endedAt      DateTime?
+  endReason    String?
+  createdAt    DateTime       @default(now())
+  admin        Admin          @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  institute    Institute      @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  ticket       SupportTicket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  internalCase InternalCase?  @relation(fields: [caseId], references: [id], onDelete: SetNull)
 
   @@index([adminId, expiresAt])
+  @@index([instituteId, createdAt])
+}
+
+model SupportTicket {
+  id              String                     @id @default(uuid())
+  reference       String                     @unique
+  instituteId     String
+  category        String
+  subject         String
+  description     String                     @db.Text
+  priority        String                     @default("NORMAL")
+  status          String                     @default("NEW")
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  institute       Institute                  @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  messages        SupportMessage[]
+  attachments     SupportAttachment[]
+  supportSessions SuperAdminSupportSession[]
+
+  @@index([status, priority, createdAt])
+  @@index([instituteId, updatedAt])
+}
+
+model SupportMessage {
+  id            String        @id @default(uuid())
+  ticketId      String
+  authorAdminId String?
+  visibility    String
+  body          String        @db.Text
+  createdAt     DateTime      @default(now())
+  ticket        SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorAdmin   Admin?        @relation(fields: [authorAdminId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+}
+
+model SupportAttachment {
+  id          String        @id @default(uuid())
+  ticketId    String
+  storageKey  String        @unique
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  createdAt   DateTime      @default(now())
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
+model InternalCase {
+  id              String                     @id @default(uuid())
+  instituteId     String
+  title           String
+  category        String
+  priority        String                     @default("NORMAL")
+  status          String                     @default("OPEN")
+  followUpAt      DateTime?
+  linkedType      String?
+  linkedId        String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  institute       Institute                  @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  notes           InternalCaseNote[]
+  supportSessions SuperAdminSupportSession[]
+
+  @@index([status, followUpAt])
+  @@index([instituteId, updatedAt])
+}
+
+model InternalCaseNote {
+  id            String       @id @default(uuid())
+  caseId        String
+  authorAdminId String
+  body          String       @db.Text
+  createdAt     DateTime     @default(now())
+  internalCase  InternalCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  authorAdmin   Admin        @relation(fields: [authorAdminId], references: [id], onDelete: Restrict)
+
+  @@index([caseId, createdAt])
+}
+
+model InstituteCommunicationPreference {
+  instituteId         String    @id
+  whatsappOperational Boolean   @default(false)
+  whatsappConsentedAt DateTime?
+  emailOperational    Boolean   @default(false)
+  emailConsentedAt    DateTime?
+  consentSource       String?
+  updatedAt           DateTime  @updatedAt
+  institute           Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+}
+
+model TargetedCommunicationSend {
+  id                 String                           @id @default(uuid())
+  channel            String
+  templateName       String
+  audienceDefinition Json
+  reason             String
+  idempotencyKey     String                           @unique
+  status             String                           @default("DRAFT")
+  includedCount      Int                              @default(0)
+  excludedCount      Int                              @default(0)
+  createdByAdminId   String
+  dispatchedAt       DateTime?
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
+  createdByAdmin     Admin                            @relation(fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  recipients         TargetedCommunicationRecipient[]
+
+  @@index([status, createdAt])
+}
+
+model TargetedCommunicationRecipient {
+  id              String                    @id @default(uuid())
+  sendId          String
+  instituteId     String?
+  destination     String
+  variables       Json
+  status          String                    @default("PENDING")
+  exclusionReason String?
+  jobId           String?
+  error           String?
+  sentAt          DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  send            TargetedCommunicationSend @relation(fields: [sendId], references: [id], onDelete: Cascade)
+  institute       Institute?                @relation(fields: [instituteId], references: [id], onDelete: SetNull)
+
+  @@unique([sendId, instituteId])
+  @@index([status, createdAt])
   @@index([instituteId, createdAt])
 }
 
