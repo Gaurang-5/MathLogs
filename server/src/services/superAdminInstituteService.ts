@@ -1,4 +1,5 @@
-import { Prisma } from '@prisma/client';
+import crypto from 'node:crypto';
+import { Prisma, Tier } from '@prisma/client';
 import { prisma } from '../prisma';
 import { invalidateAuthCache } from '../middleware/auth';
 import { writeSuperAdminAudit } from './superAdminAuditService';
@@ -324,4 +325,299 @@ export async function updateSuperAdminInstituteConfiguration(input: MutationCont
     quizCredits: result.quizCredits,
     updatedAt: result.updatedAt
   };
+}
+
+export type InstituteOnboardingInput = {
+  owner: { name: string; phone: string; email?: string };
+  institute: { name: string; city?: string; area?: string; address?: string };
+  access: { kind: 'FULL' | 'PAGE_ONLY' | 'QUIZ_ONLY'; username?: string };
+  billing: { plan: 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE'; trialDays?: number; discountPercent?: number };
+  limits: { maxStudents: number; quizCredits: number };
+  marketplace: { isPubliclyListed: boolean; isVerified: boolean };
+};
+
+type NormalizedOnboarding = InstituteOnboardingInput & {
+  owner: InstituteOnboardingInput['owner'] & { phone: string };
+};
+
+export type OnboardingValidationError = { field: string; code: string; message: string };
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, canonical(item)]));
+  }
+  return value;
+}
+
+function requestHash(value: unknown): string {
+  return crypto.createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
+}
+
+function normalizeIndianPhone(value: unknown): string {
+  let phone = String(value || '').replace(/\D/g, '');
+  if (phone.length === 12 && phone.startsWith('91')) phone = phone.slice(2);
+  if (phone.length === 11 && phone.startsWith('0')) phone = phone.slice(1);
+  return phone;
+}
+
+export function previewInstituteOnboarding(value: unknown): {
+  valid: boolean;
+  errors: OnboardingValidationError[];
+  normalized?: NormalizedOnboarding;
+  summary?: unknown;
+} {
+  const input = value && typeof value === 'object' && !Array.isArray(value) ? value as any : {};
+  const errors: OnboardingValidationError[] = [];
+  const phone = normalizeIndianPhone(input.owner?.phone);
+  const ownerName = String(input.owner?.name || '').trim();
+  const email = String(input.owner?.email || '').trim().toLowerCase();
+  const instituteName = String(input.institute?.name || '').trim();
+  const accessKind = String(input.access?.kind || '').toUpperCase();
+  const plan = String(input.billing?.plan || '').toUpperCase();
+  const trialDays = input.billing?.trialDays === undefined ? 0 : Number(input.billing.trialDays);
+  const discountPercent = input.billing?.discountPercent === undefined ? 0 : Number(input.billing.discountPercent);
+  const maxStudents = Number(input.limits?.maxStudents);
+  const quizCredits = Number(input.limits?.quizCredits);
+  if (!ownerName || ownerName.length > 120) errors.push({ field: 'owner.name', code: 'INVALID_NAME', message: 'Owner name is required and must be at most 120 characters.' });
+  if (!/^[6-9]\d{9}$/.test(phone)) errors.push({ field: 'owner.phone', code: 'INVALID_PHONE', message: 'Enter a valid 10-digit Indian mobile number.' });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push({ field: 'owner.email', code: 'INVALID_EMAIL', message: 'Enter a valid email address.' });
+  if (instituteName.length < 2 || instituteName.length > 160) errors.push({ field: 'institute.name', code: 'INVALID_NAME', message: 'Institute name must be between 2 and 160 characters.' });
+  if (!['FULL', 'PAGE_ONLY', 'QUIZ_ONLY'].includes(accessKind)) errors.push({ field: 'access.kind', code: 'INVALID_ACCESS', message: 'Access must be FULL, PAGE_ONLY, or QUIZ_ONLY.' });
+  if (!['FREE', 'BASIC', 'PRO', 'ENTERPRISE'].includes(plan)) errors.push({ field: 'billing.plan', code: 'INVALID_PLAN', message: 'Select a supported plan.' });
+  if (!Number.isInteger(trialDays) || trialDays < 0 || trialDays > 365) errors.push({ field: 'billing.trialDays', code: 'INVALID_TRIAL', message: 'Trial days must be between 0 and 365.' });
+  if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) errors.push({ field: 'billing.discountPercent', code: 'INVALID_DISCOUNT', message: 'Discount must be between 0 and 100.' });
+  if (!Number.isInteger(maxStudents) || maxStudents < 0 || maxStudents > 100_000) errors.push({ field: 'limits.maxStudents', code: 'INVALID_LIMIT', message: 'Student limit must be between 0 and 100000.' });
+  if (!Number.isInteger(quizCredits) || quizCredits < 0 || quizCredits > 1_000_000) errors.push({ field: 'limits.quizCredits', code: 'INVALID_LIMIT', message: 'Quiz credits must be between 0 and 1000000.' });
+  if (typeof input.marketplace?.isPubliclyListed !== 'boolean') errors.push({ field: 'marketplace.isPubliclyListed', code: 'INVALID_BOOLEAN', message: 'Marketplace visibility is required.' });
+  if (typeof input.marketplace?.isVerified !== 'boolean') errors.push({ field: 'marketplace.isVerified', code: 'INVALID_BOOLEAN', message: 'Verification state is required.' });
+  if (errors.length) return { valid: false, errors };
+
+  const normalized: NormalizedOnboarding = {
+    owner: { name: ownerName, phone, ...(email ? { email } : {}) },
+    institute: {
+      name: instituteName,
+      ...(String(input.institute?.city || '').trim() ? { city: String(input.institute.city).trim() } : {}),
+      ...(String(input.institute?.area || '').trim() ? { area: String(input.institute.area).trim() } : {}),
+      ...(String(input.institute?.address || '').trim() ? { address: String(input.institute.address).trim() } : {})
+    },
+    access: { kind: accessKind as NormalizedOnboarding['access']['kind'], ...(input.access?.username ? { username: String(input.access.username).trim() } : {}) },
+    billing: { plan: plan as NormalizedOnboarding['billing']['plan'], trialDays, discountPercent },
+    limits: { maxStudents, quizCredits },
+    marketplace: { isPubliclyListed: input.marketplace.isPubliclyListed, isVerified: input.marketplace.isVerified }
+  };
+  return {
+    valid: true,
+    errors: [],
+    normalized,
+    summary: {
+      owner: { name: normalized.owner.name, loginPhone: normalized.owner.phone, email: normalized.owner.email || null },
+      institute: normalized.institute,
+      access: normalized.access,
+      billing: normalized.billing,
+      limits: normalized.limits,
+      marketplace: normalized.marketplace
+    }
+  };
+}
+
+function onboardingPlanConfig(input: NormalizedOnboarding) {
+  return {
+    requiresGrades: true,
+    maxStudents: input.limits.maxStudents,
+    planName: input.access.kind === 'FULL' ? input.billing.plan : input.access.kind,
+    accessKind: input.access.kind,
+    allowedClasses: ['9', '10'],
+    subjects: ['Math'],
+    discountPercent: input.billing.discountPercent || 0,
+    ...(input.billing.trialDays ? { isTrial: true, trialDays: input.billing.trialDays } : {})
+  };
+}
+
+async function createOnboardedInstitute(tx: Prisma.TransactionClient, input: NormalizedOnboarding, actorAdminId: string, correlationId: string) {
+  const existing = await tx.institute.findFirst({
+    where: { OR: [
+      { phoneNumber: input.owner.phone },
+      ...(input.owner.email ? [{ email: { equals: input.owner.email, mode: 'insensitive' as const } }] : [])
+    ] },
+    select: { id: true, name: true }
+  });
+  if (existing) return { kind: 'EXISTING' as const, instituteId: existing.id, name: existing.name };
+  const now = new Date();
+  const planExpiryDate = input.billing.trialDays
+    ? new Date(now.getTime() + input.billing.trialDays * 86_400_000)
+    : null;
+  const institute = await tx.institute.create({
+    data: {
+      name: input.institute.name,
+      teacherName: input.owner.name,
+      phoneNumber: input.owner.phone,
+      email: input.owner.email || null,
+      city: input.institute.city || null,
+      area: input.institute.area || null,
+      address: input.institute.address || null,
+      plan: input.billing.plan as Tier,
+      planStartDate: now,
+      planExpiryDate,
+      quizCredits: input.limits.quizCredits,
+      isQuizOnly: input.access.kind === 'QUIZ_ONLY',
+      isPubliclyListed: input.marketplace.isPubliclyListed,
+      isVerified: input.marketplace.isVerified,
+      config: onboardingPlanConfig(input)
+    }
+  });
+  const inviteToken = crypto.randomBytes(32).toString('hex');
+  await tx.inviteToken.create({
+    data: { token: inviteToken, instituteId: institute.id, expiresAt: new Date(now.getTime() + 7 * 86_400_000) }
+  });
+  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+  const setupLink = `${clientUrl}/setup?token=${inviteToken}`;
+  const emailJob = input.owner.email ? await tx.emailJob.create({
+    data: {
+      recipient: input.owner.email,
+      subject: `Complete your MathLogs setup for ${input.institute.name}`,
+      body: `Hi ${input.owner.name}, complete your MathLogs setup: ${setupLink}`,
+      instituteId: institute.id,
+      options: { senderType: 'WELCOME', purpose: 'SUPERADMIN_ONBOARDING' }
+    }
+  }) : null;
+  const whatsappJob = await tx.whatsappJob.create({
+    data: {
+      recipient: `91${input.owner.phone}`,
+      templateId: process.env.WHATSAPP_TEMPLATE_SETUP || 'onboarding_setup_link',
+      data: [input.owner.name, input.institute.name, setupLink],
+      instituteId: institute.id
+    }
+  });
+  await writeSuperAdminAudit(tx, {
+    action: 'INSTITUTE_ONBOARDED', entityType: 'Institute', entityId: institute.id,
+    instituteId: institute.id, actorAdminId, correlationId,
+    reason: 'Superadmin guided onboarding',
+    after: { name: institute.name, plan: institute.plan, accessKind: input.access.kind, loginPhone: input.owner.phone },
+    metadata: { emailJobId: emailJob?.id || null, whatsappJobId: whatsappJob.id }
+  });
+  return { kind: 'CREATED' as const, instituteId: institute.id, name: institute.name, communication: { emailQueued: Boolean(emailJob), whatsappQueued: true } };
+}
+
+function safeOnboardingResult(result: Awaited<ReturnType<typeof createOnboardedInstitute>>) {
+  return result.kind === 'EXISTING'
+    ? { instituteId: result.instituteId, name: result.name, status: 'EXISTING' }
+    : { instituteId: result.instituteId, name: result.name, status: 'CREATED', communication: result.communication };
+}
+
+export async function commitInstituteOnboarding(input: {
+  value: unknown;
+  idempotencyKey: string;
+  actorAdminId: string;
+  correlationId: string;
+}) {
+  const preview = previewInstituteOnboarding(input.value);
+  if (!preview.valid || !preview.normalized) throw new InstituteServiceError('ONBOARDING_INVALID', preview.errors);
+  if (input.idempotencyKey.trim().length < 8 || input.idempotencyKey.length > 200) throw new InstituteServiceError('IDEMPOTENCY_KEY_REQUIRED');
+  const hash = requestHash(preview.normalized);
+  const evaluate = (operation: { requestHash: string; status: string; result: unknown }) => {
+    if (operation.requestHash !== hash) throw new InstituteServiceError('IDEMPOTENCY_KEY_REUSED');
+    if (operation.status !== 'COMPLETED' || !operation.result) throw new InstituteServiceError('IDEMPOTENCY_IN_PROGRESS');
+    return { replay: true, result: operation.result };
+  };
+  const existing = await prisma.superAdminOnboardingOperation.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+  if (existing) return evaluate(existing);
+  let operation;
+  try {
+    operation = await prisma.superAdminOnboardingOperation.create({
+      data: { actorAdminId: input.actorAdminId, kind: 'SINGLE', idempotencyKey: input.idempotencyKey, requestHash: hash }
+    });
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+    return evaluate(await prisma.superAdminOnboardingOperation.findUniqueOrThrow({ where: { idempotencyKey: input.idempotencyKey } }));
+  }
+  try {
+    const result = await prisma.$transaction(async tx => {
+      const created = await createOnboardedInstitute(tx, preview.normalized!, input.actorAdminId, input.correlationId);
+      const safe = safeOnboardingResult(created);
+      await tx.superAdminOnboardingOperation.update({ where: { id: operation.id }, data: { status: 'COMPLETED', result: safe } });
+      return safe;
+    });
+    return { replay: false, result };
+  } catch (error) {
+    await prisma.superAdminOnboardingOperation.update({ where: { id: operation.id }, data: { status: 'FAILED', result: { error: 'ONBOARDING_FAILED' } } });
+    throw error;
+  }
+}
+
+export function previewInstituteImport(rows: unknown) {
+  if (!Array.isArray(rows) || rows.length === 0 || rows.length > 500) throw new InstituteServiceError('IMPORT_ROWS_REQUIRED');
+  const normalized: { row: number; value: NormalizedOnboarding }[] = [];
+  const errors: Array<OnboardingValidationError & { row: number }> = [];
+  const phones = new Set<string>();
+  rows.forEach((value, index) => {
+    const preview = previewInstituteOnboarding(value);
+    if (!preview.valid || !preview.normalized) {
+      errors.push(...preview.errors.map(error => ({ row: index + 1, ...error })));
+      return;
+    }
+    if (phones.has(preview.normalized.owner.phone)) {
+      errors.push({ row: index + 1, field: 'owner.phone', code: 'DUPLICATE_IN_FILE', message: 'Owner phone is duplicated in this import.' });
+      return;
+    }
+    phones.add(preview.normalized.owner.phone);
+    normalized.push({ row: index + 1, value: preview.normalized });
+  });
+  return { totalRows: rows.length, validRows: normalized.length, invalidRows: rows.length - normalized.length, errors, normalized };
+}
+
+export async function commitInstituteImport(input: {
+  rows: unknown;
+  idempotencyKey: string;
+  actorAdminId: string;
+  correlationId: string;
+}) {
+  const preview = previewInstituteImport(input.rows);
+  if (input.idempotencyKey.trim().length < 8 || input.idempotencyKey.length > 200) throw new InstituteServiceError('IDEMPOTENCY_KEY_REQUIRED');
+  const normalizedRequest = preview.normalized.map(item => ({ row: item.row, value: item.value }));
+  const hash = requestHash({ rows: input.rows });
+  const existing = await prisma.superAdminOnboardingOperation.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+  if (existing) {
+    if (existing.requestHash !== hash) throw new InstituteServiceError('IDEMPOTENCY_KEY_REUSED');
+    if (existing.status !== 'COMPLETED' || !existing.result) throw new InstituteServiceError('IDEMPOTENCY_IN_PROGRESS');
+    return { replay: true, result: existing.result };
+  }
+  const operation = await prisma.superAdminOnboardingOperation.create({
+    data: {
+      actorAdminId: input.actorAdminId, kind: 'IMPORT', idempotencyKey: input.idempotencyKey, requestHash: hash,
+      rows: { create: normalizedRequest.map(item => ({ rowNumber: item.row, requestHash: requestHash(item.value) })) }
+    }
+  });
+  const created: unknown[] = [];
+  const existingRows: unknown[] = [];
+  const failed: unknown[] = preview.errors.map(error => error);
+  for (const item of normalizedRequest) {
+    try {
+      const result = await prisma.$transaction(async tx => {
+        const onboarded = await createOnboardedInstitute(tx, item.value, input.actorAdminId, input.correlationId);
+        const safe = { row: item.row, ...safeOnboardingResult(onboarded) };
+        await tx.superAdminOnboardingRow.update({
+          where: { operationId_rowNumber: { operationId: operation.id, rowNumber: item.row } },
+          data: { status: 'COMPLETED', instituteId: onboarded.instituteId, result: safe }
+        });
+        return { onboarded, safe };
+      });
+      (result.onboarded.kind === 'EXISTING' ? existingRows : created).push(result.safe);
+    } catch {
+      const safeFailure = { row: item.row, field: 'row', code: 'ROW_FAILED', message: 'The row could not be created.' };
+      failed.push(safeFailure);
+      await prisma.superAdminOnboardingRow.update({
+        where: { operationId_rowNumber: { operationId: operation.id, rowNumber: item.row } },
+        data: { status: 'FAILED', result: safeFailure }
+      });
+    }
+  }
+  const result = { created, existing: existingRows, failed };
+  await prisma.superAdminOnboardingOperation.update({
+    where: { id: operation.id },
+    data: { status: 'COMPLETED', result: JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue }
+  });
+  return { replay: false, result };
 }

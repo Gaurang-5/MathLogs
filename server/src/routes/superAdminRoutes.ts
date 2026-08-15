@@ -10,8 +10,12 @@ import {
 } from '../controllers/superAdminSecurityController';
 import { getHome, searchInstitutes } from '../controllers/superAdminHomeController';
 import {
+  commitImport,
+  commitOnboarding,
   getInstitute,
   listInstitutes,
+  previewImport,
+  previewOnboarding,
   updateInstituteConfiguration,
   updateInstituteDetails
 } from '../controllers/superAdminInstituteController';
@@ -22,6 +26,10 @@ router.use(authenticateToken, requireSuperAdmin);
 router.get('/home', getHome);
 router.get('/search', searchInstitutes);
 router.get('/institutes', listInstitutes);
+router.post('/institutes/onboarding/preview', previewOnboarding);
+router.post('/institutes/onboarding/commit', commitOnboarding);
+router.post('/institutes/import/preview', previewImport);
+router.post('/institutes/import/commit', commitImport);
 router.get('/institutes/:id', getInstitute);
 router.patch('/institutes/:id/details', updateInstituteDetails);
 router.patch('/institutes/:id/configuration', updateInstituteConfiguration);
