@@ -1,66 +1,70 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import type { CanonicalPlan } from '../domain/plans/planCatalog';
 
 export type CanonicalMigrationMode = 'preflight' | 'apply';
-
-const LEGACY_CANONICAL_PLAN: CanonicalPlan = 'ENTERPRISE';
-
-type BusinessCounts = {
-  instituteCount: number;
-  studentCount: number;
-  paymentCount: number;
-  quizCount: number;
+export type CreditPeriodResolver = (institute: { id: string; createdAt: Date; planExpiryDate: Date | null; quizCredits: number }, now: Date) => {
+  includedQuizCreditsExpireAt: Date;
+  quizCreditsRenewAt: Date;
 };
 
-async function collectBusinessCounts(client: PrismaClient): Promise<BusinessCounts> {
-  const [instituteCount, studentCount, paymentCount, quizCount] = await Promise.all([
-    client.institute.count(),
-    client.student.count(),
-    client.feePayment.count(),
-    client.onlineQuiz.count()
-  ]);
+const LEGACY_CANONICAL_PLAN: CanonicalPlan = 'ENTERPRISE';
+type CountClient = Pick<PrismaClient, '$queryRawUnsafe'>;
+type BusinessCounts = { instituteCount: number; adminCount: number; studentCount: number; batchCount: number; paymentCount: number; quizCount: number; marketplaceClaimCount: number; leadInquiryCount: number; reviewCount: number };
 
-  return { instituteCount, studentCount, paymentCount, quizCount };
+async function collectBusinessCounts(client: CountClient): Promise<BusinessCounts> {
+  const rows = await client.$queryRawUnsafe<BusinessCounts[]>(`SELECT
+    (SELECT COUNT(*)::integer FROM "Institute") AS "instituteCount",
+    (SELECT COUNT(*)::integer FROM "Admin") AS "adminCount",
+    (SELECT COUNT(*)::integer FROM "Student") AS "studentCount",
+    (SELECT COUNT(*)::integer FROM "Batch") AS "batchCount",
+    (SELECT COUNT(*)::integer FROM "FeePayment") AS "paymentCount",
+    (SELECT COUNT(*)::integer FROM "OnlineQuiz") AS "quizCount",
+    (SELECT COUNT(*)::integer FROM "MarketplaceClaim") AS "marketplaceClaimCount",
+    (SELECT COUNT(*)::integer FROM "LeadInquiry") AS "leadInquiryCount",
+    (SELECT COUNT(*)::integer FROM "Review") AS "reviewCount"`);
+  return rows[0];
 }
 
 function assertBusinessCountsUnchanged(before: BusinessCounts, after: BusinessCounts): void {
-  if (
-    before.instituteCount !== after.instituteCount ||
-    before.studentCount !== after.studentCount ||
-    before.paymentCount !== after.paymentCount ||
-    before.quizCount !== after.quizCount
-  ) {
-    throw new Error('CANONICAL_PLAN_MIGRATION_CHANGED_BUSINESS_COUNTS');
-  }
+  if (Object.keys(before).some(key => before[key as keyof BusinessCounts] !== after[key as keyof BusinessCounts])) throw new Error('CANONICAL_PLAN_MIGRATION_CHANGED_BUSINESS_COUNTS');
 }
 
-export async function migrateCanonicalPlans(client: PrismaClient, mode: CanonicalMigrationMode, now = new Date()) {
-  const before = await collectBusinessCounts(client);
-  const candidates = await client.institute.findMany({
-    where: { canonicalPlanMigratedAt: null },
-    select: { id: true, createdAt: true, planExpiryDate: true, quizCredits: true }
-  });
+function requireCreditPeriod(resolver: CreditPeriodResolver, institute: { id: string; createdAt: Date; planExpiryDate: Date | null; quizCredits: number }, now: Date) {
+  const period = resolver(institute, now);
+  if (!(period.includedQuizCreditsExpireAt instanceof Date) || Number.isNaN(period.includedQuizCreditsExpireAt.getTime()) || !(period.quizCreditsRenewAt instanceof Date) || Number.isNaN(period.quizCreditsRenewAt.getTime())) {
+    throw new Error('INVALID_CREDIT_PERIOD');
+  }
+  return period;
+}
 
-  if (mode === 'preflight') return { mode, before, candidates: candidates.length };
+export async function migrateCanonicalPlans(client: PrismaClient, mode: CanonicalMigrationMode, now = new Date(), creditPeriodResolver?: CreditPeriodResolver) {
+  if (mode !== 'preflight' && mode !== 'apply') throw new Error('INVALID_CANONICAL_MIGRATION_MODE');
+  if (mode === 'apply' && !creditPeriodResolver) throw new Error('CREDIT_PERIOD_RESOLVER_REQUIRED');
 
-  await client.$transaction(async tx => {
-    for (const institute of candidates) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await client.$transaction(async tx => {
+    await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(64271, 2)');
+    const before = await collectBusinessCounts(tx);
+    const candidates = await tx.institute.findMany({ where: { canonicalPlanMigratedAt: null }, select: { id: true, createdAt: true, planExpiryDate: true, quizCredits: true } });
+    if (mode === 'preflight') return { mode, before, candidates: candidates.length };
+
+    const prepared = candidates.map(institute => ({ institute, period: requireCreditPeriod(creditPeriodResolver!, institute, now) }));
+    for (const { institute, period } of prepared) {
       const active = !institute.planExpiryDate || institute.planExpiryDate.getTime() >= now.getTime();
-      await tx.institute.update({
-        where: { id: institute.id },
-        data: {
-          plan: LEGACY_CANONICAL_PLAN,
-          marketplaceAccessGrantedAt: institute.createdAt,
-          lifetimeQuizCredits: institute.quizCredits,
-          includedQuizCredits: active ? 5 : 0,
-          canonicalPlanMigratedAt: now
-        },
-        select: { id: true }
+      const updated = await tx.institute.updateMany({
+        where: { id: institute.id, canonicalPlanMigratedAt: null },
+        data: { plan: LEGACY_CANONICAL_PLAN, marketplaceAccessGrantedAt: institute.createdAt, lifetimeQuizCredits: institute.quizCredits, includedQuizCredits: active ? 5 : 0, includedQuizCreditsExpireAt: period.includedQuizCreditsExpireAt, quizCreditsRenewAt: period.quizCreditsRenewAt, canonicalPlanMigratedAt: now }
       });
+      if (updated.count !== 1) throw new Error('CANONICAL_PLAN_MIGRATION_STALE_CANDIDATE');
     }
-  });
-
-  const after = await collectBusinessCounts(client);
-  assertBusinessCountsUnchanged(before, after);
-  return { mode, before, after, migrated: candidates.length };
+    const after = await collectBusinessCounts(tx);
+    assertBusinessCountsUnchanged(before, after);
+    return { mode, before, after, migrated: candidates.length };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 120_000, timeout: 120_000 });
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'P2034' || attempt === 2) throw error;
+    }
+  }
+  throw new Error('CANONICAL_PLAN_MIGRATION_RETRY_EXHAUSTED');
 }
