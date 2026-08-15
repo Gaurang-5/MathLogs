@@ -30,7 +30,8 @@ test('keeps the authoritative catalogue deeply immutable and public results isol
   assert.ok(PLAN_CATALOG.every(plan => Object.isFrozen(plan) && Object.isFrozen(plan.features)));
 
   const publicPlans = publicPlanCatalogue();
-  publicPlans[0].features.push('local change');
+  const publicFeatures = publicPlans[0].features as string[];
+  publicFeatures.push('local change');
   assert.equal(PLAN_CATALOG[0].features.includes('local change'), false);
 });
 

@@ -77,3 +77,19 @@ Summary: all four focused tests passed (`4` passed, `0` failed), and `npm run bu
 ### Fix Round 1 commit
 
 The Fix Round 1 commit is reported in the task handoff after the final report amendment.
+
+## Fix Round 2
+
+Updated only the immutability covering test so its intentional public-copy mutation uses an explicit `string[]` test view, avoiding a compile-time `.push()` error while preserving the isolation assertion.
+
+### Verification
+
+Commands:
+
+```bash
+cd server && npx tsx --test tests/planCatalog.test.ts
+cd server && npx tsc --noEmit --target es2020 --module commonjs --moduleResolution node --esModuleInterop --strict --skipLibCheck tests/planCatalog.test.ts src/domain/plans/planCatalog.ts
+cd server && npm run build
+```
+
+Results: focused tests passed (`4` passed, `0` failed); the explicit test-inclusive TypeScript typecheck exited 0; and the server build completed successfully with `tsc` exit code 0.
