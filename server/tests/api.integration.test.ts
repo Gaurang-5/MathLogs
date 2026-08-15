@@ -303,6 +303,18 @@ test('POST /api/tests/online saves generated quiz questions for a teacher batch'
     }) as never) as typeof prisma.admin.findUnique);
     replaceMethod(prisma.batch, 'findFirst', (async () => ({ id: 'batch-quiz-1' }) as never) as typeof prisma.batch.findFirst);
     replaceMethod(prisma.batch, 'findMany', (async () => [{ id: 'batch-quiz-1' }] as never) as typeof prisma.batch.findMany);
+    replaceMethod(prisma.institute, 'findUnique', (async () => ({
+        id: 'inst-quiz-1',
+        config: {
+            lastCreditResetMonth: new Date().toISOString().slice(0, 7),
+            monthlyQuizCredits: 5,
+            purchasedQuizCredits: 0,
+        },
+        quizCredits: 5,
+        isQuizOnly: false,
+    }) as never) as typeof prisma.institute.findUnique);
+    replaceMethod(prisma.institute, 'update', (async () => ({ id: 'inst-quiz-1' }) as never) as typeof prisma.institute.update);
+    replaceMethod(prisma, '$transaction', (async (callback: any) => callback(prisma)) as typeof prisma.$transaction);
 
     let createdQuestions: Array<Record<string, unknown>> = [];
     replaceMethod(prisma.onlineQuiz, 'create', (async ({ data }: { data: any }) => {

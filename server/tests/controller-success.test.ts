@@ -381,6 +381,13 @@ test('submitOnlineQuiz grades answers and prevents duplicate submissions', async
                         id: 'submission-1',
                         submittedAt: null,
                         startedAt: new Date(),
+                        cheatingEvents: [],
+                        quiz: {
+                            timeLimitMins: 10,
+                            totalMarks: 2,
+                            title: 'Online Quiz',
+                            institute: { name: 'MathLogs Academy' },
+                        },
                         shuffledQuestions: [
                             {
                                 id: 'question-1',
