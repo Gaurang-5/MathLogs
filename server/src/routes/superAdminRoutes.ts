@@ -31,6 +31,7 @@ import {
 import { addCaseNote, addTicketMessage, createCase, getAnyTicket, getCase, listAllTickets, listCases, updateTicketStatus } from '../controllers/superAdminSupportController';
 import { dispatch, getPreference, history, preview, templates, updatePreference } from '../controllers/superAdminCommunicationController';
 import { audit, jobs, overview as systemOverview, retryJob, revokeSession, security } from '../controllers/superAdminSystemController';
+import { cancelDeletion, finalizeDeletion, getDeletion, scheduleDeletion } from '../controllers/superAdminDeletionController';
 
 const router = Router();
 
@@ -63,6 +64,10 @@ router.post('/institutes/onboarding/commit', commitOnboarding);
 router.post('/institutes/import/preview', previewImport);
 router.post('/institutes/import/commit', commitImport);
 router.get('/institutes/:id', getInstitute);
+router.get('/institutes/:id/deletion', getDeletion);
+router.post('/institutes/:id/deletion', requireSuperAdminReauth('INSTITUTE_DELETE'), scheduleDeletion);
+router.delete('/institutes/:id/deletion', cancelDeletion);
+router.post('/institutes/:id/deletion/finalize', requireSuperAdminReauth('INSTITUTE_DELETE'), finalizeDeletion);
 router.get('/institutes/:id/communication-preferences', getPreference);
 router.patch('/institutes/:id/communication-preferences', updatePreference);
 router.patch('/institutes/:id/details', updateInstituteDetails);

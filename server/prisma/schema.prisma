@@ -72,6 +72,7 @@ model Institute {
   internalCases                   InternalCase[]
   communicationPreference         InstituteCommunicationPreference?
   targetedCommunicationRecipients TargetedCommunicationRecipient[]
+  deletionRequests                SuperAdminDeletionRequest[]
 }
 
 model InviteToken {
@@ -110,6 +111,7 @@ model Admin {
   supportMessages                SupportMessage[]
   internalCaseNotes              InternalCaseNote[]
   targetedCommunicationSends     TargetedCommunicationSend[]
+  deletionRequests               SuperAdminDeletionRequest[]
 }
 
 model Batch {
@@ -743,6 +745,27 @@ model SuperAdminOnboardingOperation {
   rows           SuperAdminOnboardingRow[]
 
   @@index([actorAdminId, createdAt])
+}
+
+model SuperAdminDeletionRequest {
+  id                          String     @id @default(uuid())
+  instituteId                 String?
+  requestedById               String
+  reason                      String
+  instituteName               String
+  previousInstituteStatus     String
+  previousRegistrationsPaused Boolean    @default(false)
+  status                      String     @default("SCHEDULED")
+  eligibleAt                  DateTime
+  cancelledAt                 DateTime?
+  completedAt                 DateTime?
+  createdAt                   DateTime   @default(now())
+  updatedAt                   DateTime   @updatedAt
+  institute                   Institute? @relation(fields: [instituteId], references: [id], onDelete: SetNull)
+  requestedBy                 Admin      @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([status, eligibleAt])
+  @@index([instituteId, createdAt])
 }
 
 model SuperAdminOnboardingRow {
