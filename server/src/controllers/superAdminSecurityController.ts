@@ -25,7 +25,8 @@ function failure(res: Response, error: unknown) {
     'REAUTH_CHALLENGE_LOCKED', 'REAUTH_RESEND_COOLDOWN', 'REAUTH_CHALLENGE_EXPIRED',
     'REAUTH_CHALLENGE_CONSUMED', 'REAUTH_CHALLENGE_ALREADY_VERIFIED',
     'SUPPORT_SESSION_ALREADY_ENDED', 'SUPERADMIN_RECOVERY_CHANNEL_MISSING',
-    'REAUTH_DELIVERY_FAILED', 'REAUTH_CODE_INVALID', 'REAUTH_CHALLENGE_INVALID'
+    'REAUTH_DELIVERY_FAILED', 'REAUTH_CODE_INVALID', 'REAUTH_CHALLENGE_INVALID',
+    'SUPPORT_SESSION_LINK_INVALID'
   ]);
   if (!known.has(code)) return res.status(500).json({ success: false, error: 'SUPERADMIN_SECURITY_FAILED' });
   return res.status(statusFor(code)).json({ success: false, error: code });
@@ -66,6 +67,8 @@ export async function startSupportSession(req: Request, res: Response) {
     const data = await startSuperAdminSupportSession({
       adminId: req.user.id,
       instituteId,
+      ticketId: String(req.body?.ticketId || '').trim() || undefined,
+      caseId: String(req.body?.caseId || '').trim() || undefined,
       reason,
       correlationId: req.correlationId
     });

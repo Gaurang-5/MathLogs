@@ -131,12 +131,12 @@ export async function listSuperAdminInstitutes(input: {
     prisma.institute.count({ where })
   ]);
   const instituteIds = records.map(record => record.id);
-  const openSessions = instituteIds.length === 0 ? [] : await prisma.superAdminSupportSession.groupBy({
+  const openTickets = instituteIds.length === 0 ? [] : await prisma.supportTicket.groupBy({
     by: ['instituteId'],
-    where: { instituteId: { in: instituteIds }, endedAt: null, expiresAt: { gt: new Date() } },
+    where: { instituteId: { in: instituteIds }, status: { not: 'CLOSED' } },
     _count: { _all: true }
   });
-  const supportCounts = new Map(openSessions.map(item => [item.instituteId, item._count._all]));
+  const supportCounts = new Map(openTickets.map(item => [item.instituteId, item._count._all]));
   return { items: records.map(record => directoryItem(record, supportCounts.get(record.id) || 0)), page: input.page, pageSize: input.pageSize, total };
 }
 
@@ -147,7 +147,7 @@ export async function getSuperAdminInstitute(instituteId: string) {
   });
   if (!institute) throw new InstituteServiceError('INSTITUTE_NOT_FOUND');
 
-  const [admins, students, batches, tests, openClaims, pendingReviews, leadCounts, supportSessions, billingOperations, superAdminActivity, marketplaceActivity] = await Promise.all([
+  const [admins, students, batches, tests, openClaims, pendingReviews, leadCounts, supportTickets, internalCases, supportSessions, billingOperations, superAdminActivity, marketplaceActivity] = await Promise.all([
     prisma.admin.findMany({
       where: { instituteId },
       select: { id: true, username: true, role: true },
@@ -159,6 +159,16 @@ export async function getSuperAdminInstitute(instituteId: string) {
     prisma.marketplaceClaim.count({ where: { instituteId, status: { in: ['NEW', 'CONTACTED'] } } }),
     prisma.review.count({ where: { instituteId, status: 'PENDING', source: 'MATHLOGS' } }),
     prisma.leadInquiry.groupBy({ by: ['deliveryStatus'], where: { instituteId }, _count: { _all: true } }),
+    prisma.supportTicket.findMany({
+      where: { instituteId },
+      select: { id: true, reference: true, category: true, subject: true, priority: true, status: true, resolvedAt: true, closedAt: true, createdAt: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' }, take: 25
+    }),
+    prisma.internalCase.findMany({
+      where: { instituteId },
+      select: { id: true, title: true, category: true, priority: true, status: true, followUpAt: true, linkedType: true, linkedId: true, createdAt: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' }, take: 25
+    }),
     prisma.superAdminSupportSession.findMany({
       where: { instituteId },
       select: { id: true, reason: true, ticketId: true, caseId: true, expiresAt: true, endedAt: true, endReason: true, createdAt: true },
@@ -211,7 +221,7 @@ export async function getSuperAdminInstitute(instituteId: string) {
       isVerified: institute.isVerified, openClaims, pendingReviews
     },
     leads,
-    support: { sessions: supportSessions },
+    support: { tickets: supportTickets, cases: internalCases, sessions: supportSessions },
     activity
   };
 }

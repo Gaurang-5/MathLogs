@@ -5,7 +5,7 @@ const DAY_MS = 86_400_000;
 const LEGACY_CLAIM_MARKER = '[CLAIM REQUEST]';
 
 type AttentionSeverity = 'CRITICAL' | 'TODAY' | 'UPCOMING';
-type AttentionKind = 'CLAIM' | 'REVIEW' | 'LEAD_DELIVERY' | 'PLAN_EXPIRY' | 'JOB';
+type AttentionKind = 'CLAIM' | 'REVIEW' | 'LEAD_DELIVERY' | 'PLAN_EXPIRY' | 'SUPPORT' | 'JOB';
 
 interface AttentionItem {
   id: string;
@@ -48,9 +48,11 @@ export async function getSuperAdminHome() {
     openClaimsCount,
     pendingReviewsCount,
     failedLeadDeliveriesCount,
+    openSupportTicketsCount,
     claims,
     reviews,
     failedLeads,
+    supportTickets,
     nearPlanExpiries,
     failedWhatsappJobs,
     failedEmailJobs,
@@ -64,6 +66,7 @@ export async function getSuperAdminHome() {
     prisma.leadInquiry.count({
       where: { deliveryStatus: 'FAILED', NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } } }
     }),
+    prisma.supportTicket.count({ where: { status: { not: 'CLOSED' } } }),
     prisma.marketplaceClaim.findMany({
       where: { status: { in: ['NEW', 'CONTACTED'] } },
       select: { id: true, instituteId: true, claimantName: true, status: true, createdAt: true, institute: { select: { name: true } } },
@@ -81,6 +84,12 @@ export async function getSuperAdminHome() {
       select: { id: true, instituteId: true, studentName: true, createdAt: true, institute: { select: { name: true } } },
       orderBy: { createdAt: 'asc' },
       take: 20
+    }),
+    prisma.supportTicket.findMany({
+      where: { status: { not: 'CLOSED' } },
+      select: { id: true, reference: true, instituteId: true, subject: true, priority: true, status: true, createdAt: true, institute: { select: { name: true } } },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+      take: 30
     }),
     prisma.institute.findMany({
       where: { planExpiryDate: { gte: now, lte: inThirtyDays }, status: 'ACTIVE' },
@@ -140,6 +149,17 @@ export async function getSuperAdminHome() {
       createdAt: lead.createdAt,
       action: { label: 'Retry delivery', href: `/super-admin/marketplace/leads?lead=${lead.id}` }
     })),
+    ...supportTickets.map((ticket) => ({
+      id: `support:${ticket.id}`,
+      kind: 'SUPPORT' as const,
+      severity: (ticket.priority === 'URGENT' ? 'CRITICAL' : ticket.priority === 'HIGH' || ticket.status === 'NEW' ? 'TODAY' : 'UPCOMING') as AttentionSeverity,
+      title: `${ticket.reference}: ${ticket.subject}`,
+      detail: `${ticket.institute.name} · ${ticket.priority.toLowerCase()} priority · ${ticket.status.toLowerCase().replace(/_/g, ' ')}`,
+      instituteId: ticket.instituteId,
+      entityId: ticket.id,
+      createdAt: ticket.createdAt,
+      action: { label: 'Open ticket', href: `/super-admin/support/tickets/${ticket.id}` }
+    })),
     ...nearPlanExpiries.map((institute) => ({
       id: `plan:${institute.id}`,
       kind: 'PLAN_EXPIRY' as const,
@@ -184,7 +204,7 @@ export async function getSuperAdminHome() {
     .slice(0, 20);
 
   return {
-    metrics: { totalInstitutes, activeInstitutes, openClaims: openClaimsCount, pendingReviews: pendingReviewsCount, failedLeadDeliveries: failedLeadDeliveriesCount },
+    metrics: { totalInstitutes, activeInstitutes, openClaims: openClaimsCount, pendingReviews: pendingReviewsCount, failedLeadDeliveries: failedLeadDeliveriesCount, openSupportTickets: openSupportTicketsCount },
     attention,
     recentActivity,
     system: {

@@ -126,15 +126,26 @@ export async function verifySuperAdminReauthOtp(adminId: string, challengeId: st
 export async function startSuperAdminSupportSession(input: {
   adminId: string;
   instituteId: string;
+  ticketId?: string;
+  caseId?: string;
   reason: string;
   correlationId: string;
 }) {
+  if (input.ticketId && input.caseId) throw securityError('SUPPORT_SESSION_LINK_INVALID');
   const institute = await prisma.institute.findUnique({ where: { id: input.instituteId }, select: { id: true } });
   if (!institute) throw securityError('INSTITUTE_NOT_FOUND');
+  if (input.ticketId) {
+    const ticket = await prisma.supportTicket.findFirst({ where: { id: input.ticketId, instituteId: input.instituteId }, select: { id: true } });
+    if (!ticket) throw securityError('SUPPORT_SESSION_LINK_INVALID');
+  }
+  if (input.caseId) {
+    const internalCase = await prisma.internalCase.findFirst({ where: { id: input.caseId, instituteId: input.instituteId }, select: { id: true } });
+    if (!internalCase) throw securityError('SUPPORT_SESSION_LINK_INVALID');
+  }
   const expiresAt = new Date(Date.now() + 15 * 60_000);
   const session = await prisma.$transaction(async tx => {
     const created = await tx.superAdminSupportSession.create({
-      data: { adminId: input.adminId, instituteId: input.instituteId, reason: input.reason, expiresAt }
+      data: { adminId: input.adminId, instituteId: input.instituteId, ticketId: input.ticketId, caseId: input.caseId, reason: input.reason, expiresAt }
     });
     await writeSuperAdminAudit(tx, {
       action: 'SUPPORT_SESSION_STARTED',
@@ -143,6 +154,7 @@ export async function startSuperAdminSupportSession(input: {
       actorAdminId: input.adminId,
       instituteId: input.instituteId,
       reason: input.reason,
+      metadata: { ticketId: input.ticketId || null, caseId: input.caseId || null },
       correlationId: input.correlationId,
       supportSessionId: created.id
     });

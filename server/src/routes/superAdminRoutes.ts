@@ -28,6 +28,7 @@ import {
   revenueOverview,
   revenueSubscriptions
 } from '../controllers/superAdminRevenueController';
+import { addCaseNote, addTicketMessage, createCase, getAnyTicket, getCase, listAllTickets, listCases, updateTicketStatus } from '../controllers/superAdminSupportController';
 
 const router = Router();
 
@@ -36,6 +37,14 @@ router.get('/home', getHome);
 router.get('/search', searchInstitutes);
 router.get('/revenue/overview', revenueOverview);
 router.get('/revenue/subscriptions', revenueSubscriptions);
+router.get('/support/tickets', listAllTickets);
+router.get('/support/tickets/:id', getAnyTicket);
+router.post('/support/tickets/:id/messages', addTicketMessage);
+router.patch('/support/tickets/:id/status', updateTicketStatus);
+router.get('/support/cases', listCases);
+router.post('/support/cases', createCase);
+router.get('/support/cases/:id', getCase);
+router.post('/support/cases/:id/notes', addCaseNote);
 router.get('/institutes', listInstitutes);
 router.post('/institutes/onboarding/preview', previewOnboarding);
 router.post('/institutes/onboarding/commit', commitOnboarding);
@@ -51,7 +60,9 @@ router.post('/institutes/:id/billing-operations/:operationId/retry', retryOperat
 router.post('/security/reauth/send', authLimiter, sendReauthOtp);
 router.post('/security/reauth/verify', authLimiter, verifyReauthOtp);
 router.post('/support-sessions', (req, res, next) => {
-  if (!String(req.body?.instituteId || '').trim() || String(req.body?.reason || '').trim().length < 10) {
+  const ticketId = String(req.body?.ticketId || '').trim();
+  const caseId = String(req.body?.caseId || '').trim();
+  if (!String(req.body?.instituteId || '').trim() || String(req.body?.reason || '').trim().length < 10 || (ticketId && caseId)) {
     res.status(400).json({ success: false, error: 'INSTITUTE_AND_REASON_REQUIRED' });
     return;
   }

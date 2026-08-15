@@ -28,6 +28,9 @@ before(async () => {
   await prisma.marketplaceClaim.create({
     data: { instituteId, claimantName: 'Riya', phone: '9876543210', normalizedPhone: '9876543210' }
   });
+  await prisma.supportTicket.create({
+    data: { reference: `SUP-HOME-${Date.now()}`, instituteId, category: 'TECHNICAL', subject: 'Urgent login failure', description: 'The institute owner cannot access the dashboard.', priority: 'URGENT' }
+  });
   const admin = await prisma.admin.create({
     data: { username: `home-super-${suffix}`, password: await bcrypt.hash('test', 4), role: 'SUPER_ADMIN' }
   });
@@ -51,6 +54,8 @@ test('Home returns stable metrics, attention, activity, and system contracts', a
   assert.deepEqual(Object.keys(body.data), ['metrics', 'attention', 'recentActivity', 'system']);
   assert.ok(body.data.attention.some((item: any) => item.kind === 'CLAIM' && item.severity === 'TODAY' && item.instituteId === instituteId));
   assert.ok(body.data.attention.some((item: any) => item.kind === 'PLAN_EXPIRY' && item.severity === 'TODAY' && item.instituteId === instituteId));
+  assert.ok(body.data.attention.some((item: any) => item.kind === 'SUPPORT' && item.severity === 'CRITICAL' && item.instituteId === instituteId));
+  assert.ok(body.data.metrics.openSupportTickets >= 1);
 });
 
 test('global search requires two characters and returns bounded institute summaries', async () => {

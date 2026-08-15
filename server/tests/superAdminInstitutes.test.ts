@@ -38,6 +38,12 @@ before(async () => {
   await prisma.marketplaceClaim.create({
     data: { instituteId, claimantName: 'Riya', phone: '9876543210', normalizedPhone: '9876543210' }
   });
+  const ticket = await prisma.supportTicket.create({
+    data: { reference: `SUP-INSTITUTE-${Date.now()}`, instituteId, category: 'ACCOUNT', subject: 'Owner access request', description: 'Owner needs help restoring access to the institute.' }
+  });
+  await prisma.internalCase.create({
+    data: { instituteId, title: 'Follow up after owner verification', category: 'ACCOUNT', linkedType: 'SupportTicket', linkedId: ticket.id }
+  });
   const app = createApp();
   await new Promise<void>(resolve => { server = app.listen(0, resolve); });
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -61,6 +67,7 @@ test('directory is paginated, searchable, and restricted to Superadmin', async (
   const body = await response.json() as any;
   assert.deepEqual(Object.keys(body.data), ['items', 'page', 'pageSize', 'total']);
   assert.ok(body.data.items.some((item: any) => item.id === instituteId && item.name.startsWith('Apex Academy')));
+  assert.ok(body.data.items.some((item: any) => item.id === instituteId && item.openSupportCount >= 1 && item.attention.includes('OPEN_SUPPORT')));
   assert.ok(body.data.items.every((item: any) => !('razorpaySubscriptionId' in item) && !('config' in item)));
 });
 
@@ -71,6 +78,8 @@ test('institute workspace has a stable 360-degree contract without provider cred
   assert.deepEqual(Object.keys(body.data), ['overview', 'account', 'usage', 'billing', 'marketplace', 'leads', 'support', 'activity']);
   assert.equal(body.data.overview.id, instituteId);
   assert.equal(body.data.account.admins.length, 1);
+  assert.equal(body.data.support.tickets.length, 1);
+  assert.equal(body.data.support.cases.length, 1);
   assert.equal(JSON.stringify(body).includes('razorpaySubscriptionId'), false);
   assert.equal(JSON.stringify(body).includes('password'), false);
 });

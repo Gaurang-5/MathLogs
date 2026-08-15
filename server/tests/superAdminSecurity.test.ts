@@ -122,6 +122,9 @@ test('reauthentication stores only a hash and locks after five invalid codes', a
 });
 
 test('a verified challenge starts one audited support session and cannot be reused', async () => {
+  const ticket = await prisma.supportTicket.create({
+    data: { reference: `SUP-SESSION-${Date.now()}`, instituteId, category: 'ACCOUNT', subject: 'Owner login investigation', description: 'The owner needs audited help with their login.' }
+  });
   const challenge = await prisma.superAdminReauthChallenge.create({
     data: {
       adminId: superAdminId,
@@ -139,11 +142,13 @@ test('a verified challenge starts one audited support session and cannot be reus
   const headers = { 'X-Superadmin-Challenge': challenge.id, 'X-Correlation-Id': 'corr-support-start' };
   const first = await post('/api/super-admin/support-sessions', superToken, {
     instituteId,
+    ticketId: ticket.id,
     reason: 'Investigate the owner login issue'
   }, headers);
   assert.equal(first.status, 201);
   assert.equal(first.headers.get('x-correlation-id'), 'corr-support-start');
   const firstBody = await first.json() as any;
+  assert.equal(firstBody.data.session.ticketId, ticket.id);
   const claims = jwt.verify(firstBody.data.supportToken, 'test-secret') as any;
   assert.deepEqual({
     kind: claims.kind,
@@ -171,6 +176,7 @@ test('a verified challenge starts one audited support session and cannot be reus
   });
   assert.equal(audit.correlationId, 'corr-support-start');
   assert.equal(audit.actorAdminId, superAdminId);
+  assert.equal((audit.metadata as any).ticketId, ticket.id);
 
   const ended = await fetch(`${baseUrl}/api/super-admin/support-sessions/${firstBody.data.session.id}`, {
     method: 'DELETE',

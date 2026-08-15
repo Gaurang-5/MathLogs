@@ -65,6 +65,9 @@ function isPageOnlyAllowedRequest(req: Request): boolean {
     if (path === '/api/institute/me') {
         return method === 'GET';
     }
+    if (path === '/api/support/tickets' || /^\/api\/support\/tickets\/[^/]+(?:\/messages)?$/.test(path)) {
+        return method === 'GET' || method === 'POST';
+    }
     if (path === '/api/billing/create' || path === '/api/billing/verify') {
         return method === 'POST';
     }
