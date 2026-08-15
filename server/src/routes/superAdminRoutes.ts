@@ -9,12 +9,22 @@ import {
   verifyReauthOtp
 } from '../controllers/superAdminSecurityController';
 import { getHome, searchInstitutes } from '../controllers/superAdminHomeController';
+import {
+  getInstitute,
+  listInstitutes,
+  updateInstituteConfiguration,
+  updateInstituteDetails
+} from '../controllers/superAdminInstituteController';
 
 const router = Router();
 
 router.use(authenticateToken, requireSuperAdmin);
 router.get('/home', getHome);
 router.get('/search', searchInstitutes);
+router.get('/institutes', listInstitutes);
+router.get('/institutes/:id', getInstitute);
+router.patch('/institutes/:id/details', updateInstituteDetails);
+router.patch('/institutes/:id/configuration', updateInstituteConfiguration);
 router.post('/security/reauth/send', authLimiter, sendReauthOtp);
 router.post('/security/reauth/verify', authLimiter, verifyReauthOtp);
 router.post('/support-sessions', (req, res, next) => {
