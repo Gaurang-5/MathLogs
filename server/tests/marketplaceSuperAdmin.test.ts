@@ -2,11 +2,11 @@ import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createApp } from '../src/index';
 import { prisma } from '../src/prisma';
+import { invalidateAuthCache } from '../src/middleware/auth';
 
 let server: Server;
 let baseUrl: string;
@@ -37,7 +37,7 @@ before(async () => {
   const foreign = await prisma.institute.create({ data: { name: `Foreign ${suffix}`, ownershipStatus: 'UNCLAIMED' } });
   foreignInstituteId = foreign.id;
   const pageOnlyInstitute = await prisma.institute.create({
-    data: { name: `Page only ${suffix}`, ownershipStatus: 'CLAIMED', config: { planName: 'PAGE_ONLY' } }
+    data: { name: `Marketplace only ${suffix}`, ownershipStatus: 'CLAIMED', plan: 'MARKETPLACE', marketplaceAccessGrantedAt: new Date() }
   });
   pageOnlyInstituteId = pageOnlyInstitute.id;
   const superAdmin = await prisma.admin.create({ data: { username: `super-${suffix}`, password, role: 'SUPER_ADMIN' } });
@@ -73,7 +73,7 @@ test('superadmin endpoints reject anonymous and institute-admin callers', async 
   assert.equal((await fetch(`${baseUrl}/api/marketplace/super-admin/claims`, { headers: auth(instituteToken) })).status, 403);
 });
 
-test('page-only owners can use marketplace and upgrade reads but cannot mutate ERP data', async () => {
+test('Marketplace-only owners can use Marketplace routes but cannot mutate ERP data', async () => {
   const lead = await prisma.leadInquiry.create({
     data: { instituteId: pageOnlyInstituteId, studentName: 'Page owner lead', phone: '9888877777', deliveryStatus: 'DELIVERED' }
   });
@@ -105,24 +105,11 @@ test('page-only owners can use marketplace and upgrade reads but cannot mutate E
   });
   assert.notEqual(paidMutation.status, 403);
 
-  const orderId = 'page-only-upgrade-order';
-  const paymentId = 'page-only-upgrade-payment';
-  const signature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'dummy_secret')
-    .update(`${orderId}|${paymentId}`)
-    .digest('hex');
-  const upgrade = await fetch(`${baseUrl}/api/billing/verify`, {
-    method: 'POST',
-    headers: auth(pageOnlyToken),
-    body: JSON.stringify({
-      razorpay_order_id: orderId,
-      razorpay_payment_id: paymentId,
-      razorpay_signature: signature,
-      planId: 'all_inclusive',
-      billingCycle: 'yearly'
-    })
+  await prisma.institute.update({
+    where: { id: pageOnlyInstituteId },
+    data: { plan: 'ENTERPRISE', planExpiryDate: new Date(Date.now() + 86_400_000) }
   });
-  assert.equal(upgrade.status, 200);
+  invalidateAuthCache(pageOnlyAdminId);
   const upgradedMutation = await fetch(`${baseUrl}/api/students/manual`, {
     method: 'POST', headers: auth(pageOnlyToken), body: '{}'
   });

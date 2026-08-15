@@ -6,6 +6,7 @@ import { Client } from 'pg';
 import { PrismaClient } from '@prisma/client';
 import 'dotenv/config';
 import { migrateCanonicalPlans } from '../src/scripts/migrateCanonicalPlans';
+import { includedCreditPeriod } from '../src/domain/plans/entitlements';
 
 type BusinessCounts = {
   instituteCount: number;
@@ -125,17 +126,15 @@ test('canonical billing migration is rerunnable, preserves protected rows, and a
     const now = new Date('2026-08-16T12:00:00.000Z');
     const beforePreflightState = await instituteMigrationState(postgres);
     await assert.rejects(() => migrateCanonicalPlans(prisma!, 'preview' as never, now), { message: 'INVALID_CANONICAL_MIGRATION_MODE' });
-    await assert.rejects(() => migrateCanonicalPlans(prisma!, 'apply', now), { message: 'CREDIT_PERIOD_RESOLVER_REQUIRED' });
     assert.deepEqual(await instituteMigrationState(postgres), beforePreflightState);
     const preflight = await migrateCanonicalPlans(prisma, 'preflight', now);
     assert.deepEqual(preflight, { mode: 'preflight', before, candidates: 7 });
     assert.deepEqual(await businessCounts(postgres), before);
     assert.deepEqual(await instituteMigrationState(postgres), beforePreflightState);
 
-    const resolveCreditPeriod = () => ({ includedQuizCreditsExpireAt: new Date('2026-09-16T12:00:00.000Z'), quizCreditsRenewAt: new Date('2026-09-16T12:00:00.000Z') });
     const [first, second] = await Promise.all([
-      migrateCanonicalPlans(prisma, 'apply', now, resolveCreditPeriod),
-      migrateCanonicalPlans(prisma, 'apply', new Date('2026-08-17T12:00:00.000Z'), resolveCreditPeriod)
+      migrateCanonicalPlans(prisma, 'apply', now),
+      migrateCanonicalPlans(prisma, 'apply', new Date('2026-08-17T12:00:00.000Z'))
     ]);
     assert.deepEqual([first.migrated, second.migrated].sort(), [0, 7]);
     assert.deepEqual(first.before, before); assert.deepEqual(first.after, before);
@@ -151,14 +150,20 @@ test('canonical billing migration is rerunnable, preserves protected rows, and a
     const migratedAt = institutes[0]?.canonicalPlanMigratedAt?.toISOString();
     assert.ok(migratedAt);
     assert.ok(institutes.every(row => row.canonicalPlanMigratedAt?.toISOString() === migratedAt));
-    assert.ok(institutes.every(row => row.includedQuizCreditsExpireAt !== null && row.quizCreditsRenewAt !== null));
+    const beforeById = new Map(beforePreflightState.map(row => [row.id, row]));
+    for (const row of institutes) {
+      const beforeRow = beforeById.get(row.id)!;
+      const active = !beforeRow.planExpiryDate || beforeRow.planExpiryDate.getTime() >= now.getTime();
+      const expected = active ? includedCreditPeriod({ planStartDate: beforeRow.planStartDate, createdAt: beforeRow.createdAt }, now).includedQuizCreditsExpireAt.toISOString() : undefined;
+      assert.equal(row.includedQuizCreditsExpireAt?.toISOString(), expected, `${row.id} receives the correct UTC-anniversary expiry`);
+    }
     assert.deepEqual(institutes.map(row => row.includedQuizCreditsExpireAt?.toISOString()), institutes.map(row => row.quizCreditsRenewAt?.toISOString()));
     assert.deepEqual(institutes.map(row => row.lifetimeQuizCredits), beforePreflightState.map(row => row.quizCredits));
     assert.deepEqual(institutes.map(row => row.includedQuizCredits), institutes.map(row => expectedIncludedCredits.get(row.id)));
     assert.deepEqual(institutes.map(row => ({ id: row.id, planStartDate: row.planStartDate?.toISOString(), planExpiryDate: row.planExpiryDate?.toISOString(), config: row.config, isPubliclyListed: row.isPubliclyListed })), beforePreflightState.map(row => ({ id: row.id, planStartDate: row.planStartDate?.toISOString(), planExpiryDate: row.planExpiryDate?.toISOString(), config: row.config, isPubliclyListed: row.isPubliclyListed })));
     assert.deepEqual(rowsById.get('page-only')?.config, { kind: 'PAGE_ONLY', listing: 'public' });
     assert.equal(rowsById.get('page-only')?.isPubliclyListed, true);
-    const retry = await migrateCanonicalPlans(prisma, 'apply', new Date('2026-08-18T12:00:00.000Z'), resolveCreditPeriod);
+    const retry = await migrateCanonicalPlans(prisma, 'apply', new Date('2026-08-18T12:00:00.000Z'));
     assert.equal(retry.migrated, 0); assert.deepEqual(retry.before, before); assert.deepEqual(retry.after, before);
   } finally {
     await prisma?.$disconnect();

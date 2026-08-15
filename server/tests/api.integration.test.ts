@@ -112,6 +112,31 @@ test('POST /api/fees/pay rejects invalid bearer tokens before hitting the contro
     assert.equal(response.status, 403);
 });
 
+test('canonical Marketplace-only and expired Enterprise access cannot mutate ERP routes', async () => {
+    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: (error: unknown, decoded?: unknown) => void) => {
+        callback(null, { id: 'marketplace-auth-admin', username: 'marketplace-owner', passwordVersion: 1, instituteId: 'marketplace-auth-inst', role: 'INSTITUTE_ADMIN' });
+    }) as unknown) as typeof jwt.verify);
+    replaceMethod(prisma.admin, 'findUnique', (async () => ({
+        id: 'marketplace-auth-admin',
+        username: 'marketplace-owner',
+        passwordVersion: 1,
+        instituteId: 'marketplace-auth-inst',
+        role: 'INSTITUTE_ADMIN',
+        institute: {
+            plan: 'ENTERPRISE',
+            planExpiryDate: new Date('2026-01-01T00:00:00Z'),
+            marketplaceAccessGrantedAt: new Date('2025-01-01T00:00:00Z'),
+            trialEndsAt: null,
+            includedQuizCredits: 5,
+            lifetimeQuizCredits: 12,
+        },
+    }) as never) as typeof prisma.admin.findUnique);
+
+    const response = await postJson('/api/students/manual', {}, { Authorization: 'Bearer valid-token' });
+    assert.equal(response.status, 403);
+    assert.equal((await response.json() as { error: string }).error, 'PAGE_ONLY_ACCESS_RESTRICTED');
+});
+
 test('POST /api/auth/login returns tokens for valid credentials', async () => {
     replaceMethod(prisma.admin, 'findUnique', (async () => ({
         id: 'admin-1',

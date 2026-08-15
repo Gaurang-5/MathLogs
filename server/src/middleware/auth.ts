@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../prisma';
 import { secureLogger } from '../utils/secureLogger';
+import { effectiveEntitlements } from '../domain/plans/entitlements';
 
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -49,7 +50,7 @@ export const invalidateAuthCache = (userId: string) => {
     authCache.delete(userId);
 };
 
-function isPageOnlyAllowedRequest(req: Request): boolean {
+function isMarketplaceOnlyAllowedRequest(req: Request): boolean {
     const path = req.originalUrl.split('?')[0].replace(/\/$/, '');
     const method = req.method.toUpperCase();
 
@@ -116,9 +117,10 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
                     select: { id: true, adminId: true, instituteId: true, ticketId: true, caseId: true, expiresAt: true }
                 });
                 if (!session) return res.status(403).json({ success: false, error: 'SUPPORT_SESSION_EXPIRED' });
-                const instituteAdmin = await prisma.admin.findFirst({ where: { instituteId: session.instituteId, role: 'INSTITUTE_ADMIN' }, select: { id: true, username: true, passwordVersion: true, instituteId: true, role: true, institute: { select: { planExpiryDate: true, plan: true, isQuizOnly: true, quizCredits: true, config: true } } } });
+                const instituteAdmin = await prisma.admin.findFirst({ where: { instituteId: session.instituteId, role: 'INSTITUTE_ADMIN' }, select: { id: true, username: true, passwordVersion: true, instituteId: true, role: true, institute: { select: { planExpiryDate: true, plan: true, trialEndsAt: true, marketplaceAccessGrantedAt: true, includedQuizCredits: true, lifetimeQuizCredits: true } } } });
                 if (!instituteAdmin) return res.status(403).json({ success: false, error: 'SUPPORT_SESSION_INSTITUTE_ADMIN_MISSING' });
-                req.user = { ...instituteAdmin, supportActorAdminId: session.adminId, supportSessionId: session.id, supportTicketId: session.ticketId, supportCaseId: session.caseId } as any;
+                const entitlements = effectiveEntitlements(instituteAdmin.institute ?? {});
+                req.user = { ...instituteAdmin, entitlements, supportActorAdminId: session.adminId, supportSessionId: session.id, supportTicketId: session.ticketId, supportCaseId: session.caseId } as any;
                 if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
                     res.once('finish', () => {
                         void prisma.superAdminAuditLog.create({ data: { action: 'SUPPORT_MUTATION', entityType: 'SupportSessionRequest', entityId: normalizedSupportRoute(req), actorAdminId: session.adminId, instituteId: session.instituteId, correlationId: req.correlationId, supportSessionId: session.id, metadata: { method: req.method, route: normalizedSupportRoute(req), responseStatus: res.statusCode } } }).catch(() => undefined);
@@ -158,9 +160,10 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
                             select: {
                                 planExpiryDate: true,
                                 plan: true,
-                                isQuizOnly: true,
-                                quizCredits: true,
-                                config: true
+                                trialEndsAt: true,
+                                marketplaceAccessGrantedAt: true,
+                                includedQuizCredits: true,
+                                lifetimeQuizCredits: true
                             }
                         }
                     }
@@ -192,37 +195,17 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
             }
 
             const institute = dbUser.institute;
-            const isQuizOnlyInst = institute?.isQuizOnly === true || (institute?.config as any)?.planName === 'QUIZ_ONLY' || (institute?.config as any)?.isQuizOnly === true;
-            const isPageOnlyInst = ['PAGE_ONLY', 'listing'].includes((institute?.config as any)?.planName);
+            const entitlements = effectiveEntitlements(institute ?? {});
+            const marketplaceOnly = entitlements.marketplace && !entitlements.quiz && !entitlements.enterprise;
 
-            if (isPageOnlyInst && dbUser.role !== 'SUPER_ADMIN' && !isPageOnlyAllowedRequest(req)) {
+            if (marketplaceOnly && dbUser.role !== 'SUPER_ADMIN' && !isMarketplaceOnlyAllowedRequest(req)) {
                 return res.status(403).json({
                     error: 'PAGE_ONLY_ACCESS_RESTRICTED',
                     message: 'This account can access marketplace listing, leads, and upgrade features only.'
                 });
             }
 
-            // Quiz-Only accounts operate on a credit-based model (quizCredits) and must not be blocked by ERP plan expiry.
-            if (institute && !isQuizOnlyInst && (institute.planExpiryDate || institute.plan === 'NO_PLAN')) {
-                const expiry = institute.planExpiryDate ? new Date(institute.planExpiryDate) : new Date(0);
-                const isNoPlan = institute.plan === 'NO_PLAN';
-                const isExpired = expiry.getTime() < Date.now();
-
-                if (isExpired || isNoPlan) {
-                    // Allowed paths even when expired
-                    const path = req.path;
-                    const isExempt = path.startsWith('/billing') || path.startsWith('/auth') || path.startsWith('/institute') || path.startsWith('/tests/online') || path.startsWith('/tests/generate');
-                    
-                    if (!isExempt) {
-                        // Grant "View Only" access: they can read and download PDFs (GET) but cannot create/update/delete (POST/PUT/DELETE)
-                        if (req.method !== 'GET') {
-                            return res.status(402).json({ error: 'View Only Mode Active: Actions are restricted. Please upgrade your plan.' });
-                        }
-                    }
-                }
-            }
-
-            req.user = { ...user, ...dbUser };
+            req.user = { ...user, ...dbUser, entitlements };
             next();
         } catch (e) {
             console.error('Auth Middleware Error:', e);
