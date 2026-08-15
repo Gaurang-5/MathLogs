@@ -29,6 +29,7 @@ const SuperAdminInstituteDetail = lazy(() => import('./pages/superadmin/SuperAdm
 const SuperAdminInstituteNew = lazy(() => import('./pages/superadmin/SuperAdminInstituteNew'));
 const SuperAdminRevenue = lazy(() => import('./pages/superadmin/SuperAdminRevenue'));
 const SuperAdminSupport = lazy(() => import('./pages/superadmin/SuperAdminSupport'));
+const SuperAdminCommunications = lazy(() => import('./pages/superadmin/SuperAdminCommunications'));
 const Support = lazy(() => import('./pages/Support'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
@@ -108,6 +109,7 @@ function App() {
               <Route path="marketplace" element={<SuperAdminMarketplace />} />
               <Route path="support" element={<SuperAdminSupport />} />
               <Route path="support/tickets/:id" element={<SuperAdminSupport />} />
+              <Route path="communications" element={<SuperAdminCommunications />} />
             </Route>
 
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
