@@ -68,6 +68,9 @@ function isPageOnlyAllowedRequest(req: Request): boolean {
     if (path === '/api/support/tickets' || /^\/api\/support\/tickets\/[^/]+(?:\/messages)?$/.test(path)) {
         return method === 'GET' || method === 'POST';
     }
+    if (path === '/api/communication-preferences') {
+        return method === 'GET' || method === 'PATCH';
+    }
     if (path === '/api/billing/create' || path === '/api/billing/verify') {
         return method === 'POST';
     }
@@ -94,6 +97,16 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
         }
 
         try {
+            if (user.sessionId) {
+                const activeSession = await prisma.adminSession.findFirst({
+                    where: { id: user.sessionId, adminId: user.id, revokedAt: null, expiresAt: { gt: new Date() } },
+                    select: { id: true }
+                });
+                if (!activeSession) {
+                    res.sendStatus(403);
+                    return;
+                }
+            }
             let dbUser: any;
             const cached = authCache.get(user.id);
             const now = Date.now();

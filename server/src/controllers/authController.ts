@@ -20,15 +20,6 @@ if (!JWT_SECRET) {
  * Helper to generate and store Short-Lived Access Token (1h) + Long-Lived Refresh Token (30d)
  */
 const generateAuthTokens = async (admin: any, req?: Request, existingSessionId?: string | null) => {
-    // Access Token: 1 hour expiry (reduced from 30 days for security)
-    const token = jwt.sign({
-        id: admin.id,
-        username: admin.username,
-        passwordVersion: admin.passwordVersion,
-        instituteId: admin.instituteId,
-        role: admin.role
-    }, JWT_SECRET, { expiresIn: '1h' });
-
     // Refresh Token: Cryptographically secure string, 30 day expiry in DB
     const refreshTokenString = crypto.randomBytes(40).toString('hex');
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
@@ -51,6 +42,16 @@ const generateAuthTokens = async (admin: any, req?: Request, existingSessionId?:
         });
         sessionId = session.id;
     }
+
+    // Access tokens are bound to the durable session so revocation is immediate.
+    const token = jwt.sign({
+        id: admin.id,
+        username: admin.username,
+        passwordVersion: admin.passwordVersion,
+        instituteId: admin.instituteId,
+        role: admin.role,
+        sessionId
+    }, JWT_SECRET, { expiresIn: '1h' });
 
     await prisma.refreshToken.create({
         data: {

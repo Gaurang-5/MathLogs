@@ -30,6 +30,7 @@ import {
 } from '../controllers/superAdminRevenueController';
 import { addCaseNote, addTicketMessage, createCase, getAnyTicket, getCase, listAllTickets, listCases, updateTicketStatus } from '../controllers/superAdminSupportController';
 import { dispatch, getPreference, history, preview, templates, updatePreference } from '../controllers/superAdminCommunicationController';
+import { audit, jobs, overview as systemOverview, retryJob, revokeSession, security } from '../controllers/superAdminSystemController';
 
 const router = Router();
 
@@ -50,6 +51,12 @@ router.get('/communications/templates', templates);
 router.post('/communications/preview', preview);
 router.post('/communications/dispatch', requireSuperAdminReauth('TARGETED_COMMUNICATION'), dispatch);
 router.get('/communications/history', history);
+router.get('/system/overview', systemOverview);
+router.get('/system/jobs', jobs);
+router.post('/system/jobs/:kind/:id/retry', retryJob);
+router.get('/system/audit', audit);
+router.get('/system/security', security);
+router.post('/system/sessions/:id/revoke', requireSuperAdminReauth('SYSTEM_SESSION_REVOKE'), revokeSession);
 router.get('/institutes', listInstitutes);
 router.post('/institutes/onboarding/preview', previewOnboarding);
 router.post('/institutes/onboarding/commit', commitOnboarding);
