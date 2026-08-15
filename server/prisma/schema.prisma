@@ -24,6 +24,16 @@ model Institute {
   suspensionReason                String?
   planExpiryDate                  DateTime?
   planStartDate                   DateTime?
+  billingCycle                    BillingCycle?
+  trialStartedAt                  DateTime?
+  trialEndsAt                     DateTime?
+  trialUsedAt                     DateTime?
+  marketplaceAccessGrantedAt      DateTime?
+  includedQuizCredits             Int                               @default(0)
+  includedQuizCreditsExpireAt     DateTime?
+  lifetimeQuizCredits             Int                               @default(0)
+  quizCreditsRenewAt              DateTime?
+  canonicalPlanMigratedAt         DateTime?
   razorpayOrderId                 String?
   razorpaySubscriptionId          String?
   areRegistrationsPaused          Boolean                           @default(false)
@@ -73,6 +83,86 @@ model Institute {
   communicationPreference         InstituteCommunicationPreference?
   targetedCommunicationRecipients TargetedCommunicationRecipient[]
   deletionRequests                SuperAdminDeletionRequest[]
+  billingPayments                 BillingPayment[]
+  planTrialClaims                 PlanTrialClaim[]
+  billingWebhookEvents            BillingWebhookEvent[]
+  planNotifications               PlanNotification[]
+}
+
+model BillingPayment {
+  id                   String        @id @default(uuid())
+  instituteId          String
+  plan                 Tier?
+  creditPackId         String?
+  amountPaise          Int
+  billingCycle         BillingCycle?
+  status               String        @default("PENDING")
+  providerOrderId      String        @unique
+  providerPaymentId    String?       @unique
+  providerSignature    String?
+  verifiedAt           DateTime?
+  verificationFailedAt DateTime?
+  capturedAt           DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  institute            Institute     @relation(fields: [instituteId], references: [id], onDelete: Restrict)
+
+  @@index([instituteId, createdAt])
+  @@index([status, createdAt])
+}
+
+model PlanTrialClaim {
+  id                String    @id @default(uuid())
+  instituteId       String    @unique
+  ownerIdentityHash String    @unique @db.VarChar(128)
+  plan              Tier
+  claimedAt         DateTime  @default(now())
+  endsAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  institute         Institute @relation(fields: [instituteId], references: [id], onDelete: Restrict)
+
+  @@index([plan, endsAt])
+}
+
+model BillingWebhookEvent {
+  id              String     @id @default(uuid())
+  instituteId     String?
+  providerEventId String     @unique
+  eventType       String
+  payload         Json
+  status          String     @default("RECEIVED")
+  receivedAt      DateTime   @default(now())
+  processedAt     DateTime?
+  processingError String?    @db.Text
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  institute       Institute? @relation(fields: [instituteId], references: [id], onDelete: SetNull)
+
+  @@index([status, receivedAt])
+  @@index([instituteId, receivedAt])
+}
+
+model PlanNotification {
+  id             String    @id @default(uuid())
+  instituteId    String
+  event          String
+  eventKey       String
+  channel        String
+  scheduledAt    DateTime
+  status         String    @default("PENDING")
+  transportJobId String?
+  attempts       Int       @default(0)
+  lastAttemptAt  DateTime?
+  sentAt         DateTime?
+  failedAt       DateTime?
+  error          String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  institute      Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+
+  @@unique([instituteId, eventKey, channel])
+  @@index([status, scheduledAt])
 }
 
 model InviteToken {
@@ -790,6 +880,14 @@ enum Tier {
   ENTERPRISE
   NO_PLAN
   BASIC
+  MARKETPLACE
+  QUIZ
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+  ONE_TIME
 }
 
 enum JobStatus {
