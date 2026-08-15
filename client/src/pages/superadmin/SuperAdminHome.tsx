@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Building2, CheckCircle2, Clock3, RefreshCw, ShieldAlert, Star, UsersRound } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Building2, CheckCircle2, Clock3, Headphones, RefreshCw, ShieldAlert, Star, UsersRound } from 'lucide-react';
 import { superAdminShellApi } from '../../features/superadmin-shell/api';
 import type { AttentionItem, SuperAdminHomeData } from '../../features/superadmin-shell/types';
 
@@ -10,7 +10,7 @@ const severityStyle = {
   UPCOMING: 'border-stone-200 bg-white text-stone-700'
 };
 
-const iconFor = (item: AttentionItem) => item.kind === 'CLAIM' ? UsersRound : item.kind === 'REVIEW' ? Star : item.kind === 'PLAN_EXPIRY' ? Clock3 : AlertTriangle;
+const iconFor = (item: AttentionItem) => item.kind === 'CLAIM' ? UsersRound : item.kind === 'REVIEW' ? Star : item.kind === 'PLAN_EXPIRY' ? Clock3 : item.kind === 'SUPPORT' ? Headphones : AlertTriangle;
 
 export default function SuperAdminHome() {
   const [data, setData] = useState<SuperAdminHomeData | null>(null);
@@ -36,7 +36,8 @@ export default function SuperAdminHome() {
     { label: 'Institutes', value: data.metrics.totalInstitutes, href: '/super-admin/institutes', icon: Building2 },
     { label: 'Active', value: data.metrics.activeInstitutes, href: '/super-admin/institutes?status=ACTIVE', icon: CheckCircle2 },
     { label: 'Open claims', value: data.metrics.openClaims, href: '/super-admin/marketplace?section=claims', icon: UsersRound },
-    { label: 'Failed leads', value: data.metrics.failedLeadDeliveries, href: '/super-admin/marketplace?section=leads', icon: AlertTriangle }
+    { label: 'Failed leads', value: data.metrics.failedLeadDeliveries, href: '/super-admin/marketplace?section=leads', icon: AlertTriangle },
+    { label: 'Open support', value: data.metrics.openSupportTickets, href: '/super-admin/support', icon: Headphones }
   ];
   return <div className="mx-auto max-w-[1500px] space-y-7">
     <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.2em] text-amber-700">Attention first</p><h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Good morning. Here’s what needs you.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">One operational queue across institutes, Marketplace, delivery jobs, and billing.</p></div><button onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 self-start rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-bold shadow-sm disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</button></section>

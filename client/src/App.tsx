@@ -28,6 +28,8 @@ const SuperAdminInstitutes = lazy(() => import('./pages/superadmin/SuperAdminIns
 const SuperAdminInstituteDetail = lazy(() => import('./pages/superadmin/SuperAdminInstituteDetail'));
 const SuperAdminInstituteNew = lazy(() => import('./pages/superadmin/SuperAdminInstituteNew'));
 const SuperAdminRevenue = lazy(() => import('./pages/superadmin/SuperAdminRevenue'));
+const SuperAdminSupport = lazy(() => import('./pages/superadmin/SuperAdminSupport'));
+const Support = lazy(() => import('./pages/Support'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
@@ -104,6 +106,8 @@ function App() {
               <Route path="institutes/:id/*" element={<SuperAdminInstituteDetail />} />
               <Route path="revenue" element={<SuperAdminRevenue />} />
               <Route path="marketplace" element={<SuperAdminMarketplace />} />
+              <Route path="support" element={<SuperAdminSupport />} />
+              <Route path="support/tickets/:id" element={<SuperAdminSupport />} />
             </Route>
 
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
@@ -118,6 +122,7 @@ function App() {
             <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
             <Route path="/marketplace-settings" element={<PrivateRoute><MarketplaceSettings /></PrivateRoute>} />
             <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+            <Route path="/support" element={<PrivateRoute><Support /></PrivateRoute>} />
 
             <Route path="/approvals" element={<PrivateRoute><Approvals /></PrivateRoute>} />
 

@@ -31,7 +31,11 @@ export type InstituteWorkspaceData = {
   billing: { plan: string; planStartDate: string | null; planExpiryDate: string | null; operations: BillingOperation[] };
   marketplace: { ownershipStatus: string; isPubliclyListed: boolean; isVerified: boolean; openClaims: number; pendingReviews: number };
   leads: Record<string, number>;
-  support: { sessions: Array<{ id: string; reason: string; expiresAt: string; endedAt: string | null; createdAt: string }> };
+  support: {
+    tickets: Array<{ id: string; reference: string; category: string; subject: string; priority: string; status: string; updatedAt: string }>;
+    cases: Array<{ id: string; title: string; category: string; priority: string; status: string; followUpAt: string | null; updatedAt: string }>;
+    sessions: Array<{ id: string; reason: string; ticketId?: string | null; caseId?: string | null; expiresAt: string; endedAt: string | null; createdAt: string }>;
+  };
   activity: Array<{ id: string; action: string; source: string; createdAt: string; actorAdmin?: { username: string } | null }>;
 };
 

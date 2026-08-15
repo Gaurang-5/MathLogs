@@ -2,7 +2,7 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, FileText, Sparkles, Scan, ReceiptIndianRupee, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard, Store } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Sparkles, Scan, ReceiptIndianRupee, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard, Store, Headphones } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
 import { api } from '../utils/api';
@@ -87,7 +87,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
         startYRef.current = 0;
     };
 
-    const showMobileNav = !hideMobileNav && ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing', '/marketplace-settings'].includes(location.pathname);
+    const showMobileNav = !hideMobileNav && ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing', '/marketplace-settings', '/support'].includes(location.pathname);
 
     const handleLogout = () => {
         localStorage.clear();
@@ -103,6 +103,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
         navItems = [
             { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
             { name: 'Upgrade ERP Plan', path: '/billing', icon: CreditCard },
+            { name: 'Support', path: '/support', icon: Headphones },
             { name: 'Settings', path: '/settings', icon: Settings },
         ];
     } else if (isQuizOnly) {
@@ -111,6 +112,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
             { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
             { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
             { name: 'Buy Credits', path: '/billing', icon: CreditCard },
+            { name: 'Support', path: '/support', icon: Headphones },
             { name: 'Settings', path: '/settings', icon: Settings },
         ];
     } else {
@@ -123,6 +125,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
             { name: 'Fees', path: '/fees', icon: ReceiptIndianRupee },
             { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
             { name: 'Billing', path: '/billing', icon: CreditCard },
+            { name: 'Support', path: '/support', icon: Headphones },
             { name: 'Settings', path: '/settings', icon: Settings },
         ];
     }
@@ -332,6 +335,14 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                                 >
                                     <CreditCard className="w-5 h-5 mr-3.5" />
                                     Billing & Plans
+                                </Link>
+                                <Link
+                                    to="/support"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center w-full px-4 py-3.5 text-base font-medium text-app-text-secondary hover:bg-black/5 rounded-2xl"
+                                >
+                                    <Headphones className="w-5 h-5 mr-3.5" />
+                                    Support Center
                                 </Link>
                                 <Link
                                     to="/settings"

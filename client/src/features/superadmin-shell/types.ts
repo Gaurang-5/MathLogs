@@ -10,7 +10,7 @@ export type SuperAdminActionClass =
 
 export type AttentionItem = {
   id: string;
-  kind: 'CLAIM' | 'REVIEW' | 'LEAD_DELIVERY' | 'PLAN_EXPIRY' | 'JOB';
+  kind: 'CLAIM' | 'REVIEW' | 'LEAD_DELIVERY' | 'PLAN_EXPIRY' | 'SUPPORT' | 'JOB';
   severity: 'CRITICAL' | 'TODAY' | 'UPCOMING';
   title: string;
   detail: string;
@@ -27,6 +27,7 @@ export type SuperAdminHomeData = {
     openClaims: number;
     pendingReviews: number;
     failedLeadDeliveries: number;
+    openSupportTickets: number;
   };
   attention: AttentionItem[];
   recentActivity: Array<{
