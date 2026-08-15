@@ -15,6 +15,7 @@ import { emailWorker } from './utils/emailWorker';
 import { Client } from 'pg';
 import { secureLogger } from './utils/secureLogger';
 import { correlationId } from './middleware/correlationId';
+import { startSuperAdminBillingWorker } from './workers/superAdminBillingWorker';
 
 
 
@@ -400,6 +401,7 @@ function startServer() {
     app.listen(PORT, () => {
         // Initialize background workers
         emailWorker.start();
+        startSuperAdminBillingWorker();
 
         if (process.env.NODE_ENV === 'production' || process.env.WHATSAPP_ACCESS_TOKEN) {
             import('./utils/whatsappWorker').then(({ processWhatsappQueue }) => {
