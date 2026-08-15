@@ -103,7 +103,9 @@ async function request<T = unknown>(
         delete headers['Content-Type'];
     }
 
-    const token = localStorage.getItem('token');
+    const supportSession = (() => { try { return JSON.parse(sessionStorage.getItem('superAdminSupportSession') || 'null') as { token?: string; expiresAt?: string } | null; } catch { return null; } })();
+    const supportToken = supportSession?.token && supportSession.expiresAt && new Date(supportSession.expiresAt).getTime() > Date.now() && !endpoint.startsWith('/super-admin') ? supportSession.token : null;
+    const token = supportToken || localStorage.getItem('token');
     if (token && !headers['Authorization']) {
         headers['Authorization'] = `Bearer ${token}`;
     }
@@ -120,6 +122,11 @@ async function request<T = unknown>(
         clearTimeout(timeoutId);
 
         if (!res.ok) {
+            if (supportToken && (res.status === 401 || res.status === 403)) {
+                sessionStorage.removeItem('superAdminSupportSession');
+                window.dispatchEvent(new Event('support-session-change'));
+                throw new Error('Support session ended or no longer permits this action.');
+            }
             // Handle authentication errors
             // Exception: DELETE /academic-years/:id returns 401 for wrong password, not invalid session
             // Exception: auth endpoints obviously shouldn't loop

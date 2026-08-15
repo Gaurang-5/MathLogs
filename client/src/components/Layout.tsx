@@ -9,6 +9,7 @@ import { api } from '../utils/api';
 import ToastProvider from './ToastProvider';
 import QuickFeeModal from './QuickFeeModal';
 import PWAInstallPrompt from './PWAInstallPrompt';
+import { SupportSessionBanner } from '../features/superadmin-shell/SupportSessionBanner';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -132,6 +133,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
 
     return (
         <div className="flex min-h-screen bg-app-bg text-app-text transition-colors duration-500 font-sans selection:bg-accent-subtle selection:text-accent">
+            <SupportSessionBanner />
             <ToastProvider />
             <QuickFeeModal isOpen={showQuickFeeModal} onClose={() => setShowQuickFeeModal(false)} />
 

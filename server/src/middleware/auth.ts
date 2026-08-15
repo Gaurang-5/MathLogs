@@ -81,6 +81,18 @@ function isPageOnlyAllowedRequest(req: Request): boolean {
     return false;
 }
 
+function supportSessionActionForbidden(req: Request) {
+    const path = req.originalUrl.split('?')[0];
+    if (path.startsWith('/api/super-admin') || path.startsWith('/api/auth') || path.startsWith('/api/billing')) return true;
+    if (/^\/api\/institutes\/[^/]+(?:\/plan|\/config|\/suspend)?$/.test(path)) return true;
+    if (req.method === 'DELETE') return true;
+    return false;
+}
+
+function normalizedSupportRoute(req: Request) {
+    return req.originalUrl.split('?')[0].replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, ':id');
+}
+
 export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -97,6 +109,24 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
         }
 
         try {
+            if (user.kind === 'SUPPORT_SESSION') {
+                if (supportSessionActionForbidden(req)) return res.status(403).json({ success: false, error: 'SUPPORT_SESSION_ACTION_FORBIDDEN' });
+                const session = await prisma.superAdminSupportSession.findFirst({
+                    where: { id: user.sessionId, adminId: user.actorAdminId, instituteId: user.instituteId, endedAt: null, expiresAt: { gt: new Date() } },
+                    select: { id: true, adminId: true, instituteId: true, ticketId: true, caseId: true, expiresAt: true }
+                });
+                if (!session) return res.status(403).json({ success: false, error: 'SUPPORT_SESSION_EXPIRED' });
+                const instituteAdmin = await prisma.admin.findFirst({ where: { instituteId: session.instituteId, role: 'INSTITUTE_ADMIN' }, select: { id: true, username: true, passwordVersion: true, instituteId: true, role: true, institute: { select: { planExpiryDate: true, plan: true, isQuizOnly: true, quizCredits: true, config: true } } } });
+                if (!instituteAdmin) return res.status(403).json({ success: false, error: 'SUPPORT_SESSION_INSTITUTE_ADMIN_MISSING' });
+                req.user = { ...instituteAdmin, supportActorAdminId: session.adminId, supportSessionId: session.id, supportTicketId: session.ticketId, supportCaseId: session.caseId } as any;
+                if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+                    res.once('finish', () => {
+                        void prisma.superAdminAuditLog.create({ data: { action: 'SUPPORT_MUTATION', entityType: 'SupportSessionRequest', entityId: normalizedSupportRoute(req), actorAdminId: session.adminId, instituteId: session.instituteId, correlationId: req.correlationId, supportSessionId: session.id, metadata: { method: req.method, route: normalizedSupportRoute(req), responseStatus: res.statusCode } } }).catch(() => undefined);
+                    });
+                }
+                next();
+                return;
+            }
             if (user.sessionId) {
                 const activeSession = await prisma.adminSession.findFirst({
                     where: { id: user.sessionId, adminId: user.id, revokedAt: null, expiresAt: { gt: new Date() } },

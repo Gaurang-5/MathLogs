@@ -12,6 +12,7 @@ import { initializeSentry } from './monitoring/sentry';
 import Sentry from './monitoring/sentry';
 import { getHealthStatus, getSimpleHealth, getSystemMetrics, getDatabaseStats } from './monitoring/health';
 import { emailWorker } from './utils/emailWorker';
+import { startSuperAdminSessionWorker } from './workers/superAdminSessionWorker';
 import { Client } from 'pg';
 import { secureLogger } from './utils/secureLogger';
 import { correlationId } from './middleware/correlationId';
@@ -401,6 +402,7 @@ function startServer() {
     app.listen(PORT, () => {
         // Initialize background workers
         emailWorker.start();
+        startSuperAdminSessionWorker();
         startSuperAdminBillingWorker();
 
         if (process.env.NODE_ENV === 'production' || process.env.WHATSAPP_ACCESS_TOKEN) {
