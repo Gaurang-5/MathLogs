@@ -12,7 +12,7 @@ import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, 
 import { getOnlineQuizAnalytics, getLiveQuizStatus, unlockQuizSubmission } from '../controllers/analyticsController';
 import { assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt, getFeeInstallmentsList, getPaymentHistory } from '../controllers/feeController';
 import { getDashboardSummary, getFinancialGrowthStats, getInstallmentGrowthStats } from '../controllers/dashboardController';
-import { generateInvite, validateInvite, setupAccount, getInstitutes } from '../controllers/inviteController';
+import { validateInvite, setupAccount } from '../controllers/inviteController';
 import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } from '../controllers/onboardingController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
@@ -21,8 +21,9 @@ import { secureLogger } from '../utils/secureLogger';
 
 import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
 import superAdminRoutes from './superAdminRoutes';
-import { createInstituteTicket, getInstituteTicket, listInstituteTickets, replyInstituteTicket } from '../controllers/superAdminSupportController';
+import { createInstituteTicket, downloadSupportAttachment, getInstituteTicket, listInstituteTickets, replyInstituteTicket, uploadInstituteAttachments } from '../controllers/superAdminSupportController';
 import { getOwnPreference, updateOwnPreference } from '../controllers/superAdminCommunicationController';
+import { parseSupportAttachments } from '../middleware/supportUpload';
 
 const router = Router();
 router.use('/super-admin', superAdminRoutes);
@@ -30,8 +31,25 @@ router.post('/support/tickets', authenticateToken as any, createInstituteTicket 
 router.get('/support/tickets', authenticateToken as any, listInstituteTickets as any);
 router.get('/support/tickets/:id', authenticateToken as any, getInstituteTicket as any);
 router.post('/support/tickets/:id/messages', authenticateToken as any, replyInstituteTicket as any);
+router.post('/support/tickets/:id/attachments', authenticateToken as any, parseSupportAttachments as any, uploadInstituteAttachments as any);
+router.get('/support/attachments/:id', authenticateToken as any, downloadSupportAttachment as any);
 router.get('/communication-preferences', authenticateToken as any, getOwnPreference as any);
 router.patch('/communication-preferences', authenticateToken as any, updateOwnPreference as any);
+
+const legacySuperAdminRouteRemoved = (_req: any, res: any) =>
+    res.status(404).json({ success: false, error: 'LEGACY_SUPERADMIN_ROUTE_REMOVED' });
+
+router.get('/institutes', legacySuperAdminRouteRemoved);
+router.get('/institutes/analytics', legacySuperAdminRouteRemoved);
+router.post('/institutes/bulk-import', legacySuperAdminRouteRemoved);
+router.put('/institutes/:id/plan', legacySuperAdminRouteRemoved);
+router.put('/institutes/:id/config', legacySuperAdminRouteRemoved);
+router.put('/institutes/:id/details', legacySuperAdminRouteRemoved);
+router.put('/institutes/:id/suspend', legacySuperAdminRouteRemoved);
+router.patch('/institutes/:id/toggle-listing', legacySuperAdminRouteRemoved);
+router.get('/onboarding/leads', legacySuperAdminRouteRemoved);
+router.post('/admin-onboarding/create-link', legacySuperAdminRouteRemoved);
+router.get('/admin-onboarding/links', legacySuperAdminRouteRemoved);
 
 // ================= PUBLIC DOMAIN ROUTES =================
 // These routes do NOT require authentication and are used by parents/students.
@@ -329,30 +347,17 @@ router.get('/stats/finance-growth', authenticateToken as any, getFinancialGrowth
 router.get('/stats/class-average', authenticateToken as any, getClassAverageStats as any);
 
 
-// Invites
-router.post('/invites', authenticateToken as any, generateInvite as any);
-router.get('/institutes', authenticateToken as any, getInstitutes as any);
 import { createBillingSession, verifyBillingPayment, cancelSubscription } from '../controllers/billingController';
 router.post('/billing/create', authenticateToken as any, createBillingSession as any);
 router.post('/billing/verify', authenticateToken as any, verifyBillingPayment as any);
 router.delete('/billing/cancel', authenticateToken as any, cancelSubscription as any);
 
-import { getGlobalAnalytics, updateInstituteConfig, updateInstituteDetails, updateInstitutePlan, getInstituteDetails, suspendInstitute, getMyInstitute, uploadLogo, updateMyInstituteConfig, bulkImportInstitutes, toggleInstituteStatus } from '../controllers/instituteController';
+import { getMyInstitute, uploadLogo, updateMyInstituteConfig } from '../controllers/instituteController';
 
 
-router.get('/institutes/analytics', authenticateToken as any, getGlobalAnalytics as any);
-router.post('/institutes/bulk-import', authenticateToken as any, bulkImportInstitutes as any);
-router.patch('/institutes/:id/toggle-listing', authenticateToken as any, toggleInstituteStatus as any);
-router.put('/institutes/:id/config', authenticateToken as any, updateInstituteConfig as any);
-router.put('/institutes/:id/details', authenticateToken as any, updateInstituteDetails as any);
-router.put('/institutes/:id/plan', authenticateToken as any, updateInstitutePlan as any);
 router.get('/institute/me', authenticateToken as any, getMyInstitute as any);
 router.put('/institute/me/config', authenticateToken as any, updateMyInstituteConfig as any);
 router.put('/institute/me/logo', authenticateToken as any, uploadLogo as any);
-router.get('/institute/:id/details', authenticateToken as any, getInstituteDetails as any);
-router.put('/institutes/:id/suspend', authenticateToken as any, suspendInstitute as any);
-import { getOnboardingLeads } from '../controllers/instituteController';
-router.get('/onboarding/leads', authenticateToken as any, getOnboardingLeads as any);
 
 
 router.get('/invites/:token', publicLimiter, validateInvite as any);
@@ -366,9 +371,7 @@ router.post('/onboarding/start-trial', publicLimiter, startTrial as any);
 router.post('/onboarding/resend-setup-link', publicLimiter, resendSetupLink as any);
 
 // Admin Onboarding Links (Super Admin custom pricing flow)
-import { createAdminOnboardingLink, getAdminOnboardingLink, createAdminOnboardingOrder, verifyAdminOnboardingPayment, listAdminOnboardingLinks } from '../controllers/adminOnboardingController';
-router.post('/admin-onboarding/create-link', authenticateToken as any, createAdminOnboardingLink as any);
-router.get('/admin-onboarding/links', authenticateToken as any, listAdminOnboardingLinks as any);
+import { getAdminOnboardingLink, createAdminOnboardingOrder, verifyAdminOnboardingPayment } from '../controllers/adminOnboardingController';
 router.get('/admin-onboarding/:token', publicLimiter, getAdminOnboardingLink as any);
 router.post('/admin-onboarding/create-order', publicLimiter, createAdminOnboardingOrder as any);
 router.post('/admin-onboarding/verify-payment', publicLimiter, verifyAdminOnboardingPayment as any);

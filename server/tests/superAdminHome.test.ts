@@ -20,13 +20,13 @@ before(async () => {
       teacherName: 'Asha Verma',
       phoneNumber: '9876501234',
       email: `apex-${suffix}@example.com`,
-      planExpiryDate: new Date(Date.now() + 3 * 86_400_000),
+      planExpiryDate: new Date(Date.now() + 60 * 60_000),
       ownershipStatus: 'UNCLAIMED'
     }
   });
   instituteId = institute.id;
   await prisma.marketplaceClaim.create({
-    data: { instituteId, claimantName: 'Riya', phone: '9876543210', normalizedPhone: '9876543210' }
+    data: { instituteId, claimantName: 'Riya', phone: '9876543210', normalizedPhone: '9876543210', createdAt: new Date('2000-01-01T00:00:00.000Z') }
   });
   await prisma.supportTicket.create({
     data: { reference: `SUP-HOME-${Date.now()}`, instituteId, category: 'TECHNICAL', subject: 'Urgent login failure', description: 'The institute owner cannot access the dashboard.', priority: 'URGENT' }

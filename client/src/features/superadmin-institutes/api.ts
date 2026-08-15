@@ -34,8 +34,8 @@ export const superAdminInstituteApi = {
   },
   updateConfiguration: (id: string, value: Record<string, unknown>) => request<InstituteWorkspaceData['usage'] & { updatedAt: string }>(`/super-admin/institutes/${id}/configuration`, 'PATCH', value),
   previewOnboarding: (value: OnboardingInput) => request<{ valid: boolean; errors: unknown[]; summary: unknown }>('/super-admin/institutes/onboarding/preview', 'POST', value),
-  commitOnboarding: (value: OnboardingInput, idempotencyKey: string) => request<{ instituteId: string; name: string; status: string }>('/super-admin/institutes/onboarding/commit', 'POST', value, { 'Idempotency-Key': idempotencyKey })
-  ,deletion: (id: string) => request<DeletionRequest | null>(`/super-admin/institutes/${id}/deletion`),
+  commitOnboarding: (value: OnboardingInput, idempotencyKey: string) => request<{ instituteId: string; name: string; status: string }>('/super-admin/institutes/onboarding/commit', 'POST', value, { 'Idempotency-Key': idempotencyKey }),
+  deletion: (id: string) => request<DeletionRequest | null>(`/super-admin/institutes/${id}/deletion`),
   scheduleDeletion: (id: string, value: { typedName: string; reason: string }, challengeId: string, key: string) => request<DeletionRequest>(`/super-admin/institutes/${id}/deletion`, 'POST', value, { 'X-Superadmin-Challenge': challengeId, 'Idempotency-Key': key }),
   cancelDeletion: (id: string, reason: string) => request<DeletionRequest>(`/super-admin/institutes/${id}/deletion`, 'DELETE', { reason }),
   finalizeDeletion: (id: string, value: { typedName: string; reason: string }, challengeId: string) => request<DeletionRequest>(`/super-admin/institutes/${id}/deletion/finalize`, 'POST', value, { 'X-Superadmin-Challenge': challengeId })

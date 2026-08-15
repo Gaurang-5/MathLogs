@@ -340,3 +340,8 @@ Lists use server-side search, filters, sorting, and pagination. Detail pages fet
 - Editing or deleting audit history.
 - Displaying secrets or credential fragments.
 
+## Implementation status — August 15, 2026
+
+The unified portal is implemented under `/super-admin` with the shared shell and the Home, Institutes, Revenue, Marketplace, Support, Communications, and System workspaces. The previous monolithic `SuperAdminDashboard` client entry point has been removed. Its global `/api/institutes`, onboarding-management, bulk-import, plan/configuration, suspension, and Marketplace-listing mutation routes are intentionally tombstoned with `404 LEGACY_SUPERADMIN_ROUTE_REMOVED`; institute-owned APIs and the public onboarding payment flow remain available.
+
+The release also includes session-bound authentication, OTP reauthentication for high-risk operations, audited 15-minute institute support sessions, private support attachments, consent-aware targeted communication, durable job retry/reconciliation, and two-stage institute deletion with a seven-day waiting period. Database migrations were exercised only against the disposable local test database during implementation; production migration and deployment remain separate approval-gated operations.

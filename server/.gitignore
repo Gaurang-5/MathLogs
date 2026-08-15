@@ -12,6 +12,7 @@ prisma/backups/
 # Exclude log files
 logs/
 *.log
+var/
 
 # Migration artifacts
 migration-data/

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { writeSuperAdminAudit } from './superAdminAuditService';
+import { storeSupportAttachment } from '../utils/supportAttachmentStorage';
 
 export class SupportServiceError extends Error {
   constructor(code: string, public current?: unknown) { super(code); }
@@ -39,6 +40,29 @@ export async function createSupportTicket(instituteId: string, value: unknown) {
     const counter = await tx.idCounter.upsert({ where: { prefix: 'SUP' }, create: { prefix: 'SUP', seq: 1 }, update: { seq: { increment: 1 } } });
     return tx.supportTicket.create({ data: { ...input, instituteId, reference: `SUP-${String(counter.seq).padStart(6, '0')}` }, select: ticketSelect });
   });
+}
+
+export async function addSupportAttachments(ticketId: string, instituteId: string, files: Express.Multer.File[]) {
+  const ticket = await prisma.supportTicket.findFirst({ where: { id: ticketId, instituteId }, select: { id: true, instituteId: true } });
+  if (!ticket) throw new SupportServiceError('SUPPORT_TICKET_NOT_FOUND');
+  const saved = [];
+  for (const file of files) {
+    const storageKey = await storeSupportAttachment({ instituteId, ticketId, body: file.buffer, contentType: file.mimetype });
+    saved.push(await prisma.supportAttachment.create({
+      data: { ticketId, storageKey, fileName: file.originalname.slice(0, 255), contentType: file.mimetype, sizeBytes: file.size },
+      select: { id: true, fileName: true, contentType: true, sizeBytes: true, createdAt: true }
+    }));
+  }
+  return saved;
+}
+
+export async function getAuthorizedSupportAttachment(attachmentId: string, actor: { role: string; instituteId?: string }) {
+  const attachment = await prisma.supportAttachment.findUnique({
+    where: { id: attachmentId },
+    include: { ticket: { select: { instituteId: true } } }
+  });
+  if (!attachment || (actor.role !== 'SUPER_ADMIN' && attachment.ticket.instituteId !== actor.instituteId)) throw new SupportServiceError('SUPPORT_ATTACHMENT_NOT_FOUND');
+  return attachment;
 }
 
 export async function listSupportTickets(input: { instituteId?: string; status?: string; priority?: string; category?: string; q?: string }) {

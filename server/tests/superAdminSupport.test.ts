@@ -33,6 +33,31 @@ test('institute creates and sees only its own support tickets', async () => {
   const denied = await fetch(`${baseUrl}/api/support/tickets/${ticket.id}`, { headers: headers(otherToken) }); assert.equal(denied.status, 404);
 });
 
+test('support attachments are signature-validated, private, and authorized by ticket ownership', async () => {
+  const ticket = await prisma.supportTicket.create({ data: { reference: `SUP-ATT-${Date.now()}`, instituteId, category: 'TECHNICAL', subject: 'Screenshot for support', description: 'Attached is a screenshot showing the issue clearly.' } });
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
+  const form = new FormData();
+  form.append('attachments', new Blob([png], { type: 'image/png' }), 'issue.png');
+  const uploaded = await fetch(`${baseUrl}/api/support/tickets/${ticket.id}/attachments`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: form });
+  assert.equal(uploaded.status, 201);
+  const attachment = (await uploaded.json() as any).data[0];
+  assert.equal(attachment.fileName, 'issue.png');
+  assert.equal('storageKey' in attachment, false);
+
+  const ownerDownload = await fetch(`${baseUrl}/api/support/attachments/${attachment.id}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert.equal(ownerDownload.status, 200);
+  assert.equal(ownerDownload.headers.get('cache-control'), 'private, no-store');
+  assert.deepEqual(Buffer.from(await ownerDownload.arrayBuffer()), png);
+  assert.equal((await fetch(`${baseUrl}/api/support/attachments/${attachment.id}`, { headers: { Authorization: `Bearer ${otherToken}` } })).status, 404);
+  assert.equal((await fetch(`${baseUrl}/api/support/attachments/${attachment.id}`, { headers: { Authorization: `Bearer ${superToken}` } })).status, 200);
+
+  const spoofed = new FormData();
+  spoofed.append('attachments', new Blob([Buffer.from('not-an-image')], { type: 'image/jpeg' }), 'fake.jpg');
+  const rejected = await fetch(`${baseUrl}/api/support/tickets/${ticket.id}/attachments`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: spoofed });
+  assert.equal(rejected.status, 400);
+  assert.equal((await rejected.json() as any).error, 'INVALID_ATTACHMENT_CONTENT');
+});
+
 test('internal notes never leak to institute users and ticket transitions are explicit', async () => {
   const ticket = await prisma.supportTicket.create({ data: { reference: `SUP-VIS-${Date.now()}`, instituteId, category: 'TECHNICAL', subject: 'Dashboard error', description: 'Dashboard shows an unexpected error on load.' } });
   const internal = await fetch(`${baseUrl}/api/super-admin/support/tickets/${ticket.id}/messages`, { method: 'POST', headers: headers(superToken), body: JSON.stringify({ visibility: 'INTERNAL', body: 'Investigating application logs.', expectedUpdatedAt: ticket.updatedAt }) });

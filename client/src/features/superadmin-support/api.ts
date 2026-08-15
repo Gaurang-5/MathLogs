@@ -1,4 +1,4 @@
-import { apiRequest } from '../../utils/api';
+import { API_URL, apiRequest } from '../../utils/api';
 import type { InternalCase, SupportStatus, SupportTicket } from './types';
 
 type Method = 'GET' | 'POST' | 'PATCH';
@@ -8,6 +8,13 @@ async function request<T>(path: string, method: Method = 'GET', body?: unknown, 
   const response = await apiRequest<Envelope<T>>(path, method, body, { headers });
   if (!response.success) throw new Error(response.error || response.message || 'Support request failed');
   return response.data;
+}
+
+async function downloadAttachment(id: string) {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_URL}/support/attachments/${id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new Error('Unable to download attachment');
+  return response.blob();
 }
 
 function query(values: Record<string, string | undefined>) {
@@ -24,12 +31,15 @@ export const superAdminSupportApi = {
   cases: (filters: { instituteId?: string; status?: string } = {}) => request<InternalCase[]>(`/super-admin/support/cases${query(filters)}`),
   createCase: (value: { instituteId: string; title: string; category: string; priority: SupportPriority; followUpAt?: string; linkedType?: string; linkedId?: string }) => request<InternalCase>('/super-admin/support/cases', 'POST', value),
   addCaseNote: (id: string, body: string) => request(`/super-admin/support/cases/${id}/notes`, 'POST', { body }),
-  startSession: (value: { instituteId: string; ticketId?: string; caseId?: string; reason: string }, challengeId: string) => request<{ session: { id: string; expiresAt: string }; supportToken: string }>('/super-admin/support-sessions', 'POST', value, { 'X-Superadmin-Challenge': challengeId })
+  startSession: (value: { instituteId: string; ticketId?: string; caseId?: string; reason: string }, challengeId: string) => request<{ session: { id: string; expiresAt: string }; supportToken: string }>('/super-admin/support-sessions', 'POST', value, { 'X-Superadmin-Challenge': challengeId }),
+  downloadAttachment
 };
 
 export const instituteSupportApi = {
   tickets: () => request<SupportTicket[]>('/support/tickets'),
   ticket: (id: string) => request<SupportTicket>(`/support/tickets/${id}`),
   create: (value: { category: string; subject: string; description: string; priority: SupportPriority }) => request<SupportTicket>('/support/tickets', 'POST', value),
-  reply: (id: string, value: { body: string; expectedUpdatedAt: string }) => request<SupportTicket>(`/support/tickets/${id}/messages`, 'POST', value)
+  reply: (id: string, value: { body: string; expectedUpdatedAt: string }) => request<SupportTicket>(`/support/tickets/${id}/messages`, 'POST', value),
+  uploadAttachments: (id: string, files: File[]) => { const body = new FormData(); files.forEach(file => body.append('attachments', file)); return request<SupportTicket['attachments']>(`/support/tickets/${id}/attachments`, 'POST', body); },
+  downloadAttachment
 };

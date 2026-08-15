@@ -9,6 +9,7 @@ let server: Server;
 let baseUrl: string;
 let testInstituteId: string;
 let testSlug: string;
+let testInstituteName: string;
 
 before(async () => {
   try {
@@ -21,9 +22,10 @@ before(async () => {
 
     // Create test institute for marketplace
     testSlug = `test-coaching-${Date.now()}`;
+    testInstituteName = `Apex Mathematics Academy ${testSlug}`;
     const inst = await prisma.institute.create({
       data: {
-        name: 'Apex Mathematics Academy',
+        name: testInstituteName,
         teacherName: 'Prof. Sharma',
         slug: testSlug,
         phoneNumber: '9876543210',
@@ -66,7 +68,7 @@ after(async () => {
 });
 
 test('GET /api/marketplace/search should return listed coachings', async () => {
-  const res = await fetch(`${baseUrl}/api/marketplace/search?city=Jaipur`);
+  const res = await fetch(`${baseUrl}/api/marketplace/search?city=Jaipur&q=${encodeURIComponent(testInstituteName)}`);
   assert.equal(res.status, 200);
 
   const body: any = await res.json();
@@ -84,7 +86,7 @@ test('GET /api/marketplace/coaching/:slug should return public profile details',
 
   const body: any = await res.json();
   assert.equal(body.success, true);
-  assert.equal(body.data.name, 'Apex Mathematics Academy');
+  assert.equal(body.data.name, testInstituteName);
   assert.equal(body.data.teacherName, 'Prof. Sharma');
   assert.equal(body.data.isExclusive, true);
 });
