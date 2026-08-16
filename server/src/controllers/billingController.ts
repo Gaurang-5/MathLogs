@@ -2,11 +2,12 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
-import { Tier } from '@prisma/client';
 import { secureLogger } from '../utils/secureLogger';
 import { getRazorpayConfig } from '../utils/env';
-import { addPurchasedQuizCredits } from '../utils/quizCredits';
+import { grantLifetimeQuizCredits } from '../services/quizCreditWalletService';
 import { invalidateAuthCache } from '../middleware/auth';
+import { PLAN_CATALOG, normalizePlanId, resolvePlanPrice, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
+import { activateMarketplace, activatePaidPlan, cancelAtPeriodEnd } from '../services/subscriptionLifecycleService';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -15,137 +16,102 @@ const razorpay = new Razorpay({
     key_secret: razorpayConfig.keySecret,
 });
 
+const CREDIT_PACKS = {
+    quiz_credits_5: { credits: 5, amountPaise: 25_000 },
+    quiz_credits_10: { credits: 10, amountPaise: 50_000 },
+    quiz_credits_25: { credits: 25, amountPaise: 100_000 },
+    quiz_credits_40: { credits: 40, amountPaise: 150_000 }
+} as const;
+
+export type CheckoutProduct =
+    | { kind: 'PLAN'; plan: CanonicalPlan; billingCycle: BillingCycle; amountPaise: number }
+    | { kind: 'CREDIT_PACK'; creditPackId: keyof typeof CREDIT_PACKS; credits: number; amountPaise: number };
+
+export function resolveCheckoutProduct(planId: unknown, billingCycle: unknown): CheckoutProduct {
+    if (typeof planId === 'string' && planId.startsWith('quiz_credits_')) {
+        const pack = CREDIT_PACKS[planId as keyof typeof CREDIT_PACKS];
+        if (!pack) throw new Error('INVALID_CREDIT_PACK');
+        return { kind: 'CREDIT_PACK', creditPackId: planId as keyof typeof CREDIT_PACKS, ...pack };
+    }
+    const plan = normalizePlanId(planId);
+    const normalizedCycle = typeof billingCycle === 'string' ? billingCycle.toUpperCase() as BillingCycle : billingCycle as BillingCycle;
+    const catalogue = PLAN_CATALOG.find(product => product.id === plan)!;
+    const amountPaise = plan === 'MARKETPLACE' && catalogue.promotionalPricePaise !== null
+        ? catalogue.promotionalPricePaise
+        : resolvePlanPrice(plan, normalizedCycle);
+    if (plan === 'MARKETPLACE' && normalizedCycle !== 'ONE_TIME') throw new Error('INVALID_PLAN_CYCLE');
+    if (plan !== 'MARKETPLACE' && normalizedCycle === 'ONE_TIME') throw new Error('INVALID_PLAN_CYCLE');
+    return { kind: 'PLAN', plan, billingCycle: normalizedCycle, amountPaise };
+}
+
+export function verifyRazorpaySignature(providerOrderId: string, providerPaymentId: string, signature: string, secret = razorpayConfig.keySecret): boolean {
+    if (!providerOrderId || !providerPaymentId || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+    const expected = crypto.createHmac('sha256', secret).update(`${providerOrderId}|${providerPaymentId}`).digest();
+    const supplied = Buffer.from(signature, 'hex');
+    return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+}
+
 export const createBillingSession = async (req: Request, res: Response) => {
     try {
         const adminId = req.user?.id;
         const { planId, billingCycle } = req.body;
-
         if (!adminId) return res.status(401).json({ error: 'Unauthorized' });
-
         const admin = await prisma.admin.findUnique({
             where: { id: adminId },
             include: { institute: true }
         });
+        if (!admin?.institute) return res.status(404).json({ error: 'Institute not found' });
 
-        if (!admin || !admin.institute) {
-            return res.status(404).json({ error: 'Institute not found' });
+        let product: CheckoutProduct;
+        try {
+            product = resolveCheckoutProduct(planId, billingCycle);
+        } catch (error) {
+            return res.status(400).json({ error: error instanceof Error ? error.message : 'INVALID_BILLING_PRODUCT' });
         }
 
-        const instituteConfig = (admin.institute.config as any) || {};
+        if (product.kind === 'PLAN' && product.plan === 'MARKETPLACE' && product.amountPaise === 0) {
+            const lifecycle = await activateMarketplace(admin.institute.id);
+            await prisma.institute.update({ where: { id: admin.institute.id }, data: { isPubliclyListed: true } });
+            invalidateAuthCache(adminId);
+            return res.json({ success: true, activated: true, amount: 0, plan: lifecycle.effectivePlan });
+        }
 
-        if (planId.startsWith('quiz_credits_')) {
-            let amountInINR = 0;
-            if (planId === 'quiz_credits_5') amountInINR = 250;
-            else if (planId === 'quiz_credits_10') amountInINR = 500;
-            else if (planId === 'quiz_credits_25') amountInINR = 1000;
-            else if (planId === 'quiz_credits_40') amountInINR = 1500;
-            else {
-                return res.status(400).json({ error: 'Invalid plan selected' });
+        const pending = await prisma.billingPayment.create({
+            data: {
+                instituteId: admin.institute.id,
+                plan: product.kind === 'PLAN' ? product.plan : null,
+                creditPackId: product.kind === 'CREDIT_PACK' ? product.creditPackId : null,
+                amountPaise: product.amountPaise,
+                billingCycle: product.kind === 'PLAN' ? product.billingCycle : null,
+                providerOrderId: `pending_${crypto.randomUUID()}`
             }
+        });
+
+        try {
             const order = await razorpay.orders.create({
-                amount: amountInINR * 100,
+                amount: product.amountPaise,
                 currency: 'INR',
-                receipt: `rcpt_${admin.institute.id.slice(-8)}_${Date.now()}`,
+                receipt: `ml_${pending.id.replace(/-/g, '').slice(0, 28)}`,
                 payment_capture: true,
                 notes: {
+                    billingPaymentId: pending.id,
                     instituteId: admin.institute.id,
-                    planId,
-                    billingCycle
+                    productId: product.kind === 'PLAN' ? product.plan : product.creditPackId,
+                    billingCycle: product.kind === 'PLAN' ? product.billingCycle : 'ONE_TIME'
                 }
             } as any);
-
+            await prisma.billingPayment.update({ where: { id: pending.id }, data: { providerOrderId: String((order as any).id) } });
             return res.json({
                 success: true,
+                billingPaymentId: pending.id,
                 orderId: (order as any).id,
-                amount: (order as any).amount,
-                currency: (order as any).currency,
-                keyId: razorpayConfig.keyId,
-            });
-        }
-
-        // Determine pricing based on plan type
-        let monthlyAmountInINR: number;
-        let yearlyAmountInINR: number;
-
-        if (planId === 'custom') {
-            monthlyAmountInINR = instituteConfig.customPriceMonthly || 0;
-            yearlyAmountInINR = instituteConfig.customPriceYearly || 0;
-        } else if (planId === 'listing') {
-            monthlyAmountInINR = 0;
-            yearlyAmountInINR = 0;
-        } else if (planId === 'quiz') {
-            monthlyAmountInINR = 250;
-            yearlyAmountInINR = 2500;
-        } else {
-            // all_inclusive ERP plan (or fallback pro/basic)
-            monthlyAmountInINR = 500;
-            yearlyAmountInINR = 5000;
-        }
-        
-        if (billingCycle === 'yearly' || planId === 'listing') {
-            const chargeAmount = planId === 'listing' ? 0 : yearlyAmountInINR;
-            const amountInPaise = chargeAmount * 100;
-
-            const order = await razorpay.orders.create({
-                amount: amountInPaise,
+                amount: product.amountPaise,
                 currency: 'INR',
-                receipt: `rcpt_${admin.institute.id.slice(-8)}_${Date.now()}`,
-                payment_capture: true,
-                notes: {
-                    instituteId: admin.institute.id,
-                    planId,
-                    billingCycle
-                }
-            } as any);
-
-            return res.json({
-                success: true,
-                orderId: (order as any).id,
-                amount: (order as any).amount,
-                currency: (order as any).currency,
-                keyId: razorpayConfig.keyId,
+                keyId: razorpayConfig.keyId
             });
-        } else {
-            // MONTHLY AUTOPAY
-            let plan_id = '';
-            const allPlans = await razorpay.plans.all();
-            const existingPlan = allPlans.items.find((p: any) =>
-                p.item.amount === monthlyAmountInINR * 100 &&
-                p.period === 'monthly'
-            );
-
-            if (existingPlan) {
-                plan_id = existingPlan.id;
-            } else {
-                const newPlan = await razorpay.plans.create({
-                    period: 'monthly',
-                    interval: 1,
-                    item: {
-                        name: `MathLogs ${planId.toUpperCase()} Monthly`,
-                        amount: monthlyAmountInINR * 100,
-                        currency: 'INR',
-                        description: 'Monthly Subscription for MathLogs'
-                    }
-                });
-                plan_id = newPlan.id;
-            }
-
-            const subscription = await razorpay.subscriptions.create({
-                plan_id: plan_id,
-                customer_notify: 1,
-                total_count: 120,
-                notes: {
-                    instituteId: admin.institute.id,
-                    planId,
-                    billingCycle
-                }
-            });
-
-            return res.json({
-                success: true,
-                subscriptionId: subscription.id,
-                keyId: razorpayConfig.keyId,
-            });
+        } catch (error) {
+            await prisma.billingPayment.update({ where: { id: pending.id }, data: { status: 'PROVIDER_FAILED', verificationFailedAt: new Date() } });
+            throw error;
         }
     } catch (error) {
         console.error('Create Billing Session Error:', error);
@@ -156,131 +122,56 @@ export const createBillingSession = async (req: Request, res: Response) => {
 export const verifyBillingPayment = async (req: Request, res: Response) => {
     try {
         const adminId = req.user?.id;
-        const {
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature,
-            razorpay_subscription_id,
-            planId,
-            billingCycle
-        } = req.body;
-
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
         if (!adminId) return res.status(401).json({ error: 'Unauthorized' });
-
         const admin = await prisma.admin.findUnique({
             where: { id: adminId },
             include: { institute: true }
         });
-
-        if (!admin || !admin.institute) {
-            return res.status(404).json({ error: 'Institute not found' });
-        }
-
-        const secret = razorpayConfig.keySecret;
-        let bodyText = '';
-        if (billingCycle === 'yearly' || billingCycle === 'one-time') {
-            bodyText = razorpay_order_id + '|' + razorpay_payment_id;
-        } else {
-            bodyText = razorpay_payment_id + '|' + razorpay_subscription_id;
-        }
-        
-        const expectedSignature = crypto
-            .createHmac('sha256', secret)
-            .update(bodyText.toString())
-            .digest('hex');
-
-        if (expectedSignature !== razorpay_signature) {
+        if (!admin?.institute) return res.status(404).json({ error: 'Institute not found' });
+        if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
             return res.status(400).json({ error: 'Invalid payment signature.' });
         }
 
-        if (planId.startsWith('quiz_credits_')) {
-            let addedCredits = 0;
-            if (planId === 'quiz_credits_5') addedCredits = 5;
-            else if (planId === 'quiz_credits_10') addedCredits = 10;
-            else if (planId === 'quiz_credits_25') addedCredits = 25;
-            else if (planId === 'quiz_credits_40') addedCredits = 40;
-            else {
-                return res.status(400).json({ success: false, error: 'Invalid plan selected' });
-            }
-            await addPurchasedQuizCredits(admin.institute.id, addedCredits);
+        const payment = await prisma.billingPayment.findUnique({ where: { providerOrderId: razorpay_order_id } });
+        if (!payment || payment.instituteId !== admin.institute.id) return res.status(404).json({ error: 'Billing payment not found.' });
+        if (payment.providerPaymentId === razorpay_payment_id && ['COMPLETED', 'CREDITED'].includes(payment.status)) {
+            return res.json({ success: true, replay: true, billingPaymentId: payment.id, status: payment.status });
+        }
 
-            return res.json({
-                success: true,
-                message: `Payment verified successfully. Added ${addedCredits} lifetime quiz credits.`
+        const providerPayment = await razorpay.payments.fetch(razorpay_payment_id) as any;
+        const providerAmount = Number(providerPayment.amount);
+        if (String(providerPayment.order_id) !== payment.providerOrderId || providerAmount !== payment.amountPaise || providerPayment.currency !== 'INR') {
+            return res.status(400).json({ error: 'PAYMENT_BINDING_MISMATCH' });
+        }
+
+        const claimed = await prisma.billingPayment.updateMany({
+            where: { id: payment.id, status: 'PENDING', providerPaymentId: null },
+            data: { status: 'ACTIVATING', providerPaymentId: razorpay_payment_id, providerSignature: razorpay_signature, verifiedAt: new Date() }
+        });
+        if (claimed.count !== 1) {
+            const replay = await prisma.billingPayment.findUnique({ where: { id: payment.id } });
+            if (replay?.providerPaymentId === razorpay_payment_id) return res.json({ success: true, replay: true, billingPaymentId: payment.id, status: replay?.status });
+            return res.status(409).json({ error: 'PAYMENT_ALREADY_PROCESSING' });
+        }
+
+        if (payment.creditPackId) {
+            const product = resolveCheckoutProduct(payment.creditPackId, undefined);
+            if (product.kind !== 'CREDIT_PACK') throw new Error('INVALID_STORED_CREDIT_PACK');
+            await grantLifetimeQuizCredits({
+                instituteId: admin.institute.id,
+                amount: product.credits,
+                source: 'BILLING_PAYMENT',
+                billingPaymentId: payment.id
             });
-        }
-
-        // Extend or switch their plan
-        const currentConfig = (admin.institute.config as any) || {};
-        let tier: Tier;
-        let maxStudents: number;
-
-        if (planId === 'custom') {
-            tier = (admin.institute.plan as Tier) || Tier.PRO;
-            maxStudents = currentConfig.maxStudents || 500;
-        } else if (planId === 'all_inclusive' || planId === 'pro') {
-            tier = Tier.PRO;
-            maxStudents = 500;
-        } else if (planId === 'quiz') {
-            tier = Tier.BASIC;
-            maxStudents = 100;
-        } else if (planId === 'listing') {
-            tier = admin.institute.plan && admin.institute.plan !== Tier.NO_PLAN ? admin.institute.plan : Tier.FREE;
-            maxStudents = currentConfig.maxStudents || 500;
+        } else if (payment.plan && payment.billingCycle) {
+            await activatePaidPlan({ instituteId: admin.institute.id, plan: payment.plan, billingCycle: payment.billingCycle });
+            await prisma.billingPayment.update({ where: { id: payment.id }, data: { status: 'COMPLETED', capturedAt: new Date() } });
         } else {
-            tier = Tier.PRO;
-            maxStudents = 500;
+            throw new Error('INVALID_STORED_BILLING_PRODUCT');
         }
-
-        const daysToAdd = billingCycle === 'yearly' ? 365 : 30;
-        
-        let newExpiryDate = admin.institute.planExpiryDate ? new Date(admin.institute.planExpiryDate) : new Date();
-        // If they already expired, start from today.
-        if (newExpiryDate.getTime() < Date.now()) {
-            newExpiryDate = new Date();
-        }
-        
-        newExpiryDate.setDate(newExpiryDate.getDate() + daysToAdd);
-
-        const currentCredits = admin.institute.quizCredits || 0;
-        const updatedCredits = (planId === 'all_inclusive' || planId === 'pro' || planId === 'quiz')
-            ? Math.max(currentCredits, 5)
-            : currentCredits;
-
-        const nextConfig = { ...currentConfig, maxStudents };
-        if (
-            ['all_inclusive', 'pro', 'custom'].includes(planId) &&
-            ['PAGE_ONLY', 'listing'].includes(nextConfig.planName)
-        ) {
-            delete nextConfig.planName;
-        }
-
-        const updateData: any = {
-            plan: tier,
-            planExpiryDate: newExpiryDate,
-            quizCredits: updatedCredits,
-            razorpaySubscriptionId: razorpay_subscription_id || null,
-            razorpayOrderId: razorpay_order_id || null,
-            config: nextConfig,
-            areRegistrationsPaused: false
-        };
-
-        if (planId === 'listing') {
-            updateData.isPubliclyListed = true;
-            updateData.isVerified = true;
-        }
-
-        await prisma.institute.update({
-            where: { id: admin.institute.id },
-            data: updateData
-        });
         invalidateAuthCache(adminId);
-
-        res.json({
-            success: true,
-            message: 'Payment verified successfully. Plan extended.'
-        });
-
+        return res.json({ success: true, billingPaymentId: payment.id, status: payment.creditPackId ? 'CREDITED' : 'COMPLETED' });
     } catch (error) {
         console.error('Verify Billing Error:', error);
         res.status(500).json({ error: 'Internal server error during billing verification.' });
@@ -324,6 +215,7 @@ export const cancelSubscription = async (req: Request, res: Response) => {
                  // This ensures their plan safely continues working until `planExpiryDate` naturally expires!
             }
         });
+        await cancelAtPeriodEnd(admin.institute.id);
 
         res.json({ success: true, message: 'Subscription cancelled successfully.' });
     } catch (error) {

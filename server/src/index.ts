@@ -18,6 +18,7 @@ import { secureLogger } from './utils/secureLogger';
 import { correlationId } from './middleware/correlationId';
 import { startSuperAdminBillingWorker } from './workers/superAdminBillingWorker';
 import { runLifecycleSweep } from './services/subscriptionLifecycleService';
+import { handleRazorpayBillingWebhook } from './controllers/billingWebhookController';
 
 
 
@@ -61,6 +62,10 @@ export function createApp() {
     configureSecurityHeaders(app);
 
     app.set('trust proxy', 1);
+
+    // Razorpay signatures cover the untouched request bytes, so this route must
+    // be registered before the application JSON parser.
+    app.post('/api/billing/webhooks/razorpay', express.raw({ type: 'application/json', limit: '1mb' }), handleRazorpayBillingWebhook as any);
 
     app.use(compression({
         level: 6,
