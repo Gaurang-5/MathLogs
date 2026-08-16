@@ -12,7 +12,7 @@ import {
 } from '../services/superAdminInstituteService';
 
 const DETAIL_KEYS = new Set(['expectedUpdatedAt', 'reason', 'name', 'teacherName', 'phoneNumber', 'email']);
-const CONFIG_KEYS = new Set(['expectedUpdatedAt', 'reason', 'maxStudents', 'isQuizOnly', 'quizCredits', 'allowedClasses', 'subjects', 'requiresGrades']);
+const CONFIG_KEYS = new Set(['expectedUpdatedAt', 'reason', 'allowedClasses', 'subjects', 'requiresGrades']);
 
 function failure(res: Response, error: unknown) {
   if (!(error instanceof InstituteServiceError)) return res.status(500).json({ success: false, error: 'SUPERADMIN_INSTITUTE_FAILED' });
@@ -81,7 +81,7 @@ export async function updateInstituteDetails(req: Request, res: Response) {
 
 export async function updateInstituteConfiguration(req: Request, res: Response) {
   if (hasUnknownKeys(req.body, CONFIG_KEYS)) return res.status(400).json({ success: false, error: 'UNKNOWN_FIELD' });
-  const changes = Object.fromEntries(['maxStudents', 'isQuizOnly', 'quizCredits', 'allowedClasses', 'subjects', 'requiresGrades']
+  const changes = Object.fromEntries(['allowedClasses', 'subjects', 'requiresGrades']
     .filter(key => Object.prototype.hasOwnProperty.call(req.body, key))
     .map(key => [key, req.body[key]]));
   try {

@@ -40,9 +40,7 @@ function payload(phone: string, name = 'Guided Academy') {
   return {
     owner: { name: 'Gita Sharma', phone, email: `gita-${emailPhone}@example.com` },
     institute: { name, city: 'Jaipur', area: 'Malviya Nagar' },
-    access: { kind: 'FULL' },
-    billing: { plan: 'BASIC', trialDays: 14, discountPercent: 0 },
-    limits: { maxStudents: 120, quizCredits: 5 },
+    subscription: { plan: 'ENTERPRISE', billingCycle: 'MONTHLY', startTrial: true },
     marketplace: { isPubliclyListed: true, isVerified: false }
   };
 }
@@ -56,7 +54,8 @@ test('onboarding preview normalizes owner login and derives a safe summary witho
   const body = await response.json() as any;
   assert.equal(body.data.valid, true);
   assert.equal(body.data.summary.owner.loginPhone, phone);
-  assert.equal(body.data.summary.billing.plan, 'BASIC');
+  assert.equal(body.data.summary.subscription.plan, 'ENTERPRISE');
+  assert.equal(body.data.summary.unlimitedStudents, true);
   assert.equal(await prisma.institute.count({ where: { phoneNumber: phone } }), 0);
 });
 
@@ -80,6 +79,9 @@ test('onboarding commit is idempotent, creates a setup invite, and never returns
   assert.ok(invite);
   const institute = await prisma.institute.findUniqueOrThrow({ where: { id: firstBody.data.instituteId } });
   assert.equal(institute.phoneNumber, phone);
+  assert.equal(institute.plan, 'ENTERPRISE');
+  assert.equal(institute.includedQuizCredits, 5);
+  assert.ok(institute.trialEndsAt);
 
   const reused = await fetch(`${baseUrl}/api/super-admin/institutes/onboarding/commit`, {
     method: 'POST', headers: headers(key), body: JSON.stringify(payload(phone, 'Different Request'))

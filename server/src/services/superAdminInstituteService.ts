@@ -1,8 +1,10 @@
 import crypto from 'node:crypto';
-import { Prisma, Tier } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { invalidateAuthCache } from '../middleware/auth';
 import { writeSuperAdminAudit } from './superAdminAuditService';
+import type { BillingCycle, CanonicalPlan } from '../domain/plans/planCatalog';
+import { includedCreditPeriod } from '../domain/plans/entitlements';
 
 const instituteDirectorySelect = {
   id: true,
@@ -269,9 +271,6 @@ export async function updateSuperAdminInstituteDetails(input: MutationContext & 
 
 export async function updateSuperAdminInstituteConfiguration(input: MutationContext & {
   changes: {
-    maxStudents?: number;
-    isQuizOnly?: boolean;
-    quizCredits?: number;
     allowedClasses?: string[];
     subjects?: string[];
     requiresGrades?: boolean;
@@ -279,12 +278,6 @@ export async function updateSuperAdminInstituteConfiguration(input: MutationCont
 }) {
   assertMutationBase(input);
   if (Object.keys(input.changes).length === 0) throw new InstituteServiceError('NO_CHANGES');
-  if (input.changes.maxStudents !== undefined && (!Number.isInteger(input.changes.maxStudents) || input.changes.maxStudents < 0 || input.changes.maxStudents > 100_000)) {
-    throw new InstituteServiceError('INVALID_MAX_STUDENTS');
-  }
-  if (input.changes.quizCredits !== undefined && (!Number.isInteger(input.changes.quizCredits) || input.changes.quizCredits < 0 || input.changes.quizCredits > 1_000_000)) {
-    throw new InstituteServiceError('INVALID_QUIZ_CREDITS');
-  }
   for (const key of ['allowedClasses', 'subjects'] as const) {
     const values = input.changes[key];
     if (values && (values.length > 50 || values.some(value => typeof value !== 'string' || !value.trim() || value.length > 100))) {
@@ -295,7 +288,6 @@ export async function updateSuperAdminInstituteConfiguration(input: MutationCont
   if (!current) throw new InstituteServiceError('INSTITUTE_NOT_FOUND');
   const beforeConfig = objectConfig(current.config);
   const nextConfig: Prisma.JsonObject = { ...beforeConfig };
-  if (input.changes.maxStudents !== undefined) nextConfig.maxStudents = input.changes.maxStudents;
   if (input.changes.allowedClasses !== undefined) nextConfig.allowedClasses = input.changes.allowedClasses.map(value => value.trim());
   if (input.changes.subjects !== undefined) nextConfig.subjects = input.changes.subjects.map(value => value.trim());
   if (input.changes.requiresGrades !== undefined) nextConfig.requiresGrades = input.changes.requiresGrades;
@@ -303,11 +295,7 @@ export async function updateSuperAdminInstituteConfiguration(input: MutationCont
   const result = await prisma.$transaction(async tx => {
     const updated = await tx.institute.updateMany({
       where: { id: input.instituteId, updatedAt: new Date(input.expectedUpdatedAt) },
-      data: {
-        config: nextConfig,
-        ...(input.changes.isQuizOnly !== undefined ? { isQuizOnly: input.changes.isQuizOnly } : {}),
-        ...(input.changes.quizCredits !== undefined ? { quizCredits: input.changes.quizCredits } : {})
-      }
+      data: { config: nextConfig }
     });
     if (updated.count !== 1) return null;
     const after = await tx.institute.findUniqueOrThrow({ where: { id: input.instituteId }, select: instituteOverviewSelect });
@@ -315,8 +303,8 @@ export async function updateSuperAdminInstituteConfiguration(input: MutationCont
       action: 'INSTITUTE_CONFIGURATION_UPDATED', entityType: 'Institute', entityId: input.instituteId,
       instituteId: input.instituteId, actorAdminId: input.actorAdminId, correlationId: input.correlationId,
       reason: input.reason.trim(),
-      before: { config: beforeConfig, isQuizOnly: current.isQuizOnly, quizCredits: current.quizCredits },
-      after: { config: objectConfig(after.config), isQuizOnly: after.isQuizOnly, quizCredits: after.quizCredits }
+      before: { config: beforeConfig },
+      after: { config: objectConfig(after.config) }
     });
     return after;
   });
@@ -327,12 +315,10 @@ export async function updateSuperAdminInstituteConfiguration(input: MutationCont
   await invalidateInstituteAdmins(input.instituteId);
   const config = objectConfig(result.config);
   return {
-    maxStudents: typeof config.maxStudents === 'number' ? config.maxStudents : 100,
+    unlimitedStudents: true,
     allowedClasses: Array.isArray(config.allowedClasses) ? config.allowedClasses : [],
     subjects: Array.isArray(config.subjects) ? config.subjects : [],
     requiresGrades: config.requiresGrades !== false,
-    isQuizOnly: result.isQuizOnly,
-    quizCredits: result.quizCredits,
     updatedAt: result.updatedAt
   };
 }
@@ -340,9 +326,7 @@ export async function updateSuperAdminInstituteConfiguration(input: MutationCont
 export type InstituteOnboardingInput = {
   owner: { name: string; phone: string; email?: string };
   institute: { name: string; city?: string; area?: string; address?: string };
-  access: { kind: 'FULL' | 'PAGE_ONLY' | 'QUIZ_ONLY'; username?: string };
-  billing: { plan: 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE'; trialDays?: number; discountPercent?: number };
-  limits: { maxStudents: number; quizCredits: number };
+  subscription: { plan: CanonicalPlan; billingCycle: BillingCycle; startTrial: boolean };
   marketplace: { isPubliclyListed: boolean; isVerified: boolean };
 };
 
@@ -385,22 +369,18 @@ export function previewInstituteOnboarding(value: unknown): {
   const ownerName = String(input.owner?.name || '').trim();
   const email = String(input.owner?.email || '').trim().toLowerCase();
   const instituteName = String(input.institute?.name || '').trim();
-  const accessKind = String(input.access?.kind || '').toUpperCase();
-  const plan = String(input.billing?.plan || '').toUpperCase();
-  const trialDays = input.billing?.trialDays === undefined ? 0 : Number(input.billing.trialDays);
-  const discountPercent = input.billing?.discountPercent === undefined ? 0 : Number(input.billing.discountPercent);
-  const maxStudents = Number(input.limits?.maxStudents);
-  const quizCredits = Number(input.limits?.quizCredits);
+  const plan = String(input.subscription?.plan || '').toUpperCase();
+  const billingCycle = String(input.subscription?.billingCycle || '').toUpperCase();
+  const startTrial = input.subscription?.startTrial;
   if (!ownerName || ownerName.length > 120) errors.push({ field: 'owner.name', code: 'INVALID_NAME', message: 'Owner name is required and must be at most 120 characters.' });
   if (!/^[6-9]\d{9}$/.test(phone)) errors.push({ field: 'owner.phone', code: 'INVALID_PHONE', message: 'Enter a valid 10-digit Indian mobile number.' });
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push({ field: 'owner.email', code: 'INVALID_EMAIL', message: 'Enter a valid email address.' });
   if (instituteName.length < 2 || instituteName.length > 160) errors.push({ field: 'institute.name', code: 'INVALID_NAME', message: 'Institute name must be between 2 and 160 characters.' });
-  if (!['FULL', 'PAGE_ONLY', 'QUIZ_ONLY'].includes(accessKind)) errors.push({ field: 'access.kind', code: 'INVALID_ACCESS', message: 'Access must be FULL, PAGE_ONLY, or QUIZ_ONLY.' });
-  if (!['FREE', 'BASIC', 'PRO', 'ENTERPRISE'].includes(plan)) errors.push({ field: 'billing.plan', code: 'INVALID_PLAN', message: 'Select a supported plan.' });
-  if (!Number.isInteger(trialDays) || trialDays < 0 || trialDays > 365) errors.push({ field: 'billing.trialDays', code: 'INVALID_TRIAL', message: 'Trial days must be between 0 and 365.' });
-  if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) errors.push({ field: 'billing.discountPercent', code: 'INVALID_DISCOUNT', message: 'Discount must be between 0 and 100.' });
-  if (!Number.isInteger(maxStudents) || maxStudents < 0 || maxStudents > 100_000) errors.push({ field: 'limits.maxStudents', code: 'INVALID_LIMIT', message: 'Student limit must be between 0 and 100000.' });
-  if (!Number.isInteger(quizCredits) || quizCredits < 0 || quizCredits > 1_000_000) errors.push({ field: 'limits.quizCredits', code: 'INVALID_LIMIT', message: 'Quiz credits must be between 0 and 1000000.' });
+  if (!['MARKETPLACE', 'QUIZ', 'ENTERPRISE'].includes(plan)) errors.push({ field: 'subscription.plan', code: 'INVALID_PLAN', message: 'Select Marketplace, Quiz, or Enterprise.' });
+  if (!['MONTHLY', 'YEARLY', 'ONE_TIME'].includes(billingCycle)) errors.push({ field: 'subscription.billingCycle', code: 'INVALID_BILLING_CYCLE', message: 'Select a supported billing cycle.' });
+  if (typeof startTrial !== 'boolean') errors.push({ field: 'subscription.startTrial', code: 'INVALID_BOOLEAN', message: 'Trial choice is required.' });
+  if (plan === 'MARKETPLACE' && (billingCycle !== 'ONE_TIME' || startTrial === true)) errors.push({ field: 'subscription', code: 'INVALID_PLAN_CYCLE', message: 'Marketplace uses one-time access and has no trial.' });
+  if ((plan === 'QUIZ' || plan === 'ENTERPRISE') && billingCycle === 'ONE_TIME') errors.push({ field: 'subscription.billingCycle', code: 'INVALID_PLAN_CYCLE', message: 'Quiz and Enterprise use monthly or yearly billing.' });
   if (typeof input.marketplace?.isPubliclyListed !== 'boolean') errors.push({ field: 'marketplace.isPubliclyListed', code: 'INVALID_BOOLEAN', message: 'Marketplace visibility is required.' });
   if (typeof input.marketplace?.isVerified !== 'boolean') errors.push({ field: 'marketplace.isVerified', code: 'INVALID_BOOLEAN', message: 'Verification state is required.' });
   if (errors.length) return { valid: false, errors };
@@ -413,9 +393,7 @@ export function previewInstituteOnboarding(value: unknown): {
       ...(String(input.institute?.area || '').trim() ? { area: String(input.institute.area).trim() } : {}),
       ...(String(input.institute?.address || '').trim() ? { address: String(input.institute.address).trim() } : {})
     },
-    access: { kind: accessKind as NormalizedOnboarding['access']['kind'], ...(input.access?.username ? { username: String(input.access.username).trim() } : {}) },
-    billing: { plan: plan as NormalizedOnboarding['billing']['plan'], trialDays, discountPercent },
-    limits: { maxStudents, quizCredits },
+    subscription: { plan: plan as CanonicalPlan, billingCycle: billingCycle as BillingCycle, startTrial },
     marketplace: { isPubliclyListed: input.marketplace.isPubliclyListed, isVerified: input.marketplace.isVerified }
   };
   return {
@@ -425,9 +403,8 @@ export function previewInstituteOnboarding(value: unknown): {
     summary: {
       owner: { name: normalized.owner.name, loginPhone: normalized.owner.phone, email: normalized.owner.email || null },
       institute: normalized.institute,
-      access: normalized.access,
-      billing: normalized.billing,
-      limits: normalized.limits,
+      subscription: normalized.subscription,
+      unlimitedStudents: true,
       marketplace: normalized.marketplace
     }
   };
@@ -436,13 +413,8 @@ export function previewInstituteOnboarding(value: unknown): {
 function onboardingPlanConfig(input: NormalizedOnboarding) {
   return {
     requiresGrades: true,
-    maxStudents: input.limits.maxStudents,
-    planName: input.access.kind === 'FULL' ? input.billing.plan : input.access.kind,
-    accessKind: input.access.kind,
     allowedClasses: ['9', '10'],
-    subjects: ['Math'],
-    discountPercent: input.billing.discountPercent || 0,
-    ...(input.billing.trialDays ? { isTrial: true, trialDays: input.billing.trialDays } : {})
+    subjects: ['Math']
   };
 }
 
@@ -456,9 +428,14 @@ async function createOnboardedInstitute(tx: Prisma.TransactionClient, input: Nor
   });
   if (existing) return { kind: 'EXISTING' as const, instituteId: existing.id, name: existing.name };
   const now = new Date();
-  const planExpiryDate = input.billing.trialDays
-    ? new Date(now.getTime() + input.billing.trialDays * 86_400_000)
-    : null;
+  const isMarketplace = input.subscription.plan === 'MARKETPLACE';
+  const planExpiryDate = isMarketplace ? null : new Date(now);
+  if (planExpiryDate) {
+    if (input.subscription.startTrial) planExpiryDate.setUTCDate(planExpiryDate.getUTCDate() + 14);
+    else if (input.subscription.billingCycle === 'YEARLY') planExpiryDate.setUTCFullYear(planExpiryDate.getUTCFullYear() + 1);
+    else planExpiryDate.setUTCMonth(planExpiryDate.getUTCMonth() + 1);
+  }
+  const period = !isMarketplace ? includedCreditPeriod({ planStartDate: now }, now) : null;
   const institute = await tx.institute.create({
     data: {
       name: input.institute.name,
@@ -468,11 +445,19 @@ async function createOnboardedInstitute(tx: Prisma.TransactionClient, input: Nor
       city: input.institute.city || null,
       area: input.institute.area || null,
       address: input.institute.address || null,
-      plan: input.billing.plan as Tier,
+      plan: input.subscription.plan,
+      billingCycle: input.subscription.billingCycle,
       planStartDate: now,
       planExpiryDate,
-      quizCredits: input.limits.quizCredits,
-      isQuizOnly: input.access.kind === 'QUIZ_ONLY',
+      marketplaceAccessGrantedAt: now,
+      trialStartedAt: input.subscription.startTrial ? now : null,
+      trialEndsAt: input.subscription.startTrial ? planExpiryDate : null,
+      trialUsedAt: input.subscription.startTrial ? now : null,
+      includedQuizCredits: isMarketplace ? 0 : 5,
+      includedQuizCreditsExpireAt: period?.includedQuizCreditsExpireAt ?? null,
+      quizCreditsRenewAt: period?.quizCreditsRenewAt ?? null,
+      quizCredits: isMarketplace ? 0 : 5,
+      isQuizOnly: false,
       isPubliclyListed: input.marketplace.isPubliclyListed,
       isVerified: input.marketplace.isVerified,
       config: onboardingPlanConfig(input)
@@ -505,7 +490,7 @@ async function createOnboardedInstitute(tx: Prisma.TransactionClient, input: Nor
     action: 'INSTITUTE_ONBOARDED', entityType: 'Institute', entityId: institute.id,
     instituteId: institute.id, actorAdminId, correlationId,
     reason: 'Superadmin guided onboarding',
-    after: { name: institute.name, plan: institute.plan, accessKind: input.access.kind, loginPhone: input.owner.phone },
+    after: { name: institute.name, plan: institute.plan, billingCycle: input.subscription.billingCycle, loginPhone: input.owner.phone },
     metadata: { emailJobId: emailJob?.id || null, whatsappJobId: whatsappJob.id }
   });
   return { kind: 'CREATED' as const, instituteId: institute.id, name: institute.name, communication: { emailQueued: Boolean(emailJob), whatsappQueued: true } };
