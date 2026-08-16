@@ -17,6 +17,7 @@ import { Client } from 'pg';
 import { secureLogger } from './utils/secureLogger';
 import { correlationId } from './middleware/correlationId';
 import { startSuperAdminBillingWorker } from './workers/superAdminBillingWorker';
+import { runLifecycleSweep } from './services/subscriptionLifecycleService';
 
 
 
@@ -404,6 +405,13 @@ function startServer() {
         emailWorker.start();
         startSuperAdminSessionWorker();
         startSuperAdminBillingWorker();
+        if (process.env.NODE_ENV !== 'test') {
+            void runLifecycleSweep().catch(error => secureLogger.error('[Lifecycle] Initial sweep failed', error));
+            const lifecycleTimer = setInterval(() => {
+                void runLifecycleSweep().catch(error => secureLogger.error('[Lifecycle] Sweep failed', error));
+            }, 60 * 60 * 1000);
+            lifecycleTimer.unref();
+        }
 
         if (process.env.NODE_ENV === 'production' || process.env.WHATSAPP_ACCESS_TOKEN) {
             import('./utils/whatsappWorker').then(({ processWhatsappQueue }) => {

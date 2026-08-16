@@ -7,6 +7,8 @@ import { sendSetupLinkEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
 import { secureLogger } from '../utils/secureLogger';
 import { getRazorpayConfig } from '../utils/env';
+import { SubscriptionLifecycleError, startPlanTrial as startCanonicalTrial } from '../services/subscriptionLifecycleService';
+import { normalizePlanId } from '../domain/plans/planCatalog';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -258,14 +260,13 @@ export const startTrial = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'An account with this phone number already exists.' });
         }
 
-        const isQuizOnly = planId === 'quiz' || planId === 'quiz_only';
-        const isAllInclusive = planId === 'all_inclusive' || planId === 'pro';
-        const tier = isAllInclusive ? 'PRO' as const : 'FREE' as const;
-
-        // 14 days trial for all_inclusive
-        const planStartDate = new Date();
-        const planExpiryDate = new Date();
-        planExpiryDate.setDate(planExpiryDate.getDate() + 14);
+        let plan;
+        try {
+            plan = normalizePlanId(planId);
+        } catch {
+            return res.status(400).json({ error: 'Please select Quiz or Enterprise for a free trial.' });
+        }
+        if (plan === 'MARKETPLACE') return res.status(400).json({ error: 'Marketplace is available without a trial.' });
 
         const uniqueSlug = await createUniqueSlug(tuitionName);
 
@@ -277,11 +278,10 @@ export const startTrial = async (req: Request, res: Response) => {
                 publicPhone: phone,
                 whatsappPhone: phone,
                 email: email,
-                plan: tier,
-                isQuizOnly: isQuizOnly,
-                quizCredits: 1, // 1 Quiz credit for free trial
-                planStartDate,
-                planExpiryDate,
+                plan: 'MARKETPLACE',
+                billingCycle: 'ONE_TIME',
+                marketplaceAccessGrantedAt: new Date(),
+                quizCredits: 0,
                 isPubliclyListed: listOnMarketplace ?? true,
                 isExclusive: false,
                 slug: uniqueSlug,
@@ -291,14 +291,13 @@ export const startTrial = async (req: Request, res: Response) => {
                 googleMapsUrl: googleMapsUrl ? googleMapsUrl.trim() : null,
                 config: {
                     requiresGrades: true,
-                    maxStudents: 1000,
-                    isTrial: true,
-                    trialStartDate: planStartDate.toISOString(),
                     allowedClasses: ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"],
                     subjects: ["Mathematics", "Science", "Physics", "Chemistry", "Biology", "English"]
                 }
             }
         });
+
+        const trial = await startCanonicalTrial({ instituteId: newInstitute.id, plan, ownerIdentity: phone });
 
         const tokenString = crypto.randomBytes(24).toString('hex');
 
@@ -323,10 +322,15 @@ export const startTrial = async (req: Request, res: Response) => {
         res.json({
             success: true,
             setupLink: setupLink,
-            message: 'Trial started. Setup link sent to your WhatsApp and email.'
+            trialEndsAt: trial.trialEndsAt,
+            includedQuizCredits: trial.includedQuizCredits,
+            message: 'Your 14-day free trial with 5 quiz credits has started. Setup link sent to your WhatsApp and email.'
         });
 
     } catch (error) {
+        if (error instanceof SubscriptionLifecycleError && error.message === 'TRIAL_ALREADY_USED') {
+            return res.status(409).json({ error: 'A free trial has already been used for this account.' });
+        }
         console.error('Start Trial Error:', error);
         res.status(500).json({ error: 'Internal server error starting trial.' });
     }
