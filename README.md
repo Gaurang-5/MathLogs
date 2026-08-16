@@ -28,6 +28,16 @@ The repository is a JavaScript/TypeScript monorepo with:
 
 ## Product Scope
 
+### Plans and quiz credits
+
+MathLogs has exactly three plans, and every plan supports unlimited students:
+
+- Marketplace: ₹99 one-time, promotional free activation for now.
+- Quiz: ₹249/month or ₹2,499/year, including Marketplace and five quiz credits refreshed monthly.
+- Enterprise: ₹499/month or ₹4,999/year, including Marketplace, Quiz, and all coaching-management features.
+
+Quiz and Enterprise each offer one 14-day trial with five credits. Included credits expire at the monthly refresh; purchased lifetime credit packs never expire. The public catalogue at `GET /api/plans` is the pricing source of truth.
+
 MathLogs supports the operational lifecycle of a tuition center:
 
 - Institute onboarding, trial activation, billing, plan management, and super-admin oversight.

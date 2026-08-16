@@ -81,7 +81,7 @@ interface LinkData {
     discountPercent: number;
     monthlyPrice: number;
     yearlyPrice: number;
-    maxStudents: number;
+    unlimitedStudents: true;
     isFreeTrial?: boolean;
     trialDays?: number;
 }
@@ -115,7 +115,7 @@ export default function JoinOnboarding() {
                 const res = await api.get<LinkData>(`/admin-onboarding/${token}`);
                 if (res.valid) {
                     setLinkData(res);
-                    if (res.plan === 'QUIZ_ONLY') {
+                    if (res.plan === 'QUIZ') {
                         setBillingCycle('monthly');
                     }
                 } else {
@@ -159,7 +159,7 @@ export default function JoinOnboarding() {
                 return;
             }
 
-            // Handle FREE plans (100% discount) — skip Razorpay entirely
+            // Handle promotional Marketplace activation (100% discount) — skip Razorpay entirely
             if (orderRes.freeSetup && orderRes.setupLink) {
                 setPaymentSuccess(true);
                 toast.success('Your free plan has been activated!');
@@ -325,7 +325,7 @@ export default function JoinOnboarding() {
                             <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Exclusive Invite</span>
                         </div>
                         <h1 className="text-3xl font-black mb-4">
-                            {linkData?.plan === 'PRO' ? 'Pro Plan' : linkData?.plan === 'BASIC' ? 'Basic Plan' : linkData?.plan === 'QUIZ_ONLY' ? 'Quiz Only' : 'Custom Plan'}
+                            {linkData?.plan === 'ENTERPRISE' ? 'Enterprise Plan' : linkData?.plan === 'QUIZ' ? 'Quiz Plan' : 'Marketplace Plan'}
                             {linkData?.isFreeTrial && (
                                 <span className="ml-3 inline-block bg-amber-500 text-white text-sm font-bold px-3 py-1 rounded-full align-middle shadow-sm">
                                     {linkData.trialDays}-Day Free Trial
@@ -334,7 +334,7 @@ export default function JoinOnboarding() {
                         </h1>
 
                         {/* Billing Cycle Toggle (Hidden for Free Trials) */}
-                        {!linkData?.isFreeTrial && linkData?.plan !== 'QUIZ_ONLY' && (
+                        {!linkData?.isFreeTrial && linkData?.plan !== 'MARKETPLACE' && (
                         <div className="flex gap-2 mb-4">
                             <button
                                 onClick={() => setBillingCycle('monthly')}
@@ -355,7 +355,7 @@ export default function JoinOnboarding() {
                                 }`}
                             >
                                 Yearly
-                                {linkData && linkData.discountPercent === 0 && linkData.plan !== 'CUSTOM' && (
+                                {linkData && linkData.discountPercent === 0 && (
                                     <span className="ml-1.5 text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded-full">Save ~17%</span>
                                 )}
                             </button>
@@ -366,14 +366,14 @@ export default function JoinOnboarding() {
                             <span className="text-4xl font-black">
                                 {linkData?.isFreeTrial ? '₹0' : `₹${displayPrice.toLocaleString('en-IN')}`}
                             </span>
-                            {!linkData?.isFreeTrial && linkData?.plan !== 'QUIZ_ONLY' && (
+                            {!linkData?.isFreeTrial && linkData?.plan !== 'MARKETPLACE' && (
                                 <span className="text-sm text-gray-400 font-medium">
                                     / {billingCycle === 'monthly' ? 'month' : 'year'}
                                 </span>
                             )}
-                            {!linkData?.isFreeTrial && linkData?.plan === 'QUIZ_ONLY' && (
+                            {!linkData?.isFreeTrial && linkData?.plan === 'MARKETPLACE' && (
                                 <span className="text-sm text-gray-400 font-medium">
-                                    (One-Time Setup Fee)
+                                    (Promotional free activation; ₹99 one-time normally)
                                 </span>
                             )}
                         </div>
@@ -387,7 +387,7 @@ export default function JoinOnboarding() {
                         <div className="flex gap-4 text-sm text-gray-300">
                             <span className="flex items-center gap-1.5">
                                 <CheckCircle2 className="w-4 h-4 text-green-400" />
-                                Up to {linkData?.maxStudents} Students
+                                Unlimited Students
                             </span>
                             <span className="flex items-center gap-1.5">
                                 <CheckCircle2 className="w-4 h-4 text-green-400" />

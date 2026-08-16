@@ -76,7 +76,7 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
     return institute;
   }
 
-  return {
+  const service = {
     async activateMarketplace(instituteId: string, now = new Date()): Promise<LifecycleResult> {
       const result = await transaction(async tx => {
         await lock(tx, instituteId);
@@ -128,7 +128,7 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
     async activatePaidPlan(input: { instituteId: string; plan: CanonicalPlan | string; billingCycle: BillingCycle; now?: Date }): Promise<LifecycleResult> {
       const now = input.now ?? new Date();
       const plan = normalizePlanId(input.plan);
-      if (plan === 'MARKETPLACE') return this.activateMarketplace(input.instituteId, now);
+      if (plan === 'MARKETPLACE') return service.activateMarketplace(input.instituteId, now);
       if (input.billingCycle === 'ONE_TIME') throw new SubscriptionLifecycleError('INVALID_PLAN_CYCLE');
       const result = await transaction(async tx => {
         await lock(tx, input.instituteId);
@@ -174,10 +174,11 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
 
     async runLifecycleSweep(now = new Date(), take = 100): Promise<number> {
       const candidates = await client.institute.findMany({ where: { OR: [{ quizCreditsRenewAt: { lte: now } }, { trialEndsAt: { lte: now } }, { planExpiryDate: { lte: now } }] }, orderBy: { updatedAt: 'asc' }, take, select: { id: true } });
-      await Promise.all(candidates.map(candidate => this.reconcileInstituteLifecycle(candidate.id, now)));
+      await Promise.all(candidates.map(candidate => service.reconcileInstituteLifecycle(candidate.id, now)));
       return candidates.length;
     }
   };
+  return service;
 }
 
 const defaultLifecycle = createSubscriptionLifecycleService();

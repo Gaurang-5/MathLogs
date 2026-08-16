@@ -33,7 +33,7 @@ Now, set up the answers for "1", "2", and "3".
 1.  Go to **Settings** > **Business Tools** > **Quick Replies**.
 2.  Add a new reply:
     -   **Shortcut:** `/1`
-    -   **Message:** "Our pricing is simple: ₹999/month for unlimited students. Join the waitlist here: https://mathlogs.app"
+    -   **Message:** "MathLogs offers Marketplace (₹99 one-time, free for now), Quiz (₹249/month or ₹2,499/year), and Enterprise (₹499/month or ₹4,999/year). Every plan supports unlimited students. See https://mathlogs.app"
 3.  Add another:
     -   **Shortcut:** `/2`
     -   **Message:** "MathLogs helps you track fees, attendence, and marks. Watch our demo here: [YouTube Link]"

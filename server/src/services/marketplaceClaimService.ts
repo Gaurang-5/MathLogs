@@ -92,7 +92,7 @@ export async function submitMarketplaceClaim(
           notes: input.notes
         }
       });
-    });
+    }, { maxWait: 120_000, timeout: 120_000 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       const existingClaim = await prisma.marketplaceClaim.findFirst({
@@ -186,10 +186,7 @@ export async function approveMarketplaceClaim(
 
       adminId = provisionedAdmin.id;
       newlyProvisioned = true;
-      config = {
-        ...(isJsonObject(institute.config) ? institute.config : {}),
-        planName: 'PAGE_ONLY'
-      };
+      config = isJsonObject(institute.config) ? institute.config : {};
     }
 
     const updatedInstitute = await tx.institute.update({
@@ -200,6 +197,9 @@ export async function approveMarketplaceClaim(
         claimedAt: decidedAt,
         isVerified: true,
         isPubliclyListed: true,
+        plan: 'MARKETPLACE',
+        billingCycle: 'ONE_TIME',
+        marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt ?? decidedAt,
         status: 'ACTIVE',
         phoneNumber: claim.normalizedPhone,
         publicPhone: institute.publicPhone || claim.normalizedPhone,
@@ -236,7 +236,7 @@ export async function approveMarketplaceClaim(
     });
 
     return { claim, institute: updatedInstitute, adminId, newlyProvisioned };
-  });
+  }, { maxWait: 120_000, timeout: 120_000 });
 }
 
 export async function rejectMarketplaceClaim(input: RejectClaimInput): Promise<ClaimDecisionResult> {
@@ -296,7 +296,7 @@ export async function rejectMarketplaceClaim(input: RejectClaimInput): Promise<C
       adminId: linkedAdmin?.id ?? '',
       newlyProvisioned: false
     };
-  });
+  }, { maxWait: 120_000, timeout: 120_000 });
 }
 
 function isJsonObject(value: Prisma.JsonValue | null): value is Prisma.JsonObject {

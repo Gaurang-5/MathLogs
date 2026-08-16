@@ -5,14 +5,15 @@ export type RevenueOverviewData = {
 };
 
 export type SubscriptionItem = {
-  instituteId: string; name: string; teacherName: string | null; status: string; plan: string;
-  planStartDate: string | null; planExpiryDate: string | null; updatedAt: string;
+  instituteId: string; name: string; teacherName: string | null; status: string; plan: CanonicalPlan; effectivePlan: CanonicalPlan;
+  billingCycle: BillingCycle | null; planStartDate: string | null; planExpiryDate: string | null;
+  includedQuizCredits: number; lifetimeQuizCredits: number; totalUsableQuizCredits: number; unlimitedStudents: true; updatedAt: string;
 };
 
 export type SubscriptionResponse = { items: SubscriptionItem[]; page: number; pageSize: number; total: number };
 
 export type BillingOperationDraft = {
-  type: 'PLAN_CHANGE' | 'TRIAL_EXTENSION' | 'STUDENT_LIMIT_ADJUSTMENT' | 'QUIZ_CREDIT_ADJUSTMENT' | 'PLAN_REVOKE' | 'MANUAL_PAYMENT_REFERENCE';
+  type: 'PLAN_CHANGE' | 'TRIAL_EXTENSION' | 'LIFETIME_CREDIT_ADJUSTMENT' | 'PLAN_REVOKE' | 'MANUAL_PAYMENT_REFERENCE';
   reason: string;
   effectiveAt?: string;
   payload: Record<string, unknown>;
@@ -33,3 +34,4 @@ export type BillingOperation = {
   appliedAt: string | null; error: string | null; attempts: number; maxAttempts: number; retryable: boolean;
   createdAt: string; updatedAt: string;
 };
+import type { BillingCycle, CanonicalPlan } from '../plans/types';

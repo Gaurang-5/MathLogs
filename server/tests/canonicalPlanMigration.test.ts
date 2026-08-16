@@ -160,6 +160,7 @@ test('canonical billing migration is rerunnable, preserves protected rows, and a
     assert.deepEqual(institutes.map(row => row.includedQuizCreditsExpireAt?.toISOString()), institutes.map(row => row.quizCreditsRenewAt?.toISOString()));
     assert.deepEqual(institutes.map(row => row.lifetimeQuizCredits), beforePreflightState.map(row => row.quizCredits));
     assert.deepEqual(institutes.map(row => row.includedQuizCredits), institutes.map(row => expectedIncludedCredits.get(row.id)));
+    assert.deepEqual(institutes.map(row => row.quizCredits), institutes.map(row => row.lifetimeQuizCredits + row.includedQuizCredits));
     assert.deepEqual(institutes.map(row => ({ id: row.id, planStartDate: row.planStartDate?.toISOString(), planExpiryDate: row.planExpiryDate?.toISOString(), config: row.config, isPubliclyListed: row.isPubliclyListed })), beforePreflightState.map(row => ({ id: row.id, planStartDate: row.planStartDate?.toISOString(), planExpiryDate: row.planExpiryDate?.toISOString(), config: row.config, isPubliclyListed: row.isPubliclyListed })));
     assert.deepEqual(rowsById.get('page-only')?.config, { kind: 'PAGE_ONLY', listing: 'public' });
     assert.equal(rowsById.get('page-only')?.isPubliclyListed, true);

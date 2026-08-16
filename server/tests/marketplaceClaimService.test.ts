@@ -254,7 +254,7 @@ test('approves ownership without changing an existing linked account or paid pla
   assert.deepEqual(auditActions.map((audit) => audit.action), ['CLAIM_APPROVED', 'LISTING_VERIFIED']);
 });
 
-test('provisions one page-only account and preserves existing config values', async () => {
+test('provisions one Marketplace account and preserves existing config values', async () => {
   const institute = await createInstitute({ preservedSetting: 'keep-me' });
   const actor = await createAdmin();
   const claim = await submitMarketplaceClaim({
@@ -275,5 +275,7 @@ test('provisions one page-only account and preserves existing config values', as
   assert.equal(result.newlyProvisioned, true);
   assert.equal(provisionedAdmin.username, '9765432109');
   assert.equal(provisionedAdmin.role, 'INSTITUTE_ADMIN');
-  assert.deepEqual(refreshedInstitute.config, { preservedSetting: 'keep-me', planName: 'PAGE_ONLY' });
+  assert.equal(refreshedInstitute.plan, 'MARKETPLACE');
+  assert.equal(refreshedInstitute.billingCycle, 'ONE_TIME');
+  assert.deepEqual(refreshedInstitute.config, { preservedSetting: 'keep-me' });
 });

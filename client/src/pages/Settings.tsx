@@ -9,7 +9,6 @@ interface Profile {
     email?: string;
     phone?: string;
     planName?: string;
-    maxStudents?: number;
     logo?: string | null;
 }
 
@@ -132,9 +131,9 @@ function ProfileSection() {
                     <div className="w-full bg-black dark:bg-white text-white dark:text-black border border-black dark:border-white rounded-xl px-4 py-3.5 font-bold flex justify-between items-center shadow-lg">
                         <span className="flex items-center gap-2">
                             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                            {profile.planName || 'Basic'} Plan
+                            {profile.planName || 'Marketplace'} Plan
                         </span>
-                        <span className="text-sm border opacity-80 border-white/20 px-2 py-0.5 rounded-full">Max {profile.maxStudents || 100} students</span>
+                        <span className="text-sm border opacity-80 border-white/20 px-2 py-0.5 rounded-full">Unlimited students</span>
                     </div>
                 </div>
             </div>

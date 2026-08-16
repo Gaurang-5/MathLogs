@@ -24,7 +24,7 @@ export async function scheduleInstituteDeletion(input: { instituteId: string; va
     await tx.batch.updateMany({ where: { instituteId: institute.id }, data: { isRegistrationOpen: false } });
     await writeSuperAdminAudit(tx, { action: 'INSTITUTE_DELETION_SCHEDULED', entityType: 'SuperAdminDeletionRequest', entityId: deletion.id, instituteId: institute.id, actorAdminId: input.actorAdminId, correlationId: input.correlationId, reason: request.reason, before: institute, after: { status: 'INACTIVE', eligibleAt: deletion.eligibleAt } });
     return deletion;
-  });
+  }, { maxWait: 120_000, timeout: 120_000 });
   await completeSuperAdminIdempotency(claim.recordId, result as unknown as Prisma.InputJsonValue);
   return result;
 }
@@ -39,7 +39,7 @@ export async function cancelInstituteDeletion(input: { instituteId: string; acto
     await tx.institute.update({ where: { id: input.instituteId }, data: { status: current.previousInstituteStatus, areRegistrationsPaused: current.previousRegistrationsPaused } });
     await writeSuperAdminAudit(tx, { action: 'INSTITUTE_DELETION_CANCELLED', entityType: 'SuperAdminDeletionRequest', entityId: current.id, instituteId: input.instituteId, actorAdminId: input.actorAdminId, correlationId: input.correlationId, reason: input.reason, before: { status: 'SCHEDULED' }, after: { status: 'CANCELLED', restoredInstituteStatus: current.previousInstituteStatus } });
     return deletion;
-  });
+  }, { maxWait: 120_000, timeout: 120_000 });
 }
 
 export async function finalizeInstituteDeletion(input: { instituteId: string; value: unknown; actorAdminId: string; correlationId: string }) {
@@ -71,7 +71,7 @@ export async function finalizeInstituteDeletion(input: { instituteId: string; va
     await tx.institute.delete({ where: { id: institute.id } });
     const completedAt = new Date();
     return tx.superAdminDeletionRequest.update({ where: { id: deletion.id }, data: { status: 'COMPLETED', completedAt, instituteId: null } });
-  });
+  }, { maxWait: 120_000, timeout: 120_000 });
 }
 
 export async function getInstituteDeletion(instituteId: string) { return prisma.superAdminDeletionRequest.findFirst({ where: { instituteId }, orderBy: { createdAt: 'desc' } }); }

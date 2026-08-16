@@ -3,8 +3,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { invalidateAuthCache } from '../middleware/auth';
 import { writeSuperAdminAudit } from './superAdminAuditService';
-import type { BillingCycle, CanonicalPlan } from '../domain/plans/planCatalog';
-import { includedCreditPeriod } from '../domain/plans/entitlements';
+import { normalizePlanId, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
+import { effectiveEntitlements, includedCreditPeriod } from '../domain/plans/entitlements';
 
 const instituteDirectorySelect = {
   id: true,
@@ -76,11 +76,8 @@ function objectConfig(value: Prisma.JsonValue | null): Record<string, Prisma.Jso
   );
 }
 
-function accessKind(institute: { isQuizOnly: boolean; config: Prisma.JsonValue | null }): string {
-  const config = objectConfig(institute.config);
-  if (institute.isQuizOnly || config.planName === 'QUIZ_ONLY') return 'QUIZ_ONLY';
-  if (config.planName === 'PAGE_ONLY' || config.planName === 'listing') return 'PAGE_ONLY';
-  return 'FULL';
+function canonicalPlan(value: unknown): CanonicalPlan {
+  try { return normalizePlanId(value); } catch { return 'MARKETPLACE'; }
 }
 
 function directoryItem(record: Prisma.InstituteGetPayload<{ select: typeof instituteDirectorySelect }>, openSupportCount = 0) {
@@ -96,10 +93,10 @@ function directoryItem(record: Prisma.InstituteGetPayload<{ select: typeof insti
     phoneNumber: record.phoneNumber,
     email: record.email,
     status: record.status,
-    plan: record.plan,
+    plan: canonicalPlan(record.plan),
+    effectivePlan: canonicalPlan(record.plan),
     planExpiryDate: record.planExpiryDate,
-    accessKind: accessKind(record),
-    isQuizOnly: record.isQuizOnly,
+    unlimitedStudents: true,
     ownershipStatus: record.ownershipStatus,
     isPubliclyListed: record.isPubliclyListed,
     students: record._count.students,
@@ -118,6 +115,8 @@ export async function listSuperAdminInstitutes(input: {
   page: number;
   pageSize: number;
 }) {
+  if (input.plan && !['MARKETPLACE', 'QUIZ', 'ENTERPRISE'].includes(input.plan)) throw new InstituteServiceError('INVALID_PLAN');
+  const planFilter = input.plan || undefined;
   const where: Prisma.InstituteWhereInput = {
     ...(input.q ? { OR: [
       { name: { contains: input.q, mode: 'insensitive' } },
@@ -127,7 +126,7 @@ export async function listSuperAdminInstitutes(input: {
       { city: { contains: input.q, mode: 'insensitive' } }
     ] } : {}),
     ...(input.status ? { status: input.status } : {}),
-    ...(input.plan ? { plan: input.plan as any } : {}),
+    ...(planFilter ? { plan: planFilter as any } : {}),
     ...(input.ownershipStatus ? { ownershipStatus: input.ownershipStatus } : {})
   };
   const [records, total] = await Promise.all([
@@ -221,7 +220,7 @@ export async function getSuperAdminInstitute(instituteId: string) {
     overview: {
       id: institute.id, name: institute.name, teacherName: institute.teacherName, phoneNumber: institute.phoneNumber,
       email: institute.email, city: institute.city, area: institute.area, address: institute.address,
-      status: institute.status, suspensionReason: institute.suspensionReason, accessKind: accessKind(institute),
+      status: institute.status, suspensionReason: institute.suspensionReason,
       createdAt: institute.createdAt, updatedAt: institute.updatedAt
     },
     account: { admins },
@@ -237,7 +236,7 @@ export async function getSuperAdminInstitute(instituteId: string) {
       requiresGrades: config.requiresGrades !== false
     },
     billing: {
-      plan: institute.plan, billingCycle: institute.billingCycle, planStartDate: institute.planStartDate, planExpiryDate: institute.planExpiryDate,
+      plan: canonicalPlan(institute.plan), effectivePlan: (() => { const access = effectiveEntitlements(institute, new Date()); return access.enterprise ? 'ENTERPRISE' : access.quiz ? 'QUIZ' : 'MARKETPLACE'; })(), billingCycle: institute.billingCycle, planStartDate: institute.planStartDate, planExpiryDate: institute.planExpiryDate,
       trialStartedAt: institute.trialStartedAt, trialEndsAt: institute.trialEndsAt,
       marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt,
       operations: billingOperations, payments: billingPayments, notifications: planNotifications

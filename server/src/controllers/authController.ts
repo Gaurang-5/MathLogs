@@ -9,11 +9,18 @@ import { invalidateAuthCache } from '../middleware/auth';
 import { secureLogger } from '../utils/secureLogger';
 import { getOrResetQuizCredits } from '../utils/quizCredits';
 import { hashRequestIp, recordAuthenticationEvent, safeDeviceLabel } from '../services/superAdminAuthEventService';
+import { normalizePlanId } from '../domain/plans/planCatalog';
 
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('FATAL: JWT_SECRET environment variable must be set. Generate a secure secret with: openssl rand -base64 32');
+}
+
+function accessFlags(institute: { plan?: unknown } | null | undefined) {
+    let plan = 'MARKETPLACE';
+    try { plan = normalizePlanId(institute?.plan); } catch { /* unmigrated no-plan accounts retain Marketplace fallback */ }
+    return { isQuizOnly: plan === 'QUIZ', isPageOnly: plan === 'MARKETPLACE' };
 }
 
 /**
@@ -138,8 +145,7 @@ export const loginAdmin = async (req: Request, res: Response) => {
 
         const credits = await quizCreditPayload(admin.institute?.id);
 
-        const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
-        const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
+        const { isQuizOnly, isPageOnly } = accessFlags(admin.institute);
 
         res.json({
             success: true,
@@ -249,8 +255,8 @@ export const getProfile = async (req: Request, res: Response) => {
             email: admin.institute?.email || '',
             phone: admin.institute?.phoneNumber || '',
             instituteName: admin.institute?.name || '',
-            planName: (admin.institute?.config as any)?.planName || 'Basic',
-            maxStudents: (admin.institute?.config as any)?.maxStudents || 100,
+            planName: accessFlags(admin.institute).isPageOnly ? 'Marketplace' : accessFlags(admin.institute).isQuizOnly ? 'Quiz' : 'Enterprise',
+            unlimitedStudents: true,
             planStartDate: admin.institute?.planStartDate || null,
             planExpiryDate: admin.institute?.planExpiryDate || null,
             logo: (admin.institute?.config as any)?.logo || null
@@ -521,8 +527,7 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
 
         const tokens = await generateAuthTokens(admin, req);
 
-        const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
-        const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
+        const { isQuizOnly, isPageOnly } = accessFlags(admin.institute);
         const credits = await quizCreditPayload(admin.institute?.id);
 
         return res.json({
@@ -589,8 +594,7 @@ export const selectMobileAccount = async (req: Request, res: Response) => {
 
         const tokens = await generateAuthTokens(admin, req);
 
-        const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
-        const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
+        const { isQuizOnly, isPageOnly } = accessFlags(admin.institute);
         const credits = await quizCreditPayload(admin.institute?.id);
 
         return res.json({

@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import type { CanonicalPlan } from '../domain/plans/planCatalog';
 import { includedCreditPeriod } from '../domain/plans/entitlements';
+import 'dotenv/config';
 
 export type CanonicalMigrationMode = 'preflight' | 'apply';
 export type CreditPeriodResolver = (institute: { id: string; createdAt: Date; planStartDate: Date | null; planExpiryDate: Date | null; quizCredits: number }, now: Date) => {
@@ -60,7 +61,7 @@ export async function migrateCanonicalPlans(client: PrismaClient, mode: Canonica
     for (const { institute, active, period } of prepared) {
       const updated = await tx.institute.updateMany({
         where: { id: institute.id, canonicalPlanMigratedAt: null },
-        data: { plan: LEGACY_CANONICAL_PLAN, marketplaceAccessGrantedAt: institute.createdAt, lifetimeQuizCredits: institute.quizCredits, includedQuizCredits: active ? 5 : 0, includedQuizCreditsExpireAt: period?.includedQuizCreditsExpireAt ?? null, quizCreditsRenewAt: period?.quizCreditsRenewAt ?? null, canonicalPlanMigratedAt: now }
+        data: { plan: LEGACY_CANONICAL_PLAN, marketplaceAccessGrantedAt: institute.createdAt, lifetimeQuizCredits: institute.quizCredits, includedQuizCredits: active ? 5 : 0, quizCredits: institute.quizCredits + (active ? 5 : 0), includedQuizCreditsExpireAt: period?.includedQuizCreditsExpireAt ?? null, quizCreditsRenewAt: period?.quizCreditsRenewAt ?? null, canonicalPlanMigratedAt: now }
       });
       if (updated.count !== 1) throw new Error('CANONICAL_PLAN_MIGRATION_STALE_CANDIDATE');
     }
@@ -73,4 +74,69 @@ export async function migrateCanonicalPlans(client: PrismaClient, mode: Canonica
     }
   }
   throw new Error('CANONICAL_PLAN_MIGRATION_RETRY_EXHAUSTED');
+}
+
+type PreflightReport = {
+  mode: 'preflight';
+  target: { host: string; port: string; database: string; schema: string };
+  canonicalSchemaInstalled: boolean;
+  candidates: number;
+  planDistribution: Array<{ plan: string; institutes: number }>;
+  aggregateQuizCredits: number;
+  protectedCounts: BusinessCounts;
+};
+
+function databaseFingerprint(): PreflightReport['target'] {
+  const configured = process.env.DATABASE_URL;
+  if (!configured) throw new Error('DATABASE_URL_REQUIRED');
+  const url = new URL(configured);
+  return {
+    host: url.hostname,
+    port: url.port || '5432',
+    database: decodeURIComponent(url.pathname.replace(/^\//, '')),
+    schema: url.searchParams.get('schema') || 'public'
+  };
+}
+
+export async function canonicalMigrationPreflight(client: PrismaClient): Promise<PreflightReport> {
+  const target = databaseFingerprint();
+  const columns = await client.$queryRaw<Array<{ installed: boolean }>>`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'Institute' AND column_name = 'canonicalPlanMigratedAt'
+    ) AS installed`;
+  const canonicalSchemaInstalled = Boolean(columns[0]?.installed);
+  const candidateRows = canonicalSchemaInstalled
+    ? await client.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::integer AS count FROM "Institute" WHERE "canonicalPlanMigratedAt" IS NULL`
+    : await client.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::integer AS count FROM "Institute"`;
+  const planDistribution = await client.$queryRaw<Array<{ plan: string; institutes: number }>>`
+    SELECT "plan"::text AS plan, COUNT(*)::integer AS institutes FROM "Institute" GROUP BY "plan" ORDER BY "plan"::text`;
+  const credits = await client.$queryRaw<Array<{ total: number }>>`SELECT COALESCE(SUM("quizCredits"), 0)::integer AS total FROM "Institute"`;
+  return {
+    mode: 'preflight', target, canonicalSchemaInstalled, candidates: candidateRows[0]?.count ?? 0,
+    planDistribution, aggregateQuizCredits: credits[0]?.total ?? 0, protectedCounts: await collectBusinessCounts(client)
+  };
+}
+
+async function runCli() {
+  const argument = process.argv[2];
+  if (argument !== '--preflight' && argument !== '--apply') throw new Error('Usage: migrateCanonicalPlans.ts --preflight|--apply');
+  const client = new PrismaClient();
+  try {
+    const before = await canonicalMigrationPreflight(client);
+    if (argument === '--preflight') return console.log(JSON.stringify(before, null, 2));
+    if (!before.canonicalSchemaInstalled) throw new Error('CANONICAL_SCHEMA_NOT_INSTALLED');
+    const applied = await migrateCanonicalPlans(client, 'apply');
+    const after = await canonicalMigrationPreflight(client);
+    console.log(JSON.stringify({ before, applied, after }, null, 2));
+  } finally {
+    await client.$disconnect();
+  }
+}
+
+if (require.main === module) {
+  void runCli().catch(error => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
 }

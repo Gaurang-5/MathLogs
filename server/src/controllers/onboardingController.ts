@@ -7,8 +7,8 @@ import { sendSetupLinkEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
 import { secureLogger } from '../utils/secureLogger';
 import { getRazorpayConfig } from '../utils/env';
-import { SubscriptionLifecycleError, startPlanTrial as startCanonicalTrial } from '../services/subscriptionLifecycleService';
-import { normalizePlanId } from '../domain/plans/planCatalog';
+import { activateMarketplace, activatePaidPlan, SubscriptionLifecycleError, startPlanTrial as startCanonicalTrial } from '../services/subscriptionLifecycleService';
+import { normalizePlanId, resolvePlanPrice, type BillingCycle } from '../domain/plans/planCatalog';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -58,30 +58,30 @@ export const trackLead = async (req: Request, res: Response) => {
 // Create Order (Step 3 checkout initialization)
 export const createOrder = async (req: Request, res: Response) => {
     try {
-        const { tuitionName, ownerName, phone, email, planId } = req.body;
+        const { tuitionName, ownerName, phone, email, planId, billingCycle } = req.body;
 
         // Validate inputs
         if (!tuitionName || !ownerName || !phone || !email || !planId) {
             return res.status(400).json({ error: 'All fields are required.' });
         }
 
-        // Determine price based on planId
-        let amountInINR = 500;
-        if (planId === 'listing') {
-            amountInINR = 99;
-        } else if (planId === 'quiz' || planId === 'quiz_only') {
-            amountInINR = 250;
-        } else if (planId === 'all_inclusive' || planId === 'pro') {
-            amountInINR = 500;
+        let plan;
+        let cycle: BillingCycle;
+        let amountInPaise: number;
+        try {
+            plan = normalizePlanId(planId);
+            cycle = String(billingCycle || '').toUpperCase() as BillingCycle;
+            amountInPaise = plan === 'MARKETPLACE' ? 0 : resolvePlanPrice(plan, cycle);
+        } catch {
+            return res.status(400).json({ error: 'Invalid plan or billing cycle.' });
         }
+        if (plan === 'MARKETPLACE') return res.status(400).json({ error: 'Marketplace promotional activation does not require payment.' });
 
         // Check if user/institute already exists by email/phone
         const existingAdmin = await prisma.admin.findUnique({ where: { username: phone } });
         if (existingAdmin) {
             return res.status(400).json({ error: 'An account with this phone number already exists.' });
         }
-
-        const amountInPaise = amountInINR * 100;
 
         // Create Razorpay Order
         let order: any;
@@ -96,7 +96,8 @@ export const createOrder = async (req: Request, res: Response) => {
                     ownerName,
                     phone,
                     email,
-                    planId
+                    planId: plan,
+                    billingCycle: cycle
                 }
             });
         } catch (rzpError) {
@@ -149,6 +150,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
             phone,
             email,
             planId,
+            billingCycle,
             listOnMarketplace,
             city,
             area,
@@ -174,9 +176,16 @@ export const verifyPayment = async (req: Request, res: Response) => {
         }
 
         // 2. Provision the Database Records
-        const isQuizOnly = planId === 'quiz' || planId === 'quiz_only';
-        const isAllInclusive = planId === 'all_inclusive' || planId === 'pro';
-        const tier = isAllInclusive ? 'PRO' : 'FREE';
+        let plan;
+        let cycle: BillingCycle;
+        try {
+            plan = normalizePlanId(planId);
+            cycle = String(billingCycle || '').toUpperCase() as BillingCycle;
+            resolvePlanPrice(plan, cycle);
+        } catch {
+            return res.status(400).json({ error: 'Invalid plan or billing cycle.' });
+        }
+        if (plan === 'MARKETPLACE') return res.status(400).json({ error: 'Marketplace activation does not require payment.' });
 
         const uniqueSlug = await createUniqueSlug(tuitionName);
 
@@ -189,9 +198,11 @@ export const verifyPayment = async (req: Request, res: Response) => {
                 publicPhone: phone,
                 whatsappPhone: phone,
                 email: email,
-                plan: tier,
-                isQuizOnly: isQuizOnly,
-                quizCredits: isQuizOnly ? 5 : (isAllInclusive ? 10 : 0),
+                plan: 'MARKETPLACE',
+                billingCycle: 'ONE_TIME',
+                marketplaceAccessGrantedAt: new Date(),
+                isQuizOnly: false,
+                quizCredits: 0,
                 isPubliclyListed: listOnMarketplace ?? true,
                 isExclusive: false,
                 slug: uniqueSlug,
@@ -201,14 +212,12 @@ export const verifyPayment = async (req: Request, res: Response) => {
                 googleMapsUrl: googleMapsUrl ? googleMapsUrl.trim() : null,
                 config: {
                     requiresGrades: true,
-                    maxClasses: 12,
-                    maxBatches: isAllInclusive ? 250 : 100,
-                    maxBatchesPerClass: 100,
                     allowedClasses: ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"],
                     subjects: ["Mathematics", "Science", "Physics", "Chemistry", "Biology", "English"]
                 }
             }
         });
+        await activatePaidPlan({ instituteId: newInstitute.id, plan, billingCycle: cycle });
 
         // Generate Cryptographically Secure Token
         const tokenString = crypto.randomBytes(24).toString('hex');
@@ -266,7 +275,6 @@ export const startTrial = async (req: Request, res: Response) => {
         } catch {
             return res.status(400).json({ error: 'Please select Quiz or Enterprise for a free trial.' });
         }
-        if (plan === 'MARKETPLACE') return res.status(400).json({ error: 'Marketplace is available without a trial.' });
 
         const uniqueSlug = await createUniqueSlug(tuitionName);
 
@@ -297,7 +305,9 @@ export const startTrial = async (req: Request, res: Response) => {
             }
         });
 
-        const trial = await startCanonicalTrial({ instituteId: newInstitute.id, plan, ownerIdentity: phone });
+        const trial = plan === 'MARKETPLACE'
+            ? await activateMarketplace(newInstitute.id)
+            : await startCanonicalTrial({ instituteId: newInstitute.id, plan, ownerIdentity: phone });
 
         const tokenString = crypto.randomBytes(24).toString('hex');
 
@@ -324,7 +334,7 @@ export const startTrial = async (req: Request, res: Response) => {
             setupLink: setupLink,
             trialEndsAt: trial.trialEndsAt,
             includedQuizCredits: trial.includedQuizCredits,
-            message: 'Your 14-day free trial with 5 quiz credits has started. Setup link sent to your WhatsApp and email.'
+            message: plan === 'MARKETPLACE' ? 'Your Marketplace account is ready. Setup link sent to your WhatsApp and email.' : 'Your 14-day free trial with 5 quiz credits has started. Setup link sent to your WhatsApp and email.'
         });
 
     } catch (error) {

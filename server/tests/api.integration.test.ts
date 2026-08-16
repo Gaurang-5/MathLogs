@@ -134,7 +134,7 @@ test('canonical Marketplace-only and expired Enterprise access cannot mutate ERP
 
     const response = await postJson('/api/students/manual', {}, { Authorization: 'Bearer valid-token' });
     assert.equal(response.status, 403);
-    assert.equal((await response.json() as { error: string }).error, 'PAGE_ONLY_ACCESS_RESTRICTED');
+    assert.equal((await response.json() as { error: string }).error, 'MARKETPLACE_ONLY_ACCESS_RESTRICTED');
 });
 
 test('POST /api/auth/login returns tokens for valid credentials', async () => {
@@ -145,7 +145,11 @@ test('POST /api/auth/login returns tokens for valid credentials', async () => {
         role: 'ADMIN',
         passwordVersion: 2,
         instituteId: 'inst-1',
-        institute: { status: 'ACTIVE' },
+        institute: {
+            status: 'ACTIVE', plan: 'ENTERPRISE', planExpiryDate: new Date('2099-01-01T00:00:00Z'),
+            marketplaceAccessGrantedAt: new Date('2026-01-01T00:00:00Z'), trialEndsAt: null,
+            includedQuizCredits: 0, lifetimeQuizCredits: 0,
+        },
     }) as never) as typeof prisma.admin.findUnique);
     replaceMethod(prisma.admin, 'findFirst', (async () => null as never) as typeof prisma.admin.findFirst);
     replaceMethod(bcrypt, 'compare', (async () => true) as typeof bcrypt.compare);

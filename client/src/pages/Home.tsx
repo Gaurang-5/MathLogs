@@ -1077,7 +1077,7 @@ export default function Home() {
                             Simple, transparent plans for every center
                         </h2>
                         <p className="text-sm sm:text-lg text-neutral-500 max-w-xl mx-auto font-medium">
-                            Choose the plan that fits your coaching center. Every plan includes 5 free monthly quiz credits.
+                            Three clear plans with unlimited students. Quiz and Enterprise include five monthly quiz credits.
                         </p>
                     </div>
 
@@ -1122,7 +1122,7 @@ export default function Home() {
                                     <div className="mb-6 flex flex-col">
                                         <div className="flex items-baseline gap-2">
                                             <span className="text-lg font-bold text-neutral-400 line-through">₹99</span>
-                                            <span className="text-3xl sm:text-4xl font-black text-neutral-900">FREE</span>
+                                            <span className="text-3xl sm:text-4xl font-black text-neutral-900">₹0</span>
                                         </div>
                                         <span className="text-emerald-600 font-bold text-xs mt-1">100% Free Limited Time Offer</span>
                                     </div>
@@ -1155,12 +1155,13 @@ export default function Home() {
                         {(activePricingTab === 'all' || activePricingTab === 'quiz') && (
                             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-xs transition-all hover:shadow-md flex flex-col justify-between mt-4 md:mt-0">
                                 <div>
-                                    <h3 className="text-xl font-black text-neutral-900 mb-1">Quiz Starter</h3>
+                                    <h3 className="text-xl font-black text-neutral-900 mb-1">Quiz</h3>
                                     <p className="text-neutral-500 text-xs sm:text-sm mb-4">Regular student testing and AI question generation.</p>
                                     <div className="mb-6 flex items-baseline gap-1">
-                                        <span className="text-3xl sm:text-4xl font-black text-neutral-900">₹250</span>
+                                        <span className="text-3xl sm:text-4xl font-black text-neutral-900">₹249</span>
                                         <span className="text-neutral-500 text-xs font-semibold">/month</span>
                                     </div>
+                                    <p className="-mt-4 mb-6 text-xs font-bold text-neutral-500">or ₹2,499/year · 14-day trial</p>
                                     <Link to="/onboarding" className="block w-full text-center py-3.5 px-4 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-900 font-extrabold text-sm transition-all mb-6 active:scale-95">
                                         Get Started
                                     </Link>
@@ -1186,19 +1187,20 @@ export default function Home() {
                             </div>
                         )}
 
-                        {/* All Inclusive Tier (Most Popular) */}
+                        {/* Enterprise Tier (Most Popular) */}
                         {(activePricingTab === 'all' || activePricingTab === 'erp') && (
                             <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-neutral-900 shadow-xl shadow-neutral-200/50 relative transform md:-translate-y-4 flex flex-col justify-between mt-4 md:mt-0">
                                 <div>
                                     <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-neutral-900 text-white text-[11px] font-extrabold uppercase tracking-wider py-1 px-3.5 rounded-full whitespace-nowrap shadow-xs">
                                         👑 Most Popular
                                     </div>
-                                    <h3 className="text-xl font-black text-neutral-900 mb-1">All Inclusive</h3>
+                                    <h3 className="text-xl font-black text-neutral-900 mb-1">Enterprise</h3>
                                     <p className="text-neutral-500 text-xs sm:text-sm mb-4">Complete ERP suite for coaching institutes.</p>
                                     <div className="mb-6 flex items-baseline gap-1">
-                                        <span className="text-3xl sm:text-4xl font-black text-neutral-900">₹500</span>
+                                        <span className="text-3xl sm:text-4xl font-black text-neutral-900">₹499</span>
                                         <span className="text-neutral-500 text-xs font-semibold">/month</span>
                                     </div>
+                                    <p className="-mt-4 mb-6 text-xs font-bold text-neutral-500">or ₹4,999/year · 14-day trial</p>
                                     <Link to="/onboarding" className="block w-full text-center py-3.5 px-4 rounded-full bg-neutral-900 hover:bg-black text-white font-extrabold text-sm transition-all mb-6 shadow-md active:scale-95">
                                         Start 14-Day Free Trial
                                     </Link>

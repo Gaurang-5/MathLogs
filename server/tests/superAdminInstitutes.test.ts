@@ -22,8 +22,8 @@ before(async () => {
       phoneNumber: '9876501111',
       email: `apex-${suffix}@example.com`,
       city: 'Pune',
-      plan: 'BASIC',
-      config: { maxStudents: 125, subjects: ['Math'], allowedClasses: ['9', '10'], requiresGrades: true }
+      plan: 'ENTERPRISE',
+      config: { subjects: ['Math'], allowedClasses: ['9', '10'], requiresGrades: true }
     }
   });
   instituteId = institute.id;
@@ -118,14 +118,13 @@ test('structured detail updates reject unknown fields, detect stale edits, and w
   assert.equal((audit?.after as any).teacherName, 'Asha Sharma');
 });
 
-test('structured configuration updates merge allowed values and preserve platform-managed settings', async () => {
+test('structured configuration updates merge allowed values without student limits', async () => {
   const detail = await fetch(`${baseUrl}/api/super-admin/institutes/${instituteId}`, { headers: headers() }).then(response => response.json()) as any;
   const response = await fetch(`${baseUrl}/api/super-admin/institutes/${instituteId}/configuration`, {
     method: 'PATCH', headers: headers(),
     body: JSON.stringify({
       expectedUpdatedAt: detail.data.overview.updatedAt,
-      reason: 'Raise verified capacity for the new academic term',
-      maxStudents: 180,
+      reason: 'Update verified academic settings for the new term',
       allowedClasses: ['9', '10', '11'],
       subjects: ['Math', 'Physics'],
       requiresGrades: true
@@ -133,9 +132,9 @@ test('structured configuration updates merge allowed values and preserve platfor
   });
   assert.equal(response.status, 200);
   const body = await response.json() as any;
-  assert.equal(body.data.maxStudents, 180);
+  assert.equal('maxStudents' in body.data, false);
   assert.deepEqual(body.data.subjects, ['Math', 'Physics']);
   const persisted = await prisma.institute.findUniqueOrThrow({ where: { id: instituteId } });
-  assert.equal((persisted.config as any).maxStudents, 180);
-  assert.equal(persisted.plan, 'BASIC');
+  assert.equal('maxStudents' in (persisted.config as any), false);
+  assert.equal(persisted.plan, 'ENTERPRISE');
 });

@@ -554,7 +554,7 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
             // Overwrite so frontend disables registration natively if sub is cancelled or expired
             if (safeBatchData.institute) {
                 const isPlanExpired = safeBatchData.institute.planExpiryDate && new Date(batch.institute!.planExpiryDate!).getTime() < Date.now();
-                if (safeBatchData.institute.areRegistrationsPaused || (safeBatchData.institute as any).plan === 'NO_PLAN' || isPlanExpired) {
+                if (safeBatchData.institute.areRegistrationsPaused || isPlanExpired) {
                     safeBatchData.isRegistrationOpen = false;
                 }
             }

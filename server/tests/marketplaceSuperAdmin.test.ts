@@ -98,7 +98,7 @@ test('Marketplace-only owners can use Marketplace routes but cannot mutate ERP d
     method: 'POST', headers: auth(pageOnlyToken), body: '{}'
   });
   assert.equal(erpMutation.status, 403);
-  assert.equal(((await erpMutation.json()) as any).error, 'PAGE_ONLY_ACCESS_RESTRICTED');
+  assert.equal(((await erpMutation.json()) as any).error, 'MARKETPLACE_ONLY_ACCESS_RESTRICTED');
 
   const paidMutation = await fetch(`${baseUrl}/api/students/manual`, {
     method: 'POST', headers: auth(instituteToken), body: '{}'

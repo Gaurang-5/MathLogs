@@ -214,7 +214,7 @@ export const cancelSubscription = async (req: Request, res: Response) => {
                  // Wipe Razorpay IDs so frontend knows it's cancelled
                  razorpaySubscriptionId: null,
                  razorpayOrderId: null
-                 // Note: We DO NOT touch `plan`, `planExpiryDate`, `maxStudents`, or `areRegistrationsPaused`
+                 // Coaching-fee verification never changes subscription state or registration availability.
                  // This ensures their plan safely continues working until `planExpiryDate` naturally expires!
             }
         });

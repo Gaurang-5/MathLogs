@@ -200,7 +200,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 
             if (marketplaceOnly && dbUser.role !== 'SUPER_ADMIN' && !isMarketplaceOnlyAllowedRequest(req)) {
                 return res.status(403).json({
-                    error: 'PAGE_ONLY_ACCESS_RESTRICTED',
+                    error: 'MARKETPLACE_ONLY_ACCESS_RESTRICTED',
                     message: 'This account can access marketplace listing, leads, and upgrade features only.'
                 });
             }

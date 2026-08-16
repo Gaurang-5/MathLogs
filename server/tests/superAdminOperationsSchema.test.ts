@@ -17,7 +17,7 @@ test('persists support, consent, and targeted communication state', async () => 
   await prisma.internalCaseNote.create({ data: { caseId: internalCase.id, authorAdminId: actor.id, body: 'Cross-check subscription and manual references.' } });
   const preference = await prisma.instituteCommunicationPreference.create({ data: { instituteId: institute.id, whatsappOperational: true, consentSource: 'OWNER_SETTINGS', whatsappConsentedAt: new Date() } });
   const send = await prisma.targetedCommunicationSend.create({
-    data: { channel: 'WHATSAPP', templateName: 'trial_expiring', audienceDefinition: { plan: 'FREE', expiresWithinDays: 7 }, reason: 'Notify expiring trial institutes', idempotencyKey: `send-${suffix}`, createdByAdminId: actor.id }
+    data: { channel: 'WHATSAPP', templateName: 'trial_expiring', audienceDefinition: { plan: 'ENTERPRISE', expiresWithinDays: 7 }, reason: 'Notify expiring trial institutes', idempotencyKey: `send-${suffix}`, createdByAdminId: actor.id }
   });
   const recipient = await prisma.targetedCommunicationRecipient.create({ data: { sendId: send.id, instituteId: institute.id, destination: '919876543210', variables: ['Operations Schema', '7'] } });
   assert.equal(ticket.status, 'NEW');

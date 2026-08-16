@@ -16,8 +16,8 @@ export const generateInvite = async (req: Request, res: Response) => {
         teacherName,
         phoneNumber,
         email,
-        plan, // 'Basic', 'Pro', or 'Custom'
-        customMaxStudents,
+        plan,
+        billingCycle = 'MONTHLY',
         subjects,
         allowedClasses,
         requiresGrades = true // Default to true if not provided
@@ -56,24 +56,16 @@ export const generateInvite = async (req: Request, res: Response) => {
     try {
         secureLogger.debug('Generating invite', { instituteName, teacherName });
 
-        let maxStudents = 100;
-        let planName = 'Basic';
-        let planEnum: any = 'FREE';
-
-        if (plan === 'Pro') {
-            maxStudents = 250;
-            planName = 'Pro';
-            planEnum = 'PRO';
-        } else if (plan === 'Custom') {
-            maxStudents = customMaxStudents ? Number(customMaxStudents) : 1000;
-            planName = 'Custom';
-            planEnum = 'ENTERPRISE';
-        }
+        const planEnum = String(plan || '').toUpperCase();
+        const cycle = String(billingCycle || '').toUpperCase();
+        if (!['MARKETPLACE', 'QUIZ', 'ENTERPRISE'].includes(planEnum)) return res.status(400).json({ error: 'Invalid canonical plan' });
+        if ((planEnum === 'MARKETPLACE' && cycle !== 'ONE_TIME') || (planEnum !== 'MARKETPLACE' && !['MONTHLY', 'YEARLY'].includes(cycle))) return res.status(400).json({ error: 'Invalid billing cycle' });
 
         // Set plan start/expiry dates (1 year by default)
         const startDate = new Date();
         const expiryDate = new Date();
-        expiryDate.setFullYear(startDate.getFullYear() + 1);
+        if (cycle === 'YEARLY') expiryDate.setFullYear(startDate.getFullYear() + 1);
+        else expiryDate.setMonth(startDate.getMonth() + 1);
 
         // Create Institute
         const institute = await prisma.institute.create({
@@ -82,13 +74,16 @@ export const generateInvite = async (req: Request, res: Response) => {
                 teacherName,
                 phoneNumber,
                 email,
-                plan: planEnum,
+                plan: planEnum as any,
+                billingCycle: cycle as any,
                 planStartDate: startDate,
-                planExpiryDate: expiryDate,
+                planExpiryDate: planEnum === 'MARKETPLACE' ? null : expiryDate,
+                marketplaceAccessGrantedAt: startDate,
+                includedQuizCredits: planEnum === 'MARKETPLACE' ? 0 : 5,
+                lifetimeQuizCredits: 0,
+                quizCredits: planEnum === 'MARKETPLACE' ? 0 : 5,
                 config: {
                     requiresGrades: requiresGrades,
-                    maxStudents: maxStudents,
-                    planName: planName,
                     allowedClasses: classList,
                     subjects: subjectList
                 }
@@ -241,7 +236,7 @@ export const setupAccount = async (req: Request, res: Response) => {
             role: result.role
         }, JWT_SECRET, { expiresIn: '8h' });
 
-        const isQuizOnly = invite.institute.isQuizOnly || (invite.institute.config as any)?.planName === 'QUIZ_ONLY';
+        const isQuizOnly = invite.institute.plan === 'QUIZ';
         res.json({ success: true, token: jwtToken, adminId: result.id, isQuizOnly });
 
     } catch (e) {

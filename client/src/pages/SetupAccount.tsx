@@ -78,11 +78,7 @@ export default function SetupAccount() {
                 const res = await axios.get<InviteValidationResponse>(`${API_URL}/invites/${token}`);
                 setInstituteName(res.data.instituteName);
                 
-                if (res.data.plan === 'QUIZ_ONLY' || res.data.config?.planName === 'QUIZ_ONLY') {
-                    setStep('credentials');
-                } else {
-                    setStep('configure');
-                }
+                setStep('configure');
             } catch (error: unknown) {
                 setError(getAxiosErrorMessage(error, 'Invalid or expired invite link.'));
                 setStep('invalid');

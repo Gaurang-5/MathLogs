@@ -5,10 +5,11 @@ export type InstituteDirectoryItem = {
   phoneNumber: string | null;
   email: string | null;
   status: string;
-  plan: string;
+  plan: CanonicalPlan;
+  effectivePlan: CanonicalPlan;
   planExpiryDate: string | null;
-  accessKind: 'FULL' | 'PAGE_ONLY' | 'QUIZ_ONLY';
-  isQuizOnly: boolean;
+  unlimitedStudents: true;
+  accessKind?: string;
   ownershipStatus: string;
   isPubliclyListed: boolean;
   students: number;
@@ -24,11 +25,11 @@ export type InstituteWorkspaceData = {
   overview: {
     id: string; name: string; teacherName: string | null; phoneNumber: string | null; email: string | null;
     city: string | null; area: string | null; address: string | null; status: string; suspensionReason: string | null;
-    accessKind: string; createdAt: string; updatedAt: string;
+    createdAt: string; updatedAt: string;
   };
   account: { admins: Array<{ id: string; username: string; role: string }> };
-  usage: { students: number; batches: number; tests: number; maxStudents: number; quizCredits: number; isQuizOnly: boolean; allowedClasses: string[]; subjects: string[]; requiresGrades: boolean };
-  billing: { plan: string; planStartDate: string | null; planExpiryDate: string | null; operations: BillingOperation[] };
+  usage: { students: number; batches: number; tests: number; unlimitedStudents: true; quizCredits: number; includedQuizCredits: number; lifetimeQuizCredits: number; includedQuizCreditsExpireAt: string | null; quizCreditsRenewAt: string | null; allowedClasses: string[]; subjects: string[]; requiresGrades: boolean };
+  billing: { plan: CanonicalPlan; effectivePlan?: CanonicalPlan; billingCycle: BillingCycle | null; planStartDate: string | null; planExpiryDate: string | null; trialStartedAt: string | null; trialEndsAt: string | null; marketplaceAccessGrantedAt: string | null; operations: BillingOperation[]; payments: unknown[]; notifications: unknown[] };
   marketplace: { ownershipStatus: string; isPubliclyListed: boolean; isVerified: boolean; openClaims: number; pendingReviews: number };
   leads: Record<string, number>;
   support: {
@@ -47,10 +48,9 @@ export type BillingOperation = {
 export type OnboardingInput = {
   owner: { name: string; phone: string; email?: string };
   institute: { name: string; city?: string; area?: string; address?: string };
-  access: { kind: 'FULL' | 'PAGE_ONLY' | 'QUIZ_ONLY' };
-  billing: { plan: 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE'; trialDays: number; discountPercent: number };
-  limits: { maxStudents: number; quizCredits: number };
+  subscription: { plan: CanonicalPlan; billingCycle: BillingCycle; startTrial: boolean };
   marketplace: { isPubliclyListed: boolean; isVerified: boolean };
 };
 
 export type InstituteWorkspaceTab = 'overview' | 'account' | 'usage' | 'billing' | 'marketplace' | 'leads' | 'support' | 'activity';
+import type { BillingCycle, CanonicalPlan } from '../plans/types';

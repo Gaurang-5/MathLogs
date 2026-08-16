@@ -144,7 +144,7 @@ export async function searchMarketplace(req: Request, res: Response) {
 
     // Map and compute average ratings & exclusive status
     const mapped = filtered.map(inst => {
-      const isSubscribedExclusive = inst.isExclusive || inst.plan !== 'FREE';
+      const isSubscribedExclusive = inst.isExclusive || ['QUIZ', 'ENTERPRISE'].includes(inst.plan);
       const reviewCount = inst.reviews.length;
       const mathlogsAvgRating = reviewCount > 0
         ? Number((inst.reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount).toFixed(1))
@@ -331,7 +331,7 @@ export async function getCoachingPublicProfile(req: Request, res: Response) {
       }
     });
 
-    const isSubscribedExclusive = institute.isExclusive || institute.plan !== 'FREE';
+    const isSubscribedExclusive = institute.isExclusive || ['QUIZ', 'ENTERPRISE'].includes(institute.plan);
 
     return res.json({
       success: true,
@@ -540,7 +540,9 @@ export async function registerExternalTeacher(req: Request, res: Response) {
           claimedPhone: phoneNumber.replace(/\D/g, ''),
           claimedAt: new Date(),
           isExclusive: false,
-          plan: 'FREE',
+          plan: 'MARKETPLACE',
+          billingCycle: 'ONE_TIME',
+          marketplaceAccessGrantedAt: new Date(),
           status: 'ACTIVE'
         }
       });

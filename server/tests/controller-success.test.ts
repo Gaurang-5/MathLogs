@@ -68,7 +68,11 @@ test('loginAdmin returns tokens for a valid admin', async () => {
         role: 'ADMIN',
         passwordVersion: 2,
         instituteId: 'inst-1',
-        institute: { status: 'ACTIVE' },
+        institute: {
+            status: 'ACTIVE', plan: 'ENTERPRISE', planExpiryDate: new Date('2099-01-01T00:00:00Z'),
+            marketplaceAccessGrantedAt: new Date('2026-01-01T00:00:00Z'), trialEndsAt: null,
+            includedQuizCredits: 0, lifetimeQuizCredits: 0,
+        },
     }) as never) as typeof prisma.admin.findUnique);
     replaceMethod(prisma.admin, 'findFirst', (async () => null as never) as typeof prisma.admin.findFirst);
     replaceMethod(bcrypt, 'compare', (async () => true) as typeof bcrypt.compare);
@@ -103,6 +107,10 @@ test('loginAdmin returns tokens for a valid admin', async () => {
         isQuizOnly: false,
         isPageOnly: false,
         quizCredits: 0,
+        includedQuizCredits: 0,
+        lifetimeQuizCredits: 0,
+        includedQuizCreditsExpireAt: null,
+        quizCreditsRenewAt: null,
         message: 'Login successful',
     });
     assert.equal(refreshTokenCreateCalls, 1);

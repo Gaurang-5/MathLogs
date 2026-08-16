@@ -468,7 +468,7 @@ export default function MarketplaceHome() {
             <img src="/logo-64.webp" alt="MathLogs Logo" width={32} height={32} className="w-8 h-8 rounded-lg shadow-sm border border-neutral-100" />
             <div>
               <span className="font-extrabold text-sm text-neutral-900">Are you a teacher or coaching owner?</span>
-              <p className="text-xs text-emerald-600 font-bold mt-0.5">⚡ Limited Time Offer: List your institute on MathLogs Marketplace for FREE!</p>
+              <p className="text-xs text-emerald-600 font-bold mt-0.5">⚡ Limited Time Offer: List your institute on MathLogs Marketplace for free!</p>
             </div>
           </div>
           <Link

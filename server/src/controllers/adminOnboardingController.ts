@@ -53,7 +53,6 @@ export const createAdminOnboardingLink = async (req: Request, res: Response) => 
                 discountPercent: 0,
                 customPriceMonthlyPaise: null,
                 customPriceYearlyPaise: null,
-                maxStudents: 0,
                 isFreeTrial: Boolean(startTrial),
                 trialDays: startTrial ? 14 : null,
                 expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days

@@ -11,7 +11,7 @@ const SUBJECT_OPTIONS = [
     'Economics', 'Computer Science'
 ];
 
-type PlanId = 'basic' | 'pro' | 'listing' | 'quiz' | 'all_inclusive';
+type PlanId = 'MARKETPLACE' | 'QUIZ' | 'ENTERPRISE';
 
 interface TrialResponse {
     success: boolean;
@@ -90,14 +90,14 @@ const loadScript = (src: string): Promise<boolean> => {
 
 const pricingPlans = [
     {
-        id: 'listing' as PlanId,
-        name: 'Marketplace Listing',
+        id: 'MARKETPLACE' as PlanId,
+        name: 'Marketplace',
         icon: Store,
         price: 0,
-        tagline: 'Free Forever',
+        tagline: '₹99 one-time · Free for now',
         period: 'free',
         description: 'Get your coaching center listed on MathLogs city directory to receive direct student inquiries.',
-        trialInfo: 'Free Forever · No Card Required',
+        trialInfo: 'Promotional free activation · No trial needed',
         features: [
             'Verified Coaching Profile Page',
             'Public Directory Search Listing',
@@ -106,15 +106,15 @@ const pricingPlans = [
             'Subject & Batch Tagging'
         ],
         popular: false,
-        badge: 'FREE LISTING',
+        badge: 'PROMO LISTING',
         isOneTime: false,
         hasTrial: false,
     },
     {
-        id: 'quiz' as PlanId,
-        name: 'Quiz Starter',
+        id: 'QUIZ' as PlanId,
+        name: 'Quiz',
         icon: Sparkles,
-        price: 250,
+        price: 249,
         tagline: '5 Quiz Credits / Month',
         period: '/ month',
         description: 'AI quiz creation, automatic question generation, proctored online exams & instant analysis.',
@@ -133,10 +133,10 @@ const pricingPlans = [
         hasTrial: true,
     },
     {
-        id: 'all_inclusive' as PlanId,
-        name: 'All Inclusive ERP',
+        id: 'ENTERPRISE' as PlanId,
+        name: 'Enterprise',
         icon: Building,
-        price: 500,
+        price: 499,
         tagline: 'Complete Coaching ERP',
         period: '/ month',
         description: 'Full coaching ERP — student records, attendance, fee collection, tests & directory listing.',
@@ -199,6 +199,7 @@ export default function Onboarding() {
 
     // Step 2: Plan
     const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
+    const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY' | 'ONE_TIME'>('MONTHLY');
 
     // Step 3: Marketplace & Checkout Options
     const [listOnMarketplace, setListOnMarketplace] = useState(true);
@@ -235,9 +236,9 @@ export default function Onboarding() {
     const [resendLoading, setResendLoading] = useState(false);
     const [resendMessage, setResendMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-    const isQuizOnly = new URLSearchParams(window.location.search).get('type') === 'quiz_only';
+    const isQuizOnly = new URLSearchParams(window.location.search).get('plan')?.toUpperCase() === 'QUIZ';
     const selectedPlanData = pricingPlans.find(p => p.id === selectedPlan);
-    const canPayLater = !isQuizOnly && selectedPlan !== 'listing';
+    const canPayLater = selectedPlan !== 'MARKETPLACE';
 
     const formatPhone = (val: string) => val.replace(/\D/g, '').slice(0, 10);
 
@@ -338,7 +339,7 @@ export default function Onboarding() {
         }
 
         if (isQuizOnly) {
-            setSelectedPlan('quiz');
+            setSelectedPlan('QUIZ');
             setPaymentChoice('pay_now');
             setActiveStep(3);
         } else {
@@ -348,6 +349,7 @@ export default function Onboarding() {
 
     const handleSelectPlan = async (planId: PlanId) => {
         setSelectedPlan(planId);
+        setBillingCycle(planId === 'MARKETPLACE' ? 'ONE_TIME' : 'MONTHLY');
         setPaymentChoice('pay_later');
 
         try {
@@ -370,7 +372,7 @@ export default function Onboarding() {
         const cleanPhone = formatPhone(phone);
 
         // 1) Pay Later / Start Free Trial
-        if (paymentChoice === 'pay_later' && canPayLater) {
+        if (paymentChoice === 'pay_later' && (canPayLater || selectedPlan === 'MARKETPLACE')) {
             try {
                 const res = await api.post<TrialResponse>('/onboarding/start-trial', {
                     tuitionName,
@@ -378,6 +380,7 @@ export default function Onboarding() {
                     phone: cleanPhone,
                     email,
                     planId: selectedPlan,
+                    billingCycle,
                     listOnMarketplace,
                     city: city.trim(),
                     area: area.trim(),
@@ -421,6 +424,7 @@ export default function Onboarding() {
                 phone: cleanPhone,
                 email,
                 planId: selectedPlan,
+                billingCycle,
             });
 
             if (!orderRes.success || !orderRes.keyId) {
@@ -453,6 +457,7 @@ export default function Onboarding() {
                             phone: cleanPhone,
                             email,
                             planId: selectedPlan,
+                            billingCycle,
                             listOnMarketplace,
                             city: city.trim(),
                             area: area.trim(),
@@ -865,7 +870,7 @@ export default function Onboarding() {
                                     {paymentChoice === 'pay_later' ? 'Start Free Trial' : 'Complete Activation'}
                                 </h1>
                                 <p className="text-sm sm:text-base text-neutral-400 font-medium">
-                                    Selected Plan: <span className="text-black font-bold">{selectedPlanData.name}</span> (₹{selectedPlanData.price}{selectedPlanData.period})
+                                    Selected plan: <span className="text-black font-bold">{selectedPlanData.name}</span> · Unlimited students
                                 </p>
                             </div>
 
@@ -881,8 +886,8 @@ export default function Onboarding() {
                                     </div>
                                 </div>
 
-                                {/* Enable listing toggle for Quiz & All Inclusive */}
-                                {selectedPlan !== 'listing' && (
+                                {/* Enable listing toggle for Quiz & Enterprise */}
+                                {selectedPlan !== 'MARKETPLACE' && (
                                     <label className="flex items-center gap-3 p-3 bg-neutral-50 rounded-2xl cursor-pointer">
                                         <input
                                             type="checkbox"
@@ -981,7 +986,9 @@ export default function Onboarding() {
                                 )}
                             </div>
 
-                            {/* SECTION B: PAYMENT TIMING OPTIONS (hidden for listing — always free) */}
+                            {selectedPlan !== 'MARKETPLACE' && <div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => setBillingCycle('MONTHLY')} className={`rounded-2xl border-2 p-4 font-bold ${billingCycle === 'MONTHLY' ? 'border-black bg-black text-white' : 'border-neutral-200 bg-white'}`}>Monthly · ₹{selectedPlan === 'QUIZ' ? '249' : '499'}</button><button type="button" onClick={() => setBillingCycle('YEARLY')} className={`rounded-2xl border-2 p-4 font-bold ${billingCycle === 'YEARLY' ? 'border-black bg-black text-white' : 'border-neutral-200 bg-white'}`}>Yearly · ₹{selectedPlan === 'QUIZ' ? '2,499' : '4,999'}</button></div>}
+
+                            {/* SECTION B: PAYMENT TIMING OPTIONS */}
                             {canPayLater && (
                                 <div className="bg-white border-2 border-neutral-200 rounded-3xl p-6 sm:p-8 space-y-4">
                                     <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-500">

@@ -4,12 +4,13 @@ import { prisma } from '../prisma';
 import { invalidateAuthCache } from '../middleware/auth';
 import { writeSuperAdminAudit } from './superAdminAuditService';
 import { readBillingProviderHistory } from './superAdminBillingProvider';
+import { normalizePlanId, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
+import { includedCreditPeriod } from '../domain/plans/entitlements';
 
 export type BillingOperationType =
   | 'PLAN_CHANGE'
   | 'TRIAL_EXTENSION'
-  | 'STUDENT_LIMIT_ADJUSTMENT'
-  | 'QUIZ_CREDIT_ADJUSTMENT'
+  | 'LIFETIME_CREDIT_ADJUSTMENT'
   | 'PLAN_REVOKE'
   | 'MANUAL_PAYMENT_REFERENCE';
 
@@ -35,6 +36,14 @@ type InstituteBillingState = {
   planStartDate: Date | null;
   planExpiryDate: Date | null;
   quizCredits: number;
+  billingCycle: BillingCycle | null;
+  trialStartedAt: Date | null;
+  trialEndsAt: Date | null;
+  marketplaceAccessGrantedAt: Date | null;
+  includedQuizCredits: number;
+  includedQuizCreditsExpireAt: Date | null;
+  lifetimeQuizCredits: number;
+  quizCreditsRenewAt: Date | null;
   config: Prisma.JsonValue | null;
   updatedAt: Date;
 };
@@ -46,6 +55,14 @@ const billingStateSelect = {
   planStartDate: true,
   planExpiryDate: true,
   quizCredits: true,
+  billingCycle: true,
+  trialStartedAt: true,
+  trialEndsAt: true,
+  marketplaceAccessGrantedAt: true,
+  includedQuizCredits: true,
+  includedQuizCreditsExpireAt: true,
+  lifetimeQuizCredits: true,
+  quizCreditsRenewAt: true,
   config: true,
   updatedAt: true
 } satisfies Prisma.InstituteSelect;
@@ -68,14 +85,14 @@ function hash(value: unknown): string {
 
 export function billingActionClass(type: string): BillingActionClass {
   if (type === 'PLAN_REVOKE') return 'PLAN_REVOKE';
-  if (type === 'QUIZ_CREDIT_ADJUSTMENT' || type === 'MANUAL_PAYMENT_REFERENCE') return 'BILLING_ADJUSTMENT';
+  if (type === 'LIFETIME_CREDIT_ADJUSTMENT' || type === 'MANUAL_PAYMENT_REFERENCE') return 'BILLING_ADJUSTMENT';
   return null;
 }
 
 function normalizeBillingRequest(value: unknown): NormalizedBillingRequest {
   const input = value && typeof value === 'object' && !Array.isArray(value) ? value as any : {};
   const type = String(input.type || '').toUpperCase() as BillingOperationType;
-  const allowed: BillingOperationType[] = ['PLAN_CHANGE', 'TRIAL_EXTENSION', 'STUDENT_LIMIT_ADJUSTMENT', 'QUIZ_CREDIT_ADJUSTMENT', 'PLAN_REVOKE', 'MANUAL_PAYMENT_REFERENCE'];
+  const allowed: BillingOperationType[] = ['PLAN_CHANGE', 'TRIAL_EXTENSION', 'LIFETIME_CREDIT_ADJUSTMENT', 'PLAN_REVOKE', 'MANUAL_PAYMENT_REFERENCE'];
   if (!allowed.includes(type)) throw new RevenueServiceError('INVALID_BILLING_OPERATION');
   const reason = String(input.reason || '').trim();
   if (reason.length < 10 || reason.length > 500) throw new RevenueServiceError('REASON_REQUIRED');
@@ -90,38 +107,46 @@ function normalizeBillingRequest(value: unknown): NormalizedBillingRequest {
 }
 
 function derivePreview(institute: InstituteBillingState, request: NormalizedBillingRequest) {
-  const config = jsonObject(institute.config);
   const before: Record<string, unknown> = {};
   const after: Record<string, unknown> = {};
   if (request.type === 'PLAN_CHANGE') {
-    const plan = String(request.payload.plan || '').toUpperCase();
-    const expiryDate = new Date(String(request.payload.expiryDate || ''));
-    if (!['FREE', 'BASIC', 'PRO', 'ENTERPRISE'].includes(plan) || Number.isNaN(expiryDate.getTime())) throw new RevenueServiceError('INVALID_PLAN_CHANGE');
+    const plan = String(request.payload.plan || '').toUpperCase() as CanonicalPlan;
+    const billingCycle = String(request.payload.billingCycle || '').toUpperCase() as BillingCycle;
+    if (!['MARKETPLACE', 'QUIZ', 'ENTERPRISE'].includes(plan)) throw new RevenueServiceError('INVALID_PLAN_CHANGE');
+    if ((plan === 'MARKETPLACE' && billingCycle !== 'ONE_TIME') || (plan !== 'MARKETPLACE' && !['MONTHLY', 'YEARLY'].includes(billingCycle))) {
+      throw new RevenueServiceError('INVALID_PLAN_CYCLE');
+    }
+    const startsAt = request.effectiveAt ? new Date(request.effectiveAt) : new Date();
+    const expiryDate = plan === 'MARKETPLACE' ? null : new Date(startsAt);
+    if (expiryDate) billingCycle === 'YEARLY' ? expiryDate.setUTCFullYear(expiryDate.getUTCFullYear() + 1) : expiryDate.setUTCMonth(expiryDate.getUTCMonth() + 1);
     before.plan = institute.plan;
+    before.billingCycle = institute.billingCycle;
     before.planExpiryDate = institute.planExpiryDate;
     after.plan = plan;
-    after.planExpiryDate = expiryDate.toISOString();
+    after.billingCycle = billingCycle;
+    after.planStartDate = startsAt.toISOString();
+    after.planExpiryDate = expiryDate?.toISOString() ?? null;
   } else if (request.type === 'TRIAL_EXTENSION') {
     const days = Number(request.payload.days);
-    if (!Number.isInteger(days) || days < 1 || days > 3650) throw new RevenueServiceError('INVALID_TRIAL_EXTENSION');
-    const base = institute.planExpiryDate && institute.planExpiryDate.getTime() > Date.now() ? institute.planExpiryDate : new Date();
-    before.planExpiryDate = institute.planExpiryDate;
-    after.planExpiryDate = new Date(base.getTime() + days * 86_400_000).toISOString();
-  } else if (request.type === 'STUDENT_LIMIT_ADJUSTMENT') {
-    const maxStudents = Number(request.payload.maxStudents);
-    if (!Number.isInteger(maxStudents) || maxStudents < 0 || maxStudents > 100_000) throw new RevenueServiceError('INVALID_STUDENT_LIMIT');
-    before.maxStudents = typeof config.maxStudents === 'number' ? config.maxStudents : 100;
-    after.maxStudents = maxStudents;
-  } else if (request.type === 'QUIZ_CREDIT_ADJUSTMENT') {
+    if (!Number.isInteger(days) || days < 1 || days > 30 || !institute.trialStartedAt || !institute.trialEndsAt) throw new RevenueServiceError('INVALID_TRIAL_EXTENSION');
+    const base = institute.trialEndsAt.getTime() > Date.now() ? institute.trialEndsAt : new Date();
+    const trialEndsAt = new Date(base.getTime() + days * 86_400_000);
+    before.trialEndsAt = institute.trialEndsAt;
+    after.trialEndsAt = trialEndsAt.toISOString();
+    after.planExpiryDate = trialEndsAt.toISOString();
+    after.includedQuizCreditsExpireAt = trialEndsAt.toISOString();
+  } else if (request.type === 'LIFETIME_CREDIT_ADJUSTMENT') {
     const delta = Number(request.payload.delta);
-    if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 1_000_000 || institute.quizCredits + delta < 0) throw new RevenueServiceError('INVALID_QUIZ_CREDIT_ADJUSTMENT');
-    before.quizCredits = institute.quizCredits;
-    after.quizCredits = institute.quizCredits + delta;
+    if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 1_000_000 || institute.lifetimeQuizCredits + delta < 0) throw new RevenueServiceError('INVALID_LIFETIME_CREDIT_ADJUSTMENT');
+    before.lifetimeQuizCredits = institute.lifetimeQuizCredits;
+    after.lifetimeQuizCredits = institute.lifetimeQuizCredits + delta;
+    after.totalUsableQuizCredits = institute.includedQuizCredits + institute.lifetimeQuizCredits + delta;
   } else if (request.type === 'PLAN_REVOKE') {
     if (Object.keys(request.payload).length) throw new RevenueServiceError('INVALID_PLAN_REVOKE');
     before.plan = institute.plan;
     before.planExpiryDate = institute.planExpiryDate;
-    after.plan = 'NO_PLAN';
+    after.plan = 'MARKETPLACE';
+    after.billingCycle = 'ONE_TIME';
     after.planExpiryDate = new Date().toISOString();
   } else {
     const amountPaise = Number(request.payload.amountPaise);
@@ -213,15 +238,31 @@ export async function applyBillingOperationById(operationId: string): Promise<'A
       };
       const preview = derivePreview(institute, request);
       if (request.type === 'PLAN_CHANGE') {
-        await tx.institute.update({ where: { id: institute.id }, data: { plan: preview.after.plan as Tier, planStartDate: now, planExpiryDate: new Date(String(preview.after.planExpiryDate)) } });
+        const plan = preview.after.plan as CanonicalPlan;
+        const planStartDate = new Date(String(preview.after.planStartDate));
+        const period = plan === 'MARKETPLACE' ? null : includedCreditPeriod({ planStartDate }, planStartDate);
+        await tx.institute.update({ where: { id: institute.id }, data: {
+          plan, billingCycle: preview.after.billingCycle as BillingCycle, planStartDate,
+          planExpiryDate: preview.after.planExpiryDate ? new Date(String(preview.after.planExpiryDate)) : null,
+          trialStartedAt: null, trialEndsAt: null, marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt ?? now,
+          includedQuizCredits: plan === 'MARKETPLACE' ? 0 : 5,
+          includedQuizCreditsExpireAt: period?.includedQuizCreditsExpireAt ?? null,
+          quizCreditsRenewAt: period?.quizCreditsRenewAt ?? null,
+          quizCredits: (plan === 'MARKETPLACE' ? 0 : 5) + institute.lifetimeQuizCredits,
+          isQuizOnly: plan === 'QUIZ'
+        } });
       } else if (request.type === 'TRIAL_EXTENSION') {
-        await tx.institute.update({ where: { id: institute.id }, data: { planExpiryDate: new Date(String(preview.after.planExpiryDate)) } });
-      } else if (request.type === 'STUDENT_LIMIT_ADJUSTMENT') {
-        await tx.institute.update({ where: { id: institute.id }, data: { config: { ...jsonObject(institute.config), maxStudents: Number(preview.after.maxStudents) } } });
-      } else if (request.type === 'QUIZ_CREDIT_ADJUSTMENT') {
-        await tx.institute.update({ where: { id: institute.id }, data: { quizCredits: Number(preview.after.quizCredits) } });
+        const extended = new Date(String(preview.after.trialEndsAt));
+        await tx.institute.update({ where: { id: institute.id }, data: { trialEndsAt: extended, planExpiryDate: extended, includedQuizCreditsExpireAt: extended } });
+      } else if (request.type === 'LIFETIME_CREDIT_ADJUSTMENT') {
+        const lifetimeQuizCredits = Number(preview.after.lifetimeQuizCredits);
+        await tx.institute.update({ where: { id: institute.id }, data: { lifetimeQuizCredits, quizCredits: institute.includedQuizCredits + lifetimeQuizCredits } });
       } else if (request.type === 'PLAN_REVOKE') {
-        await tx.institute.update({ where: { id: institute.id }, data: { plan: 'NO_PLAN', planExpiryDate: now } });
+        await tx.institute.update({ where: { id: institute.id }, data: {
+          plan: 'MARKETPLACE', billingCycle: 'ONE_TIME', planExpiryDate: now, trialStartedAt: null, trialEndsAt: null,
+          marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt ?? now, includedQuizCredits: 0,
+          includedQuizCreditsExpireAt: null, quizCreditsRenewAt: null, quizCredits: institute.lifetimeQuizCredits, isQuizOnly: false
+        } });
       }
       await writeSuperAdminAudit(tx, {
         action: `BILLING_${request.type}_APPLIED`, entityType: 'SuperAdminBillingOperation', entityId: operation.id,
@@ -307,41 +348,64 @@ export async function getRevenueOverview() {
   const now = new Date();
   const [totalInstitutes, activeSubscriptions, expiringSoon, byPlan, pendingOperations, failedOperations] = await Promise.all([
     prisma.institute.count(),
-    prisma.institute.count({ where: { plan: { notIn: ['FREE', 'NO_PLAN'] }, OR: [{ planExpiryDate: null }, { planExpiryDate: { gt: now } }] } }),
-    prisma.institute.count({ where: { plan: { notIn: ['FREE', 'NO_PLAN'] }, planExpiryDate: { gt: now, lte: new Date(now.getTime() + 30 * 86_400_000) } } }),
+    prisma.institute.count({ where: { plan: { in: ['QUIZ', 'ENTERPRISE', 'BASIC', 'PRO'] }, OR: [{ planExpiryDate: null }, { planExpiryDate: { gt: now } }] } }),
+    prisma.institute.count({ where: { plan: { in: ['QUIZ', 'ENTERPRISE', 'BASIC', 'PRO'] }, planExpiryDate: { gt: now, lte: new Date(now.getTime() + 30 * 86_400_000) } } }),
     prisma.institute.groupBy({ by: ['plan'], _count: { _all: true }, orderBy: { plan: 'asc' } }),
     prisma.superAdminBillingOperation.count({ where: { status: 'PENDING' } }),
     prisma.superAdminBillingOperation.count({ where: { status: 'FAILED' } })
   ]);
   return {
     metrics: { totalInstitutes, activeSubscriptions, expiringSoon, pendingOperations, failedOperations },
-    byPlan: byPlan.map(item => ({ plan: item.plan, institutes: item._count._all })),
+    byPlan: Object.entries(byPlan.reduce<Record<CanonicalPlan, number>>((totals, item) => {
+      let plan: CanonicalPlan;
+      try { plan = normalizePlanId(item.plan); } catch { plan = 'MARKETPLACE'; }
+      totals[plan] += item._count._all;
+      return totals;
+    }, { MARKETPLACE: 0, QUIZ: 0, ENTERPRISE: 0 })).map(([plan, institutes]) => ({ plan, institutes })),
     revenueDefinition: 'MathLogs subscription operations only; institute-collected coaching fees are excluded.'
   };
 }
 
 export async function listRevenueSubscriptions(input: { q?: string; plan?: string; page: number; pageSize: number }) {
+  let requestedPlan: CanonicalPlan | undefined;
+  if (input.plan) {
+    if (!['MARKETPLACE', 'QUIZ', 'ENTERPRISE'].includes(input.plan)) throw new RevenueServiceError('INVALID_PLAN');
+    requestedPlan = input.plan as CanonicalPlan;
+  }
   const where: Prisma.InstituteWhereInput = {
     ...(input.q ? { OR: [{ name: { contains: input.q, mode: 'insensitive' } }, { teacherName: { contains: input.q, mode: 'insensitive' } }, { phoneNumber: { contains: input.q } }] } : {}),
-    ...(input.plan ? { plan: input.plan as Tier } : {})
+    ...(requestedPlan ? { plan: requestedPlan } : {})
   };
   const [items, total] = await Promise.all([
     prisma.institute.findMany({
       where,
-      select: { id: true, name: true, teacherName: true, status: true, plan: true, planStartDate: true, planExpiryDate: true, updatedAt: true },
+      select: { id: true, name: true, teacherName: true, status: true, plan: true, billingCycle: true, planStartDate: true, planExpiryDate: true, trialStartedAt: true, trialEndsAt: true, marketplaceAccessGrantedAt: true, includedQuizCredits: true, includedQuizCreditsExpireAt: true, lifetimeQuizCredits: true, quizCreditsRenewAt: true, updatedAt: true },
       orderBy: [{ planExpiryDate: 'asc' }, { id: 'asc' }], skip: (input.page - 1) * input.pageSize, take: input.pageSize
     }),
     prisma.institute.count({ where })
   ]);
-  return { items: items.map(({ id, ...item }) => ({ instituteId: id, ...item })), page: input.page, pageSize: input.pageSize, total };
+  return { items: items.map(({ id, plan: storedPlan, ...item }) => {
+    let plan: CanonicalPlan;
+    try { plan = normalizePlanId(storedPlan); } catch { plan = 'MARKETPLACE'; }
+    return { instituteId: id, ...item, plan, effectivePlan: plan, totalUsableQuizCredits: item.includedQuizCredits + item.lifetimeQuizCredits, unlimitedStudents: true };
+  }), page: input.page, pageSize: input.pageSize, total };
 }
 
 export async function getInstituteBillingHistory(instituteId: string) {
-  const institute = await prisma.institute.findUnique({ where: { id: instituteId }, select: { razorpaySubscriptionId: true } });
+  const institute = await prisma.institute.findUnique({ where: { id: instituteId }, select: { razorpaySubscriptionId: true, plan: true, billingCycle: true, planStartDate: true, planExpiryDate: true, trialStartedAt: true, trialEndsAt: true, marketplaceAccessGrantedAt: true, includedQuizCredits: true, includedQuizCreditsExpireAt: true, lifetimeQuizCredits: true, quizCreditsRenewAt: true } });
   if (!institute) throw new RevenueServiceError('INSTITUTE_NOT_FOUND');
-  const [operations, provider] = await Promise.all([
+  const [operations, notifications, payments, provider] = await Promise.all([
     prisma.superAdminBillingOperation.findMany({ where: { instituteId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+    prisma.planNotification.findMany({ where: { instituteId }, orderBy: { scheduledAt: 'desc' }, take: 100 }),
+    prisma.billingPayment.findMany({ where: { instituteId }, orderBy: { createdAt: 'desc' }, take: 100 }),
     readBillingProviderHistory(institute.razorpaySubscriptionId)
   ]);
-  return { operations: operations.map(publicOperation), ...provider };
+  let plan: CanonicalPlan;
+  try { plan = normalizePlanId(institute.plan); } catch { plan = 'MARKETPLACE'; }
+  return { plan, effectivePlan: plan, billingCycle: institute.billingCycle, planStartDate: institute.planStartDate, planExpiryDate: institute.planExpiryDate,
+    trialStartedAt: institute.trialStartedAt, trialEndsAt: institute.trialEndsAt, marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt,
+    includedQuizCredits: institute.includedQuizCredits, lifetimeQuizCredits: institute.lifetimeQuizCredits,
+    totalUsableQuizCredits: institute.includedQuizCredits + institute.lifetimeQuizCredits,
+    includedQuizCreditsExpireAt: institute.includedQuizCreditsExpireAt, quizCreditsRenewAt: institute.quizCreditsRenewAt,
+    operations: operations.map(publicOperation), payments, notifications, ...provider };
 }

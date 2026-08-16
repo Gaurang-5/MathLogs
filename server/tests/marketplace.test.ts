@@ -39,7 +39,7 @@ before(async () => {
         classesOffered: ['Class 10', 'Class 11', 'Class 12'],
         isPubliclyListed: true,
         isExclusive: true,
-        plan: 'PRO',
+        plan: 'ENTERPRISE',
         status: 'ACTIVE'
       }
     });

@@ -104,32 +104,29 @@ export const updateInstitutePlan = async (req: Request, res: Response) => {
             const updated = await prisma.institute.update({
                 where: { id },
                 data: {
-                    plan: 'NO_PLAN',
+                    plan: 'MARKETPLACE',
+                    billingCycle: 'ONE_TIME',
+                    marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt ?? new Date(),
                     planExpiryDate: new Date(),
                     razorpaySubscriptionId: null,
                     razorpayOrderId: null,
-                    config: { ...currentConfig, maxStudents: 0 },
-                    areRegistrationsPaused: true
+                    config: currentConfig,
+                    areRegistrationsPaused: false
                 }
             });
             return res.json({ success: true, message: 'Plan revoked successfully.', updated });
         }
 
+        if (!['MARKETPLACE', 'QUIZ', 'ENTERPRISE'].includes(String(plan).toUpperCase())) return res.status(400).json({ error: 'Invalid canonical plan' });
         const currentConfig = (institute.config as any) || {};
-        const maxStudents = plan === 'PRO' ? 250 : plan === 'BASIC' ? 100 : plan === 'FREE' ? 100 : 0;
-        const areRegistrationsPaused = plan === 'NO_PLAN';
 
         // Ensure that if a SuperAdmin activates a plan, the expiry date isn't stuck in the past
         let newExpiryDate = planExpiryDate ? new Date(planExpiryDate) : institute.planExpiryDate;
         const now = new Date();
-        if (!planExpiryDate && plan && plan !== 'NO_PLAN') {
+        if (!planExpiryDate && plan && plan !== 'MARKETPLACE') {
             if (!newExpiryDate || newExpiryDate.getTime() < now.getTime()) {
                 newExpiryDate = new Date();
-                if (plan === 'FREE') {
-                    newExpiryDate.setDate(now.getDate() + 14); // 14-day free trial
-                } else {
-                    newExpiryDate.setMonth(now.getMonth() + 1); // 1-month cycle for PRO/BASIC defaults
-                }
+                newExpiryDate.setMonth(now.getMonth() + 1);
             }
         }
 
@@ -138,8 +135,8 @@ export const updateInstitutePlan = async (req: Request, res: Response) => {
             data: {
                 plan: plan || institute.plan,
                 planExpiryDate: newExpiryDate,
-                config: { ...currentConfig, maxStudents },
-                areRegistrationsPaused
+                config: currentConfig,
+                areRegistrationsPaused: false
             }
         });
 
@@ -541,7 +538,9 @@ export const bulkImportInstitutes = async (req: Request, res: Response) => {
                     isPubliclyListed: item.isPubliclyListed !== false, // default true
                     isVerified: item.isVerified === true, // default false (unverified public listing)
                     status: 'ACTIVE',
-                    plan: 'FREE'
+                    plan: 'MARKETPLACE',
+                    billingCycle: 'ONE_TIME',
+                    marketplaceAccessGrantedAt: new Date()
                 }
             });
 
@@ -589,6 +588,5 @@ export const toggleInstituteStatus = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to update institute status' });
     }
 };
-
 
 
