@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { effectiveEntitlements, includedCreditPeriod, nextBillingAnniversary } from '../src/domain/plans/entitlements';
+import { effectiveEntitlements, includedCreditPeriod, nextBillingAnniversary, paidPlanExpiry } from '../src/domain/plans/entitlements';
 
 test('expired Enterprise falls back to Marketplace and preserves stored credits', () => {
   const access = effectiveEntitlements({
@@ -35,6 +35,11 @@ test('Marketplace compatibility requires a Marketplace grant and trial end equal
 test('yearly plans refresh monthly and clamp a 31st anniversary in UTC', () => {
   assert.equal(nextBillingAnniversary(new Date('2026-01-31T00:00:00Z'), new Date('2026-02-01T00:00:00Z')).toISOString(), '2026-02-28T00:00:00.000Z');
   assert.equal(nextBillingAnniversary(new Date('2024-01-31T12:34:56Z'), new Date('2024-02-01T00:00:00Z')).toISOString(), '2024-02-29T12:34:56.000Z');
+});
+
+test('paid monthly and yearly expiries clamp end-of-month dates in UTC', () => {
+  assert.equal(paidPlanExpiry(new Date('2026-01-31T12:00:00Z'), 'MONTHLY').toISOString(), '2026-02-28T12:00:00.000Z');
+  assert.equal(paidPlanExpiry(new Date('2024-02-29T12:00:00Z'), 'YEARLY').toISOString(), '2025-02-28T12:00:00.000Z');
 });
 
 test('included credits end and renew at the next monthly anniversary from the preserved start', () => {

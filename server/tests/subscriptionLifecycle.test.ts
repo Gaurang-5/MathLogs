@@ -39,7 +39,7 @@ test('trials are single-use, grant five credits, and expire to Marketplace acces
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    await postgres.query(`INSERT INTO "Institute" (id, name) VALUES ('trial-institute', 'Trial institute'), ('paid-institute', 'Paid institute')`);
+    await postgres.query(`INSERT INTO "Institute" (id, name) VALUES ('trial-institute', 'Trial institute'), ('identity-institute', 'Identity institute'), ('identity-institute-2', 'Identity institute 2'), ('paid-institute', 'Paid institute')`);
     prisma = new PrismaClient({ datasources: { db: { url: schemaUrl(schema) } } });
     const lifecycle = createSubscriptionLifecycleService(prisma, 'test-lifecycle-secret');
     const now = new Date('2026-08-15T00:00:00.000Z');
@@ -49,6 +49,8 @@ test('trials are single-use, grant five credits, and expire to Marketplace acces
     assert.equal(trial.includedQuizCredits, 5);
     assert.equal(trial.quiz, true);
     await assert.rejects(() => lifecycle.startPlanTrial({ instituteId: 'trial-institute', plan: 'ENTERPRISE', ownerIdentity: '9999999999', now }), /TRIAL_ALREADY_USED/);
+    await assert.rejects(() => lifecycle.startPlanTrial({ instituteId: 'identity-institute', plan: 'QUIZ', ownerIdentity: '+91 99999 99999', now }), /TRIAL_ALREADY_USED/);
+    await assert.rejects(() => lifecycle.startPlanTrial({ instituteId: 'identity-institute-2', plan: 'QUIZ', ownerIdentity: '09999999999', now }), /TRIAL_ALREADY_USED/);
 
     const expired = await lifecycle.reconcileInstituteLifecycle('trial-institute', new Date('2026-08-30T00:00:00.000Z'));
     assert.equal(expired.effectivePlan, 'MARKETPLACE');

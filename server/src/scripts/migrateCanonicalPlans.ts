@@ -10,6 +10,7 @@ export type CreditPeriodResolver = (institute: { id: string; createdAt: Date; pl
 };
 
 const LEGACY_CANONICAL_PLAN: CanonicalPlan = 'ENTERPRISE';
+export const CANONICAL_PLAN_CUTOVER_AT = new Date('2026-08-16T00:00:00.000Z');
 type CountClient = Pick<PrismaClient, '$queryRawUnsafe'>;
 type BusinessCounts = { instituteCount: number; adminCount: number; studentCount: number; batchCount: number; paymentCount: number; quizCount: number; marketplaceClaimCount: number; leadInquiryCount: number; reviewCount: number };
 
@@ -51,7 +52,12 @@ export async function migrateCanonicalPlans(client: PrismaClient, mode: Canonica
       return await client.$transaction(async tx => {
     await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(64271, 2)');
     const before = await collectBusinessCounts(tx);
-    const candidates = await tx.institute.findMany({ where: { canonicalPlanMigratedAt: null }, select: { id: true, createdAt: true, planStartDate: true, planExpiryDate: true, quizCredits: true } });
+    const candidateWhere = { OR: [
+      { canonicalPlanMigratedAt: null, createdAt: { lt: CANONICAL_PLAN_CUTOVER_AT } },
+      { plan: { in: ['FREE', 'PRO', 'BASIC', 'NO_PLAN'] as const } },
+      { isQuizOnly: true, canonicalPlanMigratedAt: null }
+    ] } satisfies Prisma.InstituteWhereInput;
+    const candidates = await tx.institute.findMany({ where: candidateWhere, select: { id: true, createdAt: true, planStartDate: true, planExpiryDate: true, quizCredits: true } });
     if (mode === 'preflight') return { mode, before, candidates: candidates.length };
 
     const prepared = candidates.map(institute => {
@@ -60,8 +66,8 @@ export async function migrateCanonicalPlans(client: PrismaClient, mode: Canonica
     });
     for (const { institute, active, period } of prepared) {
       const updated = await tx.institute.updateMany({
-        where: { id: institute.id, canonicalPlanMigratedAt: null },
-        data: { plan: LEGACY_CANONICAL_PLAN, marketplaceAccessGrantedAt: institute.createdAt, lifetimeQuizCredits: institute.quizCredits, includedQuizCredits: active ? 5 : 0, quizCredits: institute.quizCredits + (active ? 5 : 0), includedQuizCreditsExpireAt: period?.includedQuizCreditsExpireAt ?? null, quizCreditsRenewAt: period?.quizCreditsRenewAt ?? null, canonicalPlanMigratedAt: now }
+        where: { id: institute.id, ...candidateWhere },
+        data: { plan: LEGACY_CANONICAL_PLAN, isQuizOnly: false, marketplaceAccessGrantedAt: institute.createdAt, lifetimeQuizCredits: institute.quizCredits, includedQuizCredits: active ? 5 : 0, quizCredits: institute.quizCredits + (active ? 5 : 0), includedQuizCreditsExpireAt: period?.includedQuizCreditsExpireAt ?? null, quizCreditsRenewAt: period?.quizCreditsRenewAt ?? null, canonicalPlanMigratedAt: now }
       });
       if (updated.count !== 1) throw new Error('CANONICAL_PLAN_MIGRATION_STALE_CANDIDATE');
     }
@@ -107,8 +113,8 @@ export async function canonicalMigrationPreflight(client: PrismaClient): Promise
     ) AS installed`;
   const canonicalSchemaInstalled = Boolean(columns[0]?.installed);
   const candidateRows = canonicalSchemaInstalled
-    ? await client.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::integer AS count FROM "Institute" WHERE "canonicalPlanMigratedAt" IS NULL`
-    : await client.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::integer AS count FROM "Institute"`;
+    ? await client.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::integer AS count FROM "Institute" WHERE ("canonicalPlanMigratedAt" IS NULL AND "createdAt" < ${CANONICAL_PLAN_CUTOVER_AT}) OR "plan"::text IN ('FREE', 'PRO', 'BASIC', 'NO_PLAN') OR ("isQuizOnly" = true AND "canonicalPlanMigratedAt" IS NULL)`
+    : await client.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::integer AS count FROM "Institute" WHERE "createdAt" < ${CANONICAL_PLAN_CUTOVER_AT}`;
   const planDistribution = await client.$queryRaw<Array<{ plan: string; institutes: number }>>`
     SELECT "plan"::text AS plan, COUNT(*)::integer AS institutes FROM "Institute" GROUP BY "plan" ORDER BY "plan"::text`;
   const credits = await client.$queryRaw<Array<{ total: number }>>`SELECT COALESCE(SUM("quizCredits"), 0)::integer AS total FROM "Institute"`;

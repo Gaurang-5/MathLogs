@@ -2,14 +2,17 @@ import crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
-import { activatePaidPlan, cancelAtPeriodEnd } from '../services/subscriptionLifecycleService';
+import { cancelAtPeriodEnd } from '../services/subscriptionLifecycleService';
 import { cancelSatisfiedNotifications, scheduleLifecycleNotifications } from '../services/planNotificationService';
+import { fulfillStoredBillingPayment } from './billingController';
+import { includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
 
 export type SanitizedBillingWebhook = {
   providerEventId: string;
   eventType: string;
   paymentId: string | null;
   orderId: string | null;
+  subscriptionId: string | null;
   amount: number | null;
   currency: string | null;
 };
@@ -23,11 +26,13 @@ export function verifyBillingWebhookSignature(rawBody: Buffer, signature: string
 
 export function sanitizeBillingWebhook(body: any): SanitizedBillingWebhook {
   const payment = body?.payload?.payment?.entity ?? {};
+  const subscription = body?.payload?.subscription?.entity ?? {};
   return {
     providerEventId: String(body?.id ?? ''),
     eventType: String(body?.event ?? ''),
     paymentId: payment.id ? String(payment.id) : null,
     orderId: payment.order_id ? String(payment.order_id) : null,
+    subscriptionId: payment.subscription_id ? String(payment.subscription_id) : subscription.id ? String(subscription.id) : null,
     amount: Number.isFinite(Number(payment.amount)) ? Number(payment.amount) : null,
     currency: payment.currency ? String(payment.currency) : null
   };
@@ -54,20 +59,60 @@ export async function handleRazorpayBillingWebhook(req: Request, res: Response) 
       payload: event as unknown as Prisma.InputJsonValue
     } });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return res.json({ success: true, duplicate: true });
-    throw error;
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      stored = await prisma.billingWebhookEvent.findUnique({ where: { providerEventId: event.providerEventId } });
+      if (!stored || stored.status === 'PROCESSED') return res.json({ success: true, duplicate: true });
+      if (stored.status === 'FAILED') await prisma.billingWebhookEvent.update({ where: { id: stored.id }, data: { status: 'RECEIVED', processingError: null, processedAt: null } });
+    } else {
+      throw error;
+    }
   }
 
   try {
     const payment = event.orderId ? await prisma.billingPayment.findUnique({ where: { providerOrderId: event.orderId } }) : null;
     if (event.eventType === 'payment.failed' && payment) {
-      await prisma.billingPayment.update({ where: { id: payment.id }, data: { status: 'PAYMENT_FAILED', verificationFailedAt: new Date() } });
-      await scheduleLifecycleNotifications({ instituteId: payment.instituteId, event: 'PAYMENT_FAILED', effectiveAt: new Date(), reference: `payment:${payment.id}` }).catch(() => undefined);
-    } else if (event.eventType === 'subscription.charged' && payment?.plan && payment.billingCycle) {
-      await activatePaidPlan({ instituteId: payment.instituteId, plan: payment.plan, billingCycle: payment.billingCycle });
-      await prisma.billingPayment.update({ where: { id: payment.id }, data: { status: 'COMPLETED', capturedAt: new Date(), providerPaymentId: event.paymentId } });
-      await cancelSatisfiedNotifications(payment.instituteId).catch(() => undefined);
-      await scheduleLifecycleNotifications({ instituteId: payment.instituteId, event: 'PAYMENT_SUCCEEDED', effectiveAt: new Date(), reference: `webhook:${event.providerEventId}` }).catch(() => undefined);
+      const failed = await prisma.$transaction(async tx => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payment.id}))`;
+        const current = await tx.billingPayment.findUniqueOrThrow({ where: { id: payment.id } });
+        if (current.status !== 'PENDING' || (current.providerPaymentId && current.providerPaymentId !== event.paymentId)) return { count: 0 };
+        return tx.billingPayment.updateMany({ where: { id: payment.id, status: 'PENDING' }, data: { status: 'PAYMENT_FAILED', providerPaymentId: event.paymentId, verificationFailedAt: new Date() } });
+      });
+      if (failed.count === 1) await scheduleLifecycleNotifications({ instituteId: payment.instituteId, event: 'PAYMENT_FAILED', effectiveAt: new Date(), reference: `payment:${payment.id}` }).catch(() => undefined);
+    } else if (['payment.captured', 'order.paid'].includes(event.eventType) && payment && event.paymentId) {
+      if (event.amount !== payment.amountPaise || event.currency !== 'INR') throw new Error('PAYMENT_BINDING_MISMATCH');
+      await fulfillStoredBillingPayment(payment.id, event.paymentId);
+    } else if (event.eventType === 'subscription.charged') {
+      const institute = event.subscriptionId
+        ? await prisma.institute.findFirst({ where: { razorpaySubscriptionId: event.subscriptionId } })
+        : payment ? await prisma.institute.findUnique({ where: { id: payment.instituteId } }) : null;
+      if (!institute || !['QUIZ', 'ENTERPRISE'].includes(institute.plan) || !['MONTHLY', 'YEARLY'].includes(String(institute.billingCycle))) throw new Error('SUBSCRIPTION_BINDING_MISMATCH');
+      const now = new Date();
+      const applied = await prisma.$transaction(async tx => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${stored.id}))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${institute.id}))`;
+        const currentEvent = await tx.billingWebhookEvent.findUniqueOrThrow({ where: { id: stored.id } });
+        if (currentEvent.status === 'PROCESSED') return false;
+        const current = await tx.institute.findUniqueOrThrow({ where: { id: institute.id } });
+        if (!['QUIZ', 'ENTERPRISE'].includes(current.plan) || !['MONTHLY', 'YEARLY'].includes(String(current.billingCycle))) throw new Error('SUBSCRIPTION_BINDING_MISMATCH');
+        if (event.subscriptionId && current.razorpaySubscriptionId !== event.subscriptionId) throw new Error('SUBSCRIPTION_BINDING_MISMATCH');
+        if (payment && payment.instituteId !== current.id) throw new Error('SUBSCRIPTION_BINDING_MISMATCH');
+        const renewalStart = current.planExpiryDate && current.planExpiryDate > now ? current.planExpiryDate : now;
+        const cycle = current.billingCycle as 'MONTHLY' | 'YEARLY';
+        const period = includedCreditPeriod({ planStartDate: renewalStart }, renewalStart);
+        await tx.institute.update({ where: { id: current.id }, data: {
+          planStartDate: renewalStart, planExpiryDate: paidPlanExpiry(renewalStart, cycle),
+          includedQuizCredits: 5, includedQuizCreditsExpireAt: period.includedQuizCreditsExpireAt,
+          quizCreditsRenewAt: period.quizCreditsRenewAt, quizCredits: 5 + current.lifetimeQuizCredits,
+          marketplaceAccessGrantedAt: current.marketplaceAccessGrantedAt ?? now
+        } });
+        if (payment) await tx.billingPayment.updateMany({ where: { id: payment.id, status: { notIn: ['COMPLETED', 'CREDITED'] } }, data: { status: 'COMPLETED', capturedAt: now, providerPaymentId: event.paymentId } });
+        await tx.billingWebhookEvent.update({ where: { id: stored.id }, data: { status: 'PROCESSED', processedAt: now, instituteId: current.id } });
+        return true;
+      }, { maxWait: 120_000, timeout: 120_000 });
+      if (!applied) return res.json({ success: true, duplicate: true });
+      await cancelSatisfiedNotifications(institute.id).catch(() => undefined);
+      await scheduleLifecycleNotifications({ instituteId: institute.id, event: 'PAYMENT_SUCCEEDED', effectiveAt: now, reference: `webhook:${event.providerEventId}` }).catch(() => undefined);
+      return res.json({ success: true });
     } else if (event.eventType === 'subscription.cancelled') {
       const instituteId = String(body?.payload?.subscription?.entity?.notes?.instituteId ?? '');
       if (instituteId) await cancelAtPeriodEnd(instituteId);

@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { secureLogger } from '../utils/secureLogger';
 import { getClientUrl } from '../utils/urlConfig';
+import { paidPlanExpiry } from '../domain/plans/entitlements';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -63,9 +64,7 @@ export const generateInvite = async (req: Request, res: Response) => {
 
         // Set plan start/expiry dates (1 year by default)
         const startDate = new Date();
-        const expiryDate = new Date();
-        if (cycle === 'YEARLY') expiryDate.setFullYear(startDate.getFullYear() + 1);
-        else expiryDate.setMonth(startDate.getMonth() + 1);
+        const expiryDate = planEnum === 'MARKETPLACE' ? null : paidPlanExpiry(startDate, cycle as 'MONTHLY' | 'YEARLY');
 
         // Create Institute
         const institute = await prisma.institute.create({
@@ -77,7 +76,7 @@ export const generateInvite = async (req: Request, res: Response) => {
                 plan: planEnum as any,
                 billingCycle: cycle as any,
                 planStartDate: startDate,
-                planExpiryDate: planEnum === 'MARKETPLACE' ? null : expiryDate,
+                planExpiryDate: expiryDate,
                 marketplaceAccessGrantedAt: startDate,
                 includedQuizCredits: planEnum === 'MARKETPLACE' ? 0 : 5,
                 lifetimeQuizCredits: 0,

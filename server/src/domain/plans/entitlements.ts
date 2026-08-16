@@ -85,6 +85,18 @@ export function nextBillingAnniversary(start: Date, after: Date): Date {
   return candidate;
 }
 
+/** Returns a clamped UTC plan expiry without JavaScript month overflow. */
+export function paidPlanExpiry(start: Date, cycle: 'MONTHLY' | 'YEARLY'): Date {
+  if (Number.isNaN(start.getTime())) throw new Error('INVALID_BILLING_START_DATE');
+  if (cycle === 'MONTHLY') {
+    let year = start.getUTCFullYear();
+    let month = start.getUTCMonth() + 1;
+    if (month === 12) { month = 0; year += 1; }
+    return anniversaryInUtcMonth(start, year, month);
+  }
+  return anniversaryInUtcMonth(start, start.getUTCFullYear() + 1, start.getUTCMonth());
+}
+
 /**
  * Included credits refresh monthly for both monthly and yearly subscriptions.
  * The subscription's original start date anchors the monthly UTC anniversary.

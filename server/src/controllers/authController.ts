@@ -9,7 +9,7 @@ import { invalidateAuthCache } from '../middleware/auth';
 import { secureLogger } from '../utils/secureLogger';
 import { getOrResetQuizCredits } from '../utils/quizCredits';
 import { hashRequestIp, recordAuthenticationEvent, safeDeviceLabel } from '../services/superAdminAuthEventService';
-import { normalizePlanId } from '../domain/plans/planCatalog';
+import { effectiveEntitlements } from '../domain/plans/entitlements';
 
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -17,10 +17,9 @@ if (!JWT_SECRET) {
     throw new Error('FATAL: JWT_SECRET environment variable must be set. Generate a secure secret with: openssl rand -base64 32');
 }
 
-function accessFlags(institute: { plan?: unknown } | null | undefined) {
-    let plan = 'MARKETPLACE';
-    try { plan = normalizePlanId(institute?.plan); } catch { /* unmigrated no-plan accounts retain Marketplace fallback */ }
-    return { isQuizOnly: plan === 'QUIZ', isPageOnly: plan === 'MARKETPLACE' };
+function accessFlags(institute: Parameters<typeof effectiveEntitlements>[0] | null | undefined) {
+    const access = effectiveEntitlements(institute ?? {});
+    return { isQuizOnly: access.quiz && !access.enterprise, isPageOnly: !access.quiz && !access.enterprise };
 }
 
 /**

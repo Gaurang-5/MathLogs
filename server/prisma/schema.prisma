@@ -16,7 +16,7 @@ model Institute {
   aboutUs                         String?
   websiteConfig                   Json?
   config                          Json?                             @default("{\"subjects\": [\"Math\", \"Science\"], \"allowedClasses\": [\"9\", \"10\"], \"requiresGrades\": true}")
-  plan                            Tier                              @default(FREE)
+  plan                            Tier                              @default(MARKETPLACE)
   email                           String?
   phoneNumber                     String?
   teacherName                     String?
@@ -33,7 +33,7 @@ model Institute {
   includedQuizCreditsExpireAt     DateTime?
   lifetimeQuizCredits             Int                               @default(0)
   quizCreditsRenewAt              DateTime?
-  canonicalPlanMigratedAt         DateTime?
+  canonicalPlanMigratedAt         DateTime?                         @default(now())
   razorpayOrderId                 String?
   razorpaySubscriptionId          String?
   areRegistrationsPaused          Boolean                           @default(false)
@@ -108,6 +108,27 @@ model BillingPayment {
   institute            Institute     @relation(fields: [instituteId], references: [id], onDelete: Restrict)
 
   @@index([instituteId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OnboardingPayment {
+  id                     String       @id @default(uuid())
+  providerOrderId        String       @unique
+  providerPaymentId      String?      @unique
+  providerSignature      String?
+  amountPaise            Int
+  currency               String       @default("INR")
+  plan                   Tier
+  billingCycle           BillingCycle
+  onboardingLinkId       String?
+  provisioningData       Json
+  status                 String       @default("PENDING")
+  provisionedInstituteId String?
+  verifiedAt             DateTime?
+  completedAt            DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
   @@index([status, createdAt])
 }
 

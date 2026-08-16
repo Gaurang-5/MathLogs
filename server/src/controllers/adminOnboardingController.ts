@@ -8,6 +8,10 @@ import { sendSetupLinkEmail } from '../utils/email';
 import { secureLogger } from '../utils/secureLogger';
 import { getRazorpayConfig } from '../utils/env';
 import { normalizePlanId, resolvePlanPrice } from '../domain/plans/planCatalog';
+import { OnboardingPaymentError, persistOnboardingOrder, provisionClaimedOnboardingPayment, verifyAndClaimOnboardingPayment } from '../services/onboardingPaymentService';
+import { normalizeTrialOwnerIdentity } from '../services/subscriptionLifecycleService';
+import { includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
+import { scheduleLifecycleNotifications } from '../services/planNotificationService';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -130,36 +134,39 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
 
         // Handle FREE TRIAL links — skip payment entirely
         if (link.isFreeTrial) {
-            const planEnum: any = link.plan;
-
             const planStartDate = new Date();
-            const planExpiryDate = new Date();
-            planExpiryDate.setDate(planExpiryDate.getDate() + (link.trialDays || 14));
+            const trialEndsAt = new Date(planStartDate.getTime() + 14 * 86_400_000);
 
             const finalName = instituteName || 'New Institute';
             const finalTeacher = teacherName || '';
             const finalPhone = phoneNumber || '';
             const finalEmail = email || '';
-
-            const newInstitute = await prisma.institute.create({
-                data: {
+            const plan = normalizePlanId(link.plan);
+            if (plan === 'MARKETPLACE') return res.status(400).json({ error: 'Free trial requires Quiz or Enterprise.' });
+            const ownerIdentityHash = crypto.createHmac('sha256', process.env.JWT_SECRET || 'local-lifecycle-secret').update(normalizeTrialOwnerIdentity(finalPhone || finalEmail)).digest('hex');
+            const period = includedCreditPeriod({ planStartDate }, planStartDate);
+            const tokenString = crypto.randomBytes(24).toString('hex');
+            const provisioned = await prisma.$transaction(async tx => {
+                const claimed = await tx.adminOnboardingLink.updateMany({ where: { id: link.id, status: 'PENDING', expiresAt: { gt: planStartDate } }, data: { status: 'PROCESSING' } });
+                if (claimed.count !== 1) throw new OnboardingPaymentError('ONBOARDING_LINK_NOT_AVAILABLE');
+                const newInstitute = await tx.institute.create({ data: {
                     name: finalName,
                     teacherName: finalTeacher,
                     phoneNumber: finalPhone,
                     email: finalEmail,
-                    plan: planEnum,
+                    plan,
                     isQuizOnly: false,
                     quizCredits: 5,
                     includedQuizCredits: 5,
                     planStartDate,
-                    planExpiryDate,
-                    billingCycle: (link.billingCycle || 'MONTHLY') as any,
+                    planExpiryDate: trialEndsAt,
+                    billingCycle: 'MONTHLY',
                     trialStartedAt: planStartDate,
-                    trialEndsAt: planExpiryDate,
+                    trialEndsAt,
                     trialUsedAt: planStartDate,
                     marketplaceAccessGrantedAt: planStartDate,
-                    includedQuizCreditsExpireAt: planExpiryDate,
-                    quizCreditsRenewAt: planExpiryDate,
+                    includedQuizCreditsExpireAt: period.includedQuizCreditsExpireAt,
+                    quizCreditsRenewAt: period.quizCreditsRenewAt,
                     config: {
                         requiresGrades: true,
                         billingCycle: 'trial',
@@ -173,25 +180,20 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
                         } : {}),
                         ...(link.discountPercent ? { discountPercent: link.discountPercent } : {}),
                     }
-                }
-            });
-
-            const tokenString = crypto.randomBytes(24).toString('hex');
-            const invite = await prisma.inviteToken.create({
-                data: {
+                } });
+                await tx.planTrialClaim.create({ data: { instituteId: newInstitute.id, ownerIdentityHash, plan, claimedAt: planStartDate, endsAt: trialEndsAt } });
+                const invite = await tx.inviteToken.create({ data: {
                     token: tokenString,
                     instituteId: newInstitute.id,
                     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-                }
+                } });
+                await tx.adminOnboardingLink.update({ where: { id: link.id }, data: { status: 'USED', instituteId: newInstitute.id } });
+                return { newInstitute, invite };
             });
-
-            await prisma.adminOnboardingLink.update({
-                where: { id: link.id },
-                data: { status: 'USED', instituteId: newInstitute.id }
-            });
+            await scheduleLifecycleNotifications({ instituteId: provisioned.newInstitute.id, event: 'TRIAL_STARTED', effectiveAt: planStartDate, expiryAt: trialEndsAt, reference: `trial:${trialEndsAt.toISOString()}` }).catch(() => undefined);
 
             const clientUrl = getClientUrl(req);
-            const setupLink = `${clientUrl}/setup?token=${invite.token}`;
+            const setupLink = `${clientUrl}/setup?token=${provisioned.invite.token}`;
 
             const notificationData = {
                 ownerName: finalTeacher || 'there',
@@ -221,25 +223,25 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
 
         // Handle FREE plans (100% discount or ₹0 custom price)
         if (amountInPaise <= 0) {
-            // Directly provision the institute — no payment needed
-            const planEnum: any = link.plan;
+            const planEnum = normalizePlanId(link.plan);
 
             const planStartDate = new Date();
-            const planExpiryDate = link.plan === 'MARKETPLACE' ? null : new Date();
             const cycle = selectedBillingCycle;
-            if (planExpiryDate && cycle === 'monthly') {
-                planExpiryDate.setDate(planExpiryDate.getDate() + 30);
-            } else if (planExpiryDate) {
-                planExpiryDate.setDate(planExpiryDate.getDate() + 365);
-            }
+            const planExpiryDate = link.plan === 'MARKETPLACE' ? null : paidPlanExpiry(planStartDate, cycle === 'monthly' ? 'MONTHLY' : 'YEARLY');
+            const creditPeriod = link.plan === 'MARKETPLACE' ? null : includedCreditPeriod({ planStartDate }, planStartDate);
 
             const finalName = instituteName || 'New Institute';
             const finalTeacher = teacherName || '';
             const finalPhone = phoneNumber || '';
             const finalEmail = email || '';
-
-            const newInstitute = await prisma.institute.create({
-                data: {
+            const tokenString = crypto.randomBytes(24).toString('hex');
+            const provisioned = await prisma.$transaction(async tx => {
+                const claimed = await tx.adminOnboardingLink.updateMany({
+                    where: { id: link.id, status: 'PENDING', expiresAt: { gt: planStartDate } },
+                    data: { status: 'PROCESSING' }
+                });
+                if (claimed.count !== 1) throw new OnboardingPaymentError('ONBOARDING_LINK_NOT_AVAILABLE');
+                const newInstitute = await tx.institute.create({ data: {
                     name: finalName,
                     teacherName: finalTeacher,
                     phoneNumber: finalPhone,
@@ -252,8 +254,8 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
                     planExpiryDate,
                     billingCycle: link.plan === 'MARKETPLACE' ? 'ONE_TIME' : cycle.toUpperCase() as any,
                     marketplaceAccessGrantedAt: planStartDate,
-                    includedQuizCreditsExpireAt: planExpiryDate,
-                    quizCreditsRenewAt: planExpiryDate,
+                    includedQuizCreditsExpireAt: creditPeriod?.includedQuizCreditsExpireAt ?? null,
+                    quizCreditsRenewAt: creditPeriod?.quizCreditsRenewAt ?? null,
                     config: {
                         requiresGrades: true,
                         billingCycle: cycle,
@@ -265,27 +267,21 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
                         } : {}),
                         ...(link.discountPercent ? { discountPercent: link.discountPercent } : {}),
                     }
-                }
-            });
-
-            // Create invite token for setup
-            const tokenString = crypto.randomBytes(24).toString('hex');
-            const invite = await prisma.inviteToken.create({
-                data: {
+                } });
+                const invite = await tx.inviteToken.create({ data: {
                     token: tokenString,
                     instituteId: newInstitute.id,
                     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-                }
-            });
-
-            // Mark the link as used
-            await prisma.adminOnboardingLink.update({
-                where: { id: link.id },
-                data: { status: 'USED' }
+                } });
+                await tx.adminOnboardingLink.update({
+                    where: { id: link.id },
+                    data: { status: 'USED', instituteId: newInstitute.id }
+                });
+                return { newInstitute, invite };
             });
 
             const clientUrl = getClientUrl(req);
-            const setupLink = `${clientUrl}/setup?token=${invite.token}`;
+            const setupLink = `${clientUrl}/setup?token=${provisioned.invite.token}`;
 
             // Send notifications
             const notifPhone = finalPhone;
@@ -324,6 +320,11 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
                 teacherName: teacherName || '',
             }
         });
+        await persistOnboardingOrder({
+            providerOrderId: String(order.id), amountPaise: amountInPaise, plan: normalizePlanId(link.plan) as 'QUIZ' | 'ENTERPRISE',
+            billingCycle: selectedBillingCycle.toUpperCase() as 'MONTHLY' | 'YEARLY', onboardingLinkId: link.id,
+            provisioningData: { instituteName, teacherName, phoneNumber, email }
+        });
 
         res.json({
             success: true,
@@ -334,6 +335,8 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
         });
 
     } catch (error: any) {
+        if (error instanceof OnboardingPaymentError) return res.status(409).json({ error: error.message });
+        if (error?.code === 'P2002') return res.status(409).json({ error: 'TRIAL_ALREADY_USED' });
         console.error('Create Admin Onboarding Order Error:', error);
         res.status(500).json({ error: 'Failed to create payment order.' });
     }
@@ -341,123 +344,31 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
 
 // PUBLIC: Verify payment & provision institute for admin onboarding link
 export const verifyAdminOnboardingPayment = async (req: Request, res: Response) => {
-    const {
-        token,
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature,
-        billingCycle,
-        instituteName,
-        teacherName,
-        phoneNumber,
-        email,
-    } = req.body;
-
     try {
-        const link = await prisma.adminOnboardingLink.findUnique({
-            where: { token }
-        });
-
+        const link = await prisma.adminOnboardingLink.findUnique({ where: { token: String(req.body.token || '') } });
         if (!link) return res.status(404).json({ error: 'Link not found.' });
         if (link.status !== 'PENDING') return res.status(400).json({ error: 'This link has already been used.' });
-
-        // 1. Verify Razorpay Signature
-        const secret = razorpayConfig.keySecret;
-        const bodyText = razorpay_order_id + '|' + razorpay_payment_id;
-        const expectedSignature = crypto
-            .createHmac('sha256', secret)
-            .update(bodyText)
-            .digest('hex');
-
-        if (expectedSignature !== razorpay_signature) {
-            return res.status(400).json({ error: 'Invalid payment signature.' });
-        }
-
-        // 2. Map plan to Tier enum
-        const planEnum: any = link.plan;
-
-        // 3. Set dates based on billing cycle
-        const planStartDate = new Date();
-        const planExpiryDate = new Date();
-        const cycle = String(link.billingCycle || 'YEARLY').toLowerCase();
-        if (cycle === 'monthly') {
-            planExpiryDate.setDate(planExpiryDate.getDate() + 30);
-        } else {
-            planExpiryDate.setDate(planExpiryDate.getDate() + 365);
-        }
-
-        // 4. Create Institute (subjects/classes are configured on the /setup page)
-        const finalName = instituteName || 'New Institute';
-        const finalTeacher = teacherName || '';
-        const finalPhone = phoneNumber || '';
-        const finalEmail = email || '';
-
-        const newInstitute = await prisma.institute.create({
-            data: {
-                name: finalName,
-                teacherName: finalTeacher,
-                phoneNumber: finalPhone,
-                email: finalEmail,
-                plan: planEnum,
-                isQuizOnly: false,
-                quizCredits: link.plan === 'MARKETPLACE' ? 0 : 5,
-                includedQuizCredits: link.plan === 'MARKETPLACE' ? 0 : 5,
-                planStartDate,
-                planExpiryDate,
-                billingCycle: cycle.toUpperCase() as any,
-                marketplaceAccessGrantedAt: planStartDate,
-                includedQuizCreditsExpireAt: planExpiryDate,
-                quizCreditsRenewAt: planExpiryDate,
-                config: {
-                    requiresGrades: true,
-                    billingCycle: cycle,
-                    allowedClasses: ["Class 9", "Class 10"],
-                    subjects: ["Mathematics"],
-                    // Store pricing info for billing page renewals
-                    ...(link.plan === 'CUSTOM' ? {
-                        customPriceMonthly: (link.customPriceMonthlyPaise || 0) / 100,
-                        customPriceYearly: (link.customPriceYearlyPaise || 0) / 100,
-                    } : {}),
-                    ...(link.discountPercent ? { discountPercent: link.discountPercent } : {}),
-                }
-            }
-        });
-
-        // 6. Create invite token for the setup page
-        const tokenString = crypto.randomBytes(24).toString('hex');
-        const invite = await prisma.inviteToken.create({
-            data: {
-                token: tokenString,
-                instituteId: newInstitute.id,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-            }
-        });
-
-        // 7. Mark admin onboarding link as PAID
-        await prisma.adminOnboardingLink.update({
-            where: { id: link.id },
-            data: {
-                status: 'PAID',
-                billingCycle: cycle,
-                instituteId: newInstitute.id,
-            }
-        });
+        if (new Date() > link.expiresAt) return res.status(400).json({ error: 'This link has expired.' });
+        const payment = await verifyAndClaimOnboardingPayment({ orderId: String(req.body.razorpay_order_id || ''), paymentId: String(req.body.razorpay_payment_id || ''), signature: String(req.body.razorpay_signature || ''), onboardingLinkId: link.id });
+        const provisioned = await provisionClaimedOnboardingPayment(payment);
+        if (!provisioned.inviteToken) return res.status(409).json({ error: 'Setup already completed.' });
+        const payload = payment.provisioningData as Record<string, any>;
 
         const clientUrl = getClientUrl(req);
-        const setupLink = `${clientUrl}/setup?token=${invite.token}`;
+        const setupLink = `${clientUrl}/setup?token=${provisioned.inviteToken}`;
 
         // Send setup link via WhatsApp + Email
-        const notifPhone = phoneNumber || '';
+        const notifPhone = String(payload.phoneNumber || '');
         const notificationData = {
-            ownerName: finalTeacher || 'there',
+            ownerName: String(payload.teacherName || 'there'),
             setupLink,
-            tuitionName: finalName
+            tuitionName: String(payload.instituteName || 'New Institute')
         };
 
         if (notifPhone) {
             await Promise.allSettled([
                 sendSetupLinkWhatsApp(notifPhone, notificationData),
-                finalEmail ? sendSetupLinkEmail(finalEmail, notificationData) : Promise.resolve()
+                payload.email ? sendSetupLinkEmail(String(payload.email), notificationData) : Promise.resolve()
             ]);
         }
 
@@ -468,6 +379,7 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
         });
 
     } catch (error: any) {
+        if (error instanceof OnboardingPaymentError) return res.status(['ONBOARDING_PAYMENT_ALREADY_USED', 'ONBOARDING_LINK_NOT_AVAILABLE'].includes(error.message) ? 409 : 400).json({ error: error.message });
         console.error('Verify Admin Onboarding Payment Error:', error);
         res.status(500).json({ error: 'Payment verification failed.' });
     }

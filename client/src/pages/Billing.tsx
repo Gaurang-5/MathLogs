@@ -15,7 +15,13 @@ const date = (value?: string | null) => value ? new Date(value).toLocaleDateStri
 
 export default function Billing() {
   const [institute, setInstitute] = useState<InstituteBilling | null>(null); const [loading, setLoading] = useState(true); const [checkout, setCheckout] = useState(false);
-  const load = useCallback(async () => { try { setInstitute(await api.get<InstituteBilling>('/institute/me')); } catch { toast.error('Failed to load billing details.'); } finally { setLoading(false); } }, []);
+  const load = useCallback(async () => { try {
+    const next = await api.get<InstituteBilling>('/institute/me'); setInstitute(next);
+    const active = !next.planExpiryDate || new Date(next.planExpiryDate).getTime() >= Date.now();
+    localStorage.setItem('isPageOnly', String(next.plan === 'MARKETPLACE' || !active));
+    localStorage.setItem('isQuizOnly', String(next.plan === 'QUIZ' && active));
+    window.dispatchEvent(new Event('auth-entitlements-updated'));
+  } catch { toast.error('Failed to load billing details.'); } finally { setLoading(false); } }, []);
   useEffect(() => { void load(); }, [load]);
   const choose = async (plan: CanonicalPlan, billingCycle: BillingCycle) => {
     setCheckout(true);

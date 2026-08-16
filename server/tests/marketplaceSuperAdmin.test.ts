@@ -30,7 +30,8 @@ before(async () => {
       name: `Operations ${suffix}`, teacherName: 'Teacher One', phoneNumber: '9000000000', publicPhone: '9000000001',
       whatsappPhone: '9000000002', city: 'Jaipur', area: 'Malviya Nagar', address: 'One Street', tagline: 'Learn well',
       aboutUs: 'Detailed profile', logoUrl: 'https://example.com/logo.png', subjectsOffered: ['Math'], classesOffered: ['10'],
-      ownershipStatus: 'CLAIMED', isPubliclyListed: true, isVerified: false, googleRating: 4.5, googleReviewCount: 20
+      ownershipStatus: 'CLAIMED', isPubliclyListed: true, isVerified: false, googleRating: 4.5, googleReviewCount: 20,
+      plan: 'ENTERPRISE', planExpiryDate: new Date('2099-01-01T00:00:00Z'), marketplaceAccessGrantedAt: new Date()
     }
   });
   instituteId = institute.id;

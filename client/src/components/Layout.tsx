@@ -95,6 +95,14 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
         navigate('/login');
     };
 
+    const [entitlementVersion, setEntitlementVersion] = useState(0);
+    useEffect(() => {
+        const refresh = () => setEntitlementVersion(value => value + 1);
+        window.addEventListener('auth-entitlements-updated', refresh);
+        window.addEventListener('storage', refresh);
+        return () => { window.removeEventListener('auth-entitlements-updated', refresh); window.removeEventListener('storage', refresh); };
+    }, []);
+    void entitlementVersion;
     const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
     const isPageOnly = localStorage.getItem('isPageOnly') === 'true';
 
@@ -109,7 +117,6 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
         ];
     } else if (isQuizOnly) {
         navItems = [
-            { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
             { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
             { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
             { name: 'Buy Credits', path: '/billing', icon: CreditCard },

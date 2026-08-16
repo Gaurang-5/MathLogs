@@ -7,8 +7,9 @@ import { sendSetupLinkEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
 import { secureLogger } from '../utils/secureLogger';
 import { getRazorpayConfig } from '../utils/env';
-import { activateMarketplace, activatePaidPlan, SubscriptionLifecycleError, startPlanTrial as startCanonicalTrial } from '../services/subscriptionLifecycleService';
+import { activateMarketplace, SubscriptionLifecycleError, startPlanTrial as startCanonicalTrial } from '../services/subscriptionLifecycleService';
 import { normalizePlanId, resolvePlanPrice, type BillingCycle } from '../domain/plans/planCatalog';
+import { OnboardingPaymentError, persistOnboardingOrder, provisionClaimedOnboardingPayment, verifyAndClaimOnboardingPayment } from '../services/onboardingPaymentService';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -105,6 +106,11 @@ export const createOrder = async (req: Request, res: Response) => {
             return res.status(500).json({ error: 'Failed to initialize payment gateway.' });
         }
 
+        await persistOnboardingOrder({
+            providerOrderId: String(order.id), amountPaise: amountInPaise, plan: plan as 'QUIZ' | 'ENTERPRISE', billingCycle: cycle,
+            provisioningData: { tuitionName, ownerName, phone, email, listOnMarketplace: req.body.listOnMarketplace, city: req.body.city, area: req.body.area, subjectsOffered: req.body.subjectsOffered, googleMapsUrl: req.body.googleMapsUrl }
+        });
+
         return res.json({
             success: true,
             orderId: order.id,
@@ -140,108 +146,22 @@ async function createUniqueSlug(name: string) {
 // Verify Payment and Provision Account
 export const verifyPayment = async (req: Request, res: Response) => {
     try {
-        const {
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature,
-            razorpay_subscription_id,
-            tuitionName,
-            ownerName,
-            phone,
-            email,
-            planId,
-            billingCycle,
-            listOnMarketplace,
-            city,
-            area,
-            subjectsOffered,
-            googleMapsUrl
-        } = req.body;
-
-        // 1. Verify Signature
-        const secret = razorpayConfig.keySecret;
-
-        let bodyText = razorpay_order_id + '|' + razorpay_payment_id;
-        if (razorpay_subscription_id && !razorpay_order_id) {
-            bodyText = razorpay_payment_id + '|' + razorpay_subscription_id;
-        }
-
-        const expectedSignature = crypto
-            .createHmac('sha256', secret)
-            .update(bodyText.toString())
-            .digest('hex');
-
-        if (expectedSignature !== razorpay_signature) {
-            return res.status(400).json({ error: 'Invalid payment signature.' });
-        }
-
-        // 2. Provision the Database Records
-        let plan;
-        let cycle: BillingCycle;
-        try {
-            plan = normalizePlanId(planId);
-            cycle = String(billingCycle || '').toUpperCase() as BillingCycle;
-            resolvePlanPrice(plan, cycle);
-        } catch {
-            return res.status(400).json({ error: 'Invalid plan or billing cycle.' });
-        }
-        if (plan === 'MARKETPLACE') return res.status(400).json({ error: 'Marketplace activation does not require payment.' });
-
-        const uniqueSlug = await createUniqueSlug(tuitionName);
-
-        // A. Create Institute with Marketplace Listing
-        const newInstitute = await prisma.institute.create({
-            data: {
-                name: tuitionName,
-                teacherName: ownerName,
-                phoneNumber: phone,
-                publicPhone: phone,
-                whatsappPhone: phone,
-                email: email,
-                plan: 'MARKETPLACE',
-                billingCycle: 'ONE_TIME',
-                marketplaceAccessGrantedAt: new Date(),
-                isQuizOnly: false,
-                quizCredits: 0,
-                isPubliclyListed: listOnMarketplace ?? true,
-                isExclusive: false,
-                slug: uniqueSlug,
-                city: city ? city.trim() : null,
-                area: area ? area.trim() : null,
-                subjectsOffered: Array.isArray(subjectsOffered) ? subjectsOffered : [],
-                googleMapsUrl: googleMapsUrl ? googleMapsUrl.trim() : null,
-                config: {
-                    requiresGrades: true,
-                    allowedClasses: ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"],
-                    subjects: ["Mathematics", "Science", "Physics", "Chemistry", "Biology", "English"]
-                }
-            }
-        });
-        await activatePaidPlan({ instituteId: newInstitute.id, plan, billingCycle: cycle });
-
-        // Generate Cryptographically Secure Token
-        const tokenString = crypto.randomBytes(24).toString('hex');
-
-        // Create Invite Token
-        const invite = await prisma.inviteToken.create({
-            data: {
-                token: tokenString,
-                instituteId: newInstitute.id,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-            }
-        });
+        const payment = await verifyAndClaimOnboardingPayment({ orderId: String(req.body.razorpay_order_id || ''), paymentId: String(req.body.razorpay_payment_id || ''), signature: String(req.body.razorpay_signature || '') });
+        const provisioned = await provisionClaimedOnboardingPayment(payment);
+        if (!provisioned.inviteToken) return res.status(409).json({ error: 'Setup already completed.' });
+        const payload = payment.provisioningData as Record<string, any>;
 
         const clientUrl = getClientUrl(req);
-        const setupLink = `${clientUrl}/setup?token=${invite.token}`;
+        const setupLink = `${clientUrl}/setup?token=${provisioned.inviteToken}`;
 
         // Send setup link via WhatsApp + Email (fire-and-forget, don't block response)
-        const notificationData = { ownerName, setupLink, tuitionName };
+        const notificationData = { ownerName: String(payload.ownerName || ''), setupLink, tuitionName: String(payload.tuitionName || '') };
         await Promise.allSettled([
-            sendSetupLinkWhatsApp(phone, notificationData),
-            sendSetupLinkEmail(email, notificationData)
+            sendSetupLinkWhatsApp(String(payload.phone || ''), notificationData),
+            sendSetupLinkEmail(String(payload.email || ''), notificationData)
         ]);
 
-        secureLogger.info(`[ONBOARDING] Generated link for ${tuitionName}: ${setupLink}`);
+        secureLogger.info('[ONBOARDING] Paid account provisioned', { instituteId: provisioned.instituteId });
 
         res.json({
             success: true,
@@ -250,6 +170,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
         });
 
     } catch (error) {
+        if (error instanceof OnboardingPaymentError) return res.status(['ONBOARDING_PAYMENT_ALREADY_USED', 'ONBOARDING_LINK_NOT_AVAILABLE'].includes(error.message) ? 409 : 400).json({ error: error.message });
         console.error('Verify Payment Error:', error);
         res.status(500).json({ error: 'Internal server error during payment verification.' });
     }

@@ -56,6 +56,14 @@ async function postJson(path: string, body: unknown, headers: Record<string, str
     });
 }
 
+async function putJson(path: string, body: unknown, headers: Record<string, string> = {}) {
+    return fetch(`${baseUrl}${path}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+    });
+}
+
 test('POST /api/auth/login rejects invalid payloads before controller execution', async () => {
     const response = await postJson('/api/auth/login', {
         username: '',
@@ -135,6 +143,24 @@ test('canonical Marketplace-only and expired Enterprise access cannot mutate ERP
     const response = await postJson('/api/students/manual', {}, { Authorization: 'Bearer valid-token' });
     assert.equal(response.status, 403);
     assert.equal((await response.json() as { error: string }).error, 'MARKETPLACE_ONLY_ACCESS_RESTRICTED');
+});
+
+test('canonical Quiz-only access cannot mutate Enterprise ERP routes', async () => {
+    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: (error: unknown, decoded?: unknown) => void) => {
+        callback(null, { id: 'quiz-auth-admin', username: 'quiz-owner', passwordVersion: 1, instituteId: 'quiz-auth-inst', role: 'INSTITUTE_ADMIN' });
+    }) as unknown) as typeof jwt.verify);
+    replaceMethod(prisma.admin, 'findUnique', (async () => ({
+        id: 'quiz-auth-admin', username: 'quiz-owner', passwordVersion: 1, instituteId: 'quiz-auth-inst', role: 'INSTITUTE_ADMIN',
+        institute: {
+            plan: 'QUIZ', planExpiryDate: new Date('2099-01-01T00:00:00Z'),
+            marketplaceAccessGrantedAt: new Date('2026-01-01T00:00:00Z'), trialEndsAt: null,
+            includedQuizCredits: 5, lifetimeQuizCredits: 0,
+        },
+    }) as never) as typeof prisma.admin.findUnique);
+
+    const response = await postJson('/api/students/manual', {}, { Authorization: 'Bearer valid-token' });
+    assert.equal(response.status, 403);
+    assert.equal((await response.json() as { error: string }).error, 'ENTERPRISE_PLAN_REQUIRED');
 });
 
 test('POST /api/auth/login returns tokens for valid credentials', async () => {
@@ -252,7 +278,7 @@ test('POST /api/fees/pay-installment records a payment for an authenticated teac
         role: 'ADMIN',
         institute: {
             planExpiryDate: null,
-            plan: 'ACTIVE',
+            plan: 'ENTERPRISE',
         },
     }) as never) as typeof prisma.admin.findUnique);
     replaceMethod(prisma.student, 'findUnique', (async () => ({
@@ -331,7 +357,7 @@ test('POST /api/tests/online saves generated quiz questions for a teacher batch'
         role: 'ADMIN',
         institute: {
             planExpiryDate: null,
-            plan: 'ACTIVE',
+            plan: 'ENTERPRISE',
         },
     }) as never) as typeof prisma.admin.findUnique);
     replaceMethod(prisma.batch, 'findFirst', (async () => ({ id: 'batch-quiz-1' }) as never) as typeof prisma.batch.findFirst);
@@ -417,12 +443,65 @@ test('POST /api/tests/online saves generated quiz questions for a teacher batch'
     assert.equal(createdQuestions.length, 1);
 });
 
+test('PUT /api/tests/online charges one credit when publishing a draft and never charges it twice', async () => {
+    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: (error: unknown, decoded?: unknown) => void) => {
+        callback(null, { id: 'draft-publish-admin', username: 'quiz-owner', passwordVersion: 1, instituteId: 'draft-publish-inst', role: 'INSTITUTE_ADMIN' });
+    }) as unknown) as typeof jwt.verify);
+    replaceMethod(prisma.admin, 'findUnique', (async () => ({
+        id: 'draft-publish-admin', username: 'quiz-owner', passwordVersion: 1, instituteId: 'draft-publish-inst', role: 'INSTITUTE_ADMIN',
+        institute: { plan: 'QUIZ', planExpiryDate: new Date('2099-01-01T00:00:00Z'), trialEndsAt: null, marketplaceAccessGrantedAt: new Date(), includedQuizCredits: 5, lifetimeQuizCredits: 0 },
+    }) as never) as typeof prisma.admin.findUnique);
+
+    let finalized = false;
+    let includedCredits = 5;
+    const walletInstitute = () => ({
+        id: 'draft-publish-inst', createdAt: new Date('2026-01-01T00:00:00Z'), plan: 'QUIZ',
+        planStartDate: new Date('2026-08-01T00:00:00Z'), planExpiryDate: new Date('2099-01-01T00:00:00Z'), trialEndsAt: null,
+        marketplaceAccessGrantedAt: new Date('2026-08-01T00:00:00Z'), includedQuizCredits: includedCredits,
+        includedQuizCreditsExpireAt: new Date('2099-01-01T00:00:00Z'), lifetimeQuizCredits: 0,
+        quizCreditsRenewAt: new Date('2099-01-01T00:00:00Z'), quizCredits: includedCredits,
+    });
+    replaceMethod(prisma.institute, 'findUnique', (async () => walletInstitute() as never) as typeof prisma.institute.findUnique);
+    replaceMethod(prisma.institute, 'update', (async ({ data }: { data: any }) => {
+        includedCredits = Number(data.includedQuizCredits);
+        return walletInstitute() as never;
+    }) as typeof prisma.institute.update);
+    replaceMethod(prisma, '$executeRaw', (async () => 1) as typeof prisma.$executeRaw);
+    replaceMethod(prisma, '$transaction', (async (callback: any) => callback(prisma)) as typeof prisma.$transaction);
+    replaceMethod(prisma.onlineQuiz, 'findFirst', (async () => ({
+        id: 'draft-quiz-1', teacherId: 'draft-publish-admin', instituteId: 'draft-publish-inst', batchId: null,
+        title: 'Draft quiz', topic: 'Algebra', difficulty: 'Medium', timeLimitMins: 20, totalMarks: 1,
+        availableFrom: null, availableUntil: null, isFinalized: finalized, isPublic: true, studentQuestionCount: null,
+        questions: [{ id: 'question-1', questionText: '1 + 1?', options: ['1', '2'], correctOption: '2', marks: 1 }],
+        _count: { submissions: 0 },
+    }) as never) as typeof prisma.onlineQuiz.findFirst);
+    replaceMethod(prisma.onlineQuiz, 'update', (async ({ data }: { data: any }) => {
+        finalized = Boolean(data.isFinalized);
+        return { id: 'draft-quiz-1', isFinalized: finalized } as never;
+    }) as typeof prisma.onlineQuiz.update);
+    replaceMethod(prisma.onlineQuiz, 'updateMany', (async () => {
+        if (finalized) return { count: 0 };
+        finalized = true;
+        return { count: 1 };
+    }) as typeof prisma.onlineQuiz.updateMany);
+
+    const body = {
+        title: 'Published quiz', topic: 'Algebra', difficulty: 'Medium', timeLimitMins: 20, totalMarks: 1,
+        availableFrom: '2098-01-01T00:00:00.000Z', availableUntil: '2098-01-02T00:00:00.000Z', isPublic: true, isDraft: false,
+    };
+    const first = await putJson('/api/tests/online/draft-quiz-1', body, { Authorization: 'Bearer valid-token' });
+    const second = await putJson('/api/tests/online/draft-quiz-1', body, { Authorization: 'Bearer valid-token' });
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(includedCredits, 4);
+});
+
 test('POST /api/fees/pay is idempotent and prevents double-payment', async () => {
     replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: any) => {
         callback(null, { id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN' });
     }) as unknown) as typeof jwt.verify);
     replaceMethod(prisma.admin, 'findUnique', (async () => ({
-        id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN', institute: { plan: 'ACTIVE' },
+        id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN', institute: { plan: 'ENTERPRISE' },
     }) as never) as typeof prisma.admin.findUnique);
 
     let txLock = Promise.resolve();
@@ -470,7 +549,7 @@ test('POST /api/fees/pay-installment is idempotent and prevents double-payment',
         callback(null, { id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN' });
     }) as unknown) as typeof jwt.verify);
     replaceMethod(prisma.admin, 'findUnique', (async () => ({
-        id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN', institute: { plan: 'ACTIVE' },
+        id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN', institute: { plan: 'ENTERPRISE' },
     }) as never) as typeof prisma.admin.findUnique);
 
     let txLock = Promise.resolve();

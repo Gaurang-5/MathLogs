@@ -1082,9 +1082,14 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
             finalTotalMarks = avgMarks * sqCount;
         }
 
+        const shouldConsumeCredit = !quiz.isFinalized && isDraft !== true;
         let updatedQuiz;
         if (normalizedQuestions) {
             updatedQuiz = await prisma.$transaction(async (tx) => {
+                if (shouldConsumeCredit) {
+                    const claimed = await tx.onlineQuiz.updateMany({ where: { id: quizId, teacherId, instituteId, isFinalized: false }, data: { isFinalized: true } });
+                    if (claimed.count === 1) await consumeQuizCreditsInTransaction(tx, instituteId!, 1);
+                }
                 await tx.quizQuestion.deleteMany({ where: { quizId } });
                 return await tx.onlineQuiz.update({
                     where: { id: quizId },
@@ -1118,9 +1123,12 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
                 });
             }, { maxWait: 15000, timeout: 35000 });
         } else {
-            updatedQuiz = await prisma.onlineQuiz.update({
-                where: { id: quizId },
-                data: {
+            updatedQuiz = await prisma.$transaction(async (tx) => {
+                if (shouldConsumeCredit) {
+                    const claimed = await tx.onlineQuiz.updateMany({ where: { id: quizId, teacherId, instituteId, isFinalized: false }, data: { isFinalized: true } });
+                    if (claimed.count === 1) await consumeQuizCreditsInTransaction(tx, instituteId!, 1);
+                }
+                return tx.onlineQuiz.update({ where: { id: quizId }, data: {
                     title,
                     topic,
                     difficulty,
@@ -1143,7 +1151,7 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
                     batches: { select: { id: true, name: true, className: true } },
                     questions: true,
                     _count: { select: { submissions: true } }
-                }
+                } });
             });
         }
 
@@ -1152,6 +1160,9 @@ export const updateOnlineQuiz = async (req: Request, res: Response) => {
     } catch (e: any) {
 
         console.error("Update Online Quiz Error:", e);
+        if (e instanceof QuizCreditWalletError) {
+            return res.status(e.message === 'INSUFFICIENT_QUIZ_CREDITS' ? 402 : 403).json({ error: e.message });
+        }
         if (e.message?.startsWith('Question ')) {
             return res.status(400).json({ error: e.message });
         }

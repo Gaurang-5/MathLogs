@@ -82,6 +82,18 @@ function isMarketplaceOnlyAllowedRequest(req: Request): boolean {
     return false;
 }
 
+function isQuizPlanAllowedRequest(req: Request): boolean {
+    if (isMarketplaceOnlyAllowedRequest(req)) return true;
+    const path = req.originalUrl.split('?')[0].replace(/\/$/, '');
+    const method = req.method.toUpperCase();
+
+    if (path.startsWith('/api/quizzes')) return true;
+    if (path === '/api/tests/online' || /^\/api\/tests\/online\/[^/]+(?:\/.*)?$/.test(path)) return true;
+    if (method === 'GET' && (path === '/api/batches' || path.startsWith('/api/batches/') || path.startsWith('/api/students/search') || path.includes('/eligible-students'))) return true;
+    if (path.startsWith('/api/auth/')) return true;
+    return false;
+}
+
 function supportSessionActionForbidden(req: Request) {
     const path = req.originalUrl.split('?')[0];
     if (path.startsWith('/api/super-admin') || path.startsWith('/api/auth') || path.startsWith('/api/billing')) return true;
@@ -196,12 +208,19 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 
             const institute = dbUser.institute;
             const entitlements = effectiveEntitlements(institute ?? {});
-            const marketplaceOnly = entitlements.marketplace && !entitlements.quiz && !entitlements.enterprise;
+            const marketplaceOnly = !entitlements.quiz && !entitlements.enterprise;
+            const quizOnly = entitlements.quiz && !entitlements.enterprise;
 
             if (marketplaceOnly && dbUser.role !== 'SUPER_ADMIN' && !isMarketplaceOnlyAllowedRequest(req)) {
                 return res.status(403).json({
                     error: 'MARKETPLACE_ONLY_ACCESS_RESTRICTED',
                     message: 'This account can access marketplace listing, leads, and upgrade features only.'
+                });
+            }
+            if (quizOnly && dbUser.role !== 'SUPER_ADMIN' && !isQuizPlanAllowedRequest(req)) {
+                return res.status(403).json({
+                    error: 'ENTERPRISE_PLAN_REQUIRED',
+                    message: 'This operation requires the Enterprise plan.'
                 });
             }
 

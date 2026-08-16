@@ -199,7 +199,9 @@ async function dispatchClaimNotification(input: {
   actorAdminId: string;
   retry: boolean;
 }) {
-  return prisma.$transaction(async (tx) => {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await prisma.$transaction(async (tx) => {
     const before = await tx.marketplaceClaim.findUnique({
       where: { id: input.claimId },
       include: { institute: true }
@@ -268,7 +270,20 @@ async function dispatchClaimNotification(input: {
       },
       select: claimSelect
     });
-  });
+      }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 120_000,
+        timeout: 120_000
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2034' && attempt < 2) continue;
+        if (error.code === 'P2002') throw new Error('CLAIM_MESSAGE_NOT_RETRYABLE');
+      }
+      throw error;
+    }
+  }
+  throw new Error('CLAIM_MESSAGE_NOT_RETRYABLE');
 }
 
 export async function approveClaim(req: any, res: Response) {

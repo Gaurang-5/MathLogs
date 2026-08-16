@@ -44,7 +44,7 @@ async function businessCounts(client: Client): Promise<BusinessCounts> {
 
 async function instituteMigrationState(client: Client) {
   return (await client.query(`
-    SELECT id, plan, config, "isPubliclyListed", "planStartDate", "planExpiryDate", "quizCredits",
+    SELECT id, plan, config, "createdAt", "isPubliclyListed", "planStartDate", "planExpiryDate", "quizCredits",
       "billingCycle", "trialStartedAt", "trialEndsAt", "trialUsedAt", "marketplaceAccessGrantedAt",
       "includedQuizCredits", "includedQuizCreditsExpireAt", "lifetimeQuizCredits", "quizCreditsRenewAt",
       "canonicalPlanMigratedAt"
@@ -95,6 +95,13 @@ test('canonical billing migration is rerunnable, preserves protected rows, and a
     const migration = await readFile(path.join(process.cwd(), 'prisma/migrations/20260816140000_canonical_three_plan_billing/migration.sql'), 'utf8');
     await postgres.query(migration);
     await postgres.query(migration);
+    await postgres.query(`
+      INSERT INTO "Institute" (id, name, "createdAt", "updatedAt", plan, "quizCredits", "includedQuizCredits", "lifetimeQuizCredits", "canonicalPlanMigratedAt")
+      VALUES
+        ('post-cutover', 'Post-cutover canonical account', '2026-08-17T00:00:00.000Z', '2026-08-17T00:00:00.000Z', 'QUIZ', 5, 5, 0, NULL),
+        ('post-cutover-legacy', 'Post-cutover legacy account', '2026-08-17T00:00:00.000Z', '2026-08-17T00:00:00.000Z', 'FREE', 2, 0, 0, CURRENT_TIMESTAMP)
+    `);
+    const expectedCounts = { ...before, instituteCount: before.instituteCount + 2 };
 
     const durableTables = await postgres.query<{ table_name: string }>(`
       SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()
@@ -128,44 +135,47 @@ test('canonical billing migration is rerunnable, preserves protected rows, and a
     await assert.rejects(() => migrateCanonicalPlans(prisma!, 'preview' as never, now), { message: 'INVALID_CANONICAL_MIGRATION_MODE' });
     assert.deepEqual(await instituteMigrationState(postgres), beforePreflightState);
     const preflight = await migrateCanonicalPlans(prisma, 'preflight', now);
-    assert.deepEqual(preflight, { mode: 'preflight', before, candidates: 7 });
-    assert.deepEqual(await businessCounts(postgres), before);
+    assert.deepEqual(preflight, { mode: 'preflight', before: expectedCounts, candidates: 8 });
+    assert.deepEqual(await businessCounts(postgres), expectedCounts);
     assert.deepEqual(await instituteMigrationState(postgres), beforePreflightState);
 
     const [first, second] = await Promise.all([
       migrateCanonicalPlans(prisma, 'apply', now),
       migrateCanonicalPlans(prisma, 'apply', new Date('2026-08-17T12:00:00.000Z'))
     ]);
-    assert.deepEqual([first.migrated, second.migrated].sort(), [0, 7]);
-    assert.deepEqual(first.before, before); assert.deepEqual(first.after, before);
-    assert.deepEqual(second.before, before); assert.deepEqual(second.after, before);
+    assert.deepEqual([first.migrated, second.migrated].sort(), [0, 8]);
+    assert.deepEqual(first.before, expectedCounts); assert.deepEqual(first.after, expectedCounts);
+    assert.deepEqual(second.before, expectedCounts); assert.deepEqual(second.after, expectedCounts);
 
     const after = await businessCounts(postgres);
     const institutes = await instituteMigrationState(postgres);
     const rowsById = new Map(institutes.map(row => [row.id, row]));
-    const expectedIncludedCredits = new Map([['free-no-expiry', 5], ['basic-active', 5], ['pro-expired', 0], ['enterprise-active', 5], ['no-plan-expired', 0], ['quiz-only', 5], ['page-only', 5]]);
-    assert.deepEqual(after, before);
-    assert.ok(institutes.every(row => row.plan === 'ENTERPRISE'));
-    assert.ok(institutes.every(row => row.marketplaceAccessGrantedAt !== null));
-    const migratedAt = institutes[0]?.canonicalPlanMigratedAt?.toISOString();
+    const expectedIncludedCredits = new Map([['free-no-expiry', 5], ['basic-active', 5], ['pro-expired', 0], ['enterprise-active', 5], ['no-plan-expired', 0], ['quiz-only', 5], ['page-only', 5], ['post-cutover-legacy', 5]]);
+    assert.deepEqual(after, expectedCounts);
+    const migratedInstitutes = institutes.filter(row => row.id !== 'post-cutover');
+    assert.ok(migratedInstitutes.every(row => row.plan === 'ENTERPRISE'));
+    assert.ok(migratedInstitutes.every(row => row.marketplaceAccessGrantedAt !== null));
+    assert.equal(rowsById.get('post-cutover')?.plan, 'QUIZ');
+    assert.equal(rowsById.get('post-cutover')?.canonicalPlanMigratedAt, null);
+    const migratedAt = migratedInstitutes[0]?.canonicalPlanMigratedAt?.toISOString();
     assert.ok(migratedAt);
-    assert.ok(institutes.every(row => row.canonicalPlanMigratedAt?.toISOString() === migratedAt));
+    assert.ok(migratedInstitutes.every(row => row.canonicalPlanMigratedAt?.toISOString() === migratedAt));
     const beforeById = new Map(beforePreflightState.map(row => [row.id, row]));
-    for (const row of institutes) {
+    for (const row of migratedInstitutes) {
       const beforeRow = beforeById.get(row.id)!;
       const active = !beforeRow.planExpiryDate || beforeRow.planExpiryDate.getTime() >= now.getTime();
       const expected = active ? includedCreditPeriod({ planStartDate: beforeRow.planStartDate, createdAt: beforeRow.createdAt }, now).includedQuizCreditsExpireAt.toISOString() : undefined;
       assert.equal(row.includedQuizCreditsExpireAt?.toISOString(), expected, `${row.id} receives the correct UTC-anniversary expiry`);
     }
     assert.deepEqual(institutes.map(row => row.includedQuizCreditsExpireAt?.toISOString()), institutes.map(row => row.quizCreditsRenewAt?.toISOString()));
-    assert.deepEqual(institutes.map(row => row.lifetimeQuizCredits), beforePreflightState.map(row => row.quizCredits));
-    assert.deepEqual(institutes.map(row => row.includedQuizCredits), institutes.map(row => expectedIncludedCredits.get(row.id)));
+    assert.deepEqual(migratedInstitutes.map(row => row.lifetimeQuizCredits), migratedInstitutes.map(row => beforeById.get(row.id)?.quizCredits));
+    assert.deepEqual(migratedInstitutes.map(row => row.includedQuizCredits), migratedInstitutes.map(row => expectedIncludedCredits.get(row.id)));
     assert.deepEqual(institutes.map(row => row.quizCredits), institutes.map(row => row.lifetimeQuizCredits + row.includedQuizCredits));
     assert.deepEqual(institutes.map(row => ({ id: row.id, planStartDate: row.planStartDate?.toISOString(), planExpiryDate: row.planExpiryDate?.toISOString(), config: row.config, isPubliclyListed: row.isPubliclyListed })), beforePreflightState.map(row => ({ id: row.id, planStartDate: row.planStartDate?.toISOString(), planExpiryDate: row.planExpiryDate?.toISOString(), config: row.config, isPubliclyListed: row.isPubliclyListed })));
     assert.deepEqual(rowsById.get('page-only')?.config, { kind: 'PAGE_ONLY', listing: 'public' });
     assert.equal(rowsById.get('page-only')?.isPubliclyListed, true);
     const retry = await migrateCanonicalPlans(prisma, 'apply', new Date('2026-08-18T12:00:00.000Z'));
-    assert.equal(retry.migrated, 0); assert.deepEqual(retry.before, before); assert.deepEqual(retry.after, before);
+    assert.equal(retry.migrated, 0); assert.deepEqual(retry.before, expectedCounts); assert.deepEqual(retry.after, expectedCounts);
   } finally {
     await prisma?.$disconnect();
     await postgres.query('ROLLBACK');

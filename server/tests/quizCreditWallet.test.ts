@@ -33,6 +33,15 @@ async function createWalletSchema(postgres: Client, schema: string): Promise<voi
       "quizCreditsRenewAt" TIMESTAMP(3),
       "quizCredits" INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE "BillingPayment" (
+      id TEXT PRIMARY KEY,
+      "instituteId" TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      "capturedAt" TIMESTAMP(3),
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "BillingPayment_instituteId_fkey" FOREIGN KEY ("instituteId") REFERENCES "Institute"(id)
+    );
   `);
 }
 
@@ -51,7 +60,9 @@ test('quiz credit wallet consumes included credits first, protects inactive plan
       ('wallet-expired', 'Expired wallet', 'QUIZ', '2026-07-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z', '2026-07-01T00:00:00.000Z', 5, '2026-08-01T00:00:00.000Z', 10, '2026-08-01T00:00:00.000Z', 15),
       ('wallet-low', 'Low wallet', 'ENTERPRISE', '2026-08-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z', 1, '2026-09-01T00:00:00.000Z', 0, '2026-09-01T00:00:00.000Z', 1),
       ('wallet-race', 'Race wallet', 'QUIZ', '2026-08-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z', 1, '2026-09-01T00:00:00.000Z', 0, '2026-09-01T00:00:00.000Z', 1),
+      ('wallet-pack', 'Pack wallet', 'QUIZ', '2026-08-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z', 5, '2026-09-01T00:00:00.000Z', 10, '2026-09-01T00:00:00.000Z', 15),
       ('wallet-refresh', 'Refresh wallet', 'QUIZ', '2026-07-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2026-07-01T00:00:00.000Z', 0, '2026-08-01T00:00:00.000Z', 7, '2026-08-01T00:00:00.000Z', 7);
+      INSERT INTO "BillingPayment" (id, "instituteId", status) VALUES ('pack-payment', 'wallet-pack', 'FULFILLING');
     `);
 
     prisma = new PrismaClient({ datasources: { db: { url: schemaUrl(schema) } } });
@@ -93,6 +104,17 @@ test('quiz credit wallet consumes included credits first, protects inactive plan
     assert.equal(refreshed.includedCredits, 5);
     assert.equal(refreshed.lifetimeCredits, 7);
     assert.equal(refreshed.totalUsableCredits, 12);
+
+    await Promise.all([
+      wallet.grantLifetimeQuizCredits({ instituteId: 'wallet-pack', amount: 5, source: 'BILLING_PAYMENT', billingPaymentId: 'pack-payment' }, now),
+      wallet.grantLifetimeQuizCredits({ instituteId: 'wallet-pack', amount: 5, source: 'BILLING_PAYMENT', billingPaymentId: 'pack-payment' }, now)
+    ]);
+    const creditedPack = await postgres.query<{ lifetimeQuizCredits: number; status: string }>(`
+      SELECT i."lifetimeQuizCredits", p.status::text
+      FROM "Institute" i JOIN "BillingPayment" p ON p."instituteId" = i.id
+      WHERE p.id = 'pack-payment'
+    `);
+    assert.deepEqual(creditedPack.rows[0], { lifetimeQuizCredits: 15, status: 'CREDITED' });
 
     const legacyProjection = await postgres.query<{ quizCredits: number }>(`SELECT "quizCredits" FROM "Institute" WHERE id = 'wallet-active'`);
     assert.equal(legacyProjection.rows[0].quizCredits, 8);

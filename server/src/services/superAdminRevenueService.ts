@@ -5,7 +5,7 @@ import { invalidateAuthCache } from '../middleware/auth';
 import { writeSuperAdminAudit } from './superAdminAuditService';
 import { readBillingProviderHistory } from './superAdminBillingProvider';
 import { normalizePlanId, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
-import { includedCreditPeriod } from '../domain/plans/entitlements';
+import { effectiveEntitlements, includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
 
 export type BillingOperationType =
   | 'PLAN_CHANGE'
@@ -117,8 +117,7 @@ function derivePreview(institute: InstituteBillingState, request: NormalizedBill
       throw new RevenueServiceError('INVALID_PLAN_CYCLE');
     }
     const startsAt = request.effectiveAt ? new Date(request.effectiveAt) : new Date();
-    const expiryDate = plan === 'MARKETPLACE' ? null : new Date(startsAt);
-    if (expiryDate) billingCycle === 'YEARLY' ? expiryDate.setUTCFullYear(expiryDate.getUTCFullYear() + 1) : expiryDate.setUTCMonth(expiryDate.getUTCMonth() + 1);
+    const expiryDate = plan === 'MARKETPLACE' ? null : paidPlanExpiry(startsAt, billingCycle as 'MONTHLY' | 'YEARLY');
     before.plan = institute.plan;
     before.billingCycle = institute.billingCycle;
     before.planExpiryDate = institute.planExpiryDate;
@@ -387,7 +386,8 @@ export async function listRevenueSubscriptions(input: { q?: string; plan?: strin
   return { items: items.map(({ id, plan: storedPlan, ...item }) => {
     let plan: CanonicalPlan;
     try { plan = normalizePlanId(storedPlan); } catch { plan = 'MARKETPLACE'; }
-    return { instituteId: id, ...item, plan, effectivePlan: plan, totalUsableQuizCredits: item.includedQuizCredits + item.lifetimeQuizCredits, unlimitedStudents: true };
+    const access = effectiveEntitlements({ ...item, plan });
+    return { instituteId: id, ...item, plan, effectivePlan: access.enterprise ? 'ENTERPRISE' : access.quiz ? 'QUIZ' : 'MARKETPLACE', totalUsableQuizCredits: access.usableQuizCredits, unlimitedStudents: true };
   }), page: input.page, pageSize: input.pageSize, total };
 }
 
@@ -402,10 +402,11 @@ export async function getInstituteBillingHistory(instituteId: string) {
   ]);
   let plan: CanonicalPlan;
   try { plan = normalizePlanId(institute.plan); } catch { plan = 'MARKETPLACE'; }
-  return { plan, effectivePlan: plan, billingCycle: institute.billingCycle, planStartDate: institute.planStartDate, planExpiryDate: institute.planExpiryDate,
+  const access = effectiveEntitlements({ ...institute, plan });
+  return { plan, effectivePlan: access.enterprise ? 'ENTERPRISE' : access.quiz ? 'QUIZ' : 'MARKETPLACE', billingCycle: institute.billingCycle, planStartDate: institute.planStartDate, planExpiryDate: institute.planExpiryDate,
     trialStartedAt: institute.trialStartedAt, trialEndsAt: institute.trialEndsAt, marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt,
     includedQuizCredits: institute.includedQuizCredits, lifetimeQuizCredits: institute.lifetimeQuizCredits,
-    totalUsableQuizCredits: institute.includedQuizCredits + institute.lifetimeQuizCredits,
+    totalUsableQuizCredits: access.usableQuizCredits,
     includedQuizCreditsExpireAt: institute.includedQuizCreditsExpireAt, quizCreditsRenewAt: institute.quizCreditsRenewAt,
     operations: operations.map(publicOperation), payments, notifications, ...provider };
 }

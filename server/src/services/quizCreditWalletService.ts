@@ -156,14 +156,27 @@ export function createQuizCreditWalletService(client: PrismaClient = prisma) {
       return inWalletTransaction(async tx => {
         await lockInstitute(tx, input.instituteId);
         const institute = await loadWalletInstitute(tx, input.instituteId);
+        if (input.billingPaymentId) {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.billingPaymentId}))`;
+          const payment = await tx.billingPayment.findFirst({
+            where: { id: input.billingPaymentId, instituteId: input.instituteId },
+            select: { status: true }
+          });
+          if (!payment) throw new QuizCreditWalletError('BILLING_PAYMENT_NOT_FOUND');
+          // The wallet increment and CREDITED transition share this transaction.
+          // A stale recovery worker that arrives second observes CREDITED and no-ops.
+          if (payment.status === 'CREDITED') return projection(institute, now);
+          if (payment.status !== 'FULFILLING') throw new QuizCreditWalletError('BILLING_PAYMENT_NOT_CLAIMED');
+        }
         const nextLifetimeCredits = Math.max(0, institute.lifetimeQuizCredits ?? 0) + input.amount;
         const updated = await persistWallet(tx, input.instituteId, Math.max(0, institute.includedQuizCredits ?? 0), nextLifetimeCredits);
 
         if (input.billingPaymentId) {
-          await tx.billingPayment.updateMany({
-            where: { id: input.billingPaymentId, instituteId: input.instituteId },
+          const credited = await tx.billingPayment.updateMany({
+            where: { id: input.billingPaymentId, instituteId: input.instituteId, status: 'FULFILLING' },
             data: { status: 'CREDITED', capturedAt: now }
           });
+          if (credited.count !== 1) throw new QuizCreditWalletError('BILLING_PAYMENT_ALREADY_CREDITED');
         }
 
         if (input.actorAdminId) {

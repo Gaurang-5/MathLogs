@@ -4,7 +4,7 @@ import { prisma } from '../prisma';
 import { invalidateAuthCache } from '../middleware/auth';
 import { writeSuperAdminAudit } from './superAdminAuditService';
 import { normalizePlanId, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
-import { effectiveEntitlements, includedCreditPeriod } from '../domain/plans/entitlements';
+import { effectiveEntitlements, includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
 
 const instituteDirectorySelect = {
   id: true,
@@ -14,7 +14,11 @@ const instituteDirectorySelect = {
   email: true,
   status: true,
   plan: true,
+  trialEndsAt: true,
   planExpiryDate: true,
+  marketplaceAccessGrantedAt: true,
+  includedQuizCredits: true,
+  lifetimeQuizCredits: true,
   isQuizOnly: true,
   ownershipStatus: true,
   isPubliclyListed: true,
@@ -81,6 +85,7 @@ function canonicalPlan(value: unknown): CanonicalPlan {
 }
 
 function directoryItem(record: Prisma.InstituteGetPayload<{ select: typeof instituteDirectorySelect }>, openSupportCount = 0) {
+  const access = effectiveEntitlements(record);
   const attention: string[] = [];
   if (record.status !== 'ACTIVE') attention.push('INACTIVE');
   if (record.planExpiryDate && record.planExpiryDate.getTime() < Date.now() + 7 * 86_400_000) attention.push('PLAN_EXPIRY');
@@ -94,7 +99,8 @@ function directoryItem(record: Prisma.InstituteGetPayload<{ select: typeof insti
     email: record.email,
     status: record.status,
     plan: canonicalPlan(record.plan),
-    effectivePlan: canonicalPlan(record.plan),
+    effectivePlan: access.enterprise ? 'ENTERPRISE' : access.quiz ? 'QUIZ' : 'MARKETPLACE',
+    totalUsableQuizCredits: access.usableQuizCredits,
     planExpiryDate: record.planExpiryDate,
     unlimitedStudents: true,
     ownershipStatus: record.ownershipStatus,
@@ -210,6 +216,7 @@ export async function getSuperAdminInstitute(instituteId: string) {
     })
   ]);
   const config = objectConfig(institute.config);
+  const access = effectiveEntitlements(institute);
   const leads = Object.fromEntries(leadCounts.map(item => [item.deliveryStatus.toLowerCase(), item._count._all]));
   const activity = [
     ...superAdminActivity.map(item => ({ ...item, source: 'SUPER_ADMIN' })),
@@ -226,7 +233,8 @@ export async function getSuperAdminInstitute(instituteId: string) {
     account: { admins },
     usage: {
       students, batches, tests, unlimitedStudents: true,
-      quizCredits: institute.includedQuizCredits + institute.lifetimeQuizCredits,
+      quizCredits: access.usableQuizCredits,
+      totalUsableQuizCredits: access.usableQuizCredits,
       includedQuizCredits: institute.includedQuizCredits,
       lifetimeQuizCredits: institute.lifetimeQuizCredits,
       includedQuizCreditsExpireAt: institute.includedQuizCreditsExpireAt,
@@ -236,7 +244,7 @@ export async function getSuperAdminInstitute(instituteId: string) {
       requiresGrades: config.requiresGrades !== false
     },
     billing: {
-      plan: canonicalPlan(institute.plan), effectivePlan: (() => { const access = effectiveEntitlements(institute, new Date()); return access.enterprise ? 'ENTERPRISE' : access.quiz ? 'QUIZ' : 'MARKETPLACE'; })(), billingCycle: institute.billingCycle, planStartDate: institute.planStartDate, planExpiryDate: institute.planExpiryDate,
+      plan: canonicalPlan(institute.plan), effectivePlan: access.enterprise ? 'ENTERPRISE' : access.quiz ? 'QUIZ' : 'MARKETPLACE', billingCycle: institute.billingCycle, planStartDate: institute.planStartDate, planExpiryDate: institute.planExpiryDate,
       trialStartedAt: institute.trialStartedAt, trialEndsAt: institute.trialEndsAt,
       marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt,
       operations: billingOperations, payments: billingPayments, notifications: planNotifications
@@ -452,12 +460,9 @@ async function createOnboardedInstitute(tx: Prisma.TransactionClient, input: Nor
   if (existing) return { kind: 'EXISTING' as const, instituteId: existing.id, name: existing.name };
   const now = new Date();
   const isMarketplace = input.subscription.plan === 'MARKETPLACE';
-  const planExpiryDate = isMarketplace ? null : new Date(now);
-  if (planExpiryDate) {
-    if (input.subscription.startTrial) planExpiryDate.setUTCDate(planExpiryDate.getUTCDate() + 14);
-    else if (input.subscription.billingCycle === 'YEARLY') planExpiryDate.setUTCFullYear(planExpiryDate.getUTCFullYear() + 1);
-    else planExpiryDate.setUTCMonth(planExpiryDate.getUTCMonth() + 1);
-  }
+  const planExpiryDate = isMarketplace ? null : input.subscription.startTrial
+    ? new Date(now.getTime() + 14 * 86_400_000)
+    : paidPlanExpiry(now, input.subscription.billingCycle as 'MONTHLY' | 'YEARLY');
   const period = !isMarketplace ? includedCreditPeriod({ planStartDate: now }, now) : null;
   const institute = await tx.institute.create({
     data: {

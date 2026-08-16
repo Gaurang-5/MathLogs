@@ -4,6 +4,8 @@ import crypto from 'node:crypto';
 import { getPublicPlanCatalogue } from '../src/controllers/planCatalogController';
 import { resolveCheckoutProduct, verifyRazorpaySignature } from '../src/controllers/billingController';
 import { sanitizeBillingWebhook, verifyBillingWebhookSignature } from '../src/controllers/billingWebhookController';
+import { verifyOnboardingPaymentSignature } from '../src/services/onboardingPaymentService';
+import { getRazorpayConfig } from '../src/utils/env';
 
 test('public plan catalogue exposes only the approved products and authoritative paise prices', async () => {
   let body: unknown;
@@ -34,7 +36,7 @@ test('billing webhook verification uses raw bytes and stores only a bounded proj
   assert.equal(verifyBillingWebhookSignature(raw, signature, secret), true);
   assert.equal(verifyBillingWebhookSignature(Buffer.from('{}'), signature, secret), false);
   assert.deepEqual(sanitizeBillingWebhook(JSON.parse(raw.toString())), {
-    providerEventId: 'evt_1', eventType: 'payment.failed', paymentId: 'pay_1', orderId: 'order_1', amount: 24_900, currency: 'INR'
+    providerEventId: 'evt_1', eventType: 'payment.failed', paymentId: 'pay_1', orderId: 'order_1', subscriptionId: null, amount: 24_900, currency: 'INR'
   });
 });
 
@@ -44,6 +46,13 @@ test('payment verification accepts only the signature over the stored provider b
   assert.equal(verifyRazorpaySignature('order_1', 'payment_1', signature, secret), true);
   assert.equal(verifyRazorpaySignature('order_other', 'payment_1', signature, secret), false);
   assert.equal(verifyRazorpaySignature('order_1', 'payment_1', 'not-hex', secret), false);
+});
+
+test('public onboarding verification also binds the payment to the server-created order', () => {
+  const signature = crypto.createHmac('sha256', getRazorpayConfig().keySecret).update('order_onboarding|payment_onboarding').digest('hex');
+  assert.equal(verifyOnboardingPaymentSignature('order_onboarding', 'payment_onboarding', signature), true);
+  assert.equal(verifyOnboardingPaymentSignature('order_other', 'payment_onboarding', signature), false);
+  assert.equal(verifyOnboardingPaymentSignature('order_onboarding', 'payment_onboarding', 'invalid'), false);
 });
 
 test('checkout accepts only canonical plan/cycle pairs and fixed lifetime credit packs', () => {

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { Prisma, PrismaClient } from '@prisma/client';
-import { effectiveEntitlements, includedCreditPeriod, nextBillingAnniversary } from '../domain/plans/entitlements';
+import { effectiveEntitlements, includedCreditPeriod, nextBillingAnniversary, paidPlanExpiry } from '../domain/plans/entitlements';
 import { normalizePlanId, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
 import { prisma } from '../prisma';
 import { scheduleLifecycleNotifications } from './planNotificationService';
@@ -35,10 +35,19 @@ function addTrialDays(now: Date): Date {
 }
 
 function paidExpiry(now: Date, cycle: BillingCycle): Date {
-  const result = new Date(now);
-  if (cycle === 'YEARLY') result.setUTCFullYear(result.getUTCFullYear() + 1);
-  else result.setUTCMonth(result.getUTCMonth() + 1);
-  return result;
+  if (cycle === 'ONE_TIME') throw new SubscriptionLifecycleError('INVALID_PLAN_CYCLE');
+  return paidPlanExpiry(now, cycle);
+}
+
+export function normalizeTrialOwnerIdentity(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed.includes('@')) return trimmed;
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 14 && digits.startsWith('0091')) return digits.slice(4);
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+  if (digits.length >= 10 && digits.length <= 15) return digits;
+  throw new SubscriptionLifecycleError('INVALID_OWNER_IDENTITY');
 }
 
 function toResult(institute: InstituteState, now: Date): LifecycleResult {
@@ -97,8 +106,7 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
       const now = input.now ?? new Date();
       const plan = normalizePlanId(input.plan);
       if (plan === 'MARKETPLACE') throw new SubscriptionLifecycleError('TRIAL_NOT_AVAILABLE');
-      const normalizedIdentity = input.ownerIdentity.trim().toLowerCase();
-      if (!normalizedIdentity) throw new SubscriptionLifecycleError('INVALID_OWNER_IDENTITY');
+      const normalizedIdentity = normalizeTrialOwnerIdentity(input.ownerIdentity);
       const ownerIdentityHash = crypto.createHmac('sha256', trialSecret).update(normalizedIdentity).digest('hex');
       const result = await transaction(async tx => {
         await lock(tx, input.instituteId);

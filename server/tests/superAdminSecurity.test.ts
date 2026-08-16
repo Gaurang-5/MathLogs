@@ -33,7 +33,13 @@ async function post(path: string, token: string, body: unknown, extra: Record<st
 before(async () => {
   const suffix = `${Date.now()}-${Math.random()}`;
   const password = await bcrypt.hash('correct-password', 4);
-  const institute = await prisma.institute.create({ data: { name: `Security API ${suffix}` } });
+  const institute = await prisma.institute.create({ data: {
+    name: `Security API ${suffix}`,
+    plan: 'ENTERPRISE',
+    planStartDate: new Date(),
+    planExpiryDate: new Date('2099-01-01T00:00:00.000Z'),
+    marketplaceAccessGrantedAt: new Date()
+  } });
   instituteId = institute.id;
   const superAdmin = await prisma.admin.create({
     data: { username: `security-${suffix}@example.com`, password, role: 'SUPER_ADMIN' }

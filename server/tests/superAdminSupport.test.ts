@@ -10,8 +10,9 @@ import { prisma } from '../src/prisma';
 let server: Server; let baseUrl: string; let instituteId: string; let otherInstituteId: string; let superToken: string; let ownerToken: string; let otherToken: string;
 before(async () => {
   const suffix = `${Date.now()}-${Math.random()}`;
-  const institute = await prisma.institute.create({ data: { name: `Support Academy ${suffix}` } }); instituteId = institute.id;
-  const other = await prisma.institute.create({ data: { name: `Other Support ${suffix}` } }); otherInstituteId = other.id;
+  const activePlan = { plan: 'ENTERPRISE' as const, planStartDate: new Date(), planExpiryDate: new Date('2099-01-01T00:00:00.000Z'), marketplaceAccessGrantedAt: new Date() };
+  const institute = await prisma.institute.create({ data: { name: `Support Academy ${suffix}`, ...activePlan } }); instituteId = institute.id;
+  const other = await prisma.institute.create({ data: { name: `Other Support ${suffix}`, ...activePlan } }); otherInstituteId = other.id;
   const [superAdmin, owner, otherOwner] = await Promise.all([
     prisma.admin.create({ data: { username: `support-super-${suffix}`, password: await bcrypt.hash('test', 4), role: 'SUPER_ADMIN' } }),
     prisma.admin.create({ data: { username: `support-owner-${suffix}`, password: await bcrypt.hash('test', 4), role: 'INSTITUTE_ADMIN', instituteId } }),

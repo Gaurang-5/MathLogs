@@ -7,8 +7,9 @@ import { getRazorpayConfig } from '../utils/env';
 import { grantLifetimeQuizCredits } from '../services/quizCreditWalletService';
 import { invalidateAuthCache } from '../middleware/auth';
 import { PLAN_CATALOG, normalizePlanId, resolvePlanPrice, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
-import { activateMarketplace, activatePaidPlan, cancelAtPeriodEnd } from '../services/subscriptionLifecycleService';
+import { activateMarketplace, cancelAtPeriodEnd } from '../services/subscriptionLifecycleService';
 import { cancelSatisfiedNotifications, scheduleLifecycleNotifications } from '../services/planNotificationService';
+import { includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -50,6 +51,56 @@ export function verifyRazorpaySignature(providerOrderId: string, providerPayment
     const expected = crypto.createHmac('sha256', secret).update(`${providerOrderId}|${providerPaymentId}`).digest();
     const supplied = Buffer.from(signature, 'hex');
     return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+}
+
+export async function fulfillStoredBillingPayment(paymentId: string, providerPaymentId: string, providerSignature?: string) {
+    const payment = await prisma.billingPayment.findUniqueOrThrow({ where: { id: paymentId } });
+    if (payment.providerPaymentId === providerPaymentId && ['COMPLETED', 'CREDITED'].includes(payment.status)) return payment;
+    const staleBefore = new Date(Date.now() - 2 * 60_000);
+    const fulfillmentAnchor = payment.capturedAt ?? new Date();
+    const claimed = await prisma.billingPayment.updateMany({
+        where: {
+            id: payment.id,
+            OR: [
+                { status: 'PENDING', OR: [{ providerPaymentId: null }, { providerPaymentId }] },
+                // A Razorpay order can be retried after a failed attempt. The retry has
+                // a new payment id but remains bound to this server-created order.
+                { status: 'PAYMENT_FAILED' },
+                { status: { in: ['ACTIVATING', 'FULFILLING'] }, providerPaymentId, verifiedAt: { lte: staleBefore } }
+            ]
+        },
+        data: { status: 'FULFILLING', providerPaymentId, ...(providerSignature ? { providerSignature } : {}), verifiedAt: new Date(), capturedAt: fulfillmentAnchor }
+    });
+    if (claimed.count !== 1) throw new Error('PAYMENT_ALREADY_PROCESSING');
+    if (payment.creditPackId) {
+        const product = resolveCheckoutProduct(payment.creditPackId, undefined);
+        if (product.kind !== 'CREDIT_PACK') throw new Error('INVALID_STORED_CREDIT_PACK');
+        await grantLifetimeQuizCredits({ instituteId: payment.instituteId, amount: product.credits, source: 'BILLING_PAYMENT', billingPaymentId: payment.id });
+    } else if (payment.plan && payment.billingCycle) {
+        const plan = payment.plan;
+        const billingCycle = payment.billingCycle;
+        if (billingCycle === 'ONE_TIME' || !['QUIZ', 'ENTERPRISE'].includes(plan)) throw new Error('INVALID_STORED_BILLING_PRODUCT');
+        await prisma.$transaction(async tx => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payment.id}))`;
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payment.instituteId}))`;
+            const currentPayment = await tx.billingPayment.findUniqueOrThrow({ where: { id: payment.id } });
+            if (currentPayment.status === 'COMPLETED' && currentPayment.providerPaymentId === providerPaymentId) return;
+            if (currentPayment.status !== 'FULFILLING' || currentPayment.providerPaymentId !== providerPaymentId) throw new Error('PAYMENT_ALREADY_PROCESSING');
+            const institute = await tx.institute.findUniqueOrThrow({ where: { id: payment.instituteId } });
+            const period = includedCreditPeriod({ planStartDate: fulfillmentAnchor }, fulfillmentAnchor);
+            await tx.institute.update({ where: { id: institute.id }, data: {
+                plan, billingCycle, planStartDate: fulfillmentAnchor,
+                planExpiryDate: paidPlanExpiry(fulfillmentAnchor, billingCycle), trialStartedAt: null, trialEndsAt: null,
+                marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt ?? fulfillmentAnchor,
+                includedQuizCredits: 5, includedQuizCreditsExpireAt: period.includedQuizCreditsExpireAt,
+                quizCreditsRenewAt: period.quizCreditsRenewAt, quizCredits: 5 + institute.lifetimeQuizCredits
+            } });
+            await tx.billingPayment.update({ where: { id: payment.id }, data: { status: 'COMPLETED', capturedAt: fulfillmentAnchor } });
+        }, { maxWait: 120_000, timeout: 120_000 });
+    } else throw new Error('INVALID_STORED_BILLING_PRODUCT');
+    await cancelSatisfiedNotifications(payment.instituteId).catch(() => undefined);
+    await scheduleLifecycleNotifications({ instituteId: payment.instituteId, event: 'PAYMENT_SUCCEEDED', effectiveAt: new Date(), reference: `payment:${payment.id}` }).catch(() => undefined);
+    return prisma.billingPayment.findUniqueOrThrow({ where: { id: payment.id } });
 }
 
 export const createBillingSession = async (req: Request, res: Response) => {
@@ -142,41 +193,16 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
 
         const providerPayment = await razorpay.payments.fetch(razorpay_payment_id) as any;
         const providerAmount = Number(providerPayment.amount);
-        if (String(providerPayment.order_id) !== payment.providerOrderId || providerAmount !== payment.amountPaise || providerPayment.currency !== 'INR') {
+        if (String(providerPayment.order_id) !== payment.providerOrderId || providerAmount !== payment.amountPaise || providerPayment.currency !== 'INR' || providerPayment.status !== 'captured') {
             return res.status(400).json({ error: 'PAYMENT_BINDING_MISMATCH' });
         }
 
-        const claimed = await prisma.billingPayment.updateMany({
-            where: { id: payment.id, status: 'PENDING', providerPaymentId: null },
-            data: { status: 'ACTIVATING', providerPaymentId: razorpay_payment_id, providerSignature: razorpay_signature, verifiedAt: new Date() }
-        });
-        if (claimed.count !== 1) {
-            const replay = await prisma.billingPayment.findUnique({ where: { id: payment.id } });
-            if (replay?.providerPaymentId === razorpay_payment_id) return res.json({ success: true, replay: true, billingPaymentId: payment.id, status: replay?.status });
-            return res.status(409).json({ error: 'PAYMENT_ALREADY_PROCESSING' });
-        }
-
-        if (payment.creditPackId) {
-            const product = resolveCheckoutProduct(payment.creditPackId, undefined);
-            if (product.kind !== 'CREDIT_PACK') throw new Error('INVALID_STORED_CREDIT_PACK');
-            await grantLifetimeQuizCredits({
-                instituteId: admin.institute.id,
-                amount: product.credits,
-                source: 'BILLING_PAYMENT',
-                billingPaymentId: payment.id
-            });
-        } else if (payment.plan && payment.billingCycle) {
-            await activatePaidPlan({ instituteId: admin.institute.id, plan: payment.plan, billingCycle: payment.billingCycle });
-            await prisma.billingPayment.update({ where: { id: payment.id }, data: { status: 'COMPLETED', capturedAt: new Date() } });
-        } else {
-            throw new Error('INVALID_STORED_BILLING_PRODUCT');
-        }
-        await cancelSatisfiedNotifications(admin.institute.id).catch(() => undefined);
-        await scheduleLifecycleNotifications({ instituteId: admin.institute.id, event: 'PAYMENT_SUCCEEDED', effectiveAt: new Date(), reference: `payment:${payment.id}` }).catch(() => undefined);
+        const fulfilled = await fulfillStoredBillingPayment(payment.id, razorpay_payment_id, razorpay_signature);
         invalidateAuthCache(adminId);
-        return res.json({ success: true, billingPaymentId: payment.id, status: payment.creditPackId ? 'CREDITED' : 'COMPLETED' });
+        return res.json({ success: true, billingPaymentId: payment.id, status: fulfilled.status });
     } catch (error) {
         console.error('Verify Billing Error:', error);
+        if (error instanceof Error && error.message === 'PAYMENT_ALREADY_PROCESSING') return res.status(409).json({ error: error.message });
         res.status(500).json({ error: 'Internal server error during billing verification.' });
     }
 };

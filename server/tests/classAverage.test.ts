@@ -60,7 +60,7 @@ test('GET /api/stats/class-average returns correct class average marks percentag
         role: 'ADMIN',
         institute: {
             planExpiryDate: null,
-            plan: 'ACTIVE',
+            plan: 'ENTERPRISE',
         },
     }) as never) as typeof prisma.admin.findUnique);
 
