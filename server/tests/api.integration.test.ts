@@ -180,6 +180,10 @@ test('POST /api/auth/login returns tokens for valid credentials', async () => {
         isQuizOnly: false,
         isPageOnly: false,
         quizCredits: 0,
+        includedQuizCredits: 0,
+        lifetimeQuizCredits: 0,
+        includedQuizCreditsExpireAt: null,
+        quizCreditsRenewAt: null,
         message: 'Login successful',
     });
 });
@@ -330,15 +334,33 @@ test('POST /api/tests/online saves generated quiz questions for a teacher batch'
     replaceMethod(prisma.batch, 'findMany', (async () => [{ id: 'batch-quiz-1' }] as never) as typeof prisma.batch.findMany);
     replaceMethod(prisma.institute, 'findUnique', (async () => ({
         id: 'inst-quiz-1',
-        config: {
-            lastCreditResetMonth: new Date().toISOString().slice(0, 7),
-            monthlyQuizCredits: 5,
-            purchasedQuizCredits: 0,
-        },
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        plan: 'QUIZ',
+        planStartDate: new Date('2026-08-01T00:00:00.000Z'),
+        planExpiryDate: new Date('2026-09-01T00:00:00.000Z'),
+        trialEndsAt: null,
+        marketplaceAccessGrantedAt: new Date('2026-08-01T00:00:00.000Z'),
+        includedQuizCredits: 5,
+        includedQuizCreditsExpireAt: new Date('2026-09-01T00:00:00.000Z'),
+        lifetimeQuizCredits: 0,
+        quizCreditsRenewAt: new Date('2026-09-01T00:00:00.000Z'),
         quizCredits: 5,
-        isQuizOnly: false,
     }) as never) as typeof prisma.institute.findUnique);
-    replaceMethod(prisma.institute, 'update', (async () => ({ id: 'inst-quiz-1' }) as never) as typeof prisma.institute.update);
+    replaceMethod(prisma.institute, 'update', (async () => ({
+        id: 'inst-quiz-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        plan: 'QUIZ',
+        planStartDate: new Date('2026-08-01T00:00:00.000Z'),
+        planExpiryDate: new Date('2026-09-01T00:00:00.000Z'),
+        trialEndsAt: null,
+        marketplaceAccessGrantedAt: new Date('2026-08-01T00:00:00.000Z'),
+        includedQuizCredits: 4,
+        includedQuizCreditsExpireAt: new Date('2026-09-01T00:00:00.000Z'),
+        lifetimeQuizCredits: 0,
+        quizCreditsRenewAt: new Date('2026-09-01T00:00:00.000Z'),
+        quizCredits: 4,
+    }) as never) as typeof prisma.institute.update);
+    replaceMethod(prisma, '$executeRaw', (async () => 1) as typeof prisma.$executeRaw);
     replaceMethod(prisma, '$transaction', (async (callback: any) => callback(prisma)) as typeof prisma.$transaction);
 
     let createdQuestions: Array<Record<string, unknown>> = [];

@@ -6,7 +6,7 @@ import { addMathLogsHeader } from '../utils/pdfUtils';
 import { generateTest, generateSingleQuestion, generateTestWithVariants, generateVariantQuestion } from '../utils/ai/test-generator';
 import { sendQuizMarksBroadcast, sendQuizScheduleBroadcast } from '../utils/quizBroadcasts';
 import { secureLogger } from '../utils/secureLogger';
-import { getOrResetQuizCredits, deductQuizCredit } from '../utils/quizCredits';
+import { QuizCreditWalletError, consumeQuizCreditsInTransaction } from '../services/quizCreditWalletService';
 
 function normalizeCorrectAnswer(value: unknown): string | string[] {
     if (Array.isArray(value)) {
@@ -756,9 +756,6 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
         const institute = await prisma.institute.findUnique({ where: { id: instituteId } });
         if (!institute) return res.status(404).json({ error: 'Institute not found' });
         
-        const config = institute.config as any;
-        const isQuizOnly = institute.isQuizOnly === true || config?.isQuizOnly === true || config?.planName === 'QUIZ_ONLY';
-
         // Draft: only requires a title (everything else can be empty/incomplete)
         if (isDraft === true) {
             if (!title) {
@@ -767,11 +764,6 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
         } else {
             if (!title || (!isPublic && finalBatchIds.length === 0) || !Array.isArray(questions) || questions.length === 0 || !instituteId || !availableFrom || !availableUntil) {
                 return res.status(400).json({ error: 'Missing required fields' });
-            }
-
-            const creditStatus = await getOrResetQuizCredits(instituteId!);
-            if (creditStatus.totalCredits <= 0) {
-                return res.status(403).json({ error: 'Insufficient quiz credits. You have used your 5 free monthly quiz credits. Please purchase extra lifetime credits.' });
             }
         }
 
@@ -871,9 +863,7 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
                 }
             });
 
-            if (!isDraft) {
-                await deductQuizCredit(instituteId!);
-            }
+            if (!isDraft) await consumeQuizCreditsInTransaction(tx, instituteId!, 1);
 
             return createdQuiz;
         });
@@ -887,6 +877,13 @@ export const saveOnlineQuiz = async (req: Request, res: Response) => {
         res.json(quiz);
     } catch (e: any) {
         console.error("Save Online Quiz Error:", e);
+        if (e instanceof QuizCreditWalletError) {
+            const errorMessages: Record<string, string> = {
+                QUIZ_PLAN_INACTIVE: 'Quiz access is inactive. Start or renew a Quiz or Enterprise plan to publish quizzes.',
+                INSUFFICIENT_QUIZ_CREDITS: 'Insufficient quiz credits. Purchase extra credits or wait for your next monthly refresh.'
+            };
+            return res.status(403).json({ error: errorMessages[e.message] ?? e.message });
+        }
         if (e.message?.startsWith('Question ')) {
             return res.status(400).json({ error: e.message });
         }

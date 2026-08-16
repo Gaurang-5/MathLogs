@@ -64,6 +64,28 @@ const generateAuthTokens = async (admin: any, req?: Request, existingSessionId?:
 
     return { token, refreshToken: refreshTokenString };
 };
+
+const quizCreditPayload = async (instituteId?: string | null) => {
+    if (!instituteId) {
+        return {
+            quizCredits: 0,
+            includedQuizCredits: 0,
+            lifetimeQuizCredits: 0,
+            includedQuizCreditsExpireAt: null,
+            quizCreditsRenewAt: null
+        };
+    }
+
+    const creditStatus = await getOrResetQuizCredits(instituteId);
+    return {
+        quizCredits: creditStatus.totalUsableCredits,
+        includedQuizCredits: creditStatus.includedCredits,
+        lifetimeQuizCredits: creditStatus.lifetimeCredits,
+        includedQuizCreditsExpireAt: creditStatus.includedCreditsExpireAt,
+        quizCreditsRenewAt: creditStatus.quizCreditsRenewAt
+    };
+};
+
 export const loginAdmin = async (req: Request, res: Response) => {
     const { username, password } = req.body;
 
@@ -114,11 +136,7 @@ export const loginAdmin = async (req: Request, res: Response) => {
         const tokens = await generateAuthTokens(admin, req);
         await recordAuthenticationEvent({ adminId: admin.id, eventType: 'LOGIN', success: true, ip: req.ip, userAgent: req.get?.('user-agent') });
 
-        let quizCredits = 0;
-        if (admin.institute?.id) {
-            const creditStatus = await getOrResetQuizCredits(admin.institute.id);
-            quizCredits = creditStatus.totalCredits;
-        }
+        const credits = await quizCreditPayload(admin.institute?.id);
 
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
         const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
@@ -131,7 +149,7 @@ export const loginAdmin = async (req: Request, res: Response) => {
             role: admin.role,
             isQuizOnly,
             isPageOnly,
-            quizCredits,
+            ...credits,
             message: "Login successful"
         });
     } catch (error) {
@@ -505,7 +523,7 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
 
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
         const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
-        const quizCredits = admin.institute?.quizCredits || 0;
+        const credits = await quizCreditPayload(admin.institute?.id);
 
         return res.json({
             success: true,
@@ -515,7 +533,7 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
             role: admin.role,
             isQuizOnly,
             isPageOnly,
-            quizCredits,
+            ...credits,
             message: "Login successful"
         });
     } catch (error) {
@@ -573,7 +591,7 @@ export const selectMobileAccount = async (req: Request, res: Response) => {
 
         const isQuizOnly = admin.institute?.isQuizOnly || (admin.institute?.config as any)?.planName === 'QUIZ_ONLY';
         const isPageOnly = (admin.institute?.config as any)?.planName === 'listing' || (admin.institute?.config as any)?.planName === 'PAGE_ONLY';
-        const quizCredits = admin.institute?.quizCredits || 0;
+        const credits = await quizCreditPayload(admin.institute?.id);
 
         return res.json({
             success: true,
@@ -583,7 +601,7 @@ export const selectMobileAccount = async (req: Request, res: Response) => {
             role: admin.role,
             isQuizOnly,
             isPageOnly,
-            quizCredits,
+            ...credits,
             message: "Login successful"
         });
     } catch (error) {
