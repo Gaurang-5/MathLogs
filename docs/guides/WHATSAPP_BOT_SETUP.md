@@ -67,3 +67,21 @@ If a template has a dynamic URL button, use the final URL parameter for that but
 Marketplace messages are queued and tracked by job ID. `QUEUED` means the database job was accepted; only the worker changes the related claim to `SENT` or the lead to `DELIVERED`. Exhausted worker retries set the related record to `FAILED` and retain a bounded error. Superadmin retry actions create a new tracked job and increment the marketplace retry counter.
 
 Claim approval and rejection are committed before notification queueing. Missing template configuration or queue failure therefore leaves the saved decision intact and exposes a retryable `FAILED` communication state.
+
+## Plan lifecycle templates
+
+Create and obtain Meta approval for these operational templates:
+
+```env
+WHATSAPP_TEMPLATE_PLAN_TRIAL_STARTED=
+WHATSAPP_TEMPLATE_PLAN_ACTIVATED=
+WHATSAPP_TEMPLATE_PLAN_EXPIRY_APPROACHING=
+WHATSAPP_TEMPLATE_PLAN_PAYMENT_DUE=
+WHATSAPP_TEMPLATE_PLAN_PAYMENT_FAILED=
+WHATSAPP_TEMPLATE_PLAN_PAYMENT_SUCCEEDED=
+WHATSAPP_TEMPLATE_PLAN_MARKETPLACE_FALLBACK=
+```
+
+Every template uses the same ordered body variables: `owner_name`, `institute_name`, `plan_label`, `billing_cycle`, `formatted_amount`, `due_or_expiry_date`, `payment_link`, and `support_contact`. Keep that order unchanged in Meta. Email uses the configured no-reply SMTP account and the same persisted billing values.
+
+To test safely, enable operational email/WhatsApp consent on a test institute, schedule a lifecycle event, run the notification dispatcher, then inspect the linked `PlanNotification`, `EmailJob`, or `WhatsappJob`. Missing consent, destination, SMTP configuration, or an approved Meta template produces a bounded `FAILED` state; it never changes plan access or payment state. Failed notifications can be returned to `PENDING` through the authorized Superadmin retry flow.

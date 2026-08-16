@@ -272,6 +272,10 @@ export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) 
             prisma.targetedCommunicationRecipient.updateMany({
                 where: { id: job.superAdminEntityType === 'TargetedCommunicationRecipient' ? job.superAdminEntityId || '__none__' : '__none__' },
                 data: { status: 'SENT', sentAt, error: null }
+            }),
+            prisma.planNotification.updateMany({
+                where: { id: job.superAdminEntityType === 'PlanNotification' ? job.superAdminEntityId || '__none__' : '__none__' },
+                data: { status: 'SENT', sentAt, error: null }
             })
         ]);
 
@@ -303,6 +307,10 @@ export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) 
             prisma.targetedCommunicationRecipient.updateMany({
                 where: { id: job.superAdminEntityType === 'TargetedCommunicationRecipient' ? job.superAdminEntityId || '__none__' : '__none__' },
                 data: { status: isExhausted ? 'FAILED' : 'PENDING', error: boundedError }
+            }),
+            prisma.planNotification.updateMany({
+                where: { id: job.superAdminEntityType === 'PlanNotification' ? job.superAdminEntityId || '__none__' : '__none__' },
+                data: { status: isExhausted ? 'FAILED' : 'QUEUED', ...(isExhausted ? { failedAt: new Date() } : {}), error: boundedError }
             })
         ]);
     }

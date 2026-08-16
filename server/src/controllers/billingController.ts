@@ -8,6 +8,7 @@ import { grantLifetimeQuizCredits } from '../services/quizCreditWalletService';
 import { invalidateAuthCache } from '../middleware/auth';
 import { PLAN_CATALOG, normalizePlanId, resolvePlanPrice, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
 import { activateMarketplace, activatePaidPlan, cancelAtPeriodEnd } from '../services/subscriptionLifecycleService';
+import { cancelSatisfiedNotifications, scheduleLifecycleNotifications } from '../services/planNotificationService';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -170,6 +171,8 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
         } else {
             throw new Error('INVALID_STORED_BILLING_PRODUCT');
         }
+        await cancelSatisfiedNotifications(admin.institute.id).catch(() => undefined);
+        await scheduleLifecycleNotifications({ instituteId: admin.institute.id, event: 'PAYMENT_SUCCEEDED', effectiveAt: new Date(), reference: `payment:${payment.id}` }).catch(() => undefined);
         invalidateAuthCache(adminId);
         return res.json({ success: true, billingPaymentId: payment.id, status: payment.creditPackId ? 'CREDITED' : 'COMPLETED' });
     } catch (error) {

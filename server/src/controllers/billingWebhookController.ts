@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { activatePaidPlan, cancelAtPeriodEnd } from '../services/subscriptionLifecycleService';
+import { cancelSatisfiedNotifications, scheduleLifecycleNotifications } from '../services/planNotificationService';
 
 export type SanitizedBillingWebhook = {
   providerEventId: string;
@@ -61,9 +62,12 @@ export async function handleRazorpayBillingWebhook(req: Request, res: Response) 
     const payment = event.orderId ? await prisma.billingPayment.findUnique({ where: { providerOrderId: event.orderId } }) : null;
     if (event.eventType === 'payment.failed' && payment) {
       await prisma.billingPayment.update({ where: { id: payment.id }, data: { status: 'PAYMENT_FAILED', verificationFailedAt: new Date() } });
+      await scheduleLifecycleNotifications({ instituteId: payment.instituteId, event: 'PAYMENT_FAILED', effectiveAt: new Date(), reference: `payment:${payment.id}` }).catch(() => undefined);
     } else if (event.eventType === 'subscription.charged' && payment?.plan && payment.billingCycle) {
       await activatePaidPlan({ instituteId: payment.instituteId, plan: payment.plan, billingCycle: payment.billingCycle });
       await prisma.billingPayment.update({ where: { id: payment.id }, data: { status: 'COMPLETED', capturedAt: new Date(), providerPaymentId: event.paymentId } });
+      await cancelSatisfiedNotifications(payment.instituteId).catch(() => undefined);
+      await scheduleLifecycleNotifications({ instituteId: payment.instituteId, event: 'PAYMENT_SUCCEEDED', effectiveAt: new Date(), reference: `webhook:${event.providerEventId}` }).catch(() => undefined);
     } else if (event.eventType === 'subscription.cancelled') {
       const instituteId = String(body?.payload?.subscription?.entity?.notes?.instituteId ?? '');
       if (instituteId) await cancelAtPeriodEnd(instituteId);

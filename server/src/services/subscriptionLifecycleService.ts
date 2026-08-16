@@ -3,6 +3,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { effectiveEntitlements, includedCreditPeriod, nextBillingAnniversary } from '../domain/plans/entitlements';
 import { normalizePlanId, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
 import { prisma } from '../prisma';
+import { scheduleLifecycleNotifications } from './planNotificationService';
 
 export type LifecycleResult = {
   plan: CanonicalPlan;
@@ -77,7 +78,7 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
 
   return {
     async activateMarketplace(instituteId: string, now = new Date()): Promise<LifecycleResult> {
-      return transaction(async tx => {
+      const result = await transaction(async tx => {
         await lock(tx, instituteId);
         const current = await load(tx, instituteId);
         const updated = await tx.institute.update({ where: { id: instituteId }, data: {
@@ -88,6 +89,8 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
         }, select: instituteSelect });
         return toResult(updated, now);
       });
+      if (client === prisma) await scheduleLifecycleNotifications({ instituteId, event: 'PLAN_ACTIVATED', effectiveAt: now, reference: `marketplace:${now.toISOString()}` }).catch(() => undefined);
+      return result;
     },
 
     async startPlanTrial(input: { instituteId: string; plan: CanonicalPlan | string; ownerIdentity: string; now?: Date }): Promise<LifecycleResult> {
@@ -97,7 +100,7 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
       const normalizedIdentity = input.ownerIdentity.trim().toLowerCase();
       if (!normalizedIdentity) throw new SubscriptionLifecycleError('INVALID_OWNER_IDENTITY');
       const ownerIdentityHash = crypto.createHmac('sha256', trialSecret).update(normalizedIdentity).digest('hex');
-      return transaction(async tx => {
+      const result = await transaction(async tx => {
         await lock(tx, input.instituteId);
         const current = await load(tx, input.instituteId);
         if (current.trialUsedAt) throw new SubscriptionLifecycleError('TRIAL_ALREADY_USED');
@@ -118,6 +121,8 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
         }, select: instituteSelect });
         return toResult(updated, now);
       });
+      if (client === prisma) await scheduleLifecycleNotifications({ instituteId: input.instituteId, event: 'TRIAL_STARTED', effectiveAt: now, expiryAt: result.trialEndsAt, reference: `trial:${result.trialEndsAt?.toISOString()}` }).catch(() => undefined);
+      return result;
     },
 
     async activatePaidPlan(input: { instituteId: string; plan: CanonicalPlan | string; billingCycle: BillingCycle; now?: Date }): Promise<LifecycleResult> {
@@ -125,7 +130,7 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
       const plan = normalizePlanId(input.plan);
       if (plan === 'MARKETPLACE') return this.activateMarketplace(input.instituteId, now);
       if (input.billingCycle === 'ONE_TIME') throw new SubscriptionLifecycleError('INVALID_PLAN_CYCLE');
-      return transaction(async tx => {
+      const result = await transaction(async tx => {
         await lock(tx, input.instituteId);
         const current = await load(tx, input.instituteId);
         const planExpiryDate = paidExpiry(now, input.billingCycle);
@@ -138,6 +143,8 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
         }, select: instituteSelect });
         return toResult(updated, now);
       });
+      if (client === prisma) await scheduleLifecycleNotifications({ instituteId: input.instituteId, event: 'PLAN_ACTIVATED', effectiveAt: now, expiryAt: result.planExpiryDate, reference: `plan:${result.planExpiryDate?.toISOString()}` }).catch(() => undefined);
+      return result;
     },
 
     async cancelAtPeriodEnd(instituteId: string, now = new Date()): Promise<LifecycleResult> {

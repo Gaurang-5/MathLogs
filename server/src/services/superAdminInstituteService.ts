@@ -37,6 +37,14 @@ const instituteOverviewSelect = {
   plan: true,
   planStartDate: true,
   planExpiryDate: true,
+  billingCycle: true,
+  trialStartedAt: true,
+  trialEndsAt: true,
+  marketplaceAccessGrantedAt: true,
+  includedQuizCredits: true,
+  includedQuizCreditsExpireAt: true,
+  lifetimeQuizCredits: true,
+  quizCreditsRenewAt: true,
   quizCredits: true,
   isQuizOnly: true,
   config: true,
@@ -149,7 +157,7 @@ export async function getSuperAdminInstitute(instituteId: string) {
   });
   if (!institute) throw new InstituteServiceError('INSTITUTE_NOT_FOUND');
 
-  const [admins, students, batches, tests, openClaims, pendingReviews, leadCounts, supportTickets, internalCases, supportSessions, billingOperations, superAdminActivity, marketplaceActivity] = await Promise.all([
+  const [admins, students, batches, tests, openClaims, pendingReviews, leadCounts, supportTickets, internalCases, supportSessions, billingOperations, billingPayments, planNotifications, superAdminActivity, marketplaceActivity] = await Promise.all([
     prisma.admin.findMany({
       where: { instituteId },
       select: { id: true, username: true, role: true },
@@ -181,6 +189,16 @@ export async function getSuperAdminInstitute(instituteId: string) {
       select: { id: true, type: true, reason: true, status: true, effectiveAt: true, appliedAt: true, error: true, createdAt: true },
       orderBy: { createdAt: 'desc' }, take: 20
     }),
+    prisma.billingPayment.findMany({
+      where: { instituteId },
+      select: { id: true, plan: true, creditPackId: true, amountPaise: true, billingCycle: true, status: true, verifiedAt: true, capturedAt: true, createdAt: true },
+      orderBy: { createdAt: 'desc' }, take: 20
+    }),
+    prisma.planNotification.findMany({
+      where: { instituteId },
+      select: { id: true, event: true, channel: true, scheduledAt: true, status: true, attempts: true, sentAt: true, failedAt: true, error: true },
+      orderBy: { scheduledAt: 'desc' }, take: 50
+    }),
     prisma.superAdminAuditLog.findMany({
       where: { instituteId },
       select: { id: true, action: true, entityType: true, entityId: true, reason: true, correlationId: true, createdAt: true, actorAdmin: { select: { id: true, username: true } } },
@@ -208,15 +226,21 @@ export async function getSuperAdminInstitute(instituteId: string) {
     },
     account: { admins },
     usage: {
-      students, batches, tests, maxStudents: typeof config.maxStudents === 'number' ? config.maxStudents : 100,
-      quizCredits: institute.quizCredits, isQuizOnly: institute.isQuizOnly,
+      students, batches, tests, unlimitedStudents: true,
+      quizCredits: institute.includedQuizCredits + institute.lifetimeQuizCredits,
+      includedQuizCredits: institute.includedQuizCredits,
+      lifetimeQuizCredits: institute.lifetimeQuizCredits,
+      includedQuizCreditsExpireAt: institute.includedQuizCreditsExpireAt,
+      quizCreditsRenewAt: institute.quizCreditsRenewAt,
       allowedClasses: Array.isArray(config.allowedClasses) ? config.allowedClasses : [],
       subjects: Array.isArray(config.subjects) ? config.subjects : [],
       requiresGrades: config.requiresGrades !== false
     },
     billing: {
-      plan: institute.plan, planStartDate: institute.planStartDate, planExpiryDate: institute.planExpiryDate,
-      operations: billingOperations
+      plan: institute.plan, billingCycle: institute.billingCycle, planStartDate: institute.planStartDate, planExpiryDate: institute.planExpiryDate,
+      trialStartedAt: institute.trialStartedAt, trialEndsAt: institute.trialEndsAt,
+      marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt,
+      operations: billingOperations, payments: billingPayments, notifications: planNotifications
     },
     marketplace: {
       ownershipStatus: institute.ownershipStatus, isPubliclyListed: institute.isPubliclyListed,

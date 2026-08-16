@@ -95,6 +95,10 @@ export class EmailWorker {
                     prisma.targetedCommunicationRecipient.updateMany({
                         where: { id: job.superAdminEntityType === 'TargetedCommunicationRecipient' ? job.superAdminEntityId || '__none__' : '__none__' },
                         data: { status: 'SENT', sentAt, error: null }
+                    }),
+                    prisma.planNotification.updateMany({
+                        where: { id: job.superAdminEntityType === 'PlanNotification' ? job.superAdminEntityId || '__none__' : '__none__' },
+                        data: { status: 'SENT', sentAt, error: null }
                     })
                 ]);
                 secureLogger.info(`[EmailWorker] Job ${job.id} sent to ${job.recipient} in ${duration}ms`);
@@ -115,6 +119,10 @@ export class EmailWorker {
                 prisma.targetedCommunicationRecipient.updateMany({
                     where: { id: job.superAdminEntityType === 'TargetedCommunicationRecipient' ? job.superAdminEntityId || '__none__' : '__none__' },
                     data: { status: status === 'FAILED' ? 'FAILED' : 'PENDING', error: error.message }
+                }),
+                prisma.planNotification.updateMany({
+                    where: { id: job.superAdminEntityType === 'PlanNotification' ? job.superAdminEntityId || '__none__' : '__none__' },
+                    data: { status: status === 'FAILED' ? 'FAILED' : 'QUEUED', ...(status === 'FAILED' ? { failedAt: new Date() } : {}), error: error.message }
                 })
             ]);
         }
