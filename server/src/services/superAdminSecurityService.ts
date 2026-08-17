@@ -1,9 +1,9 @@
 import crypto from 'node:crypto';
-import axios from 'axios';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../prisma';
 import { sendOtpEmail } from '../utils/email';
+import { sendOtpWhatsApp } from '../utils/whatsapp';
 import { writeSuperAdminAudit } from './superAdminAuditService';
 
 export const SUPER_ADMIN_ACTION_CLASSES = [
@@ -31,26 +31,27 @@ function maskDestination(value: string): string {
   return `${value.slice(0, 2)}******${value.slice(-2)}`;
 }
 
-async function dispatchWhatsAppOtp(phone: string, otp: string): Promise<void> {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
-  const templateName = process.env.WHATSAPP_TEMPLATE_OTP?.trim();
-  if (!phoneNumberId || !accessToken || !templateName) throw securityError('SUPERADMIN_RECOVERY_CHANNEL_MISSING');
-  const digits = phone.replace(/\D/g, '');
-  const destination = digits.length === 10 ? `91${digits}` : digits;
-  await axios.post(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-    messaging_product: 'whatsapp',
-    to: destination,
-    type: 'template',
-    template: {
-      name: templateName,
-      language: { code: 'en' },
-      components: [{ type: 'body', parameters: [{ type: 'text', text: otp }] }]
-    }
-  }, {
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    timeout: 10_000
-  });
+type ReauthOtpDeliveryDependencies = {
+  sendEmailOtp: typeof sendOtpEmail;
+  sendWhatsAppOtp: typeof sendOtpWhatsApp;
+};
+
+export async function deliverSuperAdminReauthOtp(
+  destination: string,
+  otp: string,
+  channel: 'EMAIL' | 'WHATSAPP',
+  dependencies: ReauthOtpDeliveryDependencies = {
+    sendEmailOtp: sendOtpEmail,
+    sendWhatsAppOtp: sendOtpWhatsApp
+  }
+): Promise<void> {
+  if (channel === 'EMAIL') {
+    const result = await dependencies.sendEmailOtp(destination, otp);
+    if (!result.success) throw new Error(result.error || 'EMAIL_DISPATCH_FAILED');
+    return;
+  }
+  const queued = await dependencies.sendWhatsAppOtp(destination, otp);
+  if (!queued) throw new Error('WHATSAPP_OTP_QUEUE_FAILED');
 }
 
 export async function sendSuperAdminReauthOtp(adminId: string, actionClass: SuperAdminActionClass) {
@@ -78,12 +79,7 @@ export async function sendSuperAdminReauthOtp(adminId: string, actionClass: Supe
   });
 
   try {
-    if (isEmail) {
-      const result = await sendOtpEmail(admin.username, otp);
-      if (!result.success) throw new Error(result.error || 'EMAIL_DISPATCH_FAILED');
-    } else {
-      await dispatchWhatsAppOtp(admin.username, otp);
-    }
+    await deliverSuperAdminReauthOtp(admin.username, otp, isEmail ? 'EMAIL' : 'WHATSAPP');
   } catch (error) {
     await prisma.superAdminReauthChallenge.update({ where: { id: challenge.id }, data: { consumedAt: new Date() } });
     throw securityError('REAUTH_DELIVERY_FAILED');

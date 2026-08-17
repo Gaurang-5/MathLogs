@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import { createApp } from '../src/index';
 import { prisma } from '../src/prisma';
 import { secureLogger } from '../src/utils/secureLogger';
+import { deliverSuperAdminReauthOtp } from '../src/services/superAdminSecurityService';
 
 let server: Server;
 let baseUrl: string;
@@ -93,6 +94,18 @@ test('Superadmin security routes reject institute admins and echo correlation ID
   assert.equal(response.status, 403);
   assert.equal(response.headers.get('x-correlation-id'), 'corr-role-boundary');
   assert.equal((await response.json() as any).error, 'SUPERADMIN_REQUIRED');
+});
+
+test('phone-based reauthentication uses the same WhatsApp OTP delivery path as login', async () => {
+  const calls: Array<{ destination: string; otp: string }> = [];
+  await deliverSuperAdminReauthOtp('9512345607', '654321', 'WHATSAPP', {
+    sendEmailOtp: async () => ({ success: true }),
+    sendWhatsAppOtp: async (destination: string, otp: string) => {
+      calls.push({ destination, otp });
+      return true;
+    }
+  });
+  assert.deepEqual(calls, [{ destination: '9512345607', otp: '654321' }]);
 });
 
 test('reauthentication stores only a hash and locks after five invalid codes', async () => {
