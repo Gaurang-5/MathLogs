@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
+import { isSupportFeatureEnabled } from '../config/featureFlags';
 
 const DAY_MS = 86_400_000;
 const LEGACY_CLAIM_MARKER = '[CLAIM REQUEST]';
@@ -39,6 +40,7 @@ function severityRank(severity: AttentionSeverity): number {
 
 export async function getSuperAdminHome() {
   const now = new Date();
+  const supportEnabled = isSupportFeatureEnabled();
   const inSevenDays = new Date(now.getTime() + 7 * DAY_MS);
   const inThirtyDays = new Date(now.getTime() + 30 * DAY_MS);
 
@@ -66,7 +68,7 @@ export async function getSuperAdminHome() {
     prisma.leadInquiry.count({
       where: { deliveryStatus: 'FAILED', NOT: { studentName: { startsWith: LEGACY_CLAIM_MARKER } } }
     }),
-    prisma.supportTicket.count({ where: { status: { not: 'CLOSED' } } }),
+    supportEnabled ? prisma.supportTicket.count({ where: { status: { not: 'CLOSED' } } }) : Promise.resolve(0),
     prisma.marketplaceClaim.findMany({
       where: { status: { in: ['NEW', 'CONTACTED'] } },
       select: { id: true, instituteId: true, claimantName: true, status: true, createdAt: true, institute: { select: { name: true } } },
@@ -85,12 +87,12 @@ export async function getSuperAdminHome() {
       orderBy: { createdAt: 'asc' },
       take: 20
     }),
-    prisma.supportTicket.findMany({
+    supportEnabled ? prisma.supportTicket.findMany({
       where: { status: { not: 'CLOSED' } },
       select: { id: true, reference: true, instituteId: true, subject: true, priority: true, status: true, createdAt: true, institute: { select: { name: true } } },
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
       take: 30
-    }),
+    }) : Promise.resolve([]),
     prisma.institute.findMany({
       where: { planExpiryDate: { gte: now, lte: inThirtyDays }, status: 'ACTIVE' },
       select: { id: true, name: true, plan: true, planExpiryDate: true },

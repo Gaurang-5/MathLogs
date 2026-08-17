@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { writeSuperAdminAudit } from './superAdminAuditService';
 import { claimSuperAdminIdempotency, completeSuperAdminIdempotency } from './superAdminIdempotencyService';
+import { isSupportFeatureEnabled } from '../config/featureFlags';
 
 export class SystemServiceError extends Error { constructor(code: string) { super(code); } }
 
@@ -12,6 +13,7 @@ function mask(value: string) {
 
 export async function getSystemOverview() {
   const startedAt = Date.now();
+  const supportEnabled = isSupportFeatureEnabled();
   await prisma.$queryRaw`SELECT 1`;
   const databaseLatencyMs = Date.now() - startedAt;
   const [emailCounts, whatsappCounts, authFailures24h, activeAdminSessions, activeSupportSessions, pendingBillingOperations] = await Promise.all([
@@ -19,7 +21,7 @@ export async function getSystemOverview() {
     prisma.whatsappJob.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.authenticationEvent.count({ where: { success: false, createdAt: { gte: new Date(Date.now() - 86_400_000) } } }),
     prisma.adminSession.count({ where: { revokedAt: null, expiresAt: { gt: new Date() }, admin: { role: 'SUPER_ADMIN' } } }),
-    prisma.superAdminSupportSession.count({ where: { endedAt: null, expiresAt: { gt: new Date() } } }),
+    supportEnabled ? prisma.superAdminSupportSession.count({ where: { endedAt: null, expiresAt: { gt: new Date() } } }) : Promise.resolve(0),
     prisma.superAdminBillingOperation.count({ where: { status: { in: ['PENDING', 'PROCESSING', 'RETRYING'] } } })
   ]);
   const counts = (items: Array<{ status: string; _count: { _all: number } }>) => Object.fromEntries(items.map(item => [item.status.toLowerCase(), item._count._all]));

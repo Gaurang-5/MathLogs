@@ -11,8 +11,10 @@ let server: Server;
 let baseUrl: string;
 let token: string;
 let instituteId: string;
+const originalSupportFlag = process.env.SUPPORT_FEATURE_ENABLED;
 
 before(async () => {
+  process.env.SUPPORT_FEATURE_ENABLED = 'true';
   const suffix = `${Date.now()}-${Math.random()}`;
   const institute = await prisma.institute.create({
     data: {
@@ -41,6 +43,8 @@ before(async () => {
 });
 
 after(async () => {
+  if (originalSupportFlag === undefined) delete process.env.SUPPORT_FEATURE_ENABLED;
+  else process.env.SUPPORT_FEATURE_ENABLED = originalSupportFlag;
   await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   await prisma.$disconnect();
 });
@@ -56,6 +60,19 @@ test('Home returns stable metrics, attention, activity, and system contracts', a
   assert.ok(body.data.attention.some((item: any) => item.kind === 'PLAN_EXPIRY' && item.severity === 'TODAY' && item.instituteId === instituteId));
   assert.ok(body.data.attention.some((item: any) => item.kind === 'SUPPORT' && item.severity === 'CRITICAL' && item.instituteId === instituteId));
   assert.ok(body.data.metrics.openSupportTickets >= 1);
+});
+
+test('Home omits Support metrics and attention while the feature is disabled', async () => {
+  process.env.SUPPORT_FEATURE_ENABLED = 'false';
+  try {
+    const response = await fetch(`${baseUrl}/api/super-admin/home`, { headers: headers() });
+    assert.equal(response.status, 200);
+    const body = await response.json() as any;
+    assert.equal(body.data.metrics.openSupportTickets, 0);
+    assert.equal(body.data.attention.some((item: any) => item.kind === 'SUPPORT'), false);
+  } finally {
+    process.env.SUPPORT_FEATURE_ENABLED = 'true';
+  }
 });
 
 test('global search requires two characters and returns bounded institute summaries', async () => {
