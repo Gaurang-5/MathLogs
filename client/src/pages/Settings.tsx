@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { api } from '../utils/api';
-import { Lock, ImagePlus, Loader2, Plus, X, Trash2, ArrowUp, ArrowDown, GripVertical, Pencil, Check } from 'lucide-react';
+import { ImagePlus, Loader2, Plus, X, Trash2, ArrowUp, ArrowDown, GripVertical, Pencil, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { OperationalCommunicationPreferences } from '../features/superadmin-communications/OperationalCommunicationPreferences';
 
 interface Profile {
     username: string;
@@ -202,7 +203,6 @@ function TagInput({ label, hint, tags, setTags, placeholder }: { label: string, 
 }
 
 function CoachingConfigSection() {
-    const [config, setConfig] = useState<any>(null);
     const [subjects, setSubjects] = useState<string[]>([]);
     const [classes, setClasses] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
@@ -212,7 +212,6 @@ function CoachingConfigSection() {
         api.get('/institute/me')
             .then((res: any) => {
                 const currentConfig = res.config || {};
-                setConfig(currentConfig);
                 setSubjects(currentConfig.subjects || []);
                 setClasses(currentConfig.allowedClasses || []);
             })
@@ -707,6 +706,7 @@ export default function Settings() {
         <Layout title="Settings">
             <div className="max-w-4xl mx-auto">
                 <ProfileSection />
+                <OperationalCommunicationPreferences />
                 
                 {!isQuizOnly && (
                     <>
