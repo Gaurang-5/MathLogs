@@ -1,6 +1,7 @@
 import { Building2, Headphones, LayoutDashboard, Megaphone, MessagesSquare, Settings2, WalletCards } from 'lucide-react';
+import { supportFeatureEnabled } from '../../config/featureFlags';
 
-export const superAdminNavigation = [
+const baseSuperAdminNavigation = [
   { id: 'home', label: 'Home', href: '/super-admin', icon: LayoutDashboard, group: 'Operate' },
   { id: 'institutes', label: 'Institutes', href: '/super-admin/institutes', icon: Building2, group: 'Operate' },
   { id: 'revenue', label: 'Revenue', href: '/super-admin/revenue', icon: WalletCards, group: 'Operate' },
@@ -9,3 +10,9 @@ export const superAdminNavigation = [
   { id: 'communications', label: 'Communications', href: '/super-admin/communications', icon: MessagesSquare, group: 'Serve' },
   { id: 'system', label: 'System', href: '/super-admin/system', icon: Settings2, group: 'Platform' }
 ] as const;
+
+export type SuperAdminNavigationItem = (typeof baseSuperAdminNavigation)[number];
+
+export function getSuperAdminNavigation(supportEnabled = supportFeatureEnabled): SuperAdminNavigationItem[] {
+  return baseSuperAdminNavigation.filter(item => supportEnabled || item.id !== 'support');
+}

@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SuperAdminShell } from './SuperAdminShell';
+import { getSuperAdminNavigation } from './navigation';
 
 vi.mock('./api', () => ({ superAdminShellApi: { search: vi.fn().mockResolvedValue([]) } }));
 
@@ -17,7 +18,13 @@ describe('SuperAdminShell', () => {
     expect(container.querySelector('nav[aria-label="Operate Superadmin navigation"]')).toBeTruthy();
     expect(container.textContent).toContain('Institutes');
     expect(container.textContent).toContain('Revenue');
-    expect(container.textContent).toContain('Support');
+    expect(container.textContent).not.toContain('Support');
+    expect(container.textContent).toContain('Communications');
     expect(container.textContent).toContain('Home content');
+  });
+
+  it('restores Support navigation when explicitly enabled', async () => {
+    await act(async () => { root.render(<MemoryRouter initialEntries={['/super-admin']}><SuperAdminShell navigation={getSuperAdminNavigation(true)}><div>Home content</div></SuperAdminShell></MemoryRouter>); });
+    expect(container.textContent).toContain('Support');
   });
 });

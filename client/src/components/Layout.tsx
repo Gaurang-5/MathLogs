@@ -10,6 +10,9 @@ import ToastProvider from './ToastProvider';
 import QuickFeeModal from './QuickFeeModal';
 import PWAInstallPrompt from './PWAInstallPrompt';
 import { SupportSessionBanner } from '../features/superadmin-shell/SupportSessionBanner';
+import { reconcileSupportSession } from '../features/superadmin-shell/supportSession';
+import { supportFeatureEnabled } from '../config/featureFlags';
+import { getInstituteNavigation } from './layoutNavigation';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -34,6 +37,8 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
             }
         }).catch(() => {});
     }, []);
+
+    useEffect(() => { reconcileSupportSession(supportFeatureEnabled); }, []);
 
     // Default to collapsed on screens smaller than 1280px (xl) to prevent squashed content on tablets/laptops
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -88,7 +93,8 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
         startYRef.current = 0;
     };
 
-    const showMobileNav = !hideMobileNav && ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing', '/marketplace-settings', '/support'].includes(location.pathname);
+    const mobileNavPaths = ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing', '/marketplace-settings', ...(supportFeatureEnabled ? ['/support'] : [])];
+    const showMobileNav = !hideMobileNav && mobileNavPaths.includes(location.pathname);
 
     const handleLogout = () => {
         localStorage.clear();
@@ -106,41 +112,11 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
     const isQuizOnly = localStorage.getItem('isQuizOnly') === 'true';
     const isPageOnly = localStorage.getItem('isPageOnly') === 'true';
 
-    let navItems: { name: string; path: string; icon: any }[] = [];
-
-    if (isPageOnly) {
-        navItems = [
-            { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
-            { name: 'Upgrade ERP Plan', path: '/billing', icon: CreditCard },
-            { name: 'Support', path: '/support', icon: Headphones },
-            { name: 'Settings', path: '/settings', icon: Settings },
-        ];
-    } else if (isQuizOnly) {
-        navItems = [
-            { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
-            { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
-            { name: 'Buy Credits', path: '/billing', icon: CreditCard },
-            { name: 'Support', path: '/support', icon: Headphones },
-            { name: 'Settings', path: '/settings', icon: Settings },
-        ];
-    } else {
-        navItems = [
-            { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-            { name: 'Batches', path: '/batches', icon: Users },
-            { name: 'Tests', path: '/tests', icon: FileText },
-            { name: 'Quizzes', path: '/quizzes', icon: Sparkles },
-            { name: 'Scan Marks', path: '/scan', icon: Scan },
-            { name: 'Fees', path: '/fees', icon: ReceiptIndianRupee },
-            { name: 'Marketplace Listing', path: '/marketplace-settings', icon: Store },
-            { name: 'Billing', path: '/billing', icon: CreditCard },
-            { name: 'Support', path: '/support', icon: Headphones },
-            { name: 'Settings', path: '/settings', icon: Settings },
-        ];
-    }
+    const navItems = getInstituteNavigation({ isPageOnly, isQuizOnly, supportEnabled: supportFeatureEnabled });
 
     return (
         <div className="flex min-h-screen bg-app-bg text-app-text transition-colors duration-500 font-sans selection:bg-accent-subtle selection:text-accent">
-            <SupportSessionBanner />
+            {supportFeatureEnabled ? <SupportSessionBanner /> : null}
             <ToastProvider />
             <QuickFeeModal isOpen={showQuickFeeModal} onClose={() => setShowQuickFeeModal(false)} />
 
@@ -345,14 +321,14 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                                     <CreditCard className="w-5 h-5 mr-3.5" />
                                     Billing & Plans
                                 </Link>
-                                <Link
+                                {supportFeatureEnabled ? <Link
                                     to="/support"
                                     onClick={() => setMobileMenuOpen(false)}
                                     className="flex items-center w-full px-4 py-3.5 text-base font-medium text-app-text-secondary hover:bg-black/5 rounded-2xl"
                                 >
                                     <Headphones className="w-5 h-5 mr-3.5" />
                                     Support Center
-                                </Link>
+                                </Link> : null}
                                 <Link
                                     to="/settings"
                                     onClick={() => setMobileMenuOpen(false)}

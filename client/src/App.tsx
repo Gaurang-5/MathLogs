@@ -3,6 +3,7 @@ import { Suspense, lazy, type ReactNode } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
 import { readTokenPayload } from './utils/auth';
+import { supportFeatureEnabled } from './config/featureFlags';
 
 // Lazy Load Pages
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
@@ -76,6 +77,11 @@ function RoleRoute({ children, allowedRole }: { children: ReactNode, allowedRole
   return children;
 }
 
+export function SupportRouteBoundary({ enabled, scope, children }: { enabled: boolean; scope: 'institute' | 'superadmin'; children: ReactNode }) {
+  if (!enabled) return <Navigate to={scope === 'superadmin' ? '/super-admin' : '/settings'} replace />;
+  return children;
+}
+
 // Simple Loading Spinner
 const Loading = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -108,8 +114,8 @@ function App() {
               <Route path="institutes/:id/*" element={<SuperAdminInstituteDetail />} />
               <Route path="revenue" element={<SuperAdminRevenue />} />
               <Route path="marketplace" element={<SuperAdminMarketplace />} />
-              <Route path="support" element={<SuperAdminSupport />} />
-              <Route path="support/tickets/:id" element={<SuperAdminSupport />} />
+              <Route path="support" element={<SupportRouteBoundary enabled={supportFeatureEnabled} scope="superadmin"><SuperAdminSupport /></SupportRouteBoundary>} />
+              <Route path="support/tickets/:id" element={<SupportRouteBoundary enabled={supportFeatureEnabled} scope="superadmin"><SuperAdminSupport /></SupportRouteBoundary>} />
               <Route path="communications" element={<SuperAdminCommunications />} />
               <Route path="system" element={<SuperAdminSystem />} />
             </Route>
@@ -126,7 +132,7 @@ function App() {
             <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
             <Route path="/marketplace-settings" element={<PrivateRoute><MarketplaceSettings /></PrivateRoute>} />
             <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
-            <Route path="/support" element={<PrivateRoute><Support /></PrivateRoute>} />
+            <Route path="/support" element={<SupportRouteBoundary enabled={supportFeatureEnabled} scope="institute"><PrivateRoute><Support /></PrivateRoute></SupportRouteBoundary>} />
 
             <Route path="/approvals" element={<PrivateRoute><Approvals /></PrivateRoute>} />
 

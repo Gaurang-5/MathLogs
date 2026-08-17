@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronRight, Menu, Search, Sparkles, X } from 'lucide-react';
-import { superAdminNavigation } from './navigation';
+import { getSuperAdminNavigation, type SuperAdminNavigationItem } from './navigation';
 import { superAdminShellApi } from './api';
 import type { InstituteSearchResult } from './types';
 import { SuperAdminReauthProvider } from './ReauthDialog';
 
-export function SuperAdminShell({ counts = {}, children }: { counts?: Partial<Record<string, number>>; children?: React.ReactNode }) {
+export function SuperAdminShell({ counts = {}, children, navigation: navigationItems = getSuperAdminNavigation() }: { counts?: Partial<Record<string, number>>; children?: React.ReactNode; navigation?: SuperAdminNavigationItem[] }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<InstituteSearchResult[]>([]);
@@ -14,7 +14,7 @@ export function SuperAdminShell({ counts = {}, children }: { counts?: Partial<Re
   const navigate = useNavigate();
   const location = useLocation();
   const searchRef = useRef<HTMLDivElement>(null);
-  const title = useMemo(() => superAdminNavigation.find(item => item.href === location.pathname || (item.href !== '/super-admin' && location.pathname.startsWith(item.href)))?.label || 'Operations', [location.pathname]);
+  const title = useMemo(() => navigationItems.find(item => item.href === location.pathname || (item.href !== '/super-admin' && location.pathname.startsWith(item.href)))?.label || 'Operations', [location.pathname, navigationItems]);
 
   useEffect(() => {
     if (query.trim().length < 2) { setResults([]); return; }
@@ -41,7 +41,7 @@ export function SuperAdminShell({ counts = {}, children }: { counts?: Partial<Re
     {['Operate', 'Grow', 'Serve', 'Platform'].map(group => <div key={group} className="mb-6">
       <p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-stone-400">{group}</p>
       <nav className="space-y-1" aria-label={`${group} Superadmin navigation`}>
-        {superAdminNavigation.filter(item => item.group === group).map(item => {
+        {navigationItems.filter(item => item.group === group).map(item => {
           const Icon = item.icon;
           const count = counts[item.id] || 0;
           return <NavLink key={item.id} to={item.href} end={item.href === '/super-admin'} onClick={() => setMobileOpen(false)} className={({ isActive }) => `flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold transition ${isActive ? 'bg-stone-950 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100 hover:text-stone-950'}`}>
