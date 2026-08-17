@@ -32,9 +32,11 @@ import { addCaseNote, addTicketMessage, createCase, getAnyTicket, getCase, listA
 import { dispatch, getPreference, history, preview, templates, updatePreference } from '../controllers/superAdminCommunicationController';
 import { audit, jobs, overview as systemOverview, retryJob, revokeSession, security } from '../controllers/superAdminSystemController';
 import { cancelDeletion, finalizeDeletion, getDeletion, scheduleDeletion } from '../controllers/superAdminDeletionController';
+import { requireSupportFeature } from '../middleware/supportFeatureGate';
 
 const router = Router();
 
+router.use(['/support', '/support-sessions'], requireSupportFeature);
 router.use(authenticateToken, requireSuperAdmin);
 router.get('/home', getHome);
 router.get('/search', searchInstitutes);

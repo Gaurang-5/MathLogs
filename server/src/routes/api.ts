@@ -24,11 +24,13 @@ import superAdminRoutes from './superAdminRoutes';
 import { createInstituteTicket, downloadSupportAttachment, getInstituteTicket, listInstituteTickets, replyInstituteTicket, uploadInstituteAttachments } from '../controllers/superAdminSupportController';
 import { getOwnPreference, updateOwnPreference } from '../controllers/superAdminCommunicationController';
 import { parseSupportAttachments } from '../middleware/supportUpload';
+import { requireSupportFeature } from '../middleware/supportFeatureGate';
 import { getPublicPlanCatalogue } from '../controllers/planCatalogController';
 
 const router = Router();
 router.get('/plans', publicLimiter, getPublicPlanCatalogue as any);
 router.use('/super-admin', superAdminRoutes);
+router.use('/support', requireSupportFeature);
 router.post('/support/tickets', authenticateToken as any, createInstituteTicket as any);
 router.get('/support/tickets', authenticateToken as any, listInstituteTickets as any);
 router.get('/support/tickets/:id', authenticateToken as any, getInstituteTicket as any);

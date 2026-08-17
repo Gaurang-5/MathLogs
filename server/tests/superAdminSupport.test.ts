@@ -8,7 +8,9 @@ import { createApp } from '../src/index';
 import { prisma } from '../src/prisma';
 
 let server: Server; let baseUrl: string; let instituteId: string; let otherInstituteId: string; let superToken: string; let ownerToken: string; let otherToken: string;
+const originalSupportFlag = process.env.SUPPORT_FEATURE_ENABLED;
 before(async () => {
+  process.env.SUPPORT_FEATURE_ENABLED = 'true';
   const suffix = `${Date.now()}-${Math.random()}`;
   const activePlan = { plan: 'ENTERPRISE' as const, planStartDate: new Date(), planExpiryDate: new Date('2099-01-01T00:00:00.000Z'), marketplaceAccessGrantedAt: new Date() };
   const institute = await prisma.institute.create({ data: { name: `Support Academy ${suffix}`, ...activePlan } }); instituteId = institute.id;
@@ -23,7 +25,12 @@ before(async () => {
   otherToken = jwt.sign({ id: otherOwner.id, username: otherOwner.username, role: otherOwner.role, passwordVersion: 1 }, 'test-secret');
   const app = createApp(); await new Promise<void>(resolve => { server = app.listen(0, resolve); }); baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
-after(async () => { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); await prisma.$disconnect(); });
+after(async () => {
+  if (originalSupportFlag === undefined) delete process.env.SUPPORT_FEATURE_ENABLED;
+  else process.env.SUPPORT_FEATURE_ENABLED = originalSupportFlag;
+  await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  await prisma.$disconnect();
+});
 const headers = (token: string) => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
 
 test('institute creates and sees only its own support tickets', async () => {
