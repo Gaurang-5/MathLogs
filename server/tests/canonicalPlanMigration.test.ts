@@ -139,9 +139,10 @@ test('canonical billing migration is rerunnable, preserves protected rows, and a
     assert.deepEqual(await businessCounts(postgres), expectedCounts);
     assert.deepEqual(await instituteMigrationState(postgres), beforePreflightState);
 
+    const competingNow = new Date('2026-08-17T12:00:00.000Z');
     const [first, second] = await Promise.all([
       migrateCanonicalPlans(prisma, 'apply', now),
-      migrateCanonicalPlans(prisma, 'apply', new Date('2026-08-17T12:00:00.000Z'))
+      migrateCanonicalPlans(prisma, 'apply', competingNow)
     ]);
     assert.deepEqual([first.migrated, second.migrated].sort(), [0, 8]);
     assert.deepEqual(first.before, expectedCounts); assert.deepEqual(first.after, expectedCounts);
@@ -160,11 +161,12 @@ test('canonical billing migration is rerunnable, preserves protected rows, and a
     const migratedAt = migratedInstitutes[0]?.canonicalPlanMigratedAt?.toISOString();
     assert.ok(migratedAt);
     assert.ok(migratedInstitutes.every(row => row.canonicalPlanMigratedAt?.toISOString() === migratedAt));
+    const appliedNow = first.migrated === 8 ? now : competingNow;
     const beforeById = new Map(beforePreflightState.map(row => [row.id, row]));
     for (const row of migratedInstitutes) {
       const beforeRow = beforeById.get(row.id)!;
-      const active = !beforeRow.planExpiryDate || beforeRow.planExpiryDate.getTime() >= now.getTime();
-      const expected = active ? includedCreditPeriod({ planStartDate: beforeRow.planStartDate, createdAt: beforeRow.createdAt }, now).includedQuizCreditsExpireAt.toISOString() : undefined;
+      const active = !beforeRow.planExpiryDate || beforeRow.planExpiryDate.getTime() >= appliedNow.getTime();
+      const expected = active ? includedCreditPeriod({ planStartDate: beforeRow.planStartDate, createdAt: beforeRow.createdAt }, appliedNow).includedQuizCreditsExpireAt.toISOString() : undefined;
       assert.equal(row.includedQuizCreditsExpireAt?.toISOString(), expected, `${row.id} receives the correct UTC-anniversary expiry`);
     }
     assert.deepEqual(institutes.map(row => row.includedQuizCreditsExpireAt?.toISOString()), institutes.map(row => row.quizCreditsRenewAt?.toISOString()));

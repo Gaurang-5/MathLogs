@@ -16,6 +16,7 @@ let instituteAdminId: string;
 let instituteId: string;
 let superToken: string;
 let instituteToken: string;
+const originalSupportFlag = process.env.SUPPORT_FEATURE_ENABLED;
 
 const auth = (token: string, extra: Record<string, string> = {}) => ({
   Authorization: `Bearer ${token}`,
@@ -32,7 +33,9 @@ async function post(path: string, token: string, body: unknown, extra: Record<st
 }
 
 before(async () => {
+  process.env.SUPPORT_FEATURE_ENABLED = 'true';
   const suffix = `${Date.now()}-${Math.random()}`;
+  const superAdminPhone = `95${Date.now().toString().slice(-8)}`;
   const password = await bcrypt.hash('correct-password', 4);
   const institute = await prisma.institute.create({ data: {
     name: `Security API ${suffix}`,
@@ -43,7 +46,7 @@ before(async () => {
   } });
   instituteId = institute.id;
   const superAdmin = await prisma.admin.create({
-    data: { username: `security-${suffix}@example.com`, password, role: 'SUPER_ADMIN' }
+    data: { username: superAdminPhone, password, role: 'SUPER_ADMIN' }
   });
   superAdminId = superAdmin.id;
   const instituteAdmin = await prisma.admin.create({
@@ -77,6 +80,8 @@ before(async () => {
 });
 
 after(async () => {
+  if (originalSupportFlag === undefined) delete process.env.SUPPORT_FEATURE_ENABLED;
+  else process.env.SUPPORT_FEATURE_ENABLED = originalSupportFlag;
   await new Promise<void>((resolve, reject) => {
     server.close((error) => error ? reject(error) : resolve());
   });
