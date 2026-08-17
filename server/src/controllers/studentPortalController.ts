@@ -724,7 +724,8 @@ export const getStudentQuizzes = async (req: Request, res: Response): Promise<vo
                 where: {
                     OR: [
                         { batchId: student.batchId },
-                        { batches: { some: { id: student.batchId } } }
+                        { batches: { some: { id: student.batchId } } },
+                        { submissions: { some: { studentId } } }
                     ]
                 },
                 select: { id: true }
@@ -733,14 +734,10 @@ export const getStudentQuizzes = async (req: Request, res: Response): Promise<vo
 
             quizzes = await prisma.onlineQuiz.findMany({
                 where: {
-                    AND: [
-                        {
-                            OR: [
-                                { batchId: student.batchId },
-                                { batches: { some: { id: student.batchId } } }
-                            ]
-                        },
-                        { createdAt: { gte: student.createdAt } }
+                    OR: [
+                        { batchId: student.batchId },
+                        { batches: { some: { id: student.batchId } } },
+                        { submissions: { some: { studentId } } }
                     ]
                 },
                 include: {
