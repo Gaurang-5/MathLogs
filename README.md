@@ -243,6 +243,7 @@ The checked-in example file is `server/.env.example`. Important server variables
 | `JWT_SECRET` | Yes | Signing secret for access and refresh-token flows |
 | `PORT` | No | API port, defaults to `3001` |
 | `NODE_ENV` | No | `development`, `test`, or `production` |
+| `SUPPORT_FEATURE_ENABLED` | No | Enables ticket-based institute/Superadmin Support only when exactly `true`; defaults to disabled |
 | `CLIENT_URL` | No | Local/web origin used by generated links |
 | `FRONTEND_URL` | No | Public frontend base URL for payment and messaging links |
 | `GEMINI_API_KEY` | Optional | AI test generation and OCR |
@@ -263,6 +264,7 @@ Client-side variables:
 | `VITE_API_URL` | `client/` | Overrides the web client's API base URL during development |
 | `VITE_SENTRY_DSN` | `client/` | Enables frontend Sentry |
 | `VITE_APP_VERSION` | `client/` | Frontend release/version label |
+| `VITE_SUPPORT_FEATURE_ENABLED` | `client/` | Shows ticket-based Support only when exactly `true`; defaults to disabled |
 | `EXPO_PUBLIC_API_URL` | `mobile/` | Mobile development API base URL without `/api` |
 
 ## Database Workflow
@@ -356,6 +358,8 @@ Production deployments require:
 - `JWT_SECRET`, `DATABASE_URL`, `NODE_ENV=production`, and any integration-specific secrets.
 - Prisma migrations deployed with `npx prisma migrate deploy`.
 - Correct production origins in the server CORS allowlist.
+
+Ticket-based Support is currently held back. Keep `SUPPORT_FEATURE_ENABLED=false` and `VITE_SUPPORT_FEATURE_ENABLED=false` in production. Operational communication preferences, plan lifecycle notices, billing reminders, and configured email/WhatsApp delivery remain active while Support is disabled. A later Support launch requires both flags to be `true`, with the client flag present during the production build.
 
 See [Deploy to Heroku](./docs/guides/DEPLOY_TO_HEROKU.md) for the project deployment guide.
 
