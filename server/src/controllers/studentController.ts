@@ -6,12 +6,24 @@ import { getCourseCode, getInstituteCode } from '../utils/studentIds';
 import jwt from 'jsonwebtoken';
 import { secureLogger } from '../utils/secureLogger';
 import { getJwtSecret } from '../utils/env';
+import {
+    closeStudentFeeProfile,
+    confirmStudentFeeProfile,
+    createPendingStudentFeeProfile,
+    studentMonthCoverageDepsFor,
+} from '../services/studentMonthCoverageService';
+import { MonthCoverageError } from '../domain/monthCoverage/types';
 
 const JWT_SECRET = getJwtSecret();
 
 // H5 fix: Shared constant so both registerStudent and addStudentManually
 // always include the fields that autoSendWelcomeInvite depends on.
-const AUTO_INVITE_INSTITUTE_SELECT = { name: true } as const;
+const AUTO_INVITE_INSTITUTE_SELECT = {
+    id: true,
+    name: true,
+    coachingFeeMode: true,
+    timezone: true,
+} as const;
 
 // M2 fix: Typed interfaces instead of `any`
 interface AutoInviteStudent {
@@ -251,7 +263,9 @@ export const registerStudent = async (req: Request, res: Response) => {
 
         // Auto-send welcome invite if enabled
         await autoSendWelcomeInvite(student!, batch);
-        if (student && batch) {
+        if (student && batch.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
+            await createPendingStudentFeeProfile({ instituteId: batch.instituteId!, studentId: student.id });
+        } else if (student && batch) {
             await autoAssignGlobalInstallments(student.id, batch.id, student.createdAt);
         }
 
@@ -264,7 +278,7 @@ export const registerStudent = async (req: Request, res: Response) => {
 };
 
 export const addStudentManually = async (req: Request, res: Response) => {
-    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, additionalData } = req.body;
+    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, additionalData, feeStartMonth } = req.body;
 
     // Data Normalization
     if (typeof name === 'string') name = name.trim();
@@ -285,6 +299,9 @@ export const addStudentManually = async (req: Request, res: Response) => {
 
         const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+        if (batch.institute?.coachingFeeMode === 'MONTH_COVERAGE' && !feeStartMonth) {
+            return res.status(400).json({ error: 'FEE_START_MONTH_REQUIRED' });
+        }
 
         // Idempotency Check: Strict One-Phone-Number-Per-Batch logic
         const existingStudent = await prisma.student.findFirst({
@@ -299,20 +316,51 @@ export const addStudentManually = async (req: Request, res: Response) => {
         while (!success && retries < MAX_RETRIES) {
             try {
                 const humanId = await generateHumanId(batch);
-                student = await prisma.student.create({
-                    data: {
-                        batchId,
-                        name,
-                        parentName,
-                        parentWhatsapp,
-                        parentEmail,
-                        schoolName,
-                        additionalData,
-                        status: 'APPROVED',
-                        humanId,
-                        instituteId: batch.instituteId
-                    }
-                });
+                if (batch.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
+                    const result = await prisma.$transaction(async tx => {
+                        const createdStudent = await tx.student.create({
+                            data: {
+                                batchId,
+                                name,
+                                parentName,
+                                parentWhatsapp,
+                                parentEmail,
+                                schoolName,
+                                additionalData,
+                                status: 'APPROVED',
+                                humanId,
+                                instituteId: batch.instituteId
+                            }
+                        });
+                        const confirmation = await confirmStudentFeeProfile({
+                            instituteId: batch.instituteId!,
+                            studentId: createdStudent.id,
+                            feeStartMonth,
+                            actorId: teacherId!,
+                        }, studentMonthCoverageDepsFor(tx));
+                        return { student: createdStudent, confirmation };
+                    });
+                    student = {
+                        ...result.student,
+                        monthCoverageProfile: result.confirmation.profile,
+                        feeStartWarning: result.confirmation.warning,
+                    } as typeof student;
+                } else {
+                    student = await prisma.student.create({
+                        data: {
+                            batchId,
+                            name,
+                            parentName,
+                            parentWhatsapp,
+                            parentEmail,
+                            schoolName,
+                            additionalData,
+                            status: 'APPROVED',
+                            humanId,
+                            instituteId: batch.instituteId
+                        }
+                    });
+                }
                 success = true;
             } catch (error: any) {
                 if (error.code === 'P2002') {
@@ -342,7 +390,7 @@ export const addStudentManually = async (req: Request, res: Response) => {
 
         // Auto-send invite if enabled
         await autoSendWelcomeInvite(student!, batch);
-        if (student && batch) {
+        if (student && batch.institute?.coachingFeeMode !== 'MONTH_COVERAGE') {
             await autoAssignGlobalInstallments(student.id, batch.id, student.createdAt);
         }
 
@@ -435,6 +483,7 @@ export const getPendingStudents = async (req: Request, res: Response) => {
 export const approveStudent = async (req: Request, res: Response) => {
     // Kept for backward compatibility if any legacy pending students exist
     const { id } = req.params;
+    const { feeStartMonth } = req.body || {};
     const teacherId = req.user?.id;
     try {
         const studentToApprove = await prisma.student.findUnique({
@@ -442,7 +491,7 @@ export const approveStudent = async (req: Request, res: Response) => {
             include: {
                 batch: {
                     include: {
-                        institute: { select: { name: true } }
+                        institute: { select: { ...AUTO_INVITE_INSTITUTE_SELECT } }
                     }
                 }
             }
@@ -455,9 +504,20 @@ export const approveStudent = async (req: Request, res: Response) => {
 
         if (!studentToApprove) return res.status(404).json({ error: 'Student not found' });
         if (!studentToApprove.batch) return res.status(400).json({ error: 'Student has no batch' });
+        if (studentToApprove.batch.institute?.coachingFeeMode === 'MONTH_COVERAGE' && !feeStartMonth) {
+            return res.status(400).json({ error: 'FEE_START_MONTH_REQUIRED' });
+        }
 
         // Idempotency: If already approved and has humanId, do nothing or return existing
         if (studentToApprove.status === 'APPROVED' && studentToApprove.humanId) {
+            if (studentToApprove.batch.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
+                await confirmStudentFeeProfile({
+                    instituteId: studentToApprove.instituteId!,
+                    studentId: studentToApprove.id,
+                    feeStartMonth,
+                    actorId: teacherId!,
+                });
+            }
             return res.json(studentToApprove);
         }
 
@@ -468,10 +528,31 @@ export const approveStudent = async (req: Request, res: Response) => {
         while (!success && retries < MAX_RETRIES) {
             try {
                 const humanId = await generateHumanId(studentToApprove.batch);
-                student = await prisma.student.update({
-                    where: { id: String(id) },
-                    data: { status: 'APPROVED', humanId }
-                });
+                if (studentToApprove.batch.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
+                    const result = await prisma.$transaction(async tx => {
+                        const approvedStudent = await tx.student.update({
+                            where: { id: String(id) },
+                            data: { status: 'APPROVED', humanId }
+                        });
+                        const confirmation = await confirmStudentFeeProfile({
+                            instituteId: studentToApprove.instituteId!,
+                            studentId: approvedStudent.id,
+                            feeStartMonth,
+                            actorId: teacherId!,
+                        }, studentMonthCoverageDepsFor(tx));
+                        return { student: approvedStudent, confirmation };
+                    });
+                    student = {
+                        ...result.student,
+                        monthCoverageProfile: result.confirmation.profile,
+                        feeStartWarning: result.confirmation.warning,
+                    } as typeof student;
+                } else {
+                    student = await prisma.student.update({
+                        where: { id: String(id) },
+                        data: { status: 'APPROVED', humanId }
+                    });
+                }
                 success = true;
             } catch (error: any) {
                 if (error.code === 'P2002') {
@@ -492,7 +573,7 @@ export const approveStudent = async (req: Request, res: Response) => {
 
         // Auto-send welcome invite if enabled
         await autoSendWelcomeInvite(student!, studentToApprove.batch);
-        if (student && studentToApprove.batch) {
+        if (student && studentToApprove.batch.institute?.coachingFeeMode !== 'MONTH_COVERAGE') {
             await autoAssignGlobalInstallments(student.id, studentToApprove.batch.id, student.createdAt);
         }
 
@@ -534,14 +615,29 @@ export const archiveStudent = async (req: Request, res: Response) => {
                 feePayments: true,
                 attendanceRecords: true,
                 marks: true,
-                quizSubmissions: true
+                quizSubmissions: true,
+                batch: {
+                    include: {
+                        institute: { select: { id: true, coachingFeeMode: true, timezone: true } }
+                    }
+                }
             }
         });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
         if (student.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
-        const hasActivity = 
+        const isMonthCoverage = student.batch?.institute?.coachingFeeMode === 'MONTH_COVERAGE';
+        const leaveAt = new Date();
+        if (isMonthCoverage) {
+            await closeStudentFeeProfile({
+                instituteId: user.instituteId,
+                studentId: student.id,
+                leaveAt,
+            });
+        }
+
+        const hasActivity = isMonthCoverage ||
             student.fees.length > 0 || 
             student.feePayments.length > 0 || 
             student.attendanceRecords.length > 0 || 
@@ -555,7 +651,7 @@ export const archiveStudent = async (req: Request, res: Response) => {
                 data: {
                     status: 'LEFT',
                     leaveReason: leaveReason || 'No reason provided',
-                    leftAt: new Date(),
+                    leftAt: leaveAt,
                     batchId: null
                 }
             });
@@ -588,6 +684,31 @@ export const archiveStudent = async (req: Request, res: Response) => {
     } catch (e) {
         console.error("Archive error:", e);
         res.status(500).json({ error: 'Failed to remove or archive student' });
+    }
+};
+
+export const confirmMonthCoverageProfileController = async (req: Request, res: Response) => {
+    const studentId = String(req.params.studentId);
+    const instituteId = req.user?.instituteId;
+    const actorId = req.user?.id;
+    if (!instituteId || !actorId) return res.status(401).json({ error: 'Missing institute context' });
+
+    try {
+        const result = await confirmStudentFeeProfile({
+            instituteId,
+            studentId,
+            feeStartMonth: req.body.feeStartMonth,
+            actorId,
+        });
+        return res.json(result);
+    } catch (error) {
+        if (error instanceof MonthCoverageError) {
+            const notFound = ['STUDENT_NOT_FOUND', 'INSTITUTE_NOT_FOUND', 'BATCH_NOT_FOUND', 'PROFILE_NOT_FOUND'].includes(error.code);
+            const forbidden = error.code === 'ACTOR_NOT_AUTHORIZED';
+            return res.status(notFound ? 404 : forbidden ? 403 : 400).json({ error: error.code });
+        }
+        secureLogger.error('Confirm month coverage profile failed', error);
+        return res.status(500).json({ error: 'Failed to confirm fee profile' });
     }
 };
 

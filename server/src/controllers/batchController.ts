@@ -14,7 +14,7 @@ import { getJwtSecret } from '../utils/env';
 const JWT_SECRET = getJwtSecret();
 
 export const createBatch = async (req: Request, res: Response) => {
-    const { timeSlot, feeAmount, className, batchNumber, subject, customName, name: bodyName } = req.body;
+    const { timeSlot, feeAmount, className, batchNumber, subject, customName, name: bodyName, startDate, endDate } = req.body;
     const teacherId = req.user?.id;
     const user = req.user;
 
@@ -28,10 +28,24 @@ export const createBatch = async (req: Request, res: Response) => {
     // Fetch Institute Config
     const institute = await prisma.institute.findUnique({
         where: { id: user.instituteId },
-        select: { config: true }
+        select: { config: true, coachingFeeMode: true }
     });
 
     if (!institute) return res.status(404).json({ error: 'Institute not found' });
+
+    const usesMonthCoverage = institute.coachingFeeMode === 'MONTH_COVERAGE';
+    if (usesMonthCoverage && (!startDate || !endDate)) {
+        return res.status(400).json({ error: 'BATCH_DATES_REQUIRED' });
+    }
+    const parsedStartDate = startDate ? new Date(startDate) : null;
+    const parsedEndDate = endDate ? new Date(endDate) : null;
+    if (usesMonthCoverage && (
+        !parsedStartDate || Number.isNaN(parsedStartDate.getTime())
+        || !parsedEndDate || Number.isNaN(parsedEndDate.getTime())
+        || parsedStartDate.getTime() > parsedEndDate.getTime()
+    )) {
+        return res.status(400).json({ error: 'INVALID_BATCH_DATE_RANGE' });
+    }
 
     const config = (institute.config as any) || {
         requiresGrades: true,
@@ -81,7 +95,8 @@ export const createBatch = async (req: Request, res: Response) => {
                 timeSlot,
                 className: requiresGrades ? (className || null) : null,
                 batchNumber: validNum,
-                feeAmount: feeAmount ? parseFloat(feeAmount) : 0,
+                feeAmount: usesMonthCoverage ? 0 : (feeAmount ? parseFloat(feeAmount) : 0),
+                ...(usesMonthCoverage ? { startDate: parsedStartDate, endDate: parsedEndDate } : {}),
                 teacherId,
                 instituteId: user.instituteId
             }
@@ -97,6 +112,11 @@ export const getBatches = async (req: Request, res: Response) => {
     try {
         const user = req.user;
 
+        const institute = await prisma.institute.findUnique({
+            where: { id: user.instituteId },
+            select: { coachingFeeMode: true, timezone: true },
+        });
+
         const batches = await prisma.batch.findMany({
             where: {
                 instituteId: user.instituteId
@@ -111,7 +131,11 @@ export const getBatches = async (req: Request, res: Response) => {
                 }
             }
         });
-        res.json(batches);
+        res.json(batches.map(batch => ({
+            ...batch,
+            coachingFeeMode: institute?.coachingFeeMode ?? 'CURRENT_DUE_BASED',
+            timezone: institute?.timezone ?? 'Asia/Kolkata',
+        })));
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch batches' });
     }
@@ -133,13 +157,15 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                 className: true,
                 timeSlot: true,
                 feeAmount: true,
+                startDate: true,
+                endDate: true,
                 whatsappGroupLink: true,
                 autoSendWelcome: true,
                 isRegistrationOpen: true,
                 isRegistrationEnded: true,
                 teacherId: true,
                 instituteId: true,
-                institute: { select: { config: true } },
+                institute: { select: { config: true, coachingFeeMode: true, timezone: true } },
                 feeInstallments: {
                     select: {
                         id: true,
@@ -162,6 +188,7 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                         status: true,
                         createdAt: true,
                         additionalData: true,
+                        monthCoverageProfile: true,
                         feePayments: {
                             select: {
                                 id: true,
@@ -239,7 +266,13 @@ export const getBatchDetails = async (req: Request, res: Response) => {
             .filter(t => { if (seenTestIds.has(t.id)) return false; seenTestIds.add(t.id); return true; })
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        res.json({ ...batch, tests: allTests, sharedTests: undefined });
+        res.json({
+            ...batch,
+            coachingFeeMode: batch.institute?.coachingFeeMode ?? 'CURRENT_DUE_BASED',
+            timezone: batch.institute?.timezone ?? 'Asia/Kolkata',
+            tests: allTests,
+            sharedTests: undefined,
+        });
     } catch (e) {
         console.error('[getBatchDetails] Error:', e);
         res.status(500).json({ error: 'Failed to fetch batch details' });
@@ -645,15 +678,31 @@ export const endBatchRegistration = async (req: Request, res: Response) => {
 
 export const updateBatch = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, subject, timeSlot, feeAmount, className, whatsappGroupLink, autoSendWelcome } = req.body;
+    const { name, subject, timeSlot, feeAmount, className, whatsappGroupLink, autoSendWelcome, startDate, endDate } = req.body;
     const teacherId = req.user?.id;
 
     try {
-        const batch = await prisma.batch.findUnique({ where: { id: String(id) } });
+        const batch = await prisma.batch.findUnique({
+            where: { id: String(id) },
+            include: { institute: { select: { coachingFeeMode: true } } },
+        });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
         const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+
+        const usesMonthCoverage = batch.institute?.coachingFeeMode === 'MONTH_COVERAGE';
+        const nextStartDate = startDate ? new Date(startDate) : batch.startDate;
+        const nextEndDate = endDate ? new Date(endDate) : batch.endDate;
+        if (usesMonthCoverage && (!nextStartDate || !nextEndDate)) {
+            return res.status(400).json({ error: 'BATCH_DATES_REQUIRED' });
+        }
+        if (usesMonthCoverage && (
+            Number.isNaN(nextStartDate!.getTime()) || Number.isNaN(nextEndDate!.getTime())
+            || nextStartDate!.getTime() > nextEndDate!.getTime()
+        )) {
+            return res.status(400).json({ error: 'INVALID_BATCH_DATE_RANGE' });
+        }
 
         const updated = await prisma.batch.update({
             where: { id: String(id) },
@@ -662,7 +711,9 @@ export const updateBatch = async (req: Request, res: Response) => {
                 subject,
                 timeSlot,
                 className,
-                feeAmount: feeAmount !== undefined ? parseFloat(feeAmount) : undefined,
+                feeAmount: usesMonthCoverage ? 0 : (feeAmount !== undefined ? parseFloat(feeAmount) : undefined),
+                startDate: usesMonthCoverage && startDate ? nextStartDate : undefined,
+                endDate: usesMonthCoverage && endDate ? nextEndDate : undefined,
                 whatsappGroupLink,
                 autoSendWelcome: autoSendWelcome !== undefined ? autoSendWelcome === true : undefined
             }

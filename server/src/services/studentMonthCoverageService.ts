@@ -62,104 +62,110 @@ export type StudentMonthCoverageDeps = {
   now?(): Date;
 };
 
-export const prismaStudentMonthCoverageDeps: StudentMonthCoverageDeps = {
-  async findStudent(instituteId, studentId) {
-    return prisma.student.findFirst({
-      where: {
-        id: studentId,
-        instituteId,
-        batch: { is: { instituteId } },
-      },
-      select: {
-        id: true,
-        instituteId: true,
-        batchId: true,
-        createdAt: true,
-        leftAt: true,
-        institute: {
-          select: { id: true, coachingFeeMode: true, timezone: true },
+type StudentMonthCoveragePrismaClient = Pick<typeof prisma, 'student' | 'admin' | 'studentMonthCoverageProfile'>;
+
+export function studentMonthCoverageDepsFor(client: StudentMonthCoveragePrismaClient): StudentMonthCoverageDeps {
+  return {
+    async findStudent(instituteId, studentId) {
+      return client.student.findFirst({
+        where: {
+          id: studentId,
+          instituteId,
+          batch: { is: { instituteId } },
         },
-        batch: {
-          select: { id: true, instituteId: true, startDate: true, endDate: true },
+        select: {
+          id: true,
+          instituteId: true,
+          batchId: true,
+          createdAt: true,
+          leftAt: true,
+          institute: {
+            select: { id: true, coachingFeeMode: true, timezone: true },
+          },
+          batch: {
+            select: { id: true, instituteId: true, startDate: true, endDate: true },
+          },
         },
-      },
-    });
-  },
+      });
+    },
 
-  async findActor(instituteId, actorId) {
-    return prisma.admin.findFirst({
-      where: { id: actorId, instituteId },
-      select: { id: true, instituteId: true },
-    });
-  },
+    async findActor(instituteId, actorId) {
+      return client.admin.findFirst({
+        where: { id: actorId, instituteId },
+        select: { id: true, instituteId: true },
+      });
+    },
 
-  findProfile(studentId) {
-    return prisma.studentMonthCoverageProfile.findUnique({ where: { studentId } });
-  },
+    findProfile(studentId) {
+      return client.studentMonthCoverageProfile.findUnique({ where: { studentId } });
+    },
 
-  createPendingProfile(input) {
-    return prisma.studentMonthCoverageProfile.create({ data: input });
-  },
+    createPendingProfile(input) {
+      return client.studentMonthCoverageProfile.create({ data: input });
+    },
 
-  async activateProfile(input) {
-    const updated = await prisma.studentMonthCoverageProfile.updateMany({
-      where: {
-        studentId: input.studentId,
-        instituteId: input.instituteId,
-        batchId: input.batchId,
-      },
-      data: {
-        feeStartMonth: input.feeStartMonth,
-        feeEndMonth: input.feeEndMonth,
-        status: 'ACTIVE',
-        confirmedAt: input.confirmedAt,
-        confirmedById: input.confirmedById,
-      },
-    });
-    if (updated.count === 1) {
-      const profile = await prisma.studentMonthCoverageProfile.findFirst({
+    async activateProfile(input) {
+      const updated = await client.studentMonthCoverageProfile.updateMany({
+        where: {
+          studentId: input.studentId,
+          instituteId: input.instituteId,
+          batchId: input.batchId,
+        },
+        data: {
+          feeStartMonth: input.feeStartMonth,
+          feeEndMonth: input.feeEndMonth,
+          status: 'ACTIVE',
+          confirmedAt: input.confirmedAt,
+          confirmedById: input.confirmedById,
+        },
+      });
+      if (updated.count === 1) {
+        const profile = await client.studentMonthCoverageProfile.findFirst({
+          where: {
+            studentId: input.studentId,
+            instituteId: input.instituteId,
+            batchId: input.batchId,
+          },
+        });
+        if (profile) return profile;
+        throw new MonthCoverageError('PROFILE_NOT_FOUND');
+      }
+
+      return client.studentMonthCoverageProfile.create({
+        data: {
+          ...input,
+          status: 'ACTIVE',
+        },
+      });
+    },
+
+    async closeProfile(input) {
+      const updated = await client.studentMonthCoverageProfile.updateMany({
+        where: {
+          studentId: input.studentId,
+          instituteId: input.instituteId,
+          batchId: input.batchId,
+        },
+        data: {
+          feeEndMonth: input.feeEndMonth,
+          status: 'CLOSED',
+        },
+      });
+      if (updated.count !== 1) return null;
+      return client.studentMonthCoverageProfile.findFirst({
         where: {
           studentId: input.studentId,
           instituteId: input.instituteId,
           batchId: input.batchId,
         },
       });
-      if (profile) return profile;
-      throw new MonthCoverageError('PROFILE_NOT_FOUND');
-    }
+    },
 
-    return prisma.studentMonthCoverageProfile.create({
-      data: {
-        ...input,
-        status: 'ACTIVE',
-      },
-    });
-  },
+    now: () => new Date(),
+  };
+}
 
-  async closeProfile(input) {
-    const updated = await prisma.studentMonthCoverageProfile.updateMany({
-      where: {
-        studentId: input.studentId,
-        instituteId: input.instituteId,
-        batchId: input.batchId,
-      },
-      data: {
-        feeEndMonth: input.feeEndMonth,
-        status: 'CLOSED',
-      },
-    });
-    if (updated.count !== 1) return null;
-    return prisma.studentMonthCoverageProfile.findFirst({
-      where: {
-        studentId: input.studentId,
-        instituteId: input.instituteId,
-        batchId: input.batchId,
-      },
-    });
-  },
-
-  now: () => new Date(),
-};
+export const prismaStudentMonthCoverageDeps = studentMonthCoverageDepsFor(prisma);
 
 export type CreatePendingStudentFeeProfileInput = {
   instituteId: string;

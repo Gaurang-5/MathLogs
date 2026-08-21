@@ -112,7 +112,8 @@ export const registerStudentSchema = z.object({
         }),
         schoolName: z.string().max(300).nullish(),
         additionalData: z.record(z.string(), z.any()).optional(),
-        token: z.string().nullish()
+        token: z.string().nullish(),
+        feeStartMonth: canonicalMonthSchema.optional()
     })
 });
 
@@ -124,7 +125,9 @@ export const createBatchSchema = z.object({
         subject: z.string().min(1, "Subject is required").max(100),
         className: z.string().min(1, "Class is required").max(100).optional(), // Optional for non-grade institutes
         feeAmount: z.number().min(0).optional(),
-        timeSlot: z.string().max(100).optional()
+        timeSlot: z.string().max(100).optional(),
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional()
     })
 });
 
@@ -136,7 +139,9 @@ export const updateBatchSchema = z.object({
         timeSlot: z.string().max(100).optional(),
         feeAmount: z.number().min(0).optional(),
         whatsappGroupLink: z.string().url("Invalid URL").optional().or(z.literal('')),
-        autoSendWelcome: z.boolean().optional()
+        autoSendWelcome: z.boolean().optional(),
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional()
     })
 });
 

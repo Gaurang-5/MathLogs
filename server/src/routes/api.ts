@@ -4,9 +4,9 @@ import { authenticateToken } from '../middleware/auth';
 import { requireCoachingFeeMode } from '../middleware/requireCoachingFeeMode';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { assignFeeSchema, changePasswordSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, registerStudentSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateStudentSchema, updateTestSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, registerStudentSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateStudentSchema, updateTestSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
-import { addStudentManually, approveStudent, archiveStudent, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
+import { addStudentManually, approveStudent, archiveStudent, confirmMonthCoverageProfileController, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
@@ -30,6 +30,7 @@ import { getPublicPlanCatalogue } from '../controllers/planCatalogController';
 
 const router = Router();
 const requireCurrentDueFeeMode = requireCoachingFeeMode('CURRENT_DUE_BASED');
+const requireMonthCoverageFeeMode = requireCoachingFeeMode('MONTH_COVERAGE');
 router.get('/plans', publicLimiter, getPublicPlanCatalogue as any);
 router.use('/super-admin', superAdminRoutes);
 router.use('/support', requireSupportFeature);
@@ -298,6 +299,7 @@ router.delete('/students/:id/archive', authenticateToken as any, archiveStudent 
 router.put('/students/:id', authenticateToken as any, validateRequest(updateStudentSchema), updateStudent as any);
 router.get('/students/lookup/:humanId', authenticateToken as any, getStudentByHumanId as any);
 router.get('/students/:id/profile', authenticateToken as any, getStudentProfile as any);
+router.put('/month-coverage/students/:studentId/profile', authenticateToken as any, requireMonthCoverageFeeMode as any, validateRequest(confirmMonthCoverageProfileSchema), confirmMonthCoverageProfileController as any);
 // Students
 // Stickers
 router.get('/stickers/download', authenticateToken as any, generateStickerSheet as any);
