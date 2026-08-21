@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { secureLogger } from '../utils/secureLogger';
+import { getMonthCoverageDashboard } from '../services/monthCoverageSummaryService';
 
 
 /**
@@ -17,6 +18,20 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
         if (!teacherId) {
             secureLogger.warn(`[DASHBOARD_DEBUG] Missing context — Teacher: ${teacherId}, Institute: ${user.instituteId}`);
             return res.status(400).json({ error: 'Missing teacher context' });
+        }
+
+        if (!user.instituteId) return res.status(400).json({ error: 'Missing institute context' });
+        const dashboardInstitute = await prisma.institute.findUnique({
+            where: { id: user.instituteId },
+            select: { coachingFeeMode: true, teacherName: true },
+        });
+        if (!dashboardInstitute) return res.status(404).json({ error: 'Institute not found' });
+        if (dashboardInstitute.coachingFeeMode === 'MONTH_COVERAGE') {
+            const dashboard = await getMonthCoverageDashboard(user.instituteId, teacherId, new Date());
+            return res.json({
+                ...dashboard,
+                userName: dashboard.userName || user.username,
+            });
         }
 
         secureLogger.info(`[DASHBOARD_DEBUG] Fetching for Teacher: ${teacherId}, Inst: ${user.instituteId}`);
@@ -122,10 +137,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
             `,
 
             // Query 7: Get teacher name
-            user.instituteId ? prisma.institute.findUnique({
-                where: { id: user.instituteId },
-                select: { teacherName: true }
-            }) : Promise.resolve(null)
+            Promise.resolve(dashboardInstitute)
         ]);
 
         const batches = Number(statsResult[0]?.batches_count || 0);
@@ -141,6 +153,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
         }));
 
         res.json({
+            feeMode: 'CURRENT_DUE_BASED',
             stats: {
                 batches,
                 students
