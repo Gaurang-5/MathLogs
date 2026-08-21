@@ -101,6 +101,40 @@ test('month coverage guard accepts a month coverage institute', async () => {
   assert.equal(res.body, undefined);
 });
 
+test('month coverage guard rejects a current due-based institute', async () => {
+  const req = { user: { instituteId: 'inst-1' } } as never;
+  const res = response();
+
+  await requireCoachingFeeMode('MONTH_COVERAGE', async () => 'CURRENT_DUE_BASED')(
+    req,
+    res as never,
+    () => assert.fail('next must not run'),
+  );
+
+  assert.equal(res.statusCode, 409);
+  assert.deepEqual(res.body, {
+    error: 'FEE_MODE_MISMATCH',
+    expected: 'MONTH_COVERAGE',
+    actual: 'CURRENT_DUE_BASED',
+  });
+});
+
+test('legacy guard accepts a current due-based institute', async () => {
+  const req = { user: { instituteId: 'inst-1' } } as never;
+  const res = response();
+  let nextCalls = 0;
+
+  await requireCoachingFeeMode('CURRENT_DUE_BASED', async () => 'CURRENT_DUE_BASED')(
+    req,
+    res as never,
+    () => { nextCalls += 1; },
+  );
+
+  assert.equal(nextCalls, 1);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body, undefined);
+});
+
 test('guard rejects requests without institute context', async () => {
   const req = { user: {} } as never;
   const res = response();

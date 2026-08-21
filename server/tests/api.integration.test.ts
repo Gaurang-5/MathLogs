@@ -37,6 +37,9 @@ after(async () => {
             else resolve();
         });
     });
+    const { redis } = await import('../src/utils/redis');
+    redis.disconnect();
+    await prisma.$disconnect();
 });
 
 afterEach(() => {
@@ -261,6 +264,7 @@ test('POST /api/auth/refresh rotates tokens for a valid refresh token', async ()
 });
 
 test('POST /api/fees/pay-installment records a payment for an authenticated teacher', async () => {
+    replaceMethod(prisma.institute, 'findUnique', (async () => ({ coachingFeeMode: 'CURRENT_DUE_BASED' }) as never) as typeof prisma.institute.findUnique);
     replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: (error: unknown, decoded?: unknown) => void) => {
         callback(null, {
             id: 'teacher-1',
@@ -497,6 +501,7 @@ test('PUT /api/tests/online charges one credit when publishing a draft and never
 });
 
 test('POST /api/fees/pay is idempotent and prevents double-payment', async () => {
+    replaceMethod(prisma.institute, 'findUnique', (async () => ({ coachingFeeMode: 'CURRENT_DUE_BASED' }) as never) as typeof prisma.institute.findUnique);
     replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: any) => {
         callback(null, { id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN' });
     }) as unknown) as typeof jwt.verify);
@@ -545,6 +550,7 @@ test('POST /api/fees/pay is idempotent and prevents double-payment', async () =>
 });
 
 test('POST /api/fees/pay-installment is idempotent and prevents double-payment', async () => {
+    replaceMethod(prisma.institute, 'findUnique', (async () => ({ coachingFeeMode: 'CURRENT_DUE_BASED' }) as never) as typeof prisma.institute.findUnique);
     replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: any) => {
         callback(null, { id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN' });
     }) as unknown) as typeof jwt.verify);

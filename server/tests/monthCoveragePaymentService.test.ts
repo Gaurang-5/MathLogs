@@ -233,6 +233,68 @@ test('allocation uniqueness conflicts map to a stable already-covered error', as
   await assert.rejects(() => createMonthCoveragePayment(createInput(), deps), /MONTH_ALREADY_COVERED/);
 });
 
+test('two concurrent payment attempts cannot cover the same months twice', async () => {
+  const covered = new Set<string>();
+  const payments: Array<{ id: string; idempotencyKey: string }> = [];
+  const audits: string[] = [];
+  let transactionTail: Promise<unknown> = Promise.resolve();
+  const context = await fakeDeps().loadStudentContext('inst-1', 'student-1');
+
+  const deps: MonthCoveragePaymentCreateDeps = {
+    ...fakeDeps(),
+    loadActor: async () => ({ id: 'teacher-1', instituteId: 'inst-1' }),
+    findPaymentByIdempotency: async (_instituteId, key) => {
+      const payment = payments.find(item => item.idempotencyKey === key);
+      return payment ? {
+        id: payment.id, instituteId: 'inst-1', batchId: 'batch-1', studentId: 'student-1',
+        amountPaise: 100025, paymentDate: new Date('2026-09-10T00:00:00.000Z'), paymentMethod: 'UPI',
+        duration: 'QUARTERLY', note: null, status: 'ACTIVE', idempotencyKey: key, createdById: 'teacher-1',
+        coverageMonths: [...covered],
+      } : null;
+    },
+    runSerializable: operation => {
+      const run = transactionTail.then(() => operation({
+        loadStudentContext: async () => context,
+        listCoveredMonths: async () => [...covered],
+        findPaymentByIdempotency: async () => null,
+        findPaymentById: async () => null,
+        createPayment: async data => {
+          const id = `payment-${payments.length + 1}`;
+          payments.push({ id, idempotencyKey: data.idempotencyKey });
+          return { id, ...data, status: 'ACTIVE' as const };
+        },
+        createAllocations: async data => {
+          if (data.coverageMonths.some(month => covered.has(month))) {
+            throw { code: 'P2002', meta: { target: ['studentId', 'coverageMonth'] } };
+          }
+          data.coverageMonths.forEach(month => covered.add(month));
+        },
+        createAuditEvent: async data => { audits.push(data.action); },
+        updatePayment: async () => assert.fail('update must not run'),
+        voidPayment: async () => assert.fail('void must not run'),
+        deleteAllocations: async () => assert.fail('delete must not run'),
+      }));
+      transactionTail = run.then(() => undefined, () => undefined);
+      return run;
+    },
+  };
+
+  const results = await Promise.allSettled([
+    createMonthCoveragePayment(createInput({ idempotencyKey: 'attempt-a' }), deps),
+    createMonthCoveragePayment(createInput({ idempotencyKey: 'attempt-b' }), deps),
+  ]);
+
+  assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+  const rejection = results.find(result => result.status === 'rejected');
+  assert.match(
+    String(rejection && 'reason' in rejection ? rejection.reason : ''),
+    /MONTH_ALREADY_COVERED|INSUFFICIENT_REMAINING_MONTHS/,
+  );
+  assert.deepEqual([...covered], ['2026-07', '2026-08', '2026-09']);
+  assert.equal(payments.length, 1);
+  assert.equal(audits.length, 1);
+});
+
 test('cross-institute students fail before starting a write transaction', async () => {
   const { deps, writes, transactionCalls } = createDeps();
   deps.loadStudentContext = async () => ({

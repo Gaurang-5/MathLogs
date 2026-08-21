@@ -21,6 +21,8 @@ before(async () => {
 });
 
 after(async () => {
+    const { redis } = await import('../src/utils/redis');
+    redis.disconnect();
     await prisma.$disconnect();
     await new Promise<void>((resolve, reject) => {
         server.close((error) => {

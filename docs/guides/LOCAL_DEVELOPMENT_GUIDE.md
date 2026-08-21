@@ -6,7 +6,7 @@ If you haven't read `CONTRIBUTING.md` in the root folder yet, **read that first*
 
 ## 🖥 Prerequisites
 Before you start, make sure you have the following installed on your laptop:
-1. **Node.js**: (Version 20 or higher) - Download from `nodejs.org`
+1. **Node.js**: (Version 22 or higher) - Download from `nodejs.org`
 2. **Git**: To version control - Download from `git-scm.com`
 3. **Local Database**: 
    - We use PostgreSQL. You have two options for your local development database:
@@ -67,6 +67,36 @@ npx prisma db push
 This tells Prisma: "Hey, read our `schema.prisma` file, and create all the tables like Batches, Users, Students natively on my local Postgres!"
 
 *(Tip: In development, we use `npx prisma db push`. In production, do not run this—run `prisma migrate deploy` instead. But that's Heroku's job, not yours).*
+
+### Fee model isolation and migration checks
+
+Every institute has one immutable fee model:
+
+- `CURRENT_DUE_BASED` keeps the existing fee records, installments, balances, invoices, and parent payment flow.
+- `MONTH_COVERAGE` uses student month profiles, month allocations, teacher-entered payments, and audit events. Parent payment controls are unavailable.
+
+Existing institutes are backfilled to `CURRENT_DUE_BASED`. Never change an institute's fee model after setup or copy data between the two models.
+
+Before deploying, verify the migration against a disposable database or schema:
+
+```bash
+cd server
+npx prisma migrate deploy
+npx prisma validate
+npx prisma generate
+```
+
+Record legacy fee totals before and after migration; the values must be identical:
+
+```sql
+SELECT COUNT(*) AS records, COALESCE(SUM("amount"), 0) AS total FROM "FeeRecord";
+SELECT COUNT(*) AS payments, COALESCE(SUM("amountPaid"), 0) AS total FROM "FeePayment";
+SELECT "coachingFeeMode", COUNT(*) FROM "Institute" GROUP BY "coachingFeeMode";
+```
+
+For acceptance testing, create two disposable institutes. Confirm that current-mode pages still use only the legacy fee APIs, while month-mode pages show batch dates, student fee-start setup, 1/3/6/12-month payment previews, coverage progress, history, edit/void, and the neutral parent-unavailable state. Also attempt both cross-mode API calls and confirm each returns `409 FEE_MODE_MISMATCH`.
+
+The migration is additive, so application rollback is safe while the new tables remain. Do not drop the month-coverage tables after they contain payments; preserve them for audit and recovery.
 
 ## 🔥 Step 4: Run the App!
 
