@@ -13,8 +13,10 @@ import { getInstallmentPaidMap, getStudentJoinDate, type LegacyFee } from '../ut
 import StudentProfileDrawer from '../components/StudentProfileDrawer';
 import { BatchRegistrationQrModal } from '../components/batch/BatchRegistrationQrModal';
 import { StudentFeeStartDialog } from '../features/month-coverage/StudentFeeStartDialog';
-import { confirmStudentFeeProfile } from '../features/month-coverage/api';
-import type { MonthCoverageProfile } from '../features/month-coverage/types';
+import { confirmStudentFeeProfile, loadMonthCoverageSummary } from '../features/month-coverage/api';
+import type { MonthCoverageProfile, MonthCoverageStudentSummary, MonthCoverageSummary } from '../features/month-coverage/types';
+import { MonthCoveragePaymentDialog } from '../features/month-coverage/MonthCoveragePaymentDialog';
+import { formatCoverageRange, monthStatusCopy } from '../features/month-coverage/monthCoverageViewModel';
 
 interface Student {
     id: string;
@@ -115,6 +117,8 @@ export default function BatchDetails() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showAssignConfirm, setShowAssignConfirm] = useState<{ studentId: string, installmentId: string } | null>(null);
     const [feeStartStudent, setFeeStartStudent] = useState<Student | null>(null);
+    const [monthCoverageSummary, setMonthCoverageSummary] = useState<MonthCoverageSummary | null>(null);
+    const [monthPaymentStudent, setMonthPaymentStudent] = useState<MonthCoverageStudentSummary | null>(null);
     const [deleteCodeInput, setDeleteCodeInput] = useState('');
     const [viewMarksId, setViewMarksId] = useState<string | null>(null);
 
@@ -333,6 +337,16 @@ export default function BatchDetails() {
         try {
             const data = await apiRequest<Batch>(`/batches/${id}?t=${Date.now()}`);
             setBatch(data);
+            if (data.coachingFeeMode === 'MONTH_COVERAGE') {
+                try {
+                    setMonthCoverageSummary(await loadMonthCoverageSummary({ batchId: data.id }));
+                } catch {
+                    setMonthCoverageSummary(null);
+                    if (!silent) toast.error('Batch loaded, but fee progress is temporarily unavailable.');
+                }
+            } else {
+                setMonthCoverageSummary(null);
+            }
         } catch {
             if (!silent) {
                 toast.error('Failed to load batch details');
@@ -773,6 +787,8 @@ export default function BatchDetails() {
 
     if (!batch) return null;
 
+    const monthStudentById = new Map((monthCoverageSummary?.students ?? []).map(student => [student.studentId, student]));
+
     return (
         <Layout hideMobileNav>
             <div className="mb-6 sm:mb-8">
@@ -872,15 +888,16 @@ export default function BatchDetails() {
 
                             <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
 
-                            <button
-                                onClick={openFeeModal}
-                                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
-                            >
-                                <Settings className="w-5 h-5" />
-                                <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Fee Cols</span>
-                            </button>
-
-                            <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+                            {batch.coachingFeeMode !== 'MONTH_COVERAGE' && <>
+                                <button
+                                    onClick={openFeeModal}
+                                    className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                >
+                                    <Settings className="w-5 h-5" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Fee Cols</span>
+                                </button>
+                                <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
+                            </>}
 
 
                             <button
@@ -933,9 +950,9 @@ export default function BatchDetails() {
                             <button onClick={handlePrintStickers} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
                                 <Printer className="w-4 h-4 text-app-text-tertiary" /> Stickers
                             </button>
-                            <button onClick={openFeeModal} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
+                            {batch.coachingFeeMode !== 'MONTH_COVERAGE' && <button onClick={openFeeModal} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
                                 <Settings className="w-4 h-4 text-app-text-tertiary" /> Fee Cols
-                            </button>
+                            </button>}
                             <div className="w-px bg-black/[0.06] self-stretch mx-1" />
                             <button
                                 onClick={openWhatsappModal}
@@ -1040,6 +1057,7 @@ export default function BatchDetails() {
                                 })}
                                 <th className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Tests</th>
                                 <th className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '80px', whiteSpace: 'nowrap' }}>Avg (10)</th>
+                                {batch.coachingFeeMode === 'MONTH_COVERAGE' && <th className={cn("bg-transparent text-left", getCellPadding())} style={{ minWidth: '250px' }}>Fee Progress</th>}
                                 {batch.feeInstallments?.filter(inst => !inst.studentId).map(inst => (
                                     <th key={inst.id} className={cn("bg-transparent text-center", getCellPadding())} style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>
                                         <div className="flex flex-col items-center">
@@ -1127,6 +1145,20 @@ export default function BatchDetails() {
                                             </button>
                                         </td>
                                         <td className={cn("text-center font-bold text-app-text", getCellPadding())}>{getStudentAverage(student)}</td>
+                                        {batch.coachingFeeMode === 'MONTH_COVERAGE' && (() => {
+                                            const fee = monthStudentById.get(student.id);
+                                            return <td className={cn("text-left", getCellPadding())}>
+                                                {!fee ? <span className="text-xs font-bold text-app-text-tertiary">Progress unavailable</span> : fee.setupRequired ? (
+                                                    <button onClick={() => setFeeStartStudent(student)} className="rounded-xl bg-amber-100 px-3 py-2 text-xs font-black text-amber-800">Set fee start</button>
+                                                ) : (
+                                                    <div className="min-w-[220px]">
+                                                        <div className="flex items-center justify-between gap-3"><span className="text-xs font-black">{fee.receivedMonths} / {fee.applicableMonths} months received</span>{fee.pendingMonths > 0 && <button onClick={() => setMonthPaymentStudent(fee)} className="rounded-lg bg-black px-2.5 py-1.5 text-[10px] font-black text-white">Record</button>}</div>
+                                                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${fee.progressPercent}%` }} /></div>
+                                                        <p className={`mt-1.5 text-[10px] font-bold ${fee.overdueMonths ? 'text-red-600' : 'text-app-text-tertiary'}`}>{monthStatusCopy(fee.nextPendingMonth, fee.overdueMonths ? 'OVERDUE' : 'PENDING')}</p>
+                                                    </div>
+                                                )}
+                                            </td>;
+                                        })()}
                                         {batch.feeInstallments?.filter(inst => !inst.studentId).map(inst => {
                                             const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
                                             // Use calculated amount from map, fallback to simple check if missing (shouldn't happen)
@@ -1264,13 +1296,15 @@ export default function BatchDetails() {
                                         })}
                                         <td className={cn("text-center border-b border-black/5", getCellPadding())} >
                                             <div className="flex items-center justify-center gap-1.5">
-                                                <button
-                                                    onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
-                                                    className="p-2 bg-neutral-50 hover:bg-black text-black hover:text-white rounded-xl border border-black/5 transition-colors"
-                                                    title="Custom Invoice"
-                                                >
-                                                    <Receipt className="w-4 h-4" />
-                                                </button>
+                                                {batch.coachingFeeMode !== 'MONTH_COVERAGE' && (
+                                                    <button
+                                                        onClick={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
+                                                        className="p-2 bg-neutral-50 hover:bg-black text-black hover:text-white rounded-xl border border-black/5 transition-colors"
+                                                        title="Custom Invoice"
+                                                    >
+                                                        <Receipt className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => setEditingStudent(student)}
                                                     className="p-2 bg-neutral-50 hover:bg-black text-black hover:text-white rounded-xl border border-black/5 transition-colors"
@@ -1377,8 +1411,18 @@ export default function BatchDetails() {
                                             })}
                                         </div>
 
+                                        {batch.coachingFeeMode === 'MONTH_COVERAGE' && (() => {
+                                            const fee = monthStudentById.get(student.id);
+                                            if (!fee || fee.setupRequired) return null;
+                                            return <div className="mb-3 rounded-xl bg-neutral-50 p-3">
+                                                <div className="flex items-center justify-between gap-3"><span className="text-xs font-black">{fee.receivedMonths} / {fee.applicableMonths} months received</span>{fee.pendingMonths > 0 && <button onClick={() => setMonthPaymentStudent(fee)} className="rounded-lg bg-black px-3 py-2 text-[10px] font-black text-white">Record payment</button>}</div>
+                                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-200"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${fee.progressPercent}%` }} /></div>
+                                                <p className={`mt-1.5 text-[10px] font-bold ${fee.overdueMonths ? 'text-red-600' : 'text-app-text-tertiary'}`}>{monthStatusCopy(fee.nextPendingMonth, fee.overdueMonths ? 'OVERDUE' : 'PENDING')}</p>
+                                            </div>;
+                                        })()}
+
                                         {/* Fee pills — horizontal scroll */}
-                                        {batch.feeInstallments && batch.feeInstallments.filter(i => !i.studentId).length > 0 && (
+                                        {batch.coachingFeeMode !== 'MONTH_COVERAGE' && batch.feeInstallments && batch.feeInstallments.filter(i => !i.studentId).length > 0 && (
                                             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 mb-1">
                                                 {batch.feeInstallments.filter((inst) => {
                                                     if (inst.studentId) return false;
@@ -1505,14 +1549,16 @@ export default function BatchDetails() {
                                             <span className="text-[9px] font-bold uppercase tracking-wide">Call</span>
                                         </a>
                                         <div className="w-px bg-black/[0.05] self-stretch" />
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
-                                            className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
-                                        >
-                                            <Receipt className="w-4 h-4" />
-                                            <span className="text-[9px] font-bold uppercase tracking-wide">Invoice</span>
-                                        </button>
-                                        <div className="w-px bg-black/[0.05] self-stretch" />
+                                        {batch.coachingFeeMode !== 'MONTH_COVERAGE' && <>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
+                                                className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
+                                            >
+                                                <Receipt className="w-4 h-4" />
+                                                <span className="text-[9px] font-bold uppercase tracking-wide">Invoice</span>
+                                            </button>
+                                            <div className="w-px bg-black/[0.05] self-stretch" />
+                                        </>}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setEditingStudent(student); }}
                                             className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
@@ -1549,6 +1595,21 @@ export default function BatchDetails() {
                     )}
                 </div>
             </div>
+
+            {batch.coachingFeeMode === 'MONTH_COVERAGE' && monthCoverageSummary && (
+                <section className="mt-6 overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-sm">
+                    <div className="border-b border-black/5 p-5 sm:p-6"><h3 className="text-sm font-black uppercase tracking-widest text-app-text">Recent fee history</h3><p className="mt-1 text-xs text-app-text-tertiary">Amounts received and the exact months each payment covered.</p></div>
+                    <div className="divide-y divide-black/5">
+                        {monthCoverageSummary.recentPayments.map(payment => (
+                            <div key={payment.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                                <div><p className="font-black text-app-text">{payment.studentName} <span className="ml-2 text-emerald-700">₹{payment.amountRupees.toLocaleString('en-IN')}</span></p><p className="mt-1 text-xs font-bold text-app-text-secondary">{payment.duration.replace(/_/g, ' ').toLowerCase()} · {formatCoverageRange(payment.coverageMonths)}</p></div>
+                                <div className="text-left text-xs text-app-text-tertiary sm:text-right"><p>{new Date(payment.paymentDate).toLocaleDateString('en-IN')} · {payment.paymentMethod?.replace(/_/g, ' ') || 'Other'}</p><p className="mt-1 font-bold">{payment.status || 'ACTIVE'} · recorded by {payment.actorName || 'Teacher'}</p></div>
+                            </div>
+                        ))}
+                        {monthCoverageSummary.recentPayments.length === 0 && <p className="p-8 text-center text-sm text-app-text-tertiary">No fee payments recorded for this batch yet.</p>}
+                    </div>
+                </section>
+            )}
 
             {/* Edit Modal */}
             <AnimatePresence>
@@ -2251,6 +2312,17 @@ export default function BatchDetails() {
                     })()}
                     onClose={() => setFeeStartStudent(null)}
                     onConfirm={setStudentFeeStart}
+                />
+            )}
+
+            {monthPaymentStudent && (
+                <MonthCoveragePaymentDialog
+                    student={monthPaymentStudent}
+                    onClose={() => setMonthPaymentStudent(null)}
+                    onSaved={() => {
+                        setMonthPaymentStudent(null);
+                        void fetchDetails(true);
+                    }}
                 />
             )}
 

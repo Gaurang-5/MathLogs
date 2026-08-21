@@ -9,6 +9,7 @@ import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee, Sparkles
 import CountUp from 'react-countup';
 import StudentSearch from '../components/StudentSearch';
 import { cn } from '../utils/cn';
+import { monthLabel } from '../features/month-coverage/monthCoverageViewModel';
 
 interface ClassAveragePoint {
     name: string;
@@ -26,7 +27,8 @@ interface Defaulter {
     amount: number;
 }
 
-interface DashboardSummaryResponse {
+interface CurrentDashboardSummaryResponse {
+    feeMode?: 'CURRENT_DUE_BASED';
     stats: {
         batches: number;
         students: number;
@@ -39,6 +41,29 @@ interface DashboardSummaryResponse {
     defaulters: Defaulter[];
     userName?: string;
 }
+
+interface MonthCoverageDashboardSummaryResponse {
+    feeMode: 'MONTH_COVERAGE';
+    stats: { batches: number; students: number };
+    monthCoverage: {
+        collectedRupees: number;
+        receivedMonths: number;
+        pendingMonths: number;
+        overdueMonths: number;
+        applicableMonths: number;
+        progressPercent: number;
+    };
+    followUps: Array<{
+        studentId: string;
+        name: string;
+        batchName: string;
+        overdueMonths: number;
+        oldestOverdueMonth: string;
+    }>;
+    userName?: string;
+}
+
+type DashboardSummaryResponse = CurrentDashboardSummaryResponse | MonthCoverageDashboardSummaryResponse;
 
 const formatIndianRupee = (value: number) => new Intl.NumberFormat('en-IN').format(value);
 
@@ -79,11 +104,15 @@ export default function Dashboard() {
         queryKey: ['installmentStats'],
         queryFn: () => api.get<FinanceGrowthPoint[]>('/dashboard/installment-stats'),
         staleTime: 30000,
+        enabled: Boolean(summary && summary.feeMode !== 'MONTH_COVERAGE'),
     });
 
     const stats = summary?.stats || { batches: 0, students: 0 };
-    const finances = summary?.finances || { collected: 0, totalCollected: 0, pending: 0 };
-    const defaulters = summary?.defaulters || [];
+    const isMonthCoverage = summary?.feeMode === 'MONTH_COVERAGE';
+    const finances = summary && summary.feeMode !== 'MONTH_COVERAGE' ? summary.finances : { collected: 0, totalCollected: 0, pending: 0 };
+    const defaulters = summary && summary.feeMode !== 'MONTH_COVERAGE' ? summary.defaulters : [];
+    const monthCoverage = isMonthCoverage ? summary.monthCoverage : null;
+    const followUps = isMonthCoverage ? summary.followUps : [];
     const userName = summary?.userName || 'Teacher';
     const loading = {
         summary: summaryLoading,
@@ -100,7 +129,7 @@ export default function Dashboard() {
     };
 
     // Collection rate based on total collected (all-time), not monthly
-    const collectionRate = finances.totalCollected + finances.pending > 0
+    const collectionRate = monthCoverage ? monthCoverage.progressPercent : finances.totalCollected + finances.pending > 0
         ? Math.min(100, Math.round((finances.totalCollected / (finances.totalCollected + finances.pending)) * 100))
         : 0;
 
@@ -233,8 +262,9 @@ export default function Dashboard() {
                             <div className="min-w-0">
                                 <p className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase tracking-widest mb-0.5">Collection</p>
                                 <p className="text-xl min-[375px]:text-2xl sm:text-3xl font-extrabold text-black tracking-tighter truncate">
-                                    <CountUp end={collectionRate} duration={2} suffix="%" />
+                                    {monthCoverage ? `${monthCoverage.receivedMonths} / ${monthCoverage.applicableMonths}` : <CountUp end={collectionRate} duration={2} suffix="%" />}
                                 </p>
+                                {monthCoverage && <p className="text-[10px] font-black text-emerald-700">{collectionRate}% received</p>}
                             </div>
                         </div>
                     </motion.div>
@@ -255,7 +285,7 @@ export default function Dashboard() {
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1 min-[375px]:gap-1.5 mb-0.5 -ml-0.5 sm:ml-0">
-                                    <p className="text-[10px] sm:text-xs text-app-text-tertiary font-bold uppercase tracking-widest">This Month</p>
+                                    <p className="text-[10px] sm:text-xs text-app-text-tertiary font-bold uppercase tracking-widest">{monthCoverage ? 'Total Received' : 'This Month'}</p>
                                     <button
                                         onClick={(e) => { 
                                             e.stopPropagation(); 
@@ -274,7 +304,7 @@ export default function Dashboard() {
                                 </div>
                                 <p className="text-[17px] min-[375px]:text-xl sm:text-3xl font-extrabold text-black tracking-tighter truncate">
                                     {showFeeData ? (
-                                        <>₹<CountUp end={finances.collected} duration={2} formattingFn={formatIndianRupee} /></>
+                                        <>₹<CountUp end={monthCoverage?.collectedRupees ?? finances.collected} duration={2} formattingFn={formatIndianRupee} /></>
                                     ) : (
                                         <span className="text-app-text-tertiary">••••••</span>
                                     )}
@@ -364,7 +394,16 @@ export default function Dashboard() {
                         </h3>
                     </div>
 
-                    {loading.financeGrowth ? (
+                    {monthCoverage ? (
+                        <div className="flex h-[260px] flex-col justify-center">
+                            <div className="grid grid-cols-3 gap-3 text-center">
+                                <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-2xl font-black text-emerald-800">{monthCoverage.receivedMonths}</p><p className="mt-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">Received</p></div>
+                                <div className="rounded-2xl bg-amber-50 p-4"><p className="text-2xl font-black text-amber-800">{monthCoverage.pendingMonths}</p><p className="mt-1 text-[10px] font-black uppercase tracking-wider text-amber-700">Pending</p></div>
+                                <div className="rounded-2xl bg-red-50 p-4"><p className="text-2xl font-black text-red-700">{monthCoverage.overdueMonths}</p><p className="mt-1 text-[10px] font-black uppercase tracking-wider text-red-600">Overdue</p></div>
+                            </div>
+                            <div className="mt-6"><div className="flex justify-between text-xs font-black"><span>Month fee progress</span><span>{monthCoverage.progressPercent}%</span></div><div className="mt-2 h-3 overflow-hidden rounded-full bg-neutral-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${monthCoverage.progressPercent}%` }} /></div></div>
+                        </div>
+                    ) : loading.financeGrowth ? (
                         <div className="h-[260px] flex items-center justify-center">
                             <div className="w-7 h-7 border-2 border-black border-t-transparent rounded-full animate-spin" />
                         </div>
@@ -432,6 +471,23 @@ export default function Dashboard() {
                     )}
                 </div>
             </div>
+
+            {isMonthCoverage && followUps.length > 0 && (
+                <div className="animate-fade-in-up rounded-2xl border-[1.5px] border-black/5 bg-app-surface-opaque p-5 shadow-sm sm:rounded-[28px] sm:p-6">
+                    <h3 className="mb-5 flex items-center gap-2.5 text-sm font-bold uppercase tracking-widest text-app-text">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-black text-white"><Wallet className="h-4 w-4" /></span>
+                        Fee Follow-ups
+                    </h3>
+                    <div className="space-y-2">
+                        {followUps.map((student, index) => (
+                            <div key={student.studentId} className="flex items-center justify-between gap-4 rounded-2xl border border-black/[0.03] bg-neutral-50/80 p-3.5 sm:p-4">
+                                <div className="flex min-w-0 items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white">{index + 1}</span><div className="min-w-0"><p className="truncate text-sm font-bold text-app-text">{student.name}</p><p className="truncate text-xs text-app-text-tertiary">{student.batchName}</p></div></div>
+                                <div className="text-right"><p className="text-sm font-black text-red-600">{student.overdueMonths} overdue month{student.overdueMonths === 1 ? '' : 's'}</p><p className="mt-0.5 text-xs font-bold text-app-text-tertiary">Oldest: {monthLabel(student.oldestOverdueMonth)}</p></div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Pending Dues List */}
             {defaulters.length > 0 && (

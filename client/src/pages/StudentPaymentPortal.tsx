@@ -14,6 +14,11 @@ interface InstituteInfo { name: string; logoUrl: string | null; }
 
 type Step = 'loading' | 'phone' | 'select-student' | 'upload' | 'success';
 
+function isParentPaymentDisabled(error: unknown): boolean {
+    return axios.isAxiosError(error)
+        && error.response?.data?.error === 'PARENT_PAYMENTS_DISABLED_FOR_MONTH_COVERAGE';
+}
+
 export default function StudentPaymentPortal() {
     const { slug } = useParams<{ slug: string }>();
     const [searchParams] = useSearchParams();
@@ -28,6 +33,7 @@ export default function StudentPaymentPortal() {
     const [students, setStudents] = useState<StudentData[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
     const [amount, setAmount] = useState('');
+    const [parentPaymentsDisabled, setParentPaymentsDisabled] = useState(false);
 
     const [file, setFile] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
@@ -77,8 +83,9 @@ export default function StudentPaymentPortal() {
                     } else {
                         setStep('phone');
                     }
-                } catch {
-                    setStep('phone'); // fallback to manual entry
+                } catch (reason) {
+                    if (isParentPaymentDisabled(reason)) setParentPaymentsDisabled(true);
+                    else setStep('phone'); // fallback to manual entry
                 }
             };
             autoFetch();
@@ -101,7 +108,8 @@ export default function StudentPaymentPortal() {
                 setStep('select-student');
             }
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Could not find student. Please check the number.');
+            if (isParentPaymentDisabled(err)) setParentPaymentsDisabled(true);
+            else setError(err.response?.data?.error || 'Could not find student. Please check the number.');
         } finally {
             setLoading(false);
         }
@@ -196,7 +204,8 @@ export default function StudentPaymentPortal() {
             });
             setStep('success');
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Submission failed. Please try again.');
+            if (isParentPaymentDisabled(err)) setParentPaymentsDisabled(true);
+            else setError(err.response?.data?.error || 'Submission failed. Please try again.');
         } finally {
             setSubmitting(false);
         }
@@ -223,6 +232,19 @@ export default function StudentPaymentPortal() {
                 <Loader className="w-10 h-10 text-neutral-400 animate-spin mb-4" />
                 <p className="text-app-text-secondary font-medium">Loading portal...</p>
                 <p className="text-xs text-app-text-tertiary mt-6">Powered by <span className="font-bold text-app-text-secondary">MathLogs</span></p>
+            </div>
+        );
+    }
+
+    if (parentPaymentsDisabled) {
+        return (
+            <div className="min-h-screen bg-app-bg flex items-center justify-center p-6 font-sans">
+                <div className="w-full max-w-md rounded-3xl border border-black/5 bg-white p-8 text-center shadow-xl shadow-black/5">
+                    {institute?.logoUrl ? <img src={institute.logoUrl} alt="Institute logo" className="mx-auto mb-5 h-16 w-16 rounded-2xl object-contain" /> : <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-neutral-100"><GraduationCap className="h-7 w-7 text-neutral-500" /></div>}
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-app-text-tertiary">{institute?.name || 'Coaching fee information'}</p>
+                    <h1 className="mt-2 text-xl font-black text-app-text">Fee records are managed by your teacher</h1>
+                    <p className="mt-3 text-sm leading-6 text-app-text-secondary">Fee payments for this coaching are recorded by the teacher. Please contact the coaching directly.</p>
+                </div>
             </div>
         );
     }

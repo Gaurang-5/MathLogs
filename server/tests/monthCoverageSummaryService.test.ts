@@ -96,6 +96,11 @@ test('voided payments and allocations are excluded and student months stay disti
   assert.equal(result.totals.receivedMonths, 1);
   assert.equal(result.totals.collectedRupees, 500);
   assert.deepEqual(result.recentPayments.map(payment => payment.id), ['payment-active']);
+  assert.deepEqual(result.recentPayments[0], {
+    id: 'payment-active', studentId: 'student-1', studentName: 'Aarav', batchName: 'Evening Maths',
+    amountRupees: 500, paymentDate: '2026-09-01T00:00:00.000Z', duration: 'MONTHLY', coverageMonths: ['2026-07'],
+    paymentMethod: 'OTHER', status: 'ACTIVE', actorName: 'Teacher',
+  });
 });
 
 test('closed profiles count only through their stored fee end month', async () => {

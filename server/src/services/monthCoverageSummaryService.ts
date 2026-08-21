@@ -19,6 +19,8 @@ export type MonthCoverageSummaryStudentSource = {
     duration: MonthCoverageDuration;
     status: 'ACTIVE' | 'VOID';
     coverageMonths: string[];
+    paymentMethod?: string;
+    createdByName?: string;
   }>;
 };
 
@@ -67,6 +69,9 @@ export type MonthCoveragePaymentSummary = {
   paymentDate: string;
   duration: MonthCoverageDuration;
   coverageMonths: string[];
+  paymentMethod?: string;
+  status?: 'ACTIVE';
+  actorName?: string;
 };
 
 export type MonthCoverageTotals = {
@@ -188,6 +193,9 @@ export async function getMonthCoverageSummary(
       paymentDate: payment.paymentDate.toISOString(),
       duration: payment.duration,
       coverageMonths: [...payment.coverageMonths],
+      paymentMethod: payment.paymentMethod ?? 'OTHER',
+      status: 'ACTIVE' as const,
+      actorName: payment.createdByName ?? 'Teacher',
     }));
 
   return { feeMode: 'MONTH_COVERAGE', totals, students, recentPayments };
@@ -259,6 +267,8 @@ export const prismaMonthCoverageSummaryDeps: MonthCoverageSummaryDeps = {
             paymentDate: true,
             duration: true,
             status: true,
+            paymentMethod: true,
+            createdBy: { select: { username: true } },
             allocations: { select: { coverageMonth: true }, orderBy: { coverageMonth: 'asc' } },
           },
         },
@@ -286,6 +296,8 @@ export const prismaMonthCoverageSummaryDeps: MonthCoverageSummaryDeps = {
           paymentDate: payment.paymentDate,
           duration: payment.duration,
           status: payment.status,
+          paymentMethod: payment.paymentMethod,
+          createdByName: payment.createdBy.username,
           coverageMonths: payment.allocations.map(allocation => allocation.coverageMonth),
         })),
       }];

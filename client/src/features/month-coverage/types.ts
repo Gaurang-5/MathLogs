@@ -52,6 +52,9 @@ export type MonthCoveragePaymentSummary = {
   paymentDate: string;
   duration: MonthCoverageDuration;
   coverageMonths: string[];
+  paymentMethod?: string;
+  status?: 'ACTIVE';
+  actorName?: string;
 };
 
 export type MonthCoverageSummary = {
