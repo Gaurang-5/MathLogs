@@ -163,8 +163,44 @@ export const setupAccount = async (req: Request, res: Response) => {
             include: { institute: true }
         });
 
-        if (!invite || invite.isUsed || new Date() > invite.expiresAt) {
+        if (!invite || new Date() > invite.expiresAt) {
             return res.status(400).json({ error: 'Invalid or expired token' });
+        }
+
+        const sendSetupSuccess = (admin: {
+            id: string;
+            username: string;
+            passwordVersion: number;
+            role: string;
+        }) => {
+            const jwtToken = jwt.sign({
+                id: admin.id,
+                username: admin.username,
+                passwordVersion: admin.passwordVersion,
+                instituteId: invite.instituteId,
+                role: admin.role,
+            }, JWT_SECRET, { expiresIn: '8h' });
+
+            const isQuizOnly = invite.institute.plan === 'QUIZ';
+            return res.json({ success: true, token: jwtToken, adminId: admin.id, isQuizOnly });
+        };
+
+        if (invite.isUsed) {
+            if (!invite.institute.coachingFeeModeSelectedAt) {
+                return res.status(400).json({ error: 'Invalid or expired token' });
+            }
+            if (invite.institute.coachingFeeMode !== coachingFeeMode) {
+                return res.status(409).json({ error: 'Coaching fee mode has already been selected' });
+            }
+
+            const existing = await prisma.admin.findFirst({
+                where: { instituteId: invite.instituteId },
+            });
+            if (!existing || existing.instituteId !== invite.instituteId) {
+                return res.status(400).json({ error: 'Invalid or expired token' });
+            }
+
+            return sendSetupSuccess(existing);
         }
 
         const effectiveUsername = (username && username.trim()) ? username.trim() : (invite.institute.phoneNumber || '');
@@ -278,17 +314,7 @@ export const setupAccount = async (req: Request, res: Response) => {
             return admin;
         });
 
-        // Generate Login Token
-        const jwtToken = jwt.sign({
-            id: result.id,
-            username: result.username,
-            passwordVersion: result.passwordVersion,
-            instituteId: result.instituteId,
-            role: result.role
-        }, JWT_SECRET, { expiresIn: '8h' });
-
-        const isQuizOnly = invite.institute.plan === 'QUIZ';
-        res.json({ success: true, token: jwtToken, adminId: result.id, isQuizOnly });
+        return sendSetupSuccess(result);
 
     } catch (e) {
         if (e instanceof Error && e.name === 'CoachingFeeModeAlreadySelectedError') {
