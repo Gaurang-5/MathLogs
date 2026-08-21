@@ -17,6 +17,81 @@ export const setupSchema = z.object({
     })
 });
 
+export const coachingFeeModeSchema = z.enum(['CURRENT_DUE_BASED', 'MONTH_COVERAGE']);
+export const canonicalMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Invalid canonical month');
+export const monthCoverageDurationSchema = z.enum(['MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY']);
+export const monthCoveragePaymentMethodSchema = z.enum(['CASH', 'UPI', 'BANK', 'CARD', 'OTHER']);
+
+const stringListSchema = z.union([z.array(z.string()), z.string()]);
+
+export const setupAccountSchema = z.object({
+    body: z.object({
+        token: z.string().min(1, 'Invite token is required'),
+        username: z.string().min(3).max(100).optional(),
+        password: z.string().min(6).max(200).optional(),
+        city: z.string().optional(),
+        area: z.string().optional(),
+        subjects: stringListSchema.optional(),
+        subjectsOffered: stringListSchema.optional(),
+        allowedClasses: stringListSchema.optional(),
+        requiresGrades: z.boolean().optional(),
+        googleMapsUrl: z.string().optional(),
+        isPubliclyListed: z.boolean().optional(),
+        tagline: z.string().optional(),
+        description: z.string().optional(),
+        coachingFeeMode: coachingFeeModeSchema,
+    }).passthrough(),
+});
+
+export const confirmMonthCoverageProfileSchema = z.object({
+    body: z.object({
+        feeStartMonth: canonicalMonthSchema,
+    }),
+});
+
+const monthCoveragePaymentInputSchema = z.object({
+    studentId: z.string().uuid('Invalid Student ID'),
+    duration: monthCoverageDurationSchema,
+    requestedStartMonth: canonicalMonthSchema.nullable().optional(),
+    allowGap: z.boolean().optional(),
+});
+
+export const previewMonthCoveragePaymentSchema = z.object({
+    body: monthCoveragePaymentInputSchema,
+});
+
+export const createMonthCoveragePaymentSchema = z.object({
+    body: monthCoveragePaymentInputSchema.extend({
+        amount: z.number().positive('Amount must be positive'),
+        paymentDate: z.string().min(1, 'Payment date is required'),
+        paymentMethod: monthCoveragePaymentMethodSchema,
+        note: z.string().max(1000).optional(),
+    }),
+});
+
+export const updateMonthCoveragePaymentSchema = z.object({
+    body: monthCoveragePaymentInputSchema.extend({
+        amount: z.number().positive('Amount must be positive'),
+        paymentDate: z.string().min(1, 'Payment date is required'),
+        paymentMethod: monthCoveragePaymentMethodSchema,
+        note: z.string().max(1000).optional(),
+        reason: z.string().max(1000).optional(),
+    }),
+});
+
+export const voidMonthCoveragePaymentSchema = z.object({
+    body: z.object({
+        reason: z.string().max(1000).optional(),
+    }),
+});
+
+export const sendMonthCoverageReminderSchema = z.object({
+    body: z.object({
+        batchId: z.string().uuid('Invalid Batch ID').optional(),
+        studentIds: z.array(z.string().uuid('Invalid Student ID')).min(1).optional(),
+    }),
+});
+
 export const changePasswordSchema = z.object({
     body: z.object({
         currentPassword: z.string().min(1, "Current password is required"),

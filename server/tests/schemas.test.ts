@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loginSchema, registerStudentSchema, paymentSchema, payInstallmentSchema } from '../src/schemas';
+import {
+    createMonthCoveragePaymentSchema,
+    loginSchema,
+    registerStudentSchema,
+    paymentSchema,
+    payInstallmentSchema,
+    setupAccountSchema,
+} from '../src/schemas';
 
 const validUuid = '123e4567-e89b-12d3-a456-426614174000';
 
@@ -64,4 +71,56 @@ test('payInstallmentSchema requires a positive numeric amount', () => {
     });
 
     assert.equal(result.success, false);
+});
+
+test('setupAccountSchema accepts each supported coaching fee mode and preserves setup fields', () => {
+    for (const coachingFeeMode of ['CURRENT_DUE_BASED', 'MONTH_COVERAGE']) {
+        const result = setupAccountSchema.safeParse({
+            body: {
+                token: 'invite-token',
+                username: 'teacher',
+                password: 'secret123',
+                city: 'Pune',
+                area: 'Kothrud',
+                subjectsOffered: ['Mathematics'],
+                allowedClasses: ['10'],
+                requiresGrades: true,
+                googleMapsUrl: 'https://maps.example.test/place',
+                isPubliclyListed: true,
+                tagline: 'Exam prep',
+                description: 'Coaching for board exams',
+                coachingFeeMode,
+            },
+        });
+
+        assert.equal(result.success, true);
+    }
+});
+
+test('setupAccountSchema rejects unsupported coaching fee modes', () => {
+    const result = setupAccountSchema.safeParse({
+        body: { token: 'invite-token', coachingFeeMode: 'INSTALLMENT_BASED' },
+    });
+
+    assert.equal(result.success, false);
+});
+
+test('month coverage payment schema rejects non-positive amounts and malformed canonical months', () => {
+    const base = {
+        studentId: validUuid,
+        amount: 500,
+        paymentDate: '2026-08-22',
+        paymentMethod: 'CASH',
+        duration: 'MONTHLY',
+        requestedStartMonth: '2026-08',
+        allowGap: false,
+    };
+
+    for (const amount of [0, -1]) {
+        assert.equal(createMonthCoveragePaymentSchema.safeParse({ body: { ...base, amount } }).success, false);
+    }
+
+    for (const requestedStartMonth of ['2026-00', '2026-13', '2026-8', 'August 2026']) {
+        assert.equal(createMonthCoveragePaymentSchema.safeParse({ body: { ...base, requestedStartMonth } }).success, false);
+    }
 });

@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
+import { requireCoachingFeeMode } from '../middleware/requireCoachingFeeMode';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { assignFeeSchema, changePasswordSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, registerStudentSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateStudentSchema, updateTestSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, registerStudentSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateStudentSchema, updateTestSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
 import { addStudentManually, approveStudent, archiveStudent, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
@@ -28,6 +29,7 @@ import { requireSupportFeature } from '../middleware/supportFeatureGate';
 import { getPublicPlanCatalogue } from '../controllers/planCatalogController';
 
 const router = Router();
+const requireCurrentDueFeeMode = requireCoachingFeeMode('CURRENT_DUE_BASED');
 router.get('/plans', publicLimiter, getPublicPlanCatalogue as any);
 router.use('/super-admin', superAdminRoutes);
 router.use('/support', requireSupportFeature);
@@ -276,9 +278,9 @@ router.get('/batches/:id/download', authenticateToken as any, downloadBatchPDF a
 router.get('/batches/:id/qr-pdf', authenticateToken as any, downloadBatchQRPDF as any);
 router.put('/batches/:id/toggle-registration', authenticateToken as any, toggleBatchRegistration as any);
 router.put('/batches/:id/end-registration', authenticateToken as any, endBatchRegistration as any);
-router.post('/batches/:id/installments', authenticateToken as any, validateRequest(createInstallmentSchema), createFeeInstallment as any);
-router.put('/installments/:id', authenticateToken as any, updateFeeInstallment as any);
-router.delete('/installments/:id', authenticateToken as any, deleteFeeInstallment as any);
+router.post('/batches/:id/installments', authenticateToken as any, requireCurrentDueFeeMode as any, validateRequest(createInstallmentSchema), createFeeInstallment as any);
+router.put('/installments/:id', authenticateToken as any, requireCurrentDueFeeMode as any, updateFeeInstallment as any);
+router.delete('/installments/:id', authenticateToken as any, requireCurrentDueFeeMode as any, deleteFeeInstallment as any);
 router.post('/batches/:id/whatsapp-invite', authenticateToken as any, bulkNotifyLimiter, sendBatchWhatsappInvite as any);
 router.post('/batches/:id/invite', authenticateToken as any, inviteStudentToBatch as any);
 router.post('/students/:id/whatsapp-invite', authenticateToken as any, sendStudentWhatsappInvite as any);
@@ -327,23 +329,23 @@ router.get('/tests/:id/eligible-students', authenticateToken as any, getTestElig
 router.post('/marks', authenticateToken as any, validateRequest(submitMarkSchema), submitMark as any);
 
 // Fees
-router.get('/fees', authenticateToken as any, getFeeSummary as any);
-router.get('/fees/summary', authenticateToken as any, getFeeSummary as any);
-router.get('/fees/installments-list', authenticateToken as any, getFeeInstallmentsList as any);
-router.get('/fees/download-pending', authenticateToken as any, downloadPendingFeesReport as any);
+router.get('/fees', authenticateToken as any, requireCurrentDueFeeMode as any, getFeeSummary as any);
+router.get('/fees/summary', authenticateToken as any, requireCurrentDueFeeMode as any, getFeeSummary as any);
+router.get('/fees/installments-list', authenticateToken as any, requireCurrentDueFeeMode as any, getFeeInstallmentsList as any);
+router.get('/fees/download-pending', authenticateToken as any, requireCurrentDueFeeMode as any, downloadPendingFeesReport as any);
 // ✅ HIGH-2 FIX: Rate limiting on payment endpoints
-router.post('/fees/pay', authenticateToken as any, paymentLimiter, validateRequest(paymentSchema), recordPayment as any);
-router.post('/fees/pay-installment', authenticateToken as any, paymentLimiter, validateRequest(payInstallmentSchema), payInstallment as any);
-router.get('/fees/recent', authenticateToken as any, getRecentTransactions as any);
-router.get('/fees/download-transactions', authenticateToken as any, downloadMonthlyReport as any);
-router.post('/fees/remind', authenticateToken as any, bulkNotifyLimiter, sendFeeReminder as any);
-router.get('/fees/upi-verifications', authenticateToken as any, getUpiVerifications as any);
-router.post('/fees/upi-verifications/:id/approve', authenticateToken as any, paymentLimiter, approveUpiVerification as any);
-router.post('/fees/upi-verifications/:id/reject', authenticateToken as any, paymentLimiter, rejectUpiVerification as any);
-router.get('/fees/custom-invoices', authenticateToken as any, getCustomInvoices as any);
-router.post('/fees/assign', authenticateToken as any, paymentLimiter, validateRequest(assignFeeSchema), assignFeeInstallment as any);
-router.post('/fees/custom-invoices', authenticateToken as any, paymentLimiter, validateRequest(createCustomInvoiceSchema), createCustomInvoice as any);
-router.post('/fees/scan-receipt', authenticateToken as any, ocrLimiter, upload.single('image'), scanReceipt as any);
+router.post('/fees/pay', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, validateRequest(paymentSchema), recordPayment as any);
+router.post('/fees/pay-installment', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, validateRequest(payInstallmentSchema), payInstallment as any);
+router.get('/fees/recent', authenticateToken as any, requireCurrentDueFeeMode as any, getRecentTransactions as any);
+router.get('/fees/download-transactions', authenticateToken as any, requireCurrentDueFeeMode as any, downloadMonthlyReport as any);
+router.post('/fees/remind', authenticateToken as any, requireCurrentDueFeeMode as any, bulkNotifyLimiter, sendFeeReminder as any);
+router.get('/fees/upi-verifications', authenticateToken as any, requireCurrentDueFeeMode as any, getUpiVerifications as any);
+router.post('/fees/upi-verifications/:id/approve', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, approveUpiVerification as any);
+router.post('/fees/upi-verifications/:id/reject', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, rejectUpiVerification as any);
+router.get('/fees/custom-invoices', authenticateToken as any, requireCurrentDueFeeMode as any, getCustomInvoices as any);
+router.post('/fees/assign', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, validateRequest(assignFeeSchema), assignFeeInstallment as any);
+router.post('/fees/custom-invoices', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, validateRequest(createCustomInvoiceSchema), createCustomInvoice as any);
+router.post('/fees/scan-receipt', authenticateToken as any, requireCurrentDueFeeMode as any, ocrLimiter, upload.single('image'), scanReceipt as any);
 
 // Stats
 router.get('/stats/growth', authenticateToken as any, getStudentGrowthStats as any);
@@ -365,7 +367,7 @@ router.put('/institute/me/logo', authenticateToken as any, uploadLogo as any);
 
 
 router.get('/invites/:token', publicLimiter, validateInvite as any);
-router.post('/auth/setup-account', publicLimiter, setupAccount as any);
+router.post('/auth/setup-account', publicLimiter, validateRequest(setupAccountSchema), setupAccount as any);
 
 // Onboarding
 router.post('/onboarding/lead', publicLimiter, trackLead as any);

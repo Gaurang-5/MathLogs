@@ -1,3 +1,4 @@
+import { CoachingFeeMode, Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
@@ -142,7 +143,15 @@ export const validateInvite = async (req: Request, res: Response) => {
 
 // PUBLIC
 export const setupAccount = async (req: Request, res: Response) => {
-    const { token, username, password, requiresGrades, allowedClasses, subjects } = req.body;
+    const { token, username, password, requiresGrades, allowedClasses, subjects, coachingFeeMode } = req.body as {
+        token?: string;
+        username?: string;
+        password?: string;
+        requiresGrades?: boolean;
+        allowedClasses?: string[] | string;
+        subjects?: string[] | string;
+        coachingFeeMode: CoachingFeeMode;
+    };
 
     if (!token) {
         return res.status(400).json({ error: 'Invite token is required' });
@@ -158,7 +167,7 @@ export const setupAccount = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Invalid or expired token' });
         }
 
-        const effectiveUsername = (username && username.trim()) ? username.trim() : invite.institute.phoneNumber;
+        const effectiveUsername = (username && username.trim()) ? username.trim() : (invite.institute.phoneNumber || '');
         const effectivePassword = password || crypto.randomBytes(16).toString('hex');
 
         // Check if existing admin for this institute already exists
@@ -170,9 +179,23 @@ export const setupAccount = async (req: Request, res: Response) => {
 
         // Transaction: Create Admin + Invalidate Token + Create Default Year + Update Institute Config
         const result = await prisma.$transaction(async (tx) => {
+            const institute = await tx.institute.findUnique({
+                where: { id: invite.instituteId },
+                select: { coachingFeeMode: true, coachingFeeModeSelectedAt: true, config: true },
+            });
+            if (!institute) throw new Error('Institute not found');
+
+            if (institute.coachingFeeModeSelectedAt && institute.coachingFeeMode !== coachingFeeMode) {
+                const error = new Error('Coaching fee mode has already been selected');
+                error.name = 'CoachingFeeModeAlreadySelectedError';
+                throw error;
+            }
+
+            const instituteData: Prisma.InstituteUpdateInput = {};
+
             // 1. Update Institute Config with grade settings
             if (requiresGrades !== undefined && allowedClasses !== undefined) {
-                const currentConfig = (invite.institute.config as any) || {};
+                const currentConfig = (institute.config as Record<string, unknown>) || {};
 
                 // Process Allowed Classes
                 let classList: string[] = [];
@@ -188,16 +211,45 @@ export const setupAccount = async (req: Request, res: Response) => {
                     else if (typeof subjects === 'string') subjectList = subjects.split(',').map(s => s.trim()).filter(Boolean);
                 }
 
+                instituteData.config = {
+                    ...currentConfig,
+                    requiresGrades,
+                    allowedClasses: classList.length > 0 ? classList : currentConfig.allowedClasses,
+                    subjects: subjectList.length > 0 ? subjectList : currentConfig.subjects,
+                } as Prisma.InputJsonValue;
+            }
+
+            if (!institute.coachingFeeModeSelectedAt) {
+                const selection = await tx.institute.updateMany({
+                    where: { id: invite.instituteId, coachingFeeModeSelectedAt: null },
+                    data: {
+                        ...instituteData,
+                        coachingFeeMode,
+                        coachingFeeModeSelectedAt: new Date(),
+                    },
+                });
+
+                if (selection.count === 0) {
+                    const selectedInstitute = await tx.institute.findUnique({
+                        where: { id: invite.instituteId },
+                        select: { coachingFeeMode: true },
+                    });
+                    if (selectedInstitute?.coachingFeeMode !== coachingFeeMode) {
+                        const error = new Error('Coaching fee mode has already been selected');
+                        error.name = 'CoachingFeeModeAlreadySelectedError';
+                        throw error;
+                    }
+                    if (Object.keys(instituteData).length > 0) {
+                        await tx.institute.update({
+                            where: { id: invite.instituteId },
+                            data: instituteData,
+                        });
+                    }
+                }
+            } else if (Object.keys(instituteData).length > 0) {
                 await tx.institute.update({
                     where: { id: invite.instituteId },
-                    data: {
-                        config: {
-                            ...currentConfig,
-                            requiresGrades: requiresGrades,
-                            allowedClasses: classList.length > 0 ? classList : currentConfig.allowedClasses,
-                            subjects: subjectList.length > 0 ? subjectList : currentConfig.subjects
-                        }
-                    }
+                    data: instituteData,
                 });
             }
 
@@ -239,6 +291,9 @@ export const setupAccount = async (req: Request, res: Response) => {
         res.json({ success: true, token: jwtToken, adminId: result.id, isQuizOnly });
 
     } catch (e) {
+        if (e instanceof Error && e.name === 'CoachingFeeModeAlreadySelectedError') {
+            return res.status(409).json({ error: e.message });
+        }
         console.error(e);
         res.status(500).json({ error: 'Setup failed' });
     }
