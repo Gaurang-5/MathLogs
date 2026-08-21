@@ -14,8 +14,12 @@ test('enumerates inclusive months across a year boundary', () => {
   assert.deepEqual(enumerateMonths('2026-11', '2027-02'), ['2026-11', '2026-12', '2027-01', '2027-02']);
 });
 
-test('student joining before batch start defaults to batch start month', () => {
+test('default fee start uses the batch start for a pre-batch admission', () => {
   assert.equal(defaultFeeStartMonth('2026-06-20T00:00:00.000Z', '2026-07', 'Asia/Kolkata'), '2026-07');
+});
+
+test('default fee start uses the joining month for a post-start admission', () => {
+  assert.equal(defaultFeeStartMonth('2026-08-20T00:00:00.000Z', '2026-07', 'Asia/Kolkata'), '2026-08');
 });
 
 test('current month uses institute timezone', () => {

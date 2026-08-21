@@ -84,6 +84,8 @@ function depsFor(student = studentFixture()) {
       });
     },
     now: () => new Date('2026-07-05T00:00:00.000Z'),
+    findActor: async (instituteId: string, actorId: string) => ({ id: actorId, instituteId }),
+    findProfile: async () => null,
   };
   return { deps, writes };
 }
@@ -182,8 +184,49 @@ test('confirmation activates a profile and records the teacher and confirmation 
   assert.deepEqual(result.profile.confirmedAt, new Date('2026-07-05T00:00:00.000Z'));
 });
 
+test('rejects a confirmer from another institute before activating a profile', async () => {
+  const { deps, writes } = depsFor();
+  deps.findActor = async () => ({ id: 'teacher-2', instituteId: 'inst-2' });
+
+  await assert.rejects(
+    () => confirmStudentFeeProfile({
+      instituteId: 'inst-1', studentId: 'student-1', feeStartMonth: '2026-07', actorId: 'teacher-2',
+    }, deps),
+    (error: unknown) => error instanceof MonthCoverageError && error.code === 'ACTOR_NOT_AUTHORIZED',
+  );
+  assert.deepEqual(writes, []);
+});
+
+for (const operation of ['pending', 'confirmation', 'close'] as const) {
+  test(`rejects a stale cross-institute profile before ${operation} persistence`, async () => {
+    const { deps, writes } = depsFor();
+    deps.findProfile = async () => profile({ instituteId: 'inst-2', batchId: 'batch-2' });
+
+    const operationPromise = operation === 'pending'
+      ? createPendingStudentFeeProfile({ instituteId: 'inst-1', studentId: 'student-1' }, deps)
+      : operation === 'confirmation'
+        ? confirmStudentFeeProfile({
+          instituteId: 'inst-1', studentId: 'student-1', feeStartMonth: '2026-07', actorId: 'teacher-1',
+        }, deps)
+        : closeStudentFeeProfile({
+          instituteId: 'inst-1', studentId: 'student-1', leaveAt: new Date('2026-08-04T00:00:00.000Z'),
+        }, deps);
+
+    await assert.rejects(
+      () => operationPromise,
+      (error: unknown) => error instanceof MonthCoverageError && error.code === 'PROFILE_CONTEXT_MISMATCH',
+    );
+    assert.deepEqual(writes, []);
+  });
+}
+
 test('closing a profile caps the leave month at the batch end', async () => {
   const { deps } = depsFor();
+  deps.findProfile = async () => profile({
+    feeStartMonth: '2026-07',
+    feeEndMonth: '2026-12',
+    status: 'ACTIVE',
+  });
 
   const result = await closeStudentFeeProfile({
     instituteId: 'inst-1', studentId: 'student-1', leaveAt: new Date('2027-02-04T00:00:00.000Z'),

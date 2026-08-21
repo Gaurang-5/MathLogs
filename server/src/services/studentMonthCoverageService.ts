@@ -54,9 +54,11 @@ type ClosedProfileWrite = {
 
 export type StudentMonthCoverageDeps = {
   findStudent(instituteId: string, studentId: string): Promise<StudentMonthCoverageStudent | null>;
+  findActor(instituteId: string, actorId: string): Promise<{ id: string; instituteId: string | null } | null>;
+  findProfile(studentId: string): Promise<StudentMonthCoverageProfile | null>;
   createPendingProfile(input: PendingProfileWrite): Promise<StudentMonthCoverageProfile>;
   activateProfile(input: ActiveProfileWrite): Promise<StudentMonthCoverageProfile>;
-  closeProfile(input: ClosedProfileWrite): Promise<StudentMonthCoverageProfile>;
+  closeProfile(input: ClosedProfileWrite): Promise<StudentMonthCoverageProfile | null>;
   now?(): Date;
 };
 
@@ -84,42 +86,74 @@ export const prismaStudentMonthCoverageDeps: StudentMonthCoverageDeps = {
     });
   },
 
-  createPendingProfile(input) {
-    return prisma.studentMonthCoverageProfile.upsert({
-      where: { studentId: input.studentId },
-      create: input,
-      update: {},
+  async findActor(instituteId, actorId) {
+    return prisma.admin.findFirst({
+      where: { id: actorId, instituteId },
+      select: { id: true, instituteId: true },
     });
   },
 
-  activateProfile(input) {
-    const { confirmedAt, confirmedById, ...profile } = input;
-    return prisma.studentMonthCoverageProfile.upsert({
-      where: { studentId: input.studentId },
-      create: {
-        ...profile,
-        status: 'ACTIVE',
-        confirmedAt,
-        confirmedById,
-      },
-      update: {
+  findProfile(studentId) {
+    return prisma.studentMonthCoverageProfile.findUnique({ where: { studentId } });
+  },
+
+  createPendingProfile(input) {
+    return prisma.studentMonthCoverageProfile.create({ data: input });
+  },
+
+  async activateProfile(input) {
+    const updated = await prisma.studentMonthCoverageProfile.updateMany({
+      where: {
+        studentId: input.studentId,
+        instituteId: input.instituteId,
         batchId: input.batchId,
+      },
+      data: {
         feeStartMonth: input.feeStartMonth,
         feeEndMonth: input.feeEndMonth,
         status: 'ACTIVE',
-        confirmedAt,
-        confirmedById,
+        confirmedAt: input.confirmedAt,
+        confirmedById: input.confirmedById,
+      },
+    });
+    if (updated.count === 1) {
+      const profile = await prisma.studentMonthCoverageProfile.findFirst({
+        where: {
+          studentId: input.studentId,
+          instituteId: input.instituteId,
+          batchId: input.batchId,
+        },
+      });
+      if (profile) return profile;
+      throw new MonthCoverageError('PROFILE_NOT_FOUND');
+    }
+
+    return prisma.studentMonthCoverageProfile.create({
+      data: {
+        ...input,
+        status: 'ACTIVE',
       },
     });
   },
 
-  closeProfile(input) {
-    return prisma.studentMonthCoverageProfile.update({
-      where: { studentId: input.studentId },
-      data: {
+  async closeProfile(input) {
+    const updated = await prisma.studentMonthCoverageProfile.updateMany({
+      where: {
+        studentId: input.studentId,
+        instituteId: input.instituteId,
         batchId: input.batchId,
+      },
+      data: {
         feeEndMonth: input.feeEndMonth,
         status: 'CLOSED',
+      },
+    });
+    if (updated.count !== 1) return null;
+    return prisma.studentMonthCoverageProfile.findFirst({
+      where: {
+        studentId: input.studentId,
+        instituteId: input.instituteId,
+        batchId: input.batchId,
       },
     });
   },
@@ -190,11 +224,39 @@ async function loadValidatedStudent(
   return validateStudentContext(await deps.findStudent(instituteId, studentId), instituteId);
 }
 
+function assertProfileContext(
+  profile: StudentMonthCoverageProfile,
+  context: Pick<ValidatedStudentContext, 'batchId'>,
+  instituteId: string,
+  studentId: string,
+): void {
+  if (
+    profile.instituteId !== instituteId
+    || profile.batchId !== context.batchId
+    || profile.studentId !== studentId
+  ) {
+    throw new MonthCoverageError('PROFILE_CONTEXT_MISMATCH');
+  }
+}
+
+async function loadProfileInContext(
+  context: Pick<ValidatedStudentContext, 'batchId'>,
+  instituteId: string,
+  studentId: string,
+  deps: StudentMonthCoverageDeps,
+): Promise<StudentMonthCoverageProfile | null> {
+  const profile = await deps.findProfile(studentId);
+  if (profile) assertProfileContext(profile, context, instituteId, studentId);
+  return profile;
+}
+
 export async function createPendingStudentFeeProfile(
   input: CreatePendingStudentFeeProfileInput,
   deps: StudentMonthCoverageDeps = prismaStudentMonthCoverageDeps,
 ): Promise<StudentMonthCoverageProfile> {
   const { student, batchId } = await loadValidatedStudent(input.instituteId, input.studentId, deps);
+  const existing = await loadProfileInContext({ batchId }, input.instituteId, student.id, deps);
+  if (existing) return existing;
   return deps.createPendingProfile({
     instituteId: input.instituteId,
     batchId,
@@ -219,6 +281,12 @@ export async function confirmStudentFeeProfile(
     throw new MonthCoverageError('FEE_START_OUT_OF_RANGE');
   }
 
+  const actor = await deps.findActor(input.instituteId, input.actorId);
+  if (!actor || actor.id !== input.actorId || actor.instituteId !== input.instituteId) {
+    throw new MonthCoverageError('ACTOR_NOT_AUTHORIZED');
+  }
+  await loadProfileInContext({ batchId }, input.instituteId, student.id, deps);
+
   const joinedMonth = currentMonthInTimezone(student.createdAt, timezone);
   const warning = compareMonths(input.feeStartMonth, joinedMonth) < 0 ? 'BACKDATED_BEFORE_JOIN' : null;
   const profile = await deps.activateProfile({
@@ -239,14 +307,18 @@ export async function closeStudentFeeProfile(
   deps: StudentMonthCoverageDeps = prismaStudentMonthCoverageDeps,
 ): Promise<StudentMonthCoverageProfile> {
   const { student, batchId, timezone, batchEndMonth } = await loadValidatedStudent(input.instituteId, input.studentId, deps);
+  const existing = await loadProfileInContext({ batchId }, input.instituteId, student.id, deps);
+  if (!existing) throw new MonthCoverageError('PROFILE_NOT_FOUND');
   const leaveAt = input.leaveAt ?? student.leftAt ?? nowFrom(deps);
   const leaveMonth = currentMonthInTimezone(leaveAt, timezone);
   const feeEndMonth = compareMonths(leaveMonth, batchEndMonth) > 0 ? batchEndMonth : leaveMonth;
 
-  return deps.closeProfile({
+  const profile = await deps.closeProfile({
     instituteId: input.instituteId,
     batchId,
     studentId: student.id,
     feeEndMonth,
   });
+  if (!profile) throw new MonthCoverageError('PROFILE_NOT_FOUND');
+  return profile;
 }

@@ -15,11 +15,13 @@ export type MonthCoverageErrorCode =
   | 'BATCH_DATES_REQUIRED'
   | 'INVALID_BATCH_DATE_RANGE'
   | 'FEE_MODE_MISMATCH'
+  | 'ACTOR_NOT_AUTHORIZED'
   | 'STUDENT_NOT_FOUND'
   | 'BATCH_NOT_FOUND'
   | 'INSTITUTE_NOT_FOUND'
   | 'FEE_START_OUT_OF_RANGE'
-  | 'PROFILE_NOT_FOUND';
+  | 'PROFILE_NOT_FOUND'
+  | 'PROFILE_CONTEXT_MISMATCH';
 
 export class MonthCoverageError extends Error {
   constructor(public readonly code: MonthCoverageErrorCode) {
