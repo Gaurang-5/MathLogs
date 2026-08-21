@@ -75,7 +75,7 @@ export function sendMonthCoverageReminders(input: { batchId?: string; studentIds
 export function scanMonthCoverageReceipt(image: File) {
   const form = new FormData();
   form.append('image', image);
-  return api.post<{ amount?: number; date?: string; confidence?: number }>('/month-coverage/scan-receipt', form);
+  return api.post<{ amountPaid?: number; date?: string; confidence?: number }>('/month-coverage/scan-receipt', form);
 }
 
 export const monthCoverageReportUrl = {

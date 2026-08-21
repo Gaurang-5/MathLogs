@@ -8,6 +8,7 @@ import { Search, Loader, X, TrendingUp, TrendingDown, IndianRupee, Mail, History
 import toast from 'react-hot-toast';
 import { cn } from '../utils/cn';
 import UpiVerificationList from '../components/UpiVerificationList';
+import { MonthCoverageFeesView } from '../features/month-coverage/MonthCoverageFeesView';
 
 interface FeeBreakdown {
     name: string;
@@ -52,7 +53,7 @@ interface CustomInvoice {
     lastPaymentDate: string | null;
 }
 
-const Fees: React.FC = () => {
+const LegacyFees: React.FC = () => {
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
@@ -1310,6 +1311,21 @@ const Fees: React.FC = () => {
             <div className="h-28 md:h-8" />
         </Layout >
     );
+};
+
+const Fees: React.FC = () => {
+    const { data: institute, isLoading, isError } = useQuery({
+        queryKey: ['institute'],
+        queryFn: () => api.get<{ coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' }>('/institute/me'),
+    });
+
+    if (isLoading) {
+        return <Layout title="Fee Management"><div className="grid min-h-72 place-items-center"><Loader className="h-7 w-7 animate-spin text-app-text-tertiary" /></div></Layout>;
+    }
+    if (!isError && institute?.coachingFeeMode === 'MONTH_COVERAGE') {
+        return <Layout title="Fee Management"><MonthCoverageFeesView /></Layout>;
+    }
+    return <LegacyFees />;
 };
 
 export default Fees;

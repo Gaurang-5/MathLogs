@@ -19,7 +19,7 @@ export function monthLabel(month: string): string {
     .format(new Date(Date.UTC(value.year, value.month - 1, 1)));
 }
 
-function listMonths(months: string[]): string {
+export function listMonths(months: string[]): string {
   const labels = months.map(monthLabel);
   if (labels.length <= 1) return labels[0] ?? '';
   const years = new Set(labels.map(label => label.slice(-4)));

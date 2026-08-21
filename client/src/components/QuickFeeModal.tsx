@@ -1,8 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, Loader, IndianRupee, User, Wallet, Sparkles } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
+import type { MonthCoverageStudentSummary } from '../features/month-coverage/types';
+
+const MonthCoveragePaymentDialog = lazy(() => import('../features/month-coverage/MonthCoveragePaymentDialog')
+    .then(module => ({ default: module.MonthCoveragePaymentDialog })));
 
 interface QuickFeeModalProps {
     isOpen: boolean;
@@ -29,6 +33,9 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [scanningImage, setScanningImage] = useState(false);
+    const [feeMode, setFeeMode] = useState<'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' | null>(null);
+    const [monthStudents, setMonthStudents] = useState<MonthCoverageStudentSummary[]>([]);
+    const [selectedMonthStudent, setSelectedMonthStudent] = useState<MonthCoverageStudentSummary | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -40,17 +47,23 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
             // Focus search
             setTimeout(() => inputRef.current?.focus(), 100);
 
-            // Fetch students if empty
-            if (students.length === 0) {
-                setLoading(true);
-                api.get('/fees').then(data => {
-                    setStudents(data as Student[]);
-                    setLoading(false);
-                }).catch(() => {
-                    toast.error('Failed to load students');
-                    setLoading(false);
-                });
-            }
+            setSelectedMonthStudent(null);
+            setLoading(true);
+            api.get<{ coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' }>('/institute/me').then(async institute => {
+                const mode = institute.coachingFeeMode ?? 'CURRENT_DUE_BASED';
+                setFeeMode(mode);
+                if (mode === 'MONTH_COVERAGE') {
+                    const { loadMonthCoverageSummary } = await import('../features/month-coverage/api');
+                    const summary = await loadMonthCoverageSummary();
+                    setMonthStudents(summary.students.filter(student => !student.setupRequired && student.pendingMonths > 0));
+                } else if (students.length === 0) {
+                    setStudents(await api.get<Student[]>('/fees'));
+                }
+                setLoading(false);
+            }).catch(() => {
+                toast.error('Failed to load students');
+                setLoading(false);
+            });
         }
     }, [isOpen, students.length]);
 
@@ -61,6 +74,10 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
             (s.phone && s.phone.includes(search.trim()))
         ).slice(0, 5)
         : [];
+
+    const filteredMonthStudents = monthStudents.filter(student => !search.trim()
+        || student.name.toLowerCase().includes(search.toLowerCase())
+        || student.batchName.toLowerCase().includes(search.toLowerCase())).slice(0, 8);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -115,6 +132,46 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
             setSubmitting(false);
         }
     };
+
+    if (isOpen && feeMode === 'MONTH_COVERAGE') {
+        if (selectedMonthStudent) {
+            return <Suspense fallback={<div className="fixed inset-0 z-[110] grid place-items-center bg-black/40"><Loader className="h-7 w-7 animate-spin text-white" /></div>}>
+                <MonthCoveragePaymentDialog
+                    student={selectedMonthStudent}
+                    onClose={() => setSelectedMonthStudent(null)}
+                    onSaved={() => {
+                        window.dispatchEvent(new Event('fee-updated'));
+                        onClose();
+                    }}
+                />
+            </Suspense>;
+        }
+        return (
+            <>
+                <div onClick={onClose} className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm" />
+                <div className="fixed left-1/2 top-1/2 z-[70] w-full max-w-md -translate-x-1/2 -translate-y-1/2 p-4">
+                    <div className="rounded-[24px] bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-gray-100 p-6">
+                            <div><h2 className="text-xl font-bold text-gray-900">Log Fee Payment</h2><p className="text-sm text-gray-500">Choose a student, then select monthly or longer.</p></div>
+                            <button onClick={onClose} className="rounded-full p-2 hover:bg-gray-100"><X className="h-5 w-5 text-gray-500" /></button>
+                        </div>
+                        <div className="p-6">
+                            <label className="relative block"><Search className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" /><input ref={inputRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Search student or batch" className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3.5 pl-12 pr-4 font-medium outline-none focus:border-black" /></label>
+                            <div className="mt-3 max-h-80 divide-y divide-black/5 overflow-y-auto rounded-xl border border-black/5">
+                                {loading ? <p className="flex items-center justify-center gap-2 p-8 text-sm font-bold text-gray-500"><Loader className="h-4 w-4 animate-spin" /> Loading students…</p> : filteredMonthStudents.map(student => (
+                                    <button key={student.studentId} type="button" onClick={() => setSelectedMonthStudent(student)} className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-neutral-50">
+                                        <span><span className="block font-bold text-gray-900">{student.name}</span><span className="mt-0.5 block text-xs text-gray-500">{student.batchName} · {student.pendingMonths} month(s) pending</span></span>
+                                        <Wallet className="h-5 w-5 shrink-0 text-emerald-600" />
+                                    </button>
+                                ))}
+                                {!loading && filteredMonthStudents.length === 0 && <p className="p-8 text-center text-sm text-gray-500">No students with pending months.</p>}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </>
+        );
+    }
 
     return (
         <AnimatePresence>
