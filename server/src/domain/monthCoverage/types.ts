@@ -21,7 +21,15 @@ export type MonthCoverageErrorCode =
   | 'INSTITUTE_NOT_FOUND'
   | 'FEE_START_OUT_OF_RANGE'
   | 'PROFILE_NOT_FOUND'
-  | 'PROFILE_CONTEXT_MISMATCH';
+  | 'PROFILE_CONTEXT_MISMATCH'
+  | 'PROFILE_NOT_ACTIVE'
+  | 'MONTH_ALREADY_COVERED'
+  | 'INSUFFICIENT_REMAINING_MONTHS'
+  | 'COVERAGE_START_OUT_OF_RANGE'
+  | 'COVERAGE_GAP_REQUIRES_CONFIRMATION'
+  | 'INVALID_AMOUNT'
+  | 'INVALID_PAYMENT_DATE'
+  | 'PAYMENT_NOT_FOUND';
 
 export class MonthCoverageError extends Error {
   constructor(public readonly code: MonthCoverageErrorCode) {
