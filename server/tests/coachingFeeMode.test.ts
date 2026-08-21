@@ -25,7 +25,12 @@ afterEach(() => {
   while (restores.length > 0) restores.pop()?.();
 });
 
-function usedInvite(coachingFeeMode: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE') {
+const testNow = new Date();
+
+function usedInvite(
+  coachingFeeMode: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE',
+  coachingFeeModeSelectedAt = new Date(testNow.getTime() - 60_000),
+) {
   return {
     id: 'invite-1',
     instituteId: 'inst-1',
@@ -33,7 +38,7 @@ function usedInvite(coachingFeeMode: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE') {
     expiresAt: new Date('2026-12-01T00:00:00.000Z'),
     institute: {
       coachingFeeMode,
-      coachingFeeModeSelectedAt: new Date('2026-08-22T00:00:00.000Z'),
+      coachingFeeModeSelectedAt,
       plan: 'MARKETPLACE',
     },
   } as never;
@@ -133,6 +138,22 @@ test('used invite with the selected mode returns a reusable login without rewrit
     isQuizOnly: false,
   });
   assert.equal(transactionCalls, 0);
+});
+
+test('used invite replay after five minutes is rejected without issuing a token', async () => {
+  replaceMethod(
+    prisma.inviteToken,
+    'findUnique',
+    (async () => usedInvite('MONTH_COVERAGE', new Date(testNow.getTime() - 5 * 60_000 - 1))) as typeof prisma.inviteToken.findUnique,
+  );
+  replaceMethod(prisma.admin, 'findFirst', (async () => assert.fail('expired replay must not load an admin')) as typeof prisma.admin.findFirst);
+  replaceMethod(prisma, '$transaction', (async () => assert.fail('expired replay must not rewrite setup data')) as typeof prisma.$transaction);
+  const res = response();
+
+  await setupAccount(replayRequest, res as never);
+
+  assert.equal(res.statusCode, 400);
+  assert.deepEqual(res.body, { error: 'Invalid or expired token' });
 });
 
 test('used invite with a conflicting selected mode returns 409 without attempting a rewrite', async () => {

@@ -10,6 +10,7 @@ import { getClientUrl } from '../utils/urlConfig';
 import { paidPlanExpiry } from '../domain/plans/entitlements';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
+const SETUP_REPLAY_WINDOW_MS = 5 * 60 * 1000;
 
 // SUPER ADMIN ONLY
 export const generateInvite = async (req: Request, res: Response) => {
@@ -187,6 +188,10 @@ export const setupAccount = async (req: Request, res: Response) => {
 
         if (invite.isUsed) {
             if (!invite.institute.coachingFeeModeSelectedAt) {
+                return res.status(400).json({ error: 'Invalid or expired token' });
+            }
+            const selectionAgeMs = Date.now() - invite.institute.coachingFeeModeSelectedAt.getTime();
+            if (selectionAgeMs < 0 || selectionAgeMs > SETUP_REPLAY_WINDOW_MS) {
                 return res.status(400).json({ error: 'Invalid or expired token' });
             }
             if (invite.institute.coachingFeeMode !== coachingFeeMode) {
