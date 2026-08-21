@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, Clock, Smartphone, Mail, User, UserCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { StudentFeeStartDialog } from '../features/month-coverage/StudentFeeStartDialog';
 
 interface Student {
     id: string;
@@ -12,18 +13,31 @@ interface Student {
     parentName: string;
     parentWhatsapp: string;
     parentEmail?: string;
-    batch: { name: string };
+    batch: { name: string; startDate: string | null; endDate: string | null };
     createdAt: string;
+}
+
+type InstituteResponse = { coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' };
+
+function dateMonth(value: string): string {
+    const date = new Date(value);
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 export default function Approvals() {
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
+    const [coachingFeeMode, setCoachingFeeMode] = useState<'CURRENT_DUE_BASED' | 'MONTH_COVERAGE'>('CURRENT_DUE_BASED');
+    const [feeStartStudent, setFeeStartStudent] = useState<Student | null>(null);
 
     const fetchPending = async () => {
         try {
-            const data = await apiRequest<Student[]>('/students/pending');
+            const [data, institute] = await Promise.all([
+                apiRequest<Student[]>('/students/pending'),
+                apiRequest<InstituteResponse>('/institute/me'),
+            ]);
             setStudents(data);
+            setCoachingFeeMode(institute.coachingFeeMode ?? 'CURRENT_DUE_BASED');
         } catch {
             toast.error("Failed to fetch pending requests");
         } finally {
@@ -33,10 +47,10 @@ export default function Approvals() {
 
     useEffect(() => { fetchPending(); }, []);
 
-    const handleApprove = async (id: string, name: string) => {
-        const promise = apiRequest(`/students/${id}/approve`, 'POST', {});
+    const handleApprove = async (id: string, name: string, feeStartMonth?: string) => {
+        const promise = apiRequest<{ humanId?: string }>(`/students/${id}/approve`, 'POST', feeStartMonth ? { feeStartMonth } : {});
 
-        toast.promise<{ humanId?: string }>(promise, {
+        await toast.promise<{ humanId?: string }>(promise, {
             loading: 'Approving student...',
             success: (data) => {
                 setStudents(prev => prev.filter(s => s.id !== id));
@@ -44,6 +58,18 @@ export default function Approvals() {
             },
             error: 'Failed to approve student',
         });
+    };
+
+    const openApproval = (student: Student) => {
+        if (coachingFeeMode === 'MONTH_COVERAGE') {
+            if (!student.batch.startDate || !student.batch.endDate) {
+                toast.error('This batch needs start and end dates before fee setup.');
+                return;
+            }
+            setFeeStartStudent(student);
+            return;
+        }
+        void handleApprove(student.id, student.name);
     };
 
     const handleReject = async (id: string, name: string) => {
@@ -144,7 +170,7 @@ export default function Approvals() {
                                         Reject
                                     </button>
                                     <button
-                                        onClick={() => handleApprove(s.id, s.name)}
+                                        onClick={() => openApproval(s)}
                                         className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-900/20 hover:shadow-blue-600/40 transition-all flex items-center justify-center group/btn active:scale-95"
                                     >
                                         <Check className="w-4 h-4 mr-2 group-hover/btn:scale-110 transition-transform" />
@@ -169,6 +195,24 @@ export default function Approvals() {
                     <h3 className="text-xl font-bold text-white mb-2">All Caught Up</h3>
                     <p className="text-slate-500 max-w-sm mx-auto">There are no pending student registration requests at the moment.</p>
                 </motion.div>
+            )}
+
+            {feeStartStudent?.batch.startDate && feeStartStudent.batch.endDate && (
+                <StudentFeeStartDialog
+                    student={{ id: feeStartStudent.id, name: feeStartStudent.name, joinedAt: feeStartStudent.createdAt }}
+                    batch={{ startDate: feeStartStudent.batch.startDate, endDate: feeStartStudent.batch.endDate }}
+                    defaultMonth={(() => {
+                        const start = dateMonth(feeStartStudent.batch.startDate);
+                        const end = dateMonth(feeStartStudent.batch.endDate);
+                        const joined = dateMonth(feeStartStudent.createdAt);
+                        return joined < start ? start : joined > end ? end : joined;
+                    })()}
+                    onClose={() => setFeeStartStudent(null)}
+                    onConfirm={async feeStartMonth => {
+                        await handleApprove(feeStartStudent.id, feeStartStudent.name, feeStartMonth);
+                        setFeeStartStudent(null);
+                    }}
+                />
             )}
         </Layout>
     );

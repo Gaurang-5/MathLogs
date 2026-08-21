@@ -7,6 +7,7 @@ import {
     BookOpen, Users, ChevronRight, Settings, Plus, X, Phone, RotateCcw
 } from 'lucide-react';
 import { API_URL } from '../utils/api';
+import type { CoachingFeeMode } from '../features/month-coverage/types';
 
 type Step = 'loading' | 'invalid' | 'configure' | 'credentials' | 'done';
 
@@ -54,6 +55,7 @@ export default function SetupAccount() {
     const [subjectsInput, setSubjectsInput] = useState('');
     const [classList, setClassList] = useState<string[]>([]);
     const [subjectList, setSubjectList] = useState<string[]>(['Math', 'Science', 'English']);
+    const [coachingFeeMode, setCoachingFeeMode] = useState<CoachingFeeMode>('CURRENT_DUE_BASED');
 
     // Step 2: Credentials
     const [username, setUsername] = useState('');
@@ -144,6 +146,7 @@ export default function SetupAccount() {
                 requiresGrades,
                 allowedClasses: classList,
                 subjects: subjectList,
+                coachingFeeMode,
             });
 
             if (res.data.success) {
@@ -437,6 +440,44 @@ export default function SetupAccount() {
                                         ))}
                                     </div>
                                 </div>
+
+                                <fieldset>
+                                    <legend className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+                                        <Settings className="h-4 w-4 text-gray-400" /> Fee planning system
+                                    </legend>
+                                    <p className="text-xs leading-5 text-gray-400 mb-3">Choose once for this coaching. Existing and new systems keep separate fee records.</p>
+                                    <div className="grid gap-3">
+                                        {([
+                                            {
+                                                value: 'CURRENT_DUE_BASED',
+                                                title: 'Current amount-due system',
+                                                copy: 'Use fixed fees, installments, and rupee balances.',
+                                            },
+                                            {
+                                                value: 'MONTH_COVERAGE',
+                                                title: 'Month coverage system',
+                                                copy: 'Enter received amounts and track months received or pending.',
+                                            },
+                                        ] as const).map(option => {
+                                            const selected = coachingFeeMode === option.value;
+                                            return (
+                                                <button
+                                                    key={option.value}
+                                                    type="button"
+                                                    aria-pressed={selected}
+                                                    onClick={() => setCoachingFeeMode(option.value)}
+                                                    className={`rounded-2xl border-2 p-4 text-left transition-all ${selected ? 'border-blue-600 bg-blue-50/70 shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                                                >
+                                                    <span className="flex items-center justify-between gap-3">
+                                                        <span className={`text-sm font-bold ${selected ? 'text-blue-900' : 'text-gray-800'}`}>{option.title}</span>
+                                                        <span className={`h-4 w-4 rounded-full border-2 ${selected ? 'border-blue-600 bg-blue-600 ring-2 ring-blue-100' : 'border-gray-300'}`} />
+                                                    </span>
+                                                    <span className="mt-1 block text-xs leading-5 text-gray-500">{option.copy}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </fieldset>
 
                                 <button
                                     type="submit"

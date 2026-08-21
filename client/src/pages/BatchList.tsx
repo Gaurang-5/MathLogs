@@ -4,8 +4,9 @@ import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Users, Plus, X, GraduationCap, Hash, BookOpen, Type, ChevronRight } from 'lucide-react';
+import { CalendarDays, Clock, Users, Plus, X, GraduationCap, Hash, BookOpen, Type, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { buildCreateBatchPayload } from '../features/month-coverage/batchForm';
 
 interface Batch {
     id: string;
@@ -26,14 +27,7 @@ interface InstituteConfig {
 
 interface InstituteResponse {
     config?: InstituteConfig;
-}
-
-interface CreateBatchPayload {
-    customName: string;
-    subject: string;
-    timeSlot: string;
-    feeAmount: number;
-    className?: string;
+    coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE';
 }
 
 interface ApiErrorLike {
@@ -49,6 +43,8 @@ export default function BatchList() {
     const [subject, setSubject] = useState('Mathematics');
     const [timeSlot, setTimeSlot] = useState('');
     const [className, setClassName] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
     const { data: batches = [], isLoading: batchesLoading } = useQuery({
         queryKey: ['batches'],
@@ -66,6 +62,7 @@ export default function BatchList() {
     const requiresGrades = config.requiresGrades !== false;
     const allowedClasses = Array.isArray(config.allowedClasses) ? config.allowedClasses : [];
     const allowedSubjects = Array.isArray(config.subjects) ? config.subjects : [];
+    const usesMonthCoverage = institute?.coachingFeeMode === 'MONTH_COVERAGE';
 
     useEffect(() => {
         if (allowedSubjects.length > 0 && !allowedSubjects.includes(subject)) {
@@ -79,25 +76,30 @@ export default function BatchList() {
             toast.error('Batch Name is required');
             return;
         }
+        if (usesMonthCoverage && (!startDate || !endDate)) {
+            toast.error('Batch start and end dates are required');
+            return;
+        }
+        if (usesMonthCoverage && endDate < startDate) {
+            toast.error('Batch end date must be on or after its start date');
+            return;
+        }
         const toastId = toast.loading('Creating batch...');
 
         try {
-            const payload: CreateBatchPayload = {
+            const payload = buildCreateBatchPayload({
                 customName,
                 subject,
                 timeSlot,
-                feeAmount: 0
-            };
-
-            // Only include className if grades are required
-            if (requiresGrades) {
-                payload.className = className;
-            }
+                className,
+                startDate,
+                endDate,
+            }, institute?.coachingFeeMode ?? 'CURRENT_DUE_BASED', requiresGrades);
 
             await apiRequest('/batches', 'POST', payload);
             setShowForm(false);
             // Reset
-            setCustomName(''); setTimeSlot(''); setClassName('');
+            setCustomName(''); setTimeSlot(''); setClassName(''); setStartDate(''); setEndDate('');
             queryClient.invalidateQueries({ queryKey: ['batches'] });
             toast.success('Batch created successfully!', { id: toastId });
         } catch (error: unknown) {
@@ -172,6 +174,40 @@ export default function BatchList() {
                                         />
                                     </div>
                                 </div>
+
+                                {usesMonthCoverage && (
+                                    <>
+                                        <div className="space-y-2 group">
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Batch Start Date *</label>
+                                            <div className="relative">
+                                                <CalendarDays className="absolute left-4 top-4 w-5 h-5 text-gray-400 group-focus-within:text-accent-primary transition-colors" />
+                                                <input
+                                                    aria-label="Batch Start Date"
+                                                    type="date"
+                                                    value={startDate}
+                                                    onChange={event => setStartDate(event.target.value)}
+                                                    required
+                                                    className="w-full bg-neutral-50/50 border-2 border-transparent focus:bg-white focus:border-accent-primary text-app-text pl-12 p-4 rounded-2xl outline-none transition-all font-semibold"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2 group">
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Batch End Date *</label>
+                                            <div className="relative">
+                                                <CalendarDays className="absolute left-4 top-4 w-5 h-5 text-gray-400 group-focus-within:text-accent-primary transition-colors" />
+                                                <input
+                                                    aria-label="Batch End Date"
+                                                    type="date"
+                                                    min={startDate || undefined}
+                                                    value={endDate}
+                                                    onChange={event => setEndDate(event.target.value)}
+                                                    required
+                                                    className="w-full bg-neutral-50/50 border-2 border-transparent focus:bg-white focus:border-accent-primary text-app-text pl-12 p-4 rounded-2xl outline-none transition-all font-semibold"
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
 
                                 {allowedSubjects.length > 0 ? (
                                     <Dropdown

@@ -5,13 +5,16 @@ import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Monitor, Copy, Share2, Sparkles, ChevronRight } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Monitor, Copy, Share2, Sparkles, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
 import { getInstallmentPaidMap, getStudentJoinDate, type LegacyFee } from '../utils/fees';
 import StudentProfileDrawer from '../components/StudentProfileDrawer';
 import { BatchRegistrationQrModal } from '../components/batch/BatchRegistrationQrModal';
+import { StudentFeeStartDialog } from '../features/month-coverage/StudentFeeStartDialog';
+import { confirmStudentFeeProfile } from '../features/month-coverage/api';
+import type { MonthCoverageProfile } from '../features/month-coverage/types';
 
 interface Student {
     id: string;
@@ -28,6 +31,7 @@ interface Student {
     createdAt?: string;
     additionalData?: any;
     feeAssignments?: { installmentId: string }[];
+    monthCoverageProfile?: MonthCoverageProfile | null;
 }
 
 interface FeeInstallment {
@@ -83,6 +87,14 @@ interface Batch {
     students: Student[];
     feeInstallments: FeeInstallment[];
     tests?: BatchTest[];
+    startDate?: string | null;
+    endDate?: string | null;
+    coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE';
+}
+
+function dateMonth(value: string): string {
+    const date = new Date(value);
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -102,6 +114,7 @@ export default function BatchDetails() {
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showAssignConfirm, setShowAssignConfirm] = useState<{ studentId: string, installmentId: string } | null>(null);
+    const [feeStartStudent, setFeeStartStudent] = useState<Student | null>(null);
     const [deleteCodeInput, setDeleteCodeInput] = useState('');
     const [viewMarksId, setViewMarksId] = useState<string | null>(null);
 
@@ -145,7 +158,9 @@ export default function BatchDetails() {
         timeSlot: '', // Keeping as string for flexibility
         feeAmount: '',
         className: '',
-        whatsappGroupLink: ''
+        whatsappGroupLink: '',
+        startDate: '',
+        endDate: '',
     });
 
     // Fee Installment State — unified multi-step modal
@@ -268,7 +283,9 @@ export default function BatchDetails() {
                 timeSlot: batch.timeSlot,
                 feeAmount: batch.feeAmount.toString(),
                 className: batch.className || '',
-                whatsappGroupLink: batch.whatsappGroupLink || ''
+                whatsappGroupLink: batch.whatsappGroupLink || '',
+                startDate: batch.startDate?.slice(0, 10) || '',
+                endDate: batch.endDate?.slice(0, 10) || '',
             });
             setShowEditBatch(true);
         }
@@ -280,10 +297,25 @@ export default function BatchDetails() {
 
     const handleUpdateBatch = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (batch?.coachingFeeMode === 'MONTH_COVERAGE' && editBatchData.endDate < editBatchData.startDate) {
+            toast.error('Batch end date must be on or after its start date');
+            return;
+        }
         const toastId = toast.loading('Updating batch...');
         try {
             // Convert fee to number
-            const payload = { ...editBatchData, feeAmount: parseFloat(editBatchData.feeAmount) || 0 };
+            const payload = {
+                name: editBatchData.name,
+                subject: editBatchData.subject,
+                timeSlot: editBatchData.timeSlot,
+                className: editBatchData.className,
+                whatsappGroupLink: editBatchData.whatsappGroupLink,
+                feeAmount: parseFloat(editBatchData.feeAmount) || 0,
+                ...(batch?.coachingFeeMode === 'MONTH_COVERAGE' ? {
+                    startDate: `${editBatchData.startDate}T00:00:00.000Z`,
+                    endDate: `${editBatchData.endDate}T23:59:59.999Z`,
+                } : {}),
+            };
             await apiRequest(`/batches/${id}`, 'PUT', payload);
 
             // Update local state
@@ -427,6 +459,19 @@ export default function BatchDetails() {
         } catch {
             toast.error('Failed to send invite', { id: toastId });
         }
+    };
+
+    const setStudentFeeStart = async (feeStartMonth: string) => {
+        if (!feeStartStudent) return;
+        const result = await confirmStudentFeeProfile(feeStartStudent.id, feeStartMonth);
+        setBatch(previous => previous ? {
+            ...previous,
+            students: previous.students.map(student => student.id === feeStartStudent.id
+                ? { ...student, monthCoverageProfile: result.profile }
+                : student),
+        } : null);
+        setFeeStartStudent(null);
+        toast.success('Fee start month saved');
     };
 
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
@@ -1032,7 +1077,20 @@ export default function BatchDetails() {
                                             
                                             if (field.system || isStudentNameField) {
                                                 if (isStudentNameField) { 
-                                                    content = <div className="text-left font-semibold text-app-text group-hover:text-black transition-colors">{student.name}</div>; 
+                                                    content = (
+                                                        <div className="text-left font-semibold text-app-text group-hover:text-black transition-colors">
+                                                            <span>{student.name}</span>
+                                                            {batch.coachingFeeMode === 'MONTH_COVERAGE' && student.monthCoverageProfile?.status === 'PENDING_SETUP' && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={event => { event.stopPropagation(); setFeeStartStudent(student); }}
+                                                                    className="ml-2 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800 hover:bg-amber-200"
+                                                                >
+                                                                    Set fee start
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
                                                     rawText = student.name; 
                                                 }
                                                 else if (field.id === 'schoolName') { content = student.schoolName || '-'; rawText = student.schoolName || ''; }
@@ -1272,6 +1330,15 @@ export default function BatchDetails() {
                                                     </h4>
                                                     <ChevronRight className="w-4 h-4 text-app-text-tertiary group-hover/name:text-black shrink-0 transition-transform group-hover/name:translate-x-0.5" />
                                                 </button>
+                                                {batch.coachingFeeMode === 'MONTH_COVERAGE' && student.monthCoverageProfile?.status === 'PENDING_SETUP' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFeeStartStudent(student)}
+                                                        className="mt-2 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-800"
+                                                    >
+                                                        Set fee start
+                                                    </button>
+                                                )}
                                                 {student.humanId && (
                                                     <span className="inline-flex items-center gap-1 mt-1 font-mono text-[11px] bg-neutral-100 border border-black/[0.06] px-2 py-0.5 rounded-md text-app-text-secondary font-bold">
                                                         {student.humanId}
@@ -2039,6 +2106,32 @@ export default function BatchDetails() {
                                         </div>
                                     </div>
 
+                                    {batch.coachingFeeMode === 'MONTH_COVERAGE' && (
+                                        <div className="grid grid-cols-2 gap-5">
+                                            <label className="space-y-2">
+                                                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-app-text-secondary"><CalendarDays className="h-4 w-4" /> Start date</span>
+                                                <input
+                                                    type="date"
+                                                    required
+                                                    value={editBatchData.startDate}
+                                                    onChange={event => setEditBatchData({ ...editBatchData, startDate: event.target.value })}
+                                                    className="w-full rounded-xl border-[1.5px] border-black/5 bg-white px-3 py-3 text-app-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/10"
+                                                />
+                                            </label>
+                                            <label className="space-y-2">
+                                                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-app-text-secondary"><CalendarDays className="h-4 w-4" /> End date</span>
+                                                <input
+                                                    type="date"
+                                                    min={editBatchData.startDate || undefined}
+                                                    required
+                                                    value={editBatchData.endDate}
+                                                    onChange={event => setEditBatchData({ ...editBatchData, endDate: event.target.value })}
+                                                    className="w-full rounded-xl border-[1.5px] border-black/5 bg-white px-3 py-3 text-app-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/10"
+                                                />
+                                            </label>
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-end pt-6">
                                         <button
                                             type="submit"
@@ -2141,6 +2234,25 @@ export default function BatchDetails() {
                     )
                 }
             </AnimatePresence>
+
+            {feeStartStudent && batch.startDate && batch.endDate && (
+                <StudentFeeStartDialog
+                    student={{
+                        id: feeStartStudent.id,
+                        name: feeStartStudent.name,
+                        joinedAt: feeStartStudent.createdAt ?? batch.startDate,
+                    }}
+                    batch={{ startDate: batch.startDate, endDate: batch.endDate }}
+                    defaultMonth={(() => {
+                        const start = dateMonth(batch.startDate!);
+                        const end = dateMonth(batch.endDate!);
+                        const joined = dateMonth(feeStartStudent.createdAt ?? batch.startDate!);
+                        return joined < start ? start : joined > end ? end : joined;
+                    })()}
+                    onClose={() => setFeeStartStudent(null)}
+                    onConfirm={setStudentFeeStart}
+                />
+            )}
 
             {/* ═══════════════════════════════════════════
                 UNIFIED FEE COLUMNS MODAL
