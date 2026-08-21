@@ -172,6 +172,94 @@ test('self-registered students receive a pending setup profile with no fee perio
   }]);
 });
 
+test('pending profile retries return the same tenant profile after a unique conflict', async () => {
+  const { deps, writes } = depsFor();
+  let current: StudentMonthCoverageProfile | null = null;
+  deps.findProfile = async () => current;
+  deps.createPendingProfile = async (input) => {
+    current = profile({
+      instituteId: input.instituteId,
+      batchId: input.batchId,
+      studentId: input.studentId,
+      feeStartMonth: input.feeStartMonth,
+      feeEndMonth: input.feeEndMonth,
+      status: input.status,
+    });
+    throw { code: 'P2002' };
+  };
+
+  const result = await createPendingStudentFeeProfile({ instituteId: 'inst-1', studentId: 'student-1' }, deps);
+
+  assert.equal(result.id, 'profile-1');
+  assert.equal(result.instituteId, 'inst-1');
+  assert.equal(result.status, 'PENDING_SETUP');
+  assert.deepEqual(writes, []);
+});
+
+test('confirmation retries activate the same tenant profile after a unique conflict', async () => {
+  const { deps, writes } = depsFor();
+  let current: StudentMonthCoverageProfile | null = null;
+  deps.findProfile = async () => current;
+  deps.activateProfile = async (input) => {
+    if (!current) {
+      current = profile({
+        instituteId: input.instituteId,
+        batchId: input.batchId,
+        studentId: input.studentId,
+        status: 'PENDING_SETUP',
+      });
+      throw { code: 'P2002' };
+    }
+    writes.push({ operation: 'active', ...input });
+    current = profile({
+      instituteId: input.instituteId,
+      batchId: input.batchId,
+      studentId: input.studentId,
+      feeStartMonth: input.feeStartMonth,
+      feeEndMonth: input.feeEndMonth,
+      status: 'ACTIVE',
+      confirmedAt: input.confirmedAt,
+      confirmedById: input.confirmedById,
+    });
+    return current;
+  };
+
+  const result = await confirmStudentFeeProfile({
+    instituteId: 'inst-1', studentId: 'student-1', feeStartMonth: '2026-07', actorId: 'teacher-1',
+  }, deps);
+
+  assert.equal(result.profile.id, 'profile-1');
+  assert.equal(result.profile.status, 'ACTIVE');
+  assert.equal(result.profile.instituteId, 'inst-1');
+  assert.deepEqual(writes.map((write) => write.operation), ['active']);
+});
+
+for (const operation of ['pending', 'confirmation'] as const) {
+  test(`rejects a foreign profile introduced during a ${operation} unique-conflict retry`, async () => {
+    const { deps, writes } = depsFor();
+    let current: StudentMonthCoverageProfile | null = null;
+    deps.findProfile = async () => current;
+    const introduceForeignProfile = () => {
+      current = profile({ instituteId: 'inst-2', batchId: 'batch-2', studentId: 'student-1' });
+      throw { code: 'P2002' };
+    };
+    deps.createPendingProfile = async () => introduceForeignProfile();
+    deps.activateProfile = async () => introduceForeignProfile();
+
+    const operationPromise = operation === 'pending'
+      ? createPendingStudentFeeProfile({ instituteId: 'inst-1', studentId: 'student-1' }, deps)
+      : confirmStudentFeeProfile({
+        instituteId: 'inst-1', studentId: 'student-1', feeStartMonth: '2026-07', actorId: 'teacher-1',
+      }, deps);
+
+    await assert.rejects(
+      () => operationPromise,
+      (error: unknown) => error instanceof MonthCoverageError && error.code === 'PROFILE_CONTEXT_MISMATCH',
+    );
+    assert.deepEqual(writes, []);
+  });
+}
+
 test('confirmation activates a profile and records the teacher and confirmation time', async () => {
   const { deps } = depsFor();
 

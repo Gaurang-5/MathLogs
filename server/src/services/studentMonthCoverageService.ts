@@ -250,6 +250,10 @@ async function loadProfileInContext(
   return profile;
 }
 
+function isUniqueProfileConflict(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+}
+
 export async function createPendingStudentFeeProfile(
   input: CreatePendingStudentFeeProfileInput,
   deps: StudentMonthCoverageDeps = prismaStudentMonthCoverageDeps,
@@ -257,14 +261,25 @@ export async function createPendingStudentFeeProfile(
   const { student, batchId } = await loadValidatedStudent(input.instituteId, input.studentId, deps);
   const existing = await loadProfileInContext({ batchId }, input.instituteId, student.id, deps);
   if (existing) return existing;
-  return deps.createPendingProfile({
+  const profileWrite: PendingProfileWrite = {
     instituteId: input.instituteId,
     batchId,
     studentId: student.id,
     feeStartMonth: null,
     feeEndMonth: null,
     status: 'PENDING_SETUP',
-  });
+  };
+
+  try {
+    const profile = await deps.createPendingProfile(profileWrite);
+    assertProfileContext(profile, { batchId }, input.instituteId, student.id);
+    return profile;
+  } catch (error) {
+    if (!isUniqueProfileConflict(error)) throw error;
+    const concurrentProfile = await loadProfileInContext({ batchId }, input.instituteId, student.id, deps);
+    if (!concurrentProfile) throw error;
+    return concurrentProfile;
+  }
 }
 
 export async function confirmStudentFeeProfile(
@@ -289,7 +304,7 @@ export async function confirmStudentFeeProfile(
 
   const joinedMonth = currentMonthInTimezone(student.createdAt, timezone);
   const warning = compareMonths(input.feeStartMonth, joinedMonth) < 0 ? 'BACKDATED_BEFORE_JOIN' : null;
-  const profile = await deps.activateProfile({
+  const profileWrite: ActiveProfileWrite = {
     instituteId: input.instituteId,
     batchId,
     studentId: student.id,
@@ -297,7 +312,17 @@ export async function confirmStudentFeeProfile(
     feeEndMonth: batchEndMonth,
     confirmedAt: nowFrom(deps),
     confirmedById: input.actorId,
-  });
+  };
+  let profile: StudentMonthCoverageProfile;
+  try {
+    profile = await deps.activateProfile(profileWrite);
+  } catch (error) {
+    if (!isUniqueProfileConflict(error)) throw error;
+    const concurrentProfile = await loadProfileInContext({ batchId }, input.instituteId, student.id, deps);
+    if (!concurrentProfile) throw error;
+    profile = await deps.activateProfile(profileWrite);
+  }
+  assertProfileContext(profile, { batchId }, input.instituteId, student.id);
 
   return { profile, warning };
 }
@@ -320,5 +345,6 @@ export async function closeStudentFeeProfile(
     feeEndMonth,
   });
   if (!profile) throw new MonthCoverageError('PROFILE_NOT_FOUND');
+  assertProfileContext(profile, { batchId }, input.instituteId, student.id);
   return profile;
 }
