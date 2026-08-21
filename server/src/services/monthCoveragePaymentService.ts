@@ -34,6 +34,8 @@ export type MonthCoveragePaymentRecord = {
   status: 'ACTIVE' | 'VOID';
   idempotencyKey: string;
   createdById: string;
+  voidedAt?: Date | null;
+  voidedById?: string | null;
   coverageMonths?: string[];
 };
 
@@ -47,22 +49,24 @@ export type MonthCoverageAllocationWrite = {
   coverageMonths: string[];
 };
 
+export type MonthCoverageAuditSnapshot = {
+  amountPaise: number;
+  paymentDate: string;
+  paymentMethod: string;
+  duration: MonthCoverageDuration;
+  note: string | null;
+  status: 'ACTIVE' | 'VOID';
+  coverageMonths: string[];
+};
+
 export type MonthCoverageAuditWrite = {
   instituteId: string;
   paymentId: string;
   actorId: string;
-  action: 'CREATE';
-  reason: null;
-  before: null;
-  after: {
-    amountPaise: number;
-    paymentDate: string;
-    paymentMethod: string;
-    duration: MonthCoverageDuration;
-    note: string | null;
-    status: 'ACTIVE';
-    coverageMonths: string[];
-  };
+  action: 'CREATE' | 'UPDATE' | 'VOID';
+  reason: string | null;
+  before: MonthCoverageAuditSnapshot | null;
+  after: MonthCoverageAuditSnapshot;
 };
 
 export type MonthCoveragePaymentTransaction = MonthCoveragePaymentDeps & {
@@ -70,11 +74,27 @@ export type MonthCoveragePaymentTransaction = MonthCoveragePaymentDeps & {
   createPayment(input: MonthCoveragePaymentWrite): Promise<MonthCoveragePaymentRecord>;
   createAllocations(input: MonthCoverageAllocationWrite): Promise<void>;
   createAuditEvent(input: MonthCoverageAuditWrite): Promise<void>;
+  findPaymentById(instituteId: string, paymentId: string): Promise<MonthCoveragePaymentRecord | null>;
+  updatePayment(paymentId: string, input: {
+    amountPaise: number;
+    paymentDate: Date;
+    paymentMethod: string;
+    duration: MonthCoverageDuration;
+    note: string | null;
+  }): Promise<MonthCoveragePaymentRecord>;
+  voidPayment(paymentId: string, input: { voidedAt: Date; voidedById: string }): Promise<MonthCoveragePaymentRecord>;
+  deleteAllocations(instituteId: string, paymentId: string): Promise<void>;
 };
 
 export type MonthCoveragePaymentCreateDeps = MonthCoveragePaymentDeps & {
   loadActor(instituteId: string, actorId: string): Promise<{ id: string; instituteId: string } | null>;
   findPaymentByIdempotency(instituteId: string, idempotencyKey: string): Promise<MonthCoveragePaymentRecord | null>;
+  runSerializable<T>(operation: (tx: MonthCoveragePaymentTransaction) => Promise<T>): Promise<T>;
+};
+
+export type MonthCoveragePaymentCorrectionDeps = MonthCoveragePaymentDeps & {
+  loadActor(instituteId: string, actorId: string): Promise<{ id: string; instituteId: string } | null>;
+  findPaymentById(instituteId: string, paymentId: string): Promise<MonthCoveragePaymentRecord | null>;
   runSerializable<T>(operation: (tx: MonthCoveragePaymentTransaction) => Promise<T>): Promise<T>;
 };
 
@@ -118,6 +138,25 @@ export type MonthCoveragePaymentResult = {
   idempotent: boolean;
 };
 
+export type UpdateMonthCoveragePaymentInput = Omit<CreateMonthCoveragePaymentInput, 'idempotencyKey'> & {
+  paymentId: string;
+  reason?: string;
+};
+
+export type VoidMonthCoveragePaymentInput = {
+  instituteId: string;
+  actorId: string;
+  paymentId: string;
+  reason?: string;
+  now: Date;
+};
+
+export type VoidMonthCoveragePreview = {
+  paymentId: string;
+  amountRupees: number;
+  reopenedMonths: string[];
+};
+
 type MonthCoveragePrismaClient = Pick<
   typeof prisma,
   'student' | 'admin' | 'monthCoverageAllocation' | 'monthCoveragePayment' | 'monthCoverageAuditEvent'
@@ -136,6 +175,8 @@ function paymentRecord(row: {
   status: 'ACTIVE' | 'VOID';
   idempotencyKey: string;
   createdById: string;
+  voidedAt?: Date | null;
+  voidedById?: string | null;
   allocations?: Array<{ coverageMonth: string }>;
 }): MonthCoveragePaymentRecord {
   return {
@@ -151,6 +192,8 @@ function paymentRecord(row: {
     status: row.status,
     idempotencyKey: row.idempotencyKey,
     createdById: row.createdById,
+    voidedAt: row.voidedAt ?? null,
+    voidedById: row.voidedById ?? null,
     ...(row.allocations ? { coverageMonths: row.allocations.map(allocation => allocation.coverageMonth) } : {}),
   };
 }
@@ -220,15 +263,44 @@ function prismaTransactionDeps(client: MonthCoveragePrismaClient): MonthCoverage
     async createAuditEvent(input) {
       await client.monthCoverageAuditEvent.create({ data: input as never });
     },
+
+    async findPaymentById(instituteId, paymentId) {
+      const row = await client.monthCoveragePayment.findFirst({
+        where: { id: paymentId, instituteId },
+        include: { allocations: { orderBy: { coverageMonth: 'asc' } } },
+      });
+      return row ? paymentRecord(row) : null;
+    },
+
+    async updatePayment(paymentId, input) {
+      const row = await client.monthCoveragePayment.update({
+        where: { id: paymentId },
+        data: input,
+      });
+      return paymentRecord(row);
+    },
+
+    async voidPayment(paymentId, input) {
+      const row = await client.monthCoveragePayment.update({
+        where: { id: paymentId },
+        data: { status: 'VOID', ...input },
+      });
+      return paymentRecord(row);
+    },
+
+    async deleteAllocations(instituteId, paymentId) {
+      await client.monthCoverageAllocation.deleteMany({ where: { instituteId, paymentId } });
+    },
   };
 }
 
 const prismaReadDeps = prismaTransactionDeps(prisma);
 
-export const prismaMonthCoveragePaymentDeps: MonthCoveragePaymentCreateDeps = {
+export const prismaMonthCoveragePaymentDeps: MonthCoveragePaymentCreateDeps & MonthCoveragePaymentCorrectionDeps = {
   loadStudentContext: prismaReadDeps.loadStudentContext,
   listCoveredMonths: prismaReadDeps.listCoveredMonths,
   findPaymentByIdempotency: prismaReadDeps.findPaymentByIdempotency,
+  findPaymentById: prismaReadDeps.findPaymentById,
   async loadActor(instituteId, actorId) {
     return prisma.admin.findFirst({
       where: { id: actorId, instituteId },
@@ -433,4 +505,139 @@ export async function createMonthCoveragePayment(
     }
     throw error;
   }
+}
+
+function auditSnapshot(payment: MonthCoveragePaymentRecord, coverageMonths: string[]): MonthCoverageAuditSnapshot {
+  return {
+    amountPaise: payment.amountPaise,
+    paymentDate: payment.paymentDate.toISOString(),
+    paymentMethod: payment.paymentMethod,
+    duration: payment.duration,
+    note: payment.note,
+    status: payment.status,
+    coverageMonths: [...coverageMonths],
+  };
+}
+
+function assertActivePayment(
+  payment: MonthCoveragePaymentRecord | null,
+  instituteId: string,
+  expectedStudentId?: string,
+): asserts payment is MonthCoveragePaymentRecord {
+  if (!payment || payment.instituteId !== instituteId) throw new MonthCoverageError('PAYMENT_NOT_FOUND');
+  if (expectedStudentId && payment.studentId !== expectedStudentId) {
+    throw new MonthCoverageError('PROFILE_CONTEXT_MISMATCH');
+  }
+  if (payment.status !== 'ACTIVE') throw new MonthCoverageError('PAYMENT_NOT_FOUND');
+}
+
+async function assertCorrectionActor(
+  instituteId: string,
+  actorId: string,
+  deps: Pick<MonthCoveragePaymentCorrectionDeps, 'loadActor'>,
+): Promise<void> {
+  const actor = await deps.loadActor(instituteId, actorId);
+  if (!actor || actor.id !== actorId || actor.instituteId !== instituteId) {
+    throw new MonthCoverageError('ACTOR_NOT_AUTHORIZED');
+  }
+}
+
+export async function updateMonthCoveragePayment(
+  input: UpdateMonthCoveragePaymentInput,
+  deps: MonthCoveragePaymentCorrectionDeps = prismaMonthCoveragePaymentDeps,
+): Promise<MonthCoveragePaymentResult> {
+  const amountPaise = paiseFromRupees(input.amountRupees);
+  if (Number.isNaN(input.paymentDate.getTime())) throw new MonthCoverageError('INVALID_PAYMENT_DATE');
+  await assertCorrectionActor(input.instituteId, input.actorId, deps);
+
+  try {
+    return await deps.runSerializable(async tx => {
+      const original = await tx.findPaymentById(input.instituteId, input.paymentId);
+      assertActivePayment(original, input.instituteId, input.studentId);
+      const beforeMonths = [...(original.coverageMonths ?? [])];
+      const before = auditSnapshot(original, beforeMonths);
+
+      await tx.deleteAllocations(input.instituteId, input.paymentId);
+      const preview = await previewMonthCoveragePayment({
+        instituteId: input.instituteId,
+        studentId: input.studentId,
+        duration: input.duration,
+        requestedStartMonth: input.requestedStartMonth,
+        allowGap: input.allowGap,
+        now: input.paymentDate,
+      }, tx);
+      const updated = await tx.updatePayment(input.paymentId, {
+        amountPaise,
+        paymentDate: input.paymentDate,
+        paymentMethod: input.paymentMethod,
+        duration: input.duration,
+        note: input.note?.trim() || null,
+      });
+      await tx.createAllocations({
+        instituteId: input.instituteId,
+        batchId: original.batchId,
+        studentId: original.studentId,
+        paymentId: original.id,
+        coverageMonths: preview.coverageMonths,
+      });
+      const payment = { ...updated, coverageMonths: preview.coverageMonths };
+      await tx.createAuditEvent({
+        instituteId: input.instituteId,
+        paymentId: input.paymentId,
+        actorId: input.actorId,
+        action: 'UPDATE',
+        reason: input.reason?.trim() || null,
+        before,
+        after: auditSnapshot(payment, preview.coverageMonths),
+      });
+      return { payment, coverageMonths: preview.coverageMonths, preview, idempotent: false };
+    });
+  } catch (error) {
+    if (isUniqueConflict(error)) throw new MonthCoverageError('MONTH_ALREADY_COVERED');
+    throw error;
+  }
+}
+
+export async function previewVoidMonthCoveragePayment(
+  input: { instituteId: string; paymentId: string },
+  deps: Pick<MonthCoveragePaymentCorrectionDeps, 'findPaymentById'> = prismaMonthCoveragePaymentDeps,
+): Promise<VoidMonthCoveragePreview> {
+  const payment = await deps.findPaymentById(input.instituteId, input.paymentId);
+  assertActivePayment(payment, input.instituteId);
+  return {
+    paymentId: payment.id,
+    amountRupees: payment.amountPaise / 100,
+    reopenedMonths: [...(payment.coverageMonths ?? [])],
+  };
+}
+
+export async function voidMonthCoveragePayment(
+  input: VoidMonthCoveragePaymentInput,
+  deps: MonthCoveragePaymentCorrectionDeps = prismaMonthCoveragePaymentDeps,
+): Promise<{ payment: MonthCoveragePaymentRecord; reopenedMonths: string[] }> {
+  if (Number.isNaN(input.now.getTime())) throw new MonthCoverageError('INVALID_DATE');
+  await assertCorrectionActor(input.instituteId, input.actorId, deps);
+
+  return deps.runSerializable(async tx => {
+    const original = await tx.findPaymentById(input.instituteId, input.paymentId);
+    assertActivePayment(original, input.instituteId);
+    const reopenedMonths = [...(original.coverageMonths ?? [])];
+    const before = auditSnapshot(original, reopenedMonths);
+    await tx.deleteAllocations(input.instituteId, input.paymentId);
+    const voided = await tx.voidPayment(input.paymentId, {
+      voidedAt: input.now,
+      voidedById: input.actorId,
+    });
+    const payment = { ...voided, status: 'VOID' as const, coverageMonths: [] };
+    await tx.createAuditEvent({
+      instituteId: input.instituteId,
+      paymentId: input.paymentId,
+      actorId: input.actorId,
+      action: 'VOID',
+      reason: input.reason?.trim() || null,
+      before,
+      after: auditSnapshot(payment, []),
+    });
+    return { payment, reopenedMonths };
+  });
 }

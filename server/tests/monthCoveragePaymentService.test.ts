@@ -3,12 +3,18 @@ import assert from 'node:assert/strict';
 import { prisma } from '../src/prisma';
 import {
   createMonthCoveragePayment,
+  previewVoidMonthCoveragePayment,
   previewMonthCoveragePayment,
   prismaMonthCoveragePaymentDeps,
+  updateMonthCoveragePayment,
+  voidMonthCoveragePayment,
   type CreateMonthCoveragePaymentInput,
+  type MonthCoveragePaymentCorrectionDeps,
   type MonthCoveragePaymentCreateDeps,
   type MonthCoveragePaymentDeps,
   type PreviewMonthCoveragePaymentInput,
+  type UpdateMonthCoveragePaymentInput,
+  type VoidMonthCoveragePaymentInput,
 } from '../src/services/monthCoveragePaymentService';
 
 function input(overrides: Partial<PreviewMonthCoveragePaymentInput> = {}): PreviewMonthCoveragePaymentInput {
@@ -254,4 +260,131 @@ test('the Prisma repository executes payment work at serializable isolation', as
   } finally {
     prisma.$transaction = originalTransaction;
   }
+});
+
+function updateInput(overrides: Partial<UpdateMonthCoveragePaymentInput> = {}): UpdateMonthCoveragePaymentInput {
+  return {
+    instituteId: 'inst-1', actorId: 'teacher-1', paymentId: 'payment-1', studentId: 'student-1',
+    amountRupees: 1200, paymentDate: new Date('2026-10-10T00:00:00.000Z'), paymentMethod: 'CASH',
+    duration: 'MONTHLY', requestedStartMonth: '2026-10', allowGap: true, note: 'Corrected', reason: 'Wrong period',
+    ...overrides,
+  };
+}
+
+function correctionDeps(options: { failReplacement?: boolean } = {}) {
+  const originalPayment = {
+    id: 'payment-1', instituteId: 'inst-1', batchId: 'batch-1', studentId: 'student-1', amountPaise: 100000,
+    paymentDate: new Date('2026-09-10T00:00:00.000Z'), paymentMethod: 'UPI', duration: 'QUARTERLY' as const,
+    note: 'Original', status: 'ACTIVE' as const, idempotencyKey: 'attempt-1', createdById: 'teacher-1',
+    coverageMonths: ['2026-07', '2026-08', '2026-09'],
+  };
+  let state = { payment: { ...originalPayment, coverageMonths: [...originalPayment.coverageMonths] }, audits: [] as Array<Record<string, unknown>> };
+  const context = {
+    instituteId: 'inst-1', batchId: 'batch-1', studentId: 'student-1', coachingFeeMode: 'MONTH_COVERAGE' as const,
+    timezone: 'Asia/Kolkata', profile: { status: 'ACTIVE' as const, feeStartMonth: '2026-07', feeEndMonth: '2026-12' },
+  };
+  const deps: MonthCoveragePaymentCorrectionDeps = {
+    loadStudentContext: async () => context,
+    listCoveredMonths: async () => state.payment.status === 'ACTIVE' ? [...state.payment.coverageMonths] : [],
+    loadActor: async () => ({ id: 'teacher-1', instituteId: 'inst-1' }),
+    findPaymentByIdempotency: async () => state.payment,
+    findPaymentById: async () => state.payment,
+    runSerializable: async operation => {
+      const draft = {
+        payment: { ...state.payment, coverageMonths: [...state.payment.coverageMonths] },
+        audits: state.audits.map(audit => ({ ...audit })),
+      };
+      const tx = {
+        loadStudentContext: async () => context,
+        listCoveredMonths: async () => draft.payment.status === 'ACTIVE' ? [...draft.payment.coverageMonths] : [],
+        findPaymentByIdempotency: async () => draft.payment,
+        findPaymentById: async () => draft.payment,
+        createPayment: async () => draft.payment,
+        updatePayment: async (_paymentId: string, data: Record<string, unknown>) => {
+          draft.payment = { ...draft.payment, ...data } as typeof draft.payment;
+          return draft.payment;
+        },
+        voidPayment: async (data: { voidedAt: Date; voidedById: string }) => {
+          draft.payment = { ...draft.payment, status: 'VOID', ...data } as typeof draft.payment;
+          return draft.payment;
+        },
+        deleteAllocations: async () => { draft.payment.coverageMonths = []; },
+        createAllocations: async (data: { coverageMonths: string[] }) => {
+          if (options.failReplacement) throw new Error('replacement failed');
+          draft.payment.coverageMonths = [...data.coverageMonths];
+        },
+        createAuditEvent: async (data: Record<string, unknown>) => { draft.audits.push(data); },
+      };
+      const result = await operation(tx as never);
+      state = draft;
+      return result;
+    },
+  };
+  return { deps, getState: () => state };
+}
+
+test('editing replaces allocations and writes immutable before and after snapshots', async () => {
+  const { deps, getState } = correctionDeps();
+
+  const result = await updateMonthCoveragePayment(updateInput(), deps);
+
+  assert.equal(result.payment.amountPaise, 120000);
+  assert.deepEqual(result.coverageMonths, ['2026-10']);
+  const audit = getState().audits[0] as { action: string; reason: string; before: { coverageMonths: string[] }; after: { coverageMonths: string[] } };
+  assert.equal(audit.action, 'UPDATE');
+  assert.equal(audit.reason, 'Wrong period');
+  assert.deepEqual(audit.before.coverageMonths, ['2026-07', '2026-08', '2026-09']);
+  assert.deepEqual(audit.after.coverageMonths, ['2026-10']);
+});
+
+test('editing stores a null audit reason when the teacher omits it', async () => {
+  const { deps, getState } = correctionDeps();
+
+  await updateMonthCoveragePayment(updateInput({ reason: undefined }), deps);
+
+  assert.equal(getState().audits[0].reason, null);
+});
+
+test('void preview returns the exact active months that will reopen', async () => {
+  const { deps } = correctionDeps();
+
+  const result = await previewVoidMonthCoveragePayment({ instituteId: 'inst-1', paymentId: 'payment-1' }, deps);
+
+  assert.deepEqual(result.reopenedMonths, ['2026-07', '2026-08', '2026-09']);
+  assert.equal(result.amountRupees, 1000);
+});
+
+test('voiding preserves the payment, removes active allocations, and writes a void audit', async () => {
+  const { deps, getState } = correctionDeps();
+  const input: VoidMonthCoveragePaymentInput = {
+    instituteId: 'inst-1', actorId: 'teacher-1', paymentId: 'payment-1', reason: 'Duplicate receipt',
+    now: new Date('2026-10-12T00:00:00.000Z'),
+  };
+
+  const result = await voidMonthCoveragePayment(input, deps);
+
+  assert.equal(result.payment.status, 'VOID');
+  assert.deepEqual(getState().payment.coverageMonths, []);
+  assert.equal(getState().audits[0].action, 'VOID');
+  assert.deepEqual((getState().audits[0].before as { coverageMonths: string[] }).coverageMonths, ['2026-07', '2026-08', '2026-09']);
+});
+
+test('a month reopened by voiding becomes available to the next preview', async () => {
+  const { deps } = correctionDeps();
+  await voidMonthCoveragePayment({
+    instituteId: 'inst-1', actorId: 'teacher-1', paymentId: 'payment-1', now: new Date('2026-10-12T00:00:00.000Z'),
+  }, deps);
+
+  const preview = await previewMonthCoveragePayment(input({ duration: 'MONTHLY' }), deps);
+  assert.deepEqual(preview.coverageMonths, ['2026-07']);
+});
+
+test('failed replacement allocation rolls back the original payment and months', async () => {
+  const { deps, getState } = correctionDeps({ failReplacement: true });
+
+  await assert.rejects(() => updateMonthCoveragePayment(updateInput(), deps), /replacement failed/);
+
+  assert.equal(getState().payment.amountPaise, 100000);
+  assert.deepEqual(getState().payment.coverageMonths, ['2026-07', '2026-08', '2026-09']);
+  assert.deepEqual(getState().audits, []);
 });
