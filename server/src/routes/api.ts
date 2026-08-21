@@ -4,7 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireCoachingFeeMode } from '../middleware/requireCoachingFeeMode';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, registerStudentSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateStudentSchema, updateTestSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
 import { addStudentManually, approveStudent, archiveStudent, confirmMonthCoverageProfileController, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
@@ -27,6 +27,7 @@ import { getOwnPreference, updateOwnPreference } from '../controllers/superAdmin
 import { parseSupportAttachments } from '../middleware/supportUpload';
 import { requireSupportFeature } from '../middleware/supportFeatureGate';
 import { getPublicPlanCatalogue } from '../controllers/planCatalogController';
+import { monthCoverageHandlers } from '../controllers/monthCoverageController';
 
 const router = Router();
 const requireCurrentDueFeeMode = requireCoachingFeeMode('CURRENT_DUE_BASED');
@@ -331,6 +332,17 @@ router.get('/tests/:id/eligible-students', authenticateToken as any, getTestElig
 router.post('/marks', authenticateToken as any, validateRequest(submitMarkSchema), submitMark as any);
 
 // Fees
+router.get('/month-coverage/summary', authenticateToken as any, requireMonthCoverageFeeMode as any, monthCoverageHandlers.summary as any);
+router.get('/month-coverage/payments/recent', authenticateToken as any, requireMonthCoverageFeeMode as any, monthCoverageHandlers.recentPayments as any);
+router.post('/month-coverage/payments/preview', authenticateToken as any, requireMonthCoverageFeeMode as any, validateRequest(previewMonthCoveragePaymentSchema), monthCoverageHandlers.previewPayment as any);
+router.post('/month-coverage/payments', authenticateToken as any, requireMonthCoverageFeeMode as any, paymentLimiter, validateRequest(createMonthCoveragePaymentSchema), monthCoverageHandlers.createPayment as any);
+router.put('/month-coverage/payments/:paymentId', authenticateToken as any, requireMonthCoverageFeeMode as any, paymentLimiter, validateRequest(updateMonthCoveragePaymentSchema), monthCoverageHandlers.updatePayment as any);
+router.get('/month-coverage/payments/:paymentId/void-preview', authenticateToken as any, requireMonthCoverageFeeMode as any, monthCoverageHandlers.voidPreview as any);
+router.delete('/month-coverage/payments/:paymentId', authenticateToken as any, requireMonthCoverageFeeMode as any, paymentLimiter, validateRequest(voidMonthCoveragePaymentSchema), monthCoverageHandlers.voidPayment as any);
+router.post('/month-coverage/scan-receipt', authenticateToken as any, requireMonthCoverageFeeMode as any, ocrLimiter, upload.single('image'), scanReceipt as any);
+router.post('/month-coverage/reminders', authenticateToken as any, requireMonthCoverageFeeMode as any, bulkNotifyLimiter, validateRequest(sendMonthCoverageReminderSchema), monthCoverageHandlers.sendReminders as any);
+router.get('/month-coverage/reports/pending', authenticateToken as any, requireMonthCoverageFeeMode as any, monthCoverageHandlers.pendingReport as any);
+router.get('/month-coverage/reports/transactions', authenticateToken as any, requireMonthCoverageFeeMode as any, monthCoverageHandlers.transactionReport as any);
 router.get('/fees', authenticateToken as any, requireCurrentDueFeeMode as any, getFeeSummary as any);
 router.get('/fees/summary', authenticateToken as any, requireCurrentDueFeeMode as any, getFeeSummary as any);
 router.get('/fees/installments-list', authenticateToken as any, requireCurrentDueFeeMode as any, getFeeInstallmentsList as any);

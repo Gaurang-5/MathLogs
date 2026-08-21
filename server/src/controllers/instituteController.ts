@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { secureLogger } from '../utils/secureLogger';
+import { deleteMonthCoverageData } from '../services/monthCoverageDeletionService';
 import { clearPublicBatchCache } from './batchController';
 
 
@@ -261,28 +262,29 @@ export const deleteInstitute = async (req: Request, res: Response) => {
 
         // ✅ COMPLETE CASCADE DELETE: Delete all related data
         // Order matters: delete children before parents
-        await prisma.$transaction([
+        await prisma.$transaction(async tx => {
+            await deleteMonthCoverageData(tx, id);
             // Delete fee payments first (children of students)
-            prisma.feePayment.deleteMany({ where: { student: { instituteId: id } } }),
+            await tx.feePayment.deleteMany({ where: { student: { instituteId: id } } });
             // Delete fee records (children of students)
-            prisma.feeRecord.deleteMany({ where: { student: { instituteId: id } } }),
+            await tx.feeRecord.deleteMany({ where: { student: { instituteId: id } } });
             // Delete marks (children of students via tests)
-            prisma.mark.deleteMany({ where: { student: { instituteId: id } } }),
+            await tx.mark.deleteMany({ where: { student: { instituteId: id } } });
             // Delete students
-            prisma.student.deleteMany({ where: { instituteId: id } }),
+            await tx.student.deleteMany({ where: { instituteId: id } });
             // Delete fee installments (children of batches)
-            prisma.feeInstallment.deleteMany({ where: { batch: { instituteId: id } } }),
+            await tx.feeInstallment.deleteMany({ where: { batch: { instituteId: id } } });
             // Delete batches
-            prisma.batch.deleteMany({ where: { instituteId: id } }),
+            await tx.batch.deleteMany({ where: { instituteId: id } });
             // Delete tests
-            prisma.test.deleteMany({ where: { instituteId: id } }),
+            await tx.test.deleteMany({ where: { instituteId: id } });
             // Delete admins
-            prisma.admin.deleteMany({ where: { instituteId: id } }),
+            await tx.admin.deleteMany({ where: { instituteId: id } });
             // Delete invite tokens
-            prisma.inviteToken.deleteMany({ where: { instituteId: id } }),
+            await tx.inviteToken.deleteMany({ where: { instituteId: id } });
             // Finally, delete the institute itself
-            prisma.institute.delete({ where: { id } })
-        ]);
+            await tx.institute.delete({ where: { id } });
+        });
 
         // ✅ AUDIT LOG: Successful deletion
         secureLogger.info(`[AUDIT] Institute Deletion Completed`, {
@@ -588,5 +590,4 @@ export const toggleInstituteStatus = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to update institute status' });
     }
 };
-
 

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { writeSuperAdminAudit } from './superAdminAuditService';
 import { claimSuperAdminIdempotency, completeSuperAdminIdempotency } from './superAdminIdempotencyService';
+import { deleteMonthCoverageData } from './monthCoverageDeletionService';
 
 export class DeletionServiceError extends Error { constructor(code: string, public current?: unknown) { super(code); } }
 const DELAY_MS = 7 * 86_400_000;
@@ -57,6 +58,7 @@ export async function finalizeInstituteDeletion(input: { instituteId: string; va
     const adminIds = (await tx.admin.findMany({ where: { instituteId: institute.id }, select: { id: true } })).map(item => item.id);
     await tx.supportTicket.deleteMany({ where: { instituteId: institute.id } });
     await tx.internalCase.deleteMany({ where: { instituteId: institute.id } });
+    await deleteMonthCoverageData(tx, institute.id);
     await tx.feePayment.deleteMany({ where: { student: { instituteId: institute.id } } });
     await tx.feeRecord.deleteMany({ where: { student: { instituteId: institute.id } } });
     await tx.mark.deleteMany({ where: { student: { instituteId: institute.id } } });

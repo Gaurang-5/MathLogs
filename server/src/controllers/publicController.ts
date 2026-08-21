@@ -134,11 +134,14 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
 
         const institute = await prisma.institute.findUnique({
             where: { slug: slug.toLowerCase() },
-            select: { id: true, name: true, config: true }
+            select: { id: true, name: true, config: true, coachingFeeMode: true }
         });
 
         if (!institute) {
             return res.status(404).json({ error: 'Institute not found.' });
+        }
+        if (institute.coachingFeeMode === 'MONTH_COVERAGE') {
+            return res.status(403).json({ error: 'PARENT_PAYMENTS_DISABLED_FOR_MONTH_COVERAGE' });
         }
 
         const logoUrl = (institute.config as any)?.logo || null;
@@ -219,6 +222,14 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
 export const submitUpiPayment = async (req: Request, res: Response) => {
     try {
         const slug = req.params.slug as string;
+        const institute = await prisma.institute.findUnique({
+            where: { slug: slug.toLowerCase() }
+        });
+
+        if (institute?.coachingFeeMode === 'MONTH_COVERAGE') {
+            return res.status(403).json({ error: 'PARENT_PAYMENTS_DISABLED_FOR_MONTH_COVERAGE' });
+        }
+
         const body = (req.body || {}) as Record<string, any>;
         const { studentId, installmentId, amount, paidByName } = body;
         const file = req.file;
@@ -231,10 +242,6 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
         if (isNaN(numericAmount) || numericAmount <= 0) {
             return res.status(400).json({ error: 'Invalid amount.' });
         }
-
-        const institute = await prisma.institute.findUnique({
-            where: { slug: slug.toLowerCase() }
-        });
 
         if (!institute) {
             return res.status(404).json({ error: 'Institute not found.' });
