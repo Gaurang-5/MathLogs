@@ -113,45 +113,7 @@ test('batch details expose fee mode, timezone, dates, and student setup status',
   assert.deepEqual((body.students as Array<{ monthCoverageProfile: { status: string } }>)[0].monthCoverageProfile.status, 'PENDING_SETUP');
 });
 
-test('manual month-mode admission requires the teacher to choose a fee start month', async () => {
-  replaceMethod(prisma.batch, 'findUnique', (async () => ({
-    id: 'batch-1', instituteId: 'inst-1', institute: {
-      id: 'inst-1', name: 'MathLogs', coachingFeeMode: 'MONTH_COVERAGE', timezone: 'Asia/Kolkata',
-    },
-  }) as never) as typeof prisma.batch.findUnique);
-  replaceMethod(prisma.student, 'findFirst', (async () => assert.fail('missing fee start must reject before student lookup')) as typeof prisma.student.findFirst);
-  const res = response();
-
-  await addStudentManually({
-    body: { batchId: 'batch-1', name: 'Aarav', parentName: 'Parent', parentWhatsapp: '9876543210' },
-    user: { id: 'teacher-1', instituteId: 'inst-1' },
-  } as never, res as never);
-
-  assert.equal(res.statusCode, 400);
-  assert.deepEqual(res.body, { error: 'FEE_START_MONTH_REQUIRED' });
-});
-
-test('month-mode approval requires the teacher to choose a fee start month', async () => {
-  replaceMethod(prisma.student, 'findUnique', (async () => ({
-    id: 'student-1', status: 'PENDING', humanId: null, instituteId: 'inst-1',
-    batch: {
-      id: 'batch-1', instituteId: 'inst-1', institute: {
-        id: 'inst-1', name: 'MathLogs', coachingFeeMode: 'MONTH_COVERAGE', timezone: 'Asia/Kolkata',
-      },
-    },
-  }) as never) as typeof prisma.student.findUnique);
-  replaceMethod(prisma.student, 'update', (async () => assert.fail('missing fee start must reject before approval')) as typeof prisma.student.update);
-  const res = response();
-
-  await approveStudent({
-    params: { id: 'student-1' }, body: {}, user: { id: 'teacher-1', instituteId: 'inst-1' },
-  } as never, res as never);
-
-  assert.equal(res.statusCode, 400);
-  assert.deepEqual(res.body, { error: 'FEE_START_MONTH_REQUIRED' });
-});
-
-test('manual month-mode admission creates the student and active profile in one transaction', async () => {
+test('manual month-mode admission automatically creates an active profile in one transaction', async () => {
   const batch = {
     id: 'batch-1', name: 'Evening Maths', subject: 'Maths', className: null, timeSlot: null,
     createdAt: new Date('2026-07-01T00:00:00.000Z'), startDate: new Date('2026-07-01T00:00:00.000Z'),
@@ -198,7 +160,7 @@ test('manual month-mode admission creates the student and active profile in one 
 
   await addStudentManually({
     body: {
-      batchId: 'batch-1', name: 'Aarav', parentName: 'Parent', parentWhatsapp: '9876543210', feeStartMonth: '2026-08',
+      batchId: 'batch-1', name: 'Aarav', parentName: 'Parent', parentWhatsapp: '9876543210',
     },
     user: { id: 'teacher-1', instituteId: 'inst-1' },
   } as never, res as never);
@@ -206,9 +168,10 @@ test('manual month-mode admission creates the student and active profile in one 
   assert.equal(res.statusCode, 200);
   assert.equal(transactionCalls, 1);
   assert.equal((res.body as { monthCoverageProfile: { status: string } }).monthCoverageProfile.status, 'ACTIVE');
+  assert.equal((res.body as { monthCoverageProfile: { feeStartMonth: string } }).monthCoverageProfile.feeStartMonth, '2026-08');
 });
 
-test('month-mode approval updates the student and confirms the profile in one transaction', async () => {
+test('month-mode approval automatically activates the profile in one transaction', async () => {
   const batch = {
     id: 'batch-1', name: 'Evening Maths', subject: 'Maths', className: null, timeSlot: null,
     createdAt: new Date('2026-07-01T00:00:00.000Z'), startDate: new Date('2026-07-01T00:00:00.000Z'),
@@ -251,13 +214,14 @@ test('month-mode approval updates the student and confirms the profile in one tr
   const res = response();
 
   await approveStudent({
-    params: { id: 'student-1' }, body: { feeStartMonth: '2026-08' },
+    params: { id: 'student-1' }, body: {},
     user: { id: 'teacher-1', instituteId: 'inst-1' },
   } as never, res as never);
 
   assert.equal(res.statusCode, 200);
   assert.equal(transactionCalls, 1);
   assert.equal((res.body as { monthCoverageProfile: { status: string } }).monthCoverageProfile.status, 'ACTIVE');
+  assert.equal((res.body as { monthCoverageProfile: { feeStartMonth: string } }).monthCoverageProfile.feeStartMonth, '2026-08');
 });
 
 test('self-registered month-mode student receives pending setup without legacy assignments', async () => {

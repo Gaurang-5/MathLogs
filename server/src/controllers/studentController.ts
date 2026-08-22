@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import { secureLogger } from '../utils/secureLogger';
 import { getJwtSecret } from '../utils/env';
 import {
+    activateStudentFeeProfileAutomatically,
     closeStudentFeeProfile,
     confirmStudentFeeProfile,
     createPendingStudentFeeProfile,
@@ -278,7 +279,7 @@ export const registerStudent = async (req: Request, res: Response) => {
 };
 
 export const addStudentManually = async (req: Request, res: Response) => {
-    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, additionalData, feeStartMonth } = req.body;
+    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, additionalData } = req.body;
 
     // Data Normalization
     if (typeof name === 'string') name = name.trim();
@@ -299,10 +300,6 @@ export const addStudentManually = async (req: Request, res: Response) => {
 
         const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
-        if (batch.institute?.coachingFeeMode === 'MONTH_COVERAGE' && !feeStartMonth) {
-            return res.status(400).json({ error: 'FEE_START_MONTH_REQUIRED' });
-        }
-
         // Idempotency Check: Strict One-Phone-Number-Per-Batch logic
         const existingStudent = await prisma.student.findFirst({
             where: { batchId, parentWhatsapp, instituteId: user.instituteId }
@@ -332,10 +329,9 @@ export const addStudentManually = async (req: Request, res: Response) => {
                                 instituteId: batch.instituteId
                             }
                         });
-                        const confirmation = await confirmStudentFeeProfile({
+                        const confirmation = await activateStudentFeeProfileAutomatically({
                             instituteId: batch.instituteId!,
                             studentId: createdStudent.id,
-                            feeStartMonth,
                             actorId: teacherId!,
                         }, studentMonthCoverageDepsFor(tx));
                         return { student: createdStudent, confirmation };
@@ -483,7 +479,6 @@ export const getPendingStudents = async (req: Request, res: Response) => {
 export const approveStudent = async (req: Request, res: Response) => {
     // Kept for backward compatibility if any legacy pending students exist
     const { id } = req.params;
-    const { feeStartMonth } = req.body || {};
     const teacherId = req.user?.id;
     try {
         const studentToApprove = await prisma.student.findUnique({
@@ -504,17 +499,12 @@ export const approveStudent = async (req: Request, res: Response) => {
 
         if (!studentToApprove) return res.status(404).json({ error: 'Student not found' });
         if (!studentToApprove.batch) return res.status(400).json({ error: 'Student has no batch' });
-        if (studentToApprove.batch.institute?.coachingFeeMode === 'MONTH_COVERAGE' && !feeStartMonth) {
-            return res.status(400).json({ error: 'FEE_START_MONTH_REQUIRED' });
-        }
-
         // Idempotency: If already approved and has humanId, do nothing or return existing
         if (studentToApprove.status === 'APPROVED' && studentToApprove.humanId) {
             if (studentToApprove.batch.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
-                await confirmStudentFeeProfile({
+                await activateStudentFeeProfileAutomatically({
                     instituteId: studentToApprove.instituteId!,
                     studentId: studentToApprove.id,
-                    feeStartMonth,
                     actorId: teacherId!,
                 });
             }
@@ -534,10 +524,9 @@ export const approveStudent = async (req: Request, res: Response) => {
                             where: { id: String(id) },
                             data: { status: 'APPROVED', humanId }
                         });
-                        const confirmation = await confirmStudentFeeProfile({
+                        const confirmation = await activateStudentFeeProfileAutomatically({
                             instituteId: studentToApprove.instituteId!,
                             studentId: approvedStudent.id,
-                            feeStartMonth,
                             actorId: teacherId!,
                         }, studentMonthCoverageDepsFor(tx));
                         return { student: approvedStudent, confirmation };

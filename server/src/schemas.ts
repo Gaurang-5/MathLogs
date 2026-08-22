@@ -112,8 +112,7 @@ export const registerStudentSchema = z.object({
         }),
         schoolName: z.string().max(300).nullish(),
         additionalData: z.record(z.string(), z.any()).optional(),
-        token: z.string().nullish(),
-        feeStartMonth: canonicalMonthSchema.optional()
+        token: z.string().nullish()
     })
 });
 

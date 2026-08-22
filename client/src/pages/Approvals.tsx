@@ -5,7 +5,6 @@ import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, Clock, Smartphone, Mail, User, UserCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { StudentFeeStartDialog } from '../features/month-coverage/StudentFeeStartDialog';
 
 interface Student {
     id: string;
@@ -19,16 +18,10 @@ interface Student {
 
 type InstituteResponse = { coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' };
 
-function dateMonth(value: string): string {
-    const date = new Date(value);
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
 export default function Approvals() {
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
     const [coachingFeeMode, setCoachingFeeMode] = useState<'CURRENT_DUE_BASED' | 'MONTH_COVERAGE'>('CURRENT_DUE_BASED');
-    const [feeStartStudent, setFeeStartStudent] = useState<Student | null>(null);
 
     const fetchPending = async () => {
         try {
@@ -47,8 +40,8 @@ export default function Approvals() {
 
     useEffect(() => { fetchPending(); }, []);
 
-    const handleApprove = async (id: string, name: string, feeStartMonth?: string) => {
-        const promise = apiRequest<{ humanId?: string }>(`/students/${id}/approve`, 'POST', feeStartMonth ? { feeStartMonth } : {});
+    const handleApprove = async (id: string, name: string) => {
+        const promise = apiRequest<{ humanId?: string }>(`/students/${id}/approve`, 'POST', {});
 
         await toast.promise<{ humanId?: string }>(promise, {
             loading: 'Approving student...',
@@ -66,8 +59,6 @@ export default function Approvals() {
                 toast.error('This batch needs start and end dates before fee setup.');
                 return;
             }
-            setFeeStartStudent(student);
-            return;
         }
         void handleApprove(student.id, student.name);
     };
@@ -197,23 +188,6 @@ export default function Approvals() {
                 </motion.div>
             )}
 
-            {feeStartStudent?.batch.startDate && feeStartStudent.batch.endDate && (
-                <StudentFeeStartDialog
-                    student={{ id: feeStartStudent.id, name: feeStartStudent.name, joinedAt: feeStartStudent.createdAt }}
-                    batch={{ startDate: feeStartStudent.batch.startDate, endDate: feeStartStudent.batch.endDate }}
-                    defaultMonth={(() => {
-                        const start = dateMonth(feeStartStudent.batch.startDate);
-                        const end = dateMonth(feeStartStudent.batch.endDate);
-                        const joined = dateMonth(feeStartStudent.createdAt);
-                        return joined < start ? start : joined > end ? end : joined;
-                    })()}
-                    onClose={() => setFeeStartStudent(null)}
-                    onConfirm={async feeStartMonth => {
-                        await handleApprove(feeStartStudent.id, feeStartStudent.name, feeStartMonth);
-                        setFeeStartStudent(null);
-                    }}
-                />
-            )}
         </Layout>
     );
 }

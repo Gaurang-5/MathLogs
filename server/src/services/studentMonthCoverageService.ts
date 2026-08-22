@@ -179,6 +179,12 @@ export type ConfirmStudentFeeProfileInput = {
   actorId: string;
 };
 
+export type ActivateStudentFeeProfileAutomaticallyInput = {
+  instituteId: string;
+  studentId: string;
+  actorId: string;
+};
+
 export type CloseStudentFeeProfileInput = {
   instituteId: string;
   studentId: string;
@@ -331,6 +337,19 @@ export async function confirmStudentFeeProfile(
   assertProfileContext(profile, { batchId }, input.instituteId, student.id);
 
   return { profile, warning };
+}
+
+export async function activateStudentFeeProfileAutomatically(
+  input: ActivateStudentFeeProfileAutomaticallyInput,
+  deps: StudentMonthCoverageDeps = prismaStudentMonthCoverageDeps,
+): Promise<{ profile: StudentMonthCoverageProfile; warning: 'BACKDATED_BEFORE_JOIN' | null }> {
+  const context = await loadValidatedStudent(input.instituteId, input.studentId, deps);
+  const joinedMonth = currentMonthInTimezone(context.student.createdAt, context.timezone);
+  const feeStartMonth = compareMonths(joinedMonth, context.batchStartMonth) < 0
+    ? context.batchStartMonth
+    : joinedMonth;
+
+  return confirmStudentFeeProfile({ ...input, feeStartMonth }, deps);
 }
 
 export async function closeStudentFeeProfile(

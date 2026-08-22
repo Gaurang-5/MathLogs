@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { StudentMonthCoverageProfile } from '@prisma/client';
 import { MonthCoverageError } from '../src/domain/monthCoverage/types';
 import {
+  activateStudentFeeProfileAutomatically,
   closeStudentFeeProfile,
   confirmStudentFeeProfile,
   createPendingStudentFeeProfile,
@@ -89,6 +90,36 @@ function depsFor(student = studentFixture()) {
   };
   return { deps, writes };
 }
+
+test('automatic activation starts a pre-batch student at the batch start month', async () => {
+  const { deps } = depsFor(studentFixture({
+    createdAt: new Date('2026-05-20T00:00:00.000Z'),
+    startDate: new Date('2026-06-01T00:00:00.000Z'),
+    endDate: new Date('2027-03-31T00:00:00.000Z'),
+  }));
+
+  const result = await activateStudentFeeProfileAutomatically({
+    instituteId: 'inst-1', studentId: 'student-1', actorId: 'teacher-1',
+  }, deps);
+
+  assert.equal(result.profile.feeStartMonth, '2026-06');
+  assert.equal(result.profile.feeEndMonth, '2027-03');
+});
+
+test('automatic activation starts a mid-batch student at the joining month', async () => {
+  const { deps } = depsFor(studentFixture({
+    createdAt: new Date('2026-08-18T00:00:00.000Z'),
+    startDate: new Date('2026-06-01T00:00:00.000Z'),
+    endDate: new Date('2027-03-31T00:00:00.000Z'),
+  }));
+
+  const result = await activateStudentFeeProfileAutomatically({
+    instituteId: 'inst-1', studentId: 'student-1', actorId: 'teacher-1',
+  }, deps);
+
+  assert.equal(result.profile.feeStartMonth, '2026-08');
+  assert.equal(result.profile.feeEndMonth, '2027-03');
+});
 
 test('confirms a pre-batch student with the batch start fee month', async () => {
   const { deps } = depsFor();
