@@ -16,6 +16,7 @@ import {
 import { MonthCoverageError } from '../domain/monthCoverage/types';
 import { currentMonthInTimezone } from '../domain/monthCoverage/calendar';
 import { summarizeStudent } from '../services/monthCoverageSummaryService';
+import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -30,6 +31,7 @@ const AUTO_INVITE_INSTITUTE_SELECT = {
 
 // M2 fix: Typed interfaces instead of `any`
 interface AutoInviteStudent {
+    id: string;
     name: string;
     humanId: string | null;
     parentEmail: string | null;
@@ -79,16 +81,12 @@ const autoSendWelcomeInvite = async (student: AutoInviteStudent, batch: AutoInvi
 
         // Send WhatsApp Invite immediately
         if (student.parentWhatsapp) {
-            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
-            if (!phone.startsWith('+')) {
-                if (phone.length === 10) phone = '+91' + phone;
-            }
-            sendWelcomeWhatsApp(phone, {
+            void sendStudentAlertForStudent(student.id, phone => sendWelcomeWhatsApp(phone, {
                 studentName: student.name,
                 batchName: batch.name,
                 instituteName: senderName,
                 whatsappLink: link || ''
-            }).catch(err => console.error(`WhatsApp auto-invite failed for ${phone}:`, err));
+            })).catch(err => console.error('WhatsApp auto-invite fan-out failed:', err));
         }
     } catch (inviteErr) {
         console.error("Auto-invite error:", inviteErr);

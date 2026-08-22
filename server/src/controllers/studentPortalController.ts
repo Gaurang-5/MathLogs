@@ -6,6 +6,7 @@ import { quizCache, heartbeatManager, brandingCache } from '../utils/redis';
 import { secureLogger } from '../utils/secureLogger';
 import { getJwtSecret } from '../utils/env';
 import { sendOtpWhatsApp } from '../utils/whatsapp';
+import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
 
 
 const JWT_SECRET = getJwtSecret();
@@ -1333,17 +1334,13 @@ export const submitOnlineQuiz = async (req: Request, res: Response): Promise<voi
         // Fire and forget WhatsApp
         if (finalSubmission?.student?.parentWhatsapp) {
             import('../utils/whatsapp').then(({ sendTestMarksWhatsApp }) => {
-                let phone = finalSubmission.student.parentWhatsapp!.replace(/[^0-9+]/g, '');
-                if (!phone.startsWith('+')) {
-                    if (phone.length === 10) phone = '+91' + phone;
-                }
-                sendTestMarksWhatsApp(phone, {
+                sendStudentAlertForStudent(studentId, phone => sendTestMarksWhatsApp(phone, {
                     studentName: finalSubmission.student.name,
                     instituteName: result.instituteName || "our institute",
                     testName: result.quizTitle,
                     totalMarks: String(result.totalMarks),
                     marksObtained: String(finalScore)
-                }).catch(err => console.error('Online Quiz WhatsApp Error:', err));
+                })).catch(err => console.error('Online Quiz WhatsApp Error:', err));
             }).catch(err => console.error('Failed to import whatsapp utils:', err));
         }
     } catch (error: any) {

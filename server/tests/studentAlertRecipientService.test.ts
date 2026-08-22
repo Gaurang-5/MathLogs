@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveStudentAlertRecipients, sendStudentAlert } from '../src/services/studentAlertRecipientService';
+import { resolveStudentAlertRecipients, sendStudentAlert, sendStudentAlertForStudent } from '../src/services/studentAlertRecipientService';
 
 test('keeps primary and enabled custom phone recipients in normalized first-seen order', () => {
   assert.deepEqual(resolveStudentAlertRecipients({
@@ -37,4 +37,16 @@ test('attempts every recipient even when one sender rejects', async () => {
   });
   assert.deepEqual(attempted.sort(), ['9557940807', '9876543210']);
   assert.deepEqual(result, { attempted: 2, delivered: 1, failed: 1 });
+});
+
+test('loads a student configuration and fans out through the shared adapter', async () => {
+  const recipients: string[] = [];
+  const result = await sendStudentAlertForStudent('student-1', async recipient => { recipients.push(recipient); }, {
+    student: { findFirst: async () => ({
+      parentWhatsapp: '9557940807', additionalData: { second: '9876543210' },
+      institute: { config: { registrationForm: { fields: [{ id: 'second', type: 'tel', sendAlerts: true }] } } },
+    }) },
+  });
+  assert.deepEqual(recipients, ['9557940807', '9876543210']);
+  assert.deepEqual(result, { attempted: 2, delivered: 2, failed: 0 });
 });

@@ -7,6 +7,7 @@ import { generateTest, generateSingleQuestion, generateTestWithVariants, generat
 import { sendQuizMarksBroadcast, sendQuizScheduleBroadcast } from '../utils/quizBroadcasts';
 import { secureLogger } from '../utils/secureLogger';
 import { QuizCreditWalletError, consumeQuizCreditsInTransaction } from '../services/quizCreditWalletService';
+import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
 
 function normalizeCorrectAnswer(value: unknown): string | string[] {
     if (Array.isArray(value)) {
@@ -565,27 +566,22 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
         for (const student of students) {
             if (!student.parentWhatsapp) continue;
 
-            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
-            if (!phone.startsWith('+')) {
-                if (phone.length === 10) phone = '+91' + phone;
-            }
-
             const mark = student.marks[0];
             const scoreValue = mark ? String(mark.score) : "ABSENT";
 
             try {
-                const result = await sendTestMarksWhatsApp(phone, {
+                const delivery = await sendStudentAlertForStudent(student.id, phone => sendTestMarksWhatsApp(phone, {
                     studentName: student.name,
                     instituteName: (test as any).institute?.name || "our institute",
                     testName: test.name,
                     totalMarks: String(test.maxMarks),
                     marksObtained: scoreValue
-                });
-                if (result !== false) whatsappSent++;
-                else whatsappFailed++;
+                }));
+                whatsappSent += delivery.delivered;
+                whatsappFailed += delivery.failed;
             } catch (err) {
                 whatsappFailed++;
-                console.error(`WhatsApp failed for ${phone}:`, err);
+                console.error(`WhatsApp failed for student ${student.id}:`, err);
             }
 
         }

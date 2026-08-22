@@ -44,3 +44,32 @@ export async function sendStudentAlert<T>(
   const delivered = results.filter(result => result.status === 'fulfilled').length;
   return { attempted: recipients.length, delivered, failed: recipients.length - delivered };
 }
+
+type StudentAlertLookup = {
+  student: {
+    findFirst(args: unknown): Promise<{
+      parentWhatsapp: string | null;
+      additionalData: unknown;
+      institute: { config: unknown } | null;
+    } | null>;
+  };
+};
+
+export async function sendStudentAlertForStudent<T>(
+  studentId: string,
+  sender: (recipient: string) => Promise<T>,
+  client?: StudentAlertLookup,
+): Promise<{ attempted: number; delivered: number; failed: number }> {
+  const lookup = client ?? (await import('../prisma')).prisma as unknown as StudentAlertLookup;
+  const student = await lookup.student.findFirst({
+    where: { id: studentId },
+    select: { parentWhatsapp: true, additionalData: true, institute: { select: { config: true } } },
+  });
+  if (!student) return { attempted: 0, delivered: 0, failed: 0 };
+  const config = student.institute?.config as { registrationForm?: { fields?: AlertRegistrationField[] } } | null;
+  return sendStudentAlert({
+    parentWhatsapp: student.parentWhatsapp,
+    additionalData: student.additionalData as Record<string, unknown> | null,
+    registrationFields: config?.registrationForm?.fields ?? [],
+  }, sender);
+}

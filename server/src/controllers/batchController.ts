@@ -9,6 +9,7 @@ import { sendEmail } from '../utils/email';
 import { getClientUrl } from '../utils/urlConfig';
 import jwt from 'jsonwebtoken';
 import { sendStudentInviteWhatsApp } from '../utils/whatsapp';
+import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
 import { getJwtSecret } from '../utils/env';
 
 const JWT_SECRET = getJwtSecret();
@@ -443,27 +444,25 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
                 }
 
                 if (totalDue > 0) {
-                    let phone = student.parentWhatsapp!.replace(/[^0-9+]/g, '');
-                    if (!phone.startsWith('+') && phone.length === 10) phone = '+91' + phone;
-
                     const phoneDigits = student.parentWhatsapp!.replace(/\D/g, '').slice(-10);
                     const personalizedUpiLink = batch.institute?.slug 
                         ? `https://mathlogs.app/pay/${batch.institute.slug}?phone=${phoneDigits}`
                         : 'Please contact admin for payment details.';
 
                     try {
-                        await sendFeeReminderUpiWhatsApp(phone, {
+                        const delivery = await sendStudentAlertForStudent(student.id, phone => sendFeeReminderUpiWhatsApp(phone, {
                             studentName: student.name,
                             batchName: batch.name,
                             feeBreakup: breakupLines.join(' | '),
                             totalAmount: totalDue.toString(),
                             instituteName,
                             upiPaymentLink: personalizedUpiLink
-                        });
-                        sent++;
+                        }));
+                        sent += delivery.delivered;
+                        failed += delivery.failed;
                     } catch (err) {
                         failed++;
-                        console.error(`WhatsApp fee reminder failed for ${phone}:`, err);
+                        console.error(`WhatsApp fee reminder failed for student ${student.id}:`, err);
                     }
 
                 }
@@ -821,22 +820,18 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
         for (const student of batch.students) {
             if (!student.parentWhatsapp) continue;
 
-            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
-            if (!phone.startsWith('+')) {
-                if (phone.length === 10) phone = '+91' + phone;
-            }
-
             try {
-                await sendWelcomeWhatsApp(phone, {
+                const delivery = await sendStudentAlertForStudent(student.id, phone => sendWelcomeWhatsApp(phone, {
                     studentName: student.name,
                     batchName: batch.name,
                     instituteName: senderName,
                     whatsappLink: link
-                });
-                whatsappCount++;
+                }));
+                whatsappCount += delivery.delivered;
+                whatsappFailed += delivery.failed;
             } catch (err) {
                 whatsappFailed++;
-                console.error(`Failed to send Welcome WhatsApp to ${phone}`, err);
+                console.error(`Failed to send Welcome WhatsApp for student ${student.id}`, err);
             }
 
         }
@@ -922,16 +917,12 @@ Please join the group to stay informed.
         // Also send WhatsApp if parent has a phone number
         if (student.parentWhatsapp) {
             const { sendWelcomeWhatsApp } = await import('../utils/whatsapp');
-            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
-            if (!phone.startsWith('+')) {
-                if (phone.length === 10) phone = '+91' + phone;
-            }
-            sendWelcomeWhatsApp(phone, {
+            void sendStudentAlertForStudent(student.id, phone => sendWelcomeWhatsApp(phone, {
                 studentName: student.name,
                 batchName: batch.name,
                 instituteName: senderName,
                 whatsappLink: link || ''
-            }).catch(err => console.error(`WhatsApp invite failed for ${phone}:`, err));
+            })).catch(err => console.error(`WhatsApp invite failed for student ${student.id}:`, err));
         }
 
         res.json({ success: true, message: 'Invite sent (Email + WhatsApp)' });

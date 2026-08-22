@@ -1,12 +1,6 @@
 import { prisma } from '../prisma';
 import { sendTestMarksWhatsApp, sendQuizScheduleWhatsApp } from './whatsapp';
-
-function normalizePhone(phone?: string | null) {
-    if (!phone) return null;
-    const numeric = phone.replace(/\D/g, '');
-    if (numeric.length === 10) return `91${numeric}`;
-    return numeric.length >= 10 ? numeric : null;
-}
+import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
 
 function formatDateTime(value?: Date | null) {
     if (!value) return 'Not scheduled';
@@ -68,10 +62,7 @@ export async function sendQuizScheduleBroadcast(quizId: string) {
     let sent = 0;
     let failed = 0;
     const jobs = uniqueStudents.map(async (student) => {
-        const phone = normalizePhone(student.parentWhatsapp);
-        if (!phone) return;
-
-        const result = await sendQuizScheduleWhatsApp(phone, {
+        const delivery = await sendStudentAlertForStudent(student.id, phone => sendQuizScheduleWhatsApp(phone, {
             studentName: student.name,
             instituteName: quiz.institute.name,
             quizTitle: quiz.title,
@@ -80,10 +71,9 @@ export async function sendQuizScheduleBroadcast(quizId: string) {
             availableUntil: formatDateTime(quiz.availableUntil),
             durationMins: String(quiz.timeLimitMins),
             instituteId: quiz.institute.id
-        });
-
-        if (result === false) failed++;
-        else sent++;
+        }));
+        sent += delivery.delivered;
+        failed += delivery.failed;
     });
 
     await Promise.allSettled(jobs);
@@ -131,24 +121,20 @@ export async function sendQuizMarksBroadcast(quizId: string) {
 
     const jobs = students.map(async (student) => {
         if (!student.parentWhatsapp) return;
-        const phone = normalizePhone(student.parentWhatsapp);
-        if (!phone) return;
-
         const score = submissionMap.has(student.id) 
             ? String(Number(submissionMap.get(student.id) || 0)) 
             : "ABSENT";
 
-        const result = await sendTestMarksWhatsApp(phone, {
+        const delivery = await sendStudentAlertForStudent(student.id, phone => sendTestMarksWhatsApp(phone, {
             studentName: student.name,
             instituteName: quiz.institute.name,
             testName: quiz.title,
             marksObtained: score,
             totalMarks: String(quiz.totalMarks),
             instituteId: quiz.institute.id
-        });
-
-        if (result === false) failed++;
-        else sent++;
+        }));
+        sent += delivery.delivered;
+        failed += delivery.failed;
     });
 
     await Promise.allSettled(jobs);

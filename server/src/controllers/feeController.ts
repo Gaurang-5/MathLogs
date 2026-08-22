@@ -7,6 +7,7 @@ import { calculateStudentFeeSnapshot } from '../utils/feeCalculations';
 import { deletePaymentScreenshot, encodePaymentScreenshotKey, signPaymentScreenshotKey } from '../utils/paymentStorage';
 import { processReceiptScreenshot } from '../utils/ai/receipt-scanner';
 import { streamPendingFeesReportPdf, streamTransactionsReportPdf } from '../services/receiptPdfService';
+import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
 
 // Email handling moved to utils/email.ts
 
@@ -452,9 +453,6 @@ export const recordPayment = async (req: Request, res: Response) => {
 
         // Send WhatsApp receipt OUTSIDE transaction (fire-and-forget)
         if (result.parentWhatsapp) {
-            let phone = result.parentWhatsapp.replace(/[^0-9+]/g, '');
-            if (phone.length === 10) phone = '+91' + phone;
-
             const studentJoinDate = result.createdAt ? new Date(result.createdAt) : new Date(0);
             const installments = (result.batch?.feeInstallments || []).filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
             const allocatedInstallments = installments
@@ -466,13 +464,13 @@ export const recordPayment = async (req: Request, res: Response) => {
                 .join(', ') || 'Fee Payment';
 
             import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
-                sendPaymentReceiptWhatsApp(phone, {
+                void sendStudentAlertForStudent(result.id, phone => sendPaymentReceiptWhatsApp(phone, {
                     studentName: result.name,
                     amountPaid: `Rs. ${parsedAmount.toLocaleString()}`,
                     installmentName: allocatedInstallments,
                     instituteName: result.batch?.institute?.name || 'our institute',
                     instituteId: result.instituteId || undefined
-                }).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
+                })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
             });
         }
 
@@ -603,17 +601,14 @@ export const payInstallment = async (req: Request, res: Response) => {
 
         // Send WhatsApp receipt to parent (fire-and-forget)
         if (student.parentWhatsapp) {
-            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
-            if (phone.length === 10) phone = '+91' + phone;
-
             import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
-                sendPaymentReceiptWhatsApp(phone, {
+                void sendStudentAlertForStudent(student.id, phone => sendPaymentReceiptWhatsApp(phone, {
                     studentName: student.name,
                     amountPaid: `Rs. ${newPaymentAmount.toLocaleString()}`,
                     installmentName: installment.name,
                     instituteName: student.batch?.institute?.name || 'our institute',
                     instituteId: student.instituteId || undefined
-                }).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
+                })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
             });
         }
 
@@ -688,9 +683,6 @@ ${senderName}`;
 
         // WhatsApp Integration
         if (student.parentWhatsapp) {
-            let phone = student.parentWhatsapp.replace(/[^0-9+]/g, '');
-            if (phone.length === 10) phone = '+91' + phone;
-
             import('../utils/whatsapp').then(({ sendFeeReminderUpiWhatsApp }) => {
                 // WhatsApp templates reject newline (\n) characters inside variables.
                 const feeBreakupText = breakdownLines.join(' | ');
@@ -698,9 +690,7 @@ ${senderName}`;
                 const phoneDigits = student.parentWhatsapp!.replace(/\D/g, '').slice(-10);
                 const upiLink = `${process.env.FRONTEND_URL || 'https://mathlogs.com'}/pay/${student.batch?.institute?.slug}?phone=${phoneDigits}`;
 
-                sendFeeReminderUpiWhatsApp(
-                    phone,
-                    {
+                void sendStudentAlertForStudent(student.id, phone => sendFeeReminderUpiWhatsApp(phone, {
                         studentName: student.name,
                         batchName: student.batch?.name || "the batch",
                         feeBreakup: feeBreakupText,
@@ -709,7 +699,7 @@ ${senderName}`;
                         upiPaymentLink: upiLink,
                         instituteId: student.instituteId || undefined
                     }
-                ).catch(err => console.error("WhatsApp Fee Update Error:", err));
+                )).catch(err => console.error("WhatsApp Fee Update Error:", err));
             });
         }
 
@@ -1084,17 +1074,14 @@ export const approveUpiVerification = async (req: Request, res: Response) => {
             // 2. WhatsApp Notification
             const phoneRaw = verification.student.parentWhatsapp;
             if (phoneRaw) {
-                let phone = phoneRaw.replace(/[^0-9+]/g, '');
-                if (phone.length === 10) phone = '+91' + phone;
-
                 import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
-                    sendPaymentReceiptWhatsApp(phone, {
+                    void sendStudentAlertForStudent(verification.student.id, phone => sendPaymentReceiptWhatsApp(phone, {
                         studentName: verification.student.name,
                         amountPaid: `Rs. ${verification.amount.toLocaleString()}`,
                         installmentName: verification.installment?.name || 'Fee Payment',
                         instituteName: verification.student.batch?.institute?.name || 'our institute',
                         instituteId: instituteId || undefined
-                    }).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
+                    })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
                 }).catch(err => console.error('WhatsApp import error:', err));
             }
         } catch (sideEffectErr) {
@@ -1149,18 +1136,16 @@ export const rejectUpiVerification = async (req: Request, res: Response) => {
         // Send a WhatsApp text saying it was rejected
         const phoneRaw = verification.student.parentWhatsapp;
         if (phoneRaw && verification.student.batch?.institute?.slug) {
-            let phone = phoneRaw.replace(/[^0-9+]/g, '');
-            if (phone.length === 10) phone = '+91' + phone;
             const link = `https://mathlogs.com/pay/${verification.student.batch.institute.slug}`;
 
             import('../utils/whatsapp').then(({ sendPaymentRejectionWhatsApp }) => {
-                sendPaymentRejectionWhatsApp(phone, {
+                void sendStudentAlertForStudent(verification.student.id, phone => sendPaymentRejectionWhatsApp(phone, {
                     studentName: verification.student.name,
                     reason: reason || 'Screenshot unclear or mismatched amount',
                     paymentPortalLink: link,
                     instituteName: verification.student.batch.institute.name,
                     instituteId: instituteId || undefined
-                }).catch(err => console.error('WhatsApp Reject Notification Error:', err));
+                })).catch(err => console.error('WhatsApp Reject Notification Error:', err));
             });
         }
         res.json({ success: true, message: 'Payment rejected.' });
@@ -1357,30 +1342,26 @@ export const createCustomInvoice = async (req: Request, res: Response) => {
             try {
                 const whatsapp = await import('../utils/whatsapp');
                 if (markAsPaid) {
-                    await whatsapp.sendPaymentReceiptWhatsApp(student.parentWhatsapp, {
+                    await sendStudentAlertForStudent(student.id, phone => whatsapp.sendPaymentReceiptWhatsApp(phone, {
                         studentName: student.name,
                         amountPaid: `Rs. ${invoiceAmount.toLocaleString()}`,
                         installmentName: invoiceName,
                         instituteName,
                         instituteId: student.instituteId || undefined
-                    });
+                    }));
                 } else {
-                    const phoneDigits = student.parentWhatsapp.replace(/\D/g, '').slice(-10);
                     const baseUrl = process.env.FRONTEND_URL || 'https://mathlogs.com';
                     const instituteSlug = student.batch.institute?.slug;
-                    const upiPaymentLink = instituteSlug
-                        ? `${baseUrl}/pay/${instituteSlug}?phone=${phoneDigits}`
-                        : 'Please contact admin for payment details.';
-
-                    await whatsapp.sendFeeReminderUpiWhatsApp(student.parentWhatsapp, {
+                    const batchName = student.batch.name || 'the batch';
+                    await sendStudentAlertForStudent(student.id, phone => whatsapp.sendFeeReminderUpiWhatsApp(phone, {
                         studentName: student.name,
-                        batchName: student.batch.name || 'the batch',
+                        batchName,
                         feeBreakup: `- ${invoiceName}: Rs. ${invoiceAmount.toLocaleString()} (Due)`,
                         totalAmount: invoiceAmount.toLocaleString(),
                         instituteName,
-                        upiPaymentLink,
+                        upiPaymentLink: instituteSlug ? `${baseUrl}/pay/${instituteSlug}?phone=${phone}` : 'Please contact admin for payment details.',
                         instituteId: student.instituteId || undefined
-                    });
+                    }));
                 }
             } catch (waError) {
                 console.error('WhatsApp Custom Invoice Notification Error:', waError);
