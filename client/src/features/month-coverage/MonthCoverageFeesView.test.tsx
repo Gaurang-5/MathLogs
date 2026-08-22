@@ -83,8 +83,8 @@ describe('MonthCoverageFeesView', () => {
     });
     await act(async () => { button(container, 'Payments').click(); await flush(); });
     await act(async () => { button(container, 'Void').click(); await flush(); });
-    expect(container.textContent).toContain('June, July, and August 2026');
-    await act(async () => { button(container, 'Confirm void').click(); await flush(); });
+    expect(document.body.textContent).toContain('June, July, and August 2026');
+    await act(async () => { button(document.body, 'Confirm void').click(); await flush(); });
     expect(apiMock.voidPayment).toHaveBeenCalledWith('payment-1', expect.anything());
   });
 });

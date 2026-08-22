@@ -1596,21 +1596,6 @@ export default function BatchDetails() {
                 </div>
             </div>
 
-            {batch.coachingFeeMode === 'MONTH_COVERAGE' && monthCoverageSummary && (
-                <section className="mt-6 overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-sm">
-                    <div className="border-b border-black/5 p-5 sm:p-6"><h3 className="text-sm font-black uppercase tracking-widest text-app-text">Recent fee history</h3><p className="mt-1 text-xs text-app-text-tertiary">Amounts received and the exact months each payment covered.</p></div>
-                    <div className="divide-y divide-black/5">
-                        {monthCoverageSummary.recentPayments.map(payment => (
-                            <div key={payment.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-                                <div><p className="font-black text-app-text">{payment.studentName} <span className="ml-2 text-emerald-700">₹{payment.amountRupees.toLocaleString('en-IN')}</span></p><p className="mt-1 text-xs font-bold text-app-text-secondary">{payment.duration.replace(/_/g, ' ').toLowerCase()} · {formatCoverageRange(payment.coverageMonths)}</p></div>
-                                <div className="text-left text-xs text-app-text-tertiary sm:text-right"><p>{new Date(payment.paymentDate).toLocaleDateString('en-IN')} · {payment.paymentMethod?.replace(/_/g, ' ') || 'Other'}</p><p className="mt-1 font-bold">{payment.status || 'ACTIVE'} · recorded by {payment.actorName || 'Teacher'}</p></div>
-                            </div>
-                        ))}
-                        {monthCoverageSummary.recentPayments.length === 0 && <p className="p-8 text-center text-sm text-app-text-tertiary">No fee payments recorded for this batch yet.</p>}
-                    </div>
-                </section>
-            )}
-
             {/* Edit Modal */}
             <AnimatePresence>
                 {

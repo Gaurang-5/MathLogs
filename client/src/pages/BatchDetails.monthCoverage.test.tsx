@@ -53,15 +53,12 @@ describe('BatchDetails month coverage', () => {
     container.remove();
   });
 
-  it('shows per-student month progress and complete batch payment history without legacy fee controls', async () => {
+  it('shows per-student month progress without duplicating Fees dashboard history or legacy controls', async () => {
     await act(async () => root.render(<MemoryRouter initialEntries={['/batches/batch-1']}><Routes><Route path="/batches/:id" element={<BatchDetails />} /></Routes></MemoryRouter>));
     await act(async () => { await settle(); });
     expect(container.textContent).toContain('2 / 12 months received');
     expect(container.textContent).toContain('August 2026 fee pending · overdue');
-    expect(container.textContent).toContain('Recent fee history');
-    expect(container.textContent).toContain('June–August 2026');
-    expect(container.textContent).toContain('UPI');
-    expect(container.textContent).toContain('ACTIVE · recorded by teacher');
+    expect(container.textContent).not.toContain('Recent fee history');
     expect(container.textContent).not.toContain('Fee Cols');
     expect(container.textContent).not.toContain('Custom Invoice');
   });

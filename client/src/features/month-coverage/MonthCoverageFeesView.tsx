@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, CalendarDays, Download, History, IndianRupee, Loader2, Mail, Plus, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -176,14 +177,14 @@ export function MonthCoverageFeesView() {
 
       {paymentStudent && <MonthCoveragePaymentDialog student={paymentStudent} onClose={() => setPaymentStudent(null)} onSaved={() => { setPaymentStudent(null); void refresh(); }} />}
 
-      {voiding && (
-        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/45 sm:items-center sm:p-4">
-          <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-t-[28px] bg-white p-6 shadow-2xl sm:rounded-[28px]">
+      {voiding && createPortal((
+        <div className="fixed inset-0 z-[220] flex items-end justify-center bg-black/45 sm:items-center sm:p-4">
+          <div role="dialog" aria-modal="true" data-testid="void-payment-dialog" className="max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] w-full max-w-md overflow-y-auto rounded-t-[28px] bg-white p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[28px] sm:pb-6">
             <div className="flex items-start justify-between"><div><p className="text-xs font-black uppercase tracking-wider text-red-600">Void payment</p><h2 className="mt-1 text-xl font-black">Reopen covered months?</h2></div><button onClick={() => setVoiding(null)} aria-label="Close"><X className="h-5 w-5" /></button></div>
             {!voidPreview ? <p className="mt-5 flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Loading correction preview…</p> : <><p className="mt-5 text-sm leading-6 text-app-text-secondary">Voiding ₹{voidPreview.amountRupees.toLocaleString('en-IN')} will mark <strong className="text-app-text">{listMonths(voidPreview.reopenedMonths)}</strong> as pending again.</p><label className="mt-4 block text-xs font-bold uppercase tracking-wider text-app-text-secondary">Reason (optional)<textarea value={voidReason} onChange={event => setVoidReason(event.target.value)} className="mt-2 min-h-20 w-full rounded-xl border border-black/10 bg-neutral-50 p-3 text-sm font-medium normal-case outline-none" /></label><div className="mt-5 flex gap-3"><button onClick={() => setVoiding(null)} className="flex-1 rounded-xl border border-black/10 py-3 text-sm font-black">Cancel</button><button disabled={busy} onClick={() => void confirmVoid()} className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-black text-white disabled:opacity-50">Confirm void</button></div></>}
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }
