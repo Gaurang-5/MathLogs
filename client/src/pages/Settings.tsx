@@ -288,7 +288,7 @@ const DEFAULT_FORM_FIELDS = [
     { id: 'parentEmail', label: 'Parent Email (Optional)', type: 'email', required: false, system: true }
 ];
 
-function RegistrationFormBuilder() {
+export function RegistrationFormBuilder() {
     const [fields, setFields] = useState<any[]>(DEFAULT_FORM_FIELDS);
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -298,12 +298,14 @@ function RegistrationFormBuilder() {
     const [newFieldLabel, setNewFieldLabel] = useState('');
     const [newFieldType, setNewFieldType] = useState('text');
     const [newFieldRequired, setNewFieldRequired] = useState(false);
+    const [newFieldSendAlerts, setNewFieldSendAlerts] = useState(false);
 
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
     const [editingFieldLabel, setEditingFieldLabel] = useState<string>('');
     const [editingFieldType, setEditingFieldType] = useState<string>('text');
     const [editingFieldRequired, setEditingFieldRequired] = useState<boolean>(false);
+    const [editingFieldSendAlerts, setEditingFieldSendAlerts] = useState<boolean>(false);
 
     useEffect(() => {
         api.get('/institute/me')
@@ -355,7 +357,8 @@ function RegistrationFormBuilder() {
             label: trimmedLabel,
             type: newFieldType,
             required: newFieldRequired,
-            system: false
+            system: false,
+            sendAlerts: newFieldType === 'tel' ? newFieldSendAlerts : false
         };
 
         setFields([...fields, newField]);
@@ -363,6 +366,7 @@ function RegistrationFormBuilder() {
         setNewFieldLabel('');
         setNewFieldType('text');
         setNewFieldRequired(false);
+        setNewFieldSendAlerts(false);
         setShowAddField(false);
         toast.success('Field added! Click "Save Form" to publish changes.');
     };
@@ -431,6 +435,7 @@ function RegistrationFormBuilder() {
         setEditingFieldLabel(field.label);
         setEditingFieldType(field.type || 'text');
         setEditingFieldRequired(!!field.required);
+        setEditingFieldSendAlerts(!!field.sendAlerts);
     };
 
     const handleEditSave = () => {
@@ -456,7 +461,8 @@ function RegistrationFormBuilder() {
                     ...f,
                     label: trimmed,
                     type: f.system ? f.type : editingFieldType,
-                    required: isCriticalSystem ? true : editingFieldRequired
+                    required: isCriticalSystem ? true : editingFieldRequired,
+                    sendAlerts: !f.system && editingFieldType === 'tel' ? editingFieldSendAlerts : false
                 };
             }
             return f;
@@ -534,7 +540,7 @@ function RegistrationFormBuilder() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center justify-between pt-1">
-                                                <label className="flex items-center gap-2 text-sm text-app-text font-medium cursor-pointer">
+                                                <div className="space-y-2"><label className="flex items-center gap-2 text-sm text-app-text font-medium cursor-pointer">
                                                     <input
                                                         type="checkbox"
                                                         checked={isCriticalSystem ? true : editingFieldRequired}
@@ -543,7 +549,7 @@ function RegistrationFormBuilder() {
                                                         className="w-4 h-4 text-black focus:ring-black rounded disabled:opacity-50"
                                                     />
                                                     <span>Make this field required {isCriticalSystem && '(Mandatory for registration)'}</span>
-                                                </label>
+                                                </label>{!field.system && editingFieldType === 'tel' && <label className="flex items-center gap-2 text-sm text-app-text font-medium cursor-pointer"><input type="checkbox" checked={editingFieldSendAlerts} onChange={e => setEditingFieldSendAlerts(e.target.checked)} className="w-4 h-4 text-black focus:ring-black rounded" /><span>Send alerts to this number</span></label>}</div>
                                                 <div className="flex items-center gap-2">
                                                     <button onClick={handleEditSave} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-800 transition-colors">
                                                         <Check size={14} /> Save
@@ -569,6 +575,7 @@ function RegistrationFormBuilder() {
                                                     </p>
                                                     <p className="text-xs text-app-text-tertiary mt-0.5 capitalize">
                                                         Type: {field.type} {field.system ? '• System Field' : '• Custom Field'} {!field.required && '• Optional'}
+                                                        {!field.system && field.type === 'tel' && (field.sendAlerts ? ' • Alerts enabled' : ' • Alerts off')}
                                                     </p>
                                                 </div>
                                             </div>
@@ -666,6 +673,7 @@ function RegistrationFormBuilder() {
                                 />
                                 <label htmlFor="reqCheck" className="text-sm text-app-text font-medium cursor-pointer">Make this field required</label>
                             </div>
+                            {newFieldType === 'tel' && <div className="flex items-center gap-2"><input type="checkbox" id="alertCheck" checked={newFieldSendAlerts} onChange={e => setNewFieldSendAlerts(e.target.checked)} className="w-4 h-4 text-black focus:ring-black rounded" /><label htmlFor="alertCheck" className="text-sm text-app-text font-medium cursor-pointer">Send alerts to this number</label></div>}
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="submit"
