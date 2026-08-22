@@ -11,6 +11,8 @@ import jwt from 'jsonwebtoken';
 import { sendStudentInviteWhatsApp } from '../utils/whatsapp';
 import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
 import { getJwtSecret } from '../utils/env';
+import { buildBatchExportRows, parseBatchExportColumnIds, resolveBatchExportColumns } from '../services/batchExportService';
+import { getMonthCoverageSummary } from '../services/monthCoverageSummaryService';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -284,16 +286,23 @@ export const getBatchDetails = async (req: Request, res: Response) => {
 export const downloadBatchPDF = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
     try {
+        let requestedColumns: string[] | null;
+        try {
+            requestedColumns = parseBatchExportColumnIds(req.query.columns);
+        } catch {
+            return res.status(400).json({ error: 'INVALID_EXPORT_COLUMNS' });
+        }
         const batch = await prisma.batch.findUnique({
             where: { id },
             include: {
+                institute: { select: { config: true, coachingFeeMode: true, timezone: true } },
                 students: {
                     where: { status: 'APPROVED' },
                     orderBy: { name: 'asc' },
                     include: {
                         fees: { select: { amount: true, date: true, status: true } },
                         feePayments: { select: { amountPaid: true, date: true, installmentId: true } },
-                        marks: { select: { score: true } }
+                        marks: { select: { score: true, test: { select: { maxMarks: true } } } }
                     }
                 },
                 feeInstallments: { orderBy: { createdAt: 'asc' } }
@@ -304,12 +313,47 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
 
         const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+        if (!batch.institute) return res.status(404).json({ error: 'Institute not found' });
+
+        const config = batch.institute.config && typeof batch.institute.config === 'object'
+            ? batch.institute.config as { registrationForm?: { fields?: unknown } }
+            : null;
+        const registrationFields = Array.isArray(config?.registrationForm?.fields)
+            ? config.registrationForm.fields
+            : [];
+        let columns;
+        try {
+            columns = resolveBatchExportColumns({
+                requested: requestedColumns,
+                registrationFields,
+                installments: batch.feeInstallments,
+                feeMode: batch.institute.coachingFeeMode,
+            });
+        } catch {
+            return res.status(400).json({ error: 'INVALID_EXPORT_COLUMNS' });
+        }
+
+        const needsMonthMetrics = columns.some(column => ['feeStartMonth', 'feeEndMonth', 'receivedMonths', 'pendingMonths', 'overdueMonths'].includes(column.id));
+        const monthSummary = needsMonthMetrics
+            ? await getMonthCoverageSummary({ instituteId: user.instituteId, teacherId: user.id, batchId: id, now: new Date() })
+            : null;
+        const rows = buildBatchExportRows({
+            students: batch.students,
+            columns,
+            installments: batch.feeInstallments,
+            monthMetrics: monthSummary?.students,
+        });
 
         // PERF FIX (P0-C): Run synchronous PDFKit in a worker thread.
         // PDFKit blocks the event loop for 200-500ms per PDF — catastrophic at scale.
         const ext = path.extname(__filename); // Returns .ts in dev, .js in prod
         const workerScript = path.resolve(__dirname, `../workers/batchPdfWorker${ext}`);
-        const pdfBuffer = await runPdfInWorker(workerScript, { batch });
+        const pdfBuffer = await runPdfInWorker(workerScript, {
+            batchName: batch.name,
+            subject: batch.subject,
+            columns,
+            rows,
+        });
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${batch.name}-fee-details.pdf"`);

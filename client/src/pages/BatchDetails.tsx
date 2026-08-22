@@ -17,6 +17,7 @@ import { confirmStudentFeeProfile, loadMonthCoverageSummary } from '../features/
 import type { MonthCoverageProfile, MonthCoverageStudentSummary, MonthCoverageSummary } from '../features/month-coverage/types';
 import { MonthCoveragePaymentDialog } from '../features/month-coverage/MonthCoveragePaymentDialog';
 import { formatCoverageRange, monthStatusCopy } from '../features/month-coverage/monthCoverageViewModel';
+import { BatchExportDialog, type BatchExportColumn } from '../features/batch-export/BatchExportDialog';
 
 interface Student {
     id: string;
@@ -121,6 +122,7 @@ export default function BatchDetails() {
     const [monthPaymentStudent, setMonthPaymentStudent] = useState<MonthCoverageStudentSummary | null>(null);
     const [deleteCodeInput, setDeleteCodeInput] = useState('');
     const [viewMarksId, setViewMarksId] = useState<string | null>(null);
+    const [showExportDialog, setShowExportDialog] = useState(false);
 
     const viewMarks = useMemo(() => {
         if (!viewMarksId || !batch) return null;
@@ -140,6 +142,32 @@ export default function BatchDetails() {
             { id: 'parentEmail', label: 'Parent Email (Optional)', type: 'email', required: false, system: true }
         ];
     }, [batch]);
+
+    const exportColumns = useMemo<BatchExportColumn[]>(() => {
+        if (!batch) return [];
+        const details: BatchExportColumn[] = [
+            { id: 'humanId', label: 'Student ID', group: 'Student details' },
+            ...formFields.map((field: any) => ({
+                id: field.system ? field.id : `custom:${field.id}`,
+                label: field.label,
+                group: 'Student details' as const,
+            })),
+        ];
+        const performance: BatchExportColumn[] = [{ id: 'averageMarks', label: 'Average Marks', group: 'Performance' }];
+        const fees: BatchExportColumn[] = batch.coachingFeeMode === 'MONTH_COVERAGE'
+            ? [
+                { id: 'feeStartMonth', label: 'Fee Start Month', group: 'Fees' },
+                { id: 'feeEndMonth', label: 'Fee End Month', group: 'Fees' },
+                { id: 'receivedMonths', label: 'Months Received', group: 'Fees' },
+                { id: 'pendingMonths', label: 'Months Pending', group: 'Fees' },
+                { id: 'overdueMonths', label: 'Months Overdue', group: 'Fees' },
+            ]
+            : [
+                ...batch.feeInstallments.filter(installment => !installment.studentId).map(installment => ({ id: `installment:${installment.id}`, label: installment.name, group: 'Fees' as const })),
+                { id: 'totalDue', label: 'Total Due', group: 'Fees' },
+            ];
+        return [...details, ...performance, ...fees];
+    }, [batch, formFields]);
 
     const getStudentAverage = (student: Pick<Student, 'marks'>) => {
         if (!student.marks || student.marks.length === 0) return '-';
@@ -369,11 +397,12 @@ export default function BatchDetails() {
         return () => clearInterval(interval);
     }, [fetchDetails]);
 
-    const handleDownloadPDF = async () => {
+    const handleDownloadPDF = async (columns: string[]) => {
         const toastId = toast.loading('Generating PDF...');
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/batches/${id}/download`, {
+            const query = new URLSearchParams({ columns: columns.join(',') });
+            const res = await fetch(`${API_URL}/batches/${id}/download?${query.toString()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -389,6 +418,7 @@ export default function BatchDetails() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
             toast.success('Downloaded!', { id: toastId });
+            setShowExportDialog(false);
         } catch {
             toast.error('Failed to download PDF', { id: toastId });
         }
@@ -869,7 +899,7 @@ export default function BatchDetails() {
                             <div className="w-px bg-black/[0.06] self-stretch shrink-0" />
 
                             <button
-                                onClick={handleDownloadPDF}
+                                onClick={() => setShowExportDialog(true)}
                                 className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-5 py-3.5 text-app-text-secondary hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
                             >
                                 <Download className="w-5 h-5" />
@@ -944,7 +974,7 @@ export default function BatchDetails() {
                                 <Plus className="w-4 h-4" /> Add Student
                             </button>
                             <div className="w-px bg-black/[0.06] self-stretch mx-1" />
-                            <button onClick={handleDownloadPDF} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
+                            <button onClick={() => setShowExportDialog(true)} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
                                 <Download className="w-4 h-4 text-app-text-tertiary" /> Download
                             </button>
                             <button onClick={handlePrintStickers} className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 text-black text-sm font-semibold px-4 py-2.5 rounded-xl border border-black/[0.06] transition-all active:scale-[0.97]">
@@ -2988,6 +3018,14 @@ export default function BatchDetails() {
                 onToggleRegistration={handleToggleRegistration}
                 onEndRegistration={handleEndRegistration}
             />
+
+            {showExportDialog && (
+                <BatchExportDialog
+                    columns={exportColumns}
+                    onClose={() => setShowExportDialog(false)}
+                    onDownload={handleDownloadPDF}
+                />
+            )}
 
             <StudentProfileDrawer
                 studentId={selectedStudentId}

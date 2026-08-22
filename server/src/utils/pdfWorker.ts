@@ -49,11 +49,11 @@ export function runPdfInWorker(
             }
         }, timeoutMs);
 
-        worker.on('message', (buffer: Buffer) => {
+        worker.on('message', (buffer: Buffer | Uint8Array) => {
             if (!settled) {
                 settled = true;
                 clearTimeout(timeout);
-                resolve(buffer);
+                resolve(Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer));
             }
         });
 

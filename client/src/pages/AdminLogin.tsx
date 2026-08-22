@@ -341,7 +341,7 @@ export default function AdminLogin() {
                                 >
                                     Mobile Number
                                 </label>
-                                <div className="flex items-end border-b-2 border-neutral-200 focus-within:border-black transition-all pb-3">
+                                <div className="flex min-w-0 items-end border-b-2 border-neutral-200 focus-within:border-black transition-all pb-3">
                                     <span className="text-2xl sm:text-4xl font-medium text-neutral-400 mr-3 whitespace-nowrap shrink-0 leading-none">
                                         +91
                                     </span>
@@ -350,7 +350,7 @@ export default function AdminLogin() {
                                         id="phone"
                                         inputMode="numeric"
                                         maxLength={10}
-                                        className="flex-1 bg-transparent text-black text-2xl sm:text-4xl outline-none font-medium tracking-widest placeholder:text-neutral-300 leading-none"
+                                        className="min-w-0 w-0 flex-1 bg-transparent text-black text-2xl sm:text-4xl outline-none font-medium tracking-widest placeholder:text-neutral-300 leading-none"
                                         placeholder="98765 43210"
                                         value={phone}
                                         onChange={e => setPhone(formatPhone(e.target.value))}
