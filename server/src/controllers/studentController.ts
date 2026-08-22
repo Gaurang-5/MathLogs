@@ -14,6 +14,8 @@ import {
     studentMonthCoverageDepsFor,
 } from '../services/studentMonthCoverageService';
 import { MonthCoverageError } from '../domain/monthCoverage/types';
+import { currentMonthInTimezone } from '../domain/monthCoverage/calendar';
+import { summarizeStudent } from '../services/monthCoverageSummaryService';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -885,9 +887,7 @@ export const getStudentProfile = async (req: Request, res: Response) => {
         const instituteId = req.user.instituteId;
 
         const student = await prisma.student.findUnique({
-            where: {
-                id: String(id)
-            },
+            where: { id: String(id) },
             select: {
                 id: true,
                 humanId: true,
@@ -896,21 +896,21 @@ export const getStudentProfile = async (req: Request, res: Response) => {
                 parentWhatsapp: true,
                 parentEmail: true,
                 schoolName: true,
+                additionalData: true,
                 status: true,
                 createdAt: true,
                 instituteId: true,
-                batch: {
-                    select: { name: true, className: true, subject: true }
+                institute: {
+                    select: { coachingFeeMode: true, timezone: true, config: true }
                 },
-                feePayments: {
-                    select: {
-                        id: true,
-                        amountPaid: true,
-                        date: true,
-                        installment: { select: { name: true } }
-                    },
-                    orderBy: { date: 'desc' },
-                    take: 100
+                batch: {
+                    select: { name: true, className: true, subject: true, startDate: true, endDate: true }
+                },
+                monthCoverageProfile: {
+                    select: { id: true, batchId: true, feeStartMonth: true, feeEndMonth: true, status: true }
+                },
+                monthCoverageAllocations: {
+                    select: { coverageMonth: true, payment: { select: { status: true } } }
                 },
                 marks: {
                     select: {
@@ -931,13 +931,6 @@ export const getStudentProfile = async (req: Request, res: Response) => {
                     },
                     orderBy: { attendanceDate: 'desc' },
                     take: 50 // Recent 50 records
-                },
-                balance: {
-                    select: {
-                        totalFee: true,
-                        totalPaid: true,
-                        balance: true
-                    }
                 }
             }
         });
@@ -957,13 +950,66 @@ export const getStudentProfile = async (req: Request, res: Response) => {
         // Wait, what does attendance actually store? Let's check: attendanceRecords usually store when present.
         const attendancePercentage = totalClasses > 0 ? Math.round((classesAttended / totalClasses) * 100) : null;
 
-        res.json({
+        const config = student.institute?.config as { registrationForm?: { fields?: unknown } } | null;
+        const registrationFields = Array.isArray(config?.registrationForm?.fields)
+            ? config.registrationForm.fields
+            : [];
+        const common = {
             ...student,
+            coachingFeeMode: student.institute?.coachingFeeMode ?? 'CURRENT_DUE_BASED',
+            registrationFields,
             stats: {
                 attendancePercentage,
                 attendedClasses: classesAttended,
                 totalClasses
             }
+        };
+
+        if (student.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
+            const profile = student.monthCoverageProfile;
+            const monthCoverageStats = profile?.feeStartMonth && profile.feeEndMonth
+                ? summarizeStudent({
+                    feeStartMonth: profile.feeStartMonth,
+                    feeEndMonth: profile.feeEndMonth,
+                    coveredMonths: student.monthCoverageAllocations
+                        .filter(allocation => allocation.payment.status === 'ACTIVE')
+                        .map(allocation => allocation.coverageMonth),
+                    currentMonth: currentMonthInTimezone(new Date(), student.institute.timezone),
+                })
+                : null;
+            return res.json({
+                ...common,
+                feePayments: [],
+                balance: null,
+                monthCoverageStats,
+                feeView: {
+                    mode: 'MONTH_COVERAGE',
+                    feeStartMonth: profile?.feeStartMonth ?? null,
+                    feeEndMonth: profile?.feeEndMonth ?? null,
+                    paidMonths: monthCoverageStats?.receivedMonths ?? 0,
+                    pendingMonths: monthCoverageStats?.pendingMonths ?? 0,
+                    overdueMonths: monthCoverageStats?.overdueMonths ?? 0,
+                },
+            });
+        }
+
+        const legacyFees = await prisma.student.findUnique({
+            where: { id: String(id) },
+            select: {
+                feePayments: {
+                    select: { id: true, amountPaid: true, date: true, installment: { select: { name: true } } },
+                    orderBy: { date: 'desc' },
+                    take: 100,
+                },
+                balance: { select: { totalFee: true, totalPaid: true, balance: true } },
+            },
+        });
+        return res.json({
+            ...common,
+            feePayments: legacyFees?.feePayments ?? [],
+            balance: legacyFees?.balance ?? null,
+            monthCoverageStats: null,
+            feeView: { mode: 'CURRENT_DUE_BASED', balance: legacyFees?.balance ?? null },
         });
     } catch (error) {
         console.error('Error fetching student profile:', error);

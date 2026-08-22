@@ -5,6 +5,8 @@ import Layout from '../components/Layout';
 import { ArrowLeft, User, Phone, Book, GraduationCap, CheckCircle2, CreditCard, Activity, CalendarDays, TrendingUp, MessageCircle, Mail, School, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../utils/cn';
+import { ConfiguredStudentFields } from '../features/student-profile/ConfiguredStudentFields';
+import type { RegistrationFieldDefinition } from '../features/student-profile/registrationFields';
 
 interface StudentProfileData {
     id: string;
@@ -14,6 +16,11 @@ interface StudentProfileData {
     parentWhatsapp: string;
     parentEmail?: string | null;
     schoolName?: string | null;
+    additionalData?: Record<string, unknown> | null;
+    registrationFields?: RegistrationFieldDefinition[];
+    coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE';
+    monthCoverageProfile?: { feeStartMonth: string | null; feeEndMonth: string | null; status: string } | null;
+    monthCoverageStats?: { receivedMonths: number; pendingMonths: number; overdueMonths: number; progressPercent: number } | null;
     batch?: {
         name: string;
         className: string | null;
@@ -94,11 +101,12 @@ export default function StudentProfile() {
     }, [student?.marks]);
 
     const feeCollectionPercent = useMemo(() => {
+        if (student?.coachingFeeMode === 'MONTH_COVERAGE') return student.monthCoverageStats?.progressPercent ?? 0;
         const total = student?.balance?.totalFee || 0;
         const paid = student?.balance?.totalPaid || 0;
         if (total <= 0) return 100;
         return Math.min(100, Math.round((paid / total) * 100));
-    }, [student?.balance]);
+    }, [student?.balance, student?.coachingFeeMode, student?.monthCoverageStats?.progressPercent]);
 
     if (loading) {
         return (
@@ -209,9 +217,9 @@ export default function StudentProfile() {
                             </p>
                         </div>
                         <div className="bg-neutral-50/80 border border-black/[0.06] rounded-xl p-3 text-center">
-                            <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Fee Balance</p>
-                            <p className={cn('text-base sm:text-lg font-black mt-0.5', (student.balance?.balance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                                {formatCurrency(student.balance?.balance)}
+                            <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Pending months' : 'Fee Balance'}</p>
+                            <p className={cn('text-base sm:text-lg font-black mt-0.5', (student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.pendingMonths || 0) : (student.balance?.balance || 0)) > 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                {student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.pendingMonths ?? 0) : formatCurrency(student.balance?.balance)}
                             </p>
                         </div>
                     </div>
@@ -282,6 +290,13 @@ export default function StudentProfile() {
                                 </div>
                             </div>
 
+                            {(student.registrationFields?.length || 0) > 0 && (
+                                <div className="bg-neutral-50/60 border border-black/[0.06] rounded-2xl p-4 sm:p-5">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3">Onboarding details</h3>
+                                    <ConfiguredStudentFields student={student} fields={student.registrationFields || []} />
+                                </div>
+                            )}
+
                             {/* Recent Performance */}
                             <div>
                                 <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3 px-1">Latest Test Marks</h3>
@@ -320,7 +335,7 @@ export default function StudentProfile() {
                             </div>
 
                             {/* Recent Payments */}
-                            <div>
+                            {student.coachingFeeMode !== 'MONTH_COVERAGE' && <div>
                                 <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3 px-1">Recent Payments</h3>
                                 {student.feePayments.length > 0 ? (
                                     <div className="space-y-2">
@@ -342,7 +357,7 @@ export default function StudentProfile() {
                                 ) : (
                                     <p className="text-sm text-neutral-400 py-6 text-center border border-dashed border-black/[0.06] rounded-xl">No fee payments recorded yet.</p>
                                 )}
-                            </div>
+                            </div>}
                         </div>
                     )}
 
@@ -400,24 +415,24 @@ export default function StudentProfile() {
                     {/* FEES TAB */}
                     {activeTab === 'fees' && (
                         <div className="space-y-5">
-                            <h2 className="text-base sm:text-lg font-black text-black tracking-tight">Fee Payment History</h2>
+                            <h2 className="text-base sm:text-lg font-black text-black tracking-tight">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Fee month progress' : 'Fee Payment History'}</h2>
                             
                             <div className="grid grid-cols-3 gap-2 sm:gap-3">
                                 <div className="bg-neutral-50 border border-black/[0.06] rounded-xl p-3 text-center">
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Total Fee</p>
-                                    <p className="text-sm sm:text-base font-black text-black mt-0.5">{formatCurrency(student.balance?.totalFee)}</p>
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Paid months' : 'Total Fee'}</p>
+                                    <p className="text-sm sm:text-base font-black text-black mt-0.5">{student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.receivedMonths ?? 0) : formatCurrency(student.balance?.totalFee)}</p>
                                 </div>
                                 <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3 text-center">
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">Total Paid</p>
-                                    <p className="text-sm sm:text-base font-black text-emerald-700 mt-0.5">{formatCurrency(student.balance?.totalPaid)}</p>
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Pending months' : 'Total Paid'}</p>
+                                    <p className="text-sm sm:text-base font-black text-emerald-700 mt-0.5">{student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.pendingMonths ?? 0) : formatCurrency(student.balance?.totalPaid)}</p>
                                 </div>
                                 <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3 text-center">
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-rose-600">Balance Due</p>
-                                    <p className="text-sm sm:text-base font-black text-rose-600 mt-0.5">{formatCurrency(student.balance?.balance)}</p>
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-rose-600">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Overdue months' : 'Balance Due'}</p>
+                                    <p className="text-sm sm:text-base font-black text-rose-600 mt-0.5">{student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.overdueMonths ?? 0) : formatCurrency(student.balance?.balance)}</p>
                                 </div>
                             </div>
 
-                            {student.feePayments.length > 0 ? (
+                            {student.coachingFeeMode !== 'MONTH_COVERAGE' && (student.feePayments.length > 0 ? (
                                 <div className="space-y-2">
                                     {student.feePayments.map(p => (
                                         <div key={p.id} className="flex items-center justify-between bg-white border border-black/[0.06] rounded-2xl p-4 shadow-2xs">
@@ -444,7 +459,7 @@ export default function StudentProfile() {
                                     <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-30" />
                                     <p className="font-bold text-sm">No fee payments recorded.</p>
                                 </div>
-                            )}
+                            ))}
                         </div>
                     )}
                 </div>

@@ -13,6 +13,7 @@ import {
   transactionMonthReportRows,
 } from '../src/services/monthCoverageReportService';
 import { deleteMonthCoverageData } from '../src/services/monthCoverageDeletionService';
+import { getStudentProfile } from '../src/controllers/studentController';
 
 function response() {
   return {
@@ -108,6 +109,53 @@ test('month reminder names overdue months without amount-due claims or parent pa
 
   assert.match(body, /July and August 2026/);
   assert.doesNotMatch(body, /amount due|balance|₹|Rs\.|\/pay\//i);
+});
+
+test('month student profile returns configured fields and month counts without loading legacy fees', async () => {
+  let profileReads = 0;
+  replaceMethod(prisma.student, 'findUnique', (async () => {
+    profileReads += 1;
+    if (profileReads > 1) assert.fail('month profile must not load legacy fee history');
+    return {
+      id: 'student-1', humanId: 'ML-001', name: 'Aarav', parentName: 'Parent',
+      parentWhatsapp: '9557940807', parentEmail: null, schoolName: null,
+      additionalData: { emergencyPhone: '9557940807' }, status: 'APPROVED',
+      createdAt: new Date('2026-07-01T00:00:00.000Z'), instituteId: 'inst-1',
+      institute: {
+        coachingFeeMode: 'MONTH_COVERAGE', timezone: 'Asia/Kolkata',
+        config: { registrationForm: { fields: [{ id: 'emergencyPhone', label: 'Emergency phone', type: 'tel' }] } },
+      },
+      batch: { name: 'Target', className: null, subject: 'Maths', startDate: new Date('2026-07-01'), endDate: new Date('2026-09-30') },
+      monthCoverageProfile: { id: 'profile-1', batchId: 'batch-1', feeStartMonth: '2026-07', feeEndMonth: '2026-09', status: 'ACTIVE' },
+      monthCoverageAllocations: [{ coverageMonth: '2026-07', payment: { status: 'ACTIVE' } }],
+      marks: [], attendanceRecords: [],
+    } as never;
+  }) as typeof prisma.student.findUnique);
+  const res = response();
+
+  await getStudentProfile({ params: { id: 'student-1' }, user: { instituteId: 'inst-1' } } as never, res as never);
+
+  assert.equal(res.statusCode, 200);
+  const body = res.body as any;
+  assert.equal(body.coachingFeeMode, 'MONTH_COVERAGE');
+  assert.equal(body.registrationFields[0].label, 'Emergency phone');
+  assert.deepEqual(body.feePayments, []);
+  assert.equal(body.feeView.mode, 'MONTH_COVERAGE');
+  assert.equal(body.feeView.paidMonths, 1);
+  assert.equal(body.feeView.pendingMonths, 2);
+  assert.equal(profileReads, 1);
+});
+
+test('student profile forbids a student from another institute', async () => {
+  replaceMethod(prisma.student, 'findUnique', (async () => ({
+    id: 'student-foreign', instituteId: 'inst-2', attendanceRecords: [], institute: null,
+  }) as never) as typeof prisma.student.findUnique);
+  const res = response();
+
+  await getStudentProfile({ params: { id: 'student-foreign' }, user: { instituteId: 'inst-1' } } as never, res as never);
+
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(res.body, { error: 'Unauthorized' });
 });
 
 test('reports show month counts and recognize the complete payment on its collection date', () => {

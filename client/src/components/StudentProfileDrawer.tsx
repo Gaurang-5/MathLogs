@@ -11,6 +11,10 @@ import {
     Award, Check, Clock
 } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { ConfiguredStudentFields } from '../features/student-profile/ConfiguredStudentFields';
+import type { RegistrationFieldDefinition } from '../features/student-profile/registrationFields';
+import { StudentFeeStartDialog } from '../features/month-coverage/StudentFeeStartDialog';
+import { confirmStudentFeeProfile } from '../features/month-coverage/api';
 
 interface StudentProfileData {
     id: string;
@@ -20,9 +24,14 @@ interface StudentProfileData {
     parentWhatsapp: string;
     parentEmail?: string | null;
     schoolName?: string | null;
+    additionalData?: Record<string, unknown> | null;
+    registrationFields?: RegistrationFieldDefinition[];
+    coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE';
+    monthCoverageProfile?: { feeStartMonth: string | null; feeEndMonth: string | null; status: string } | null;
+    monthCoverageStats?: { receivedMonths: number; pendingMonths: number; overdueMonths: number; progressPercent: number } | null;
     status: string;
     createdAt?: string;
-    batch?: { name: string; className: string | null; subject: string | null };
+    batch?: { name: string; className: string | null; subject: string | null; startDate?: string | null; endDate?: string | null };
     stats: { attendancePercentage: number | null; attendedClasses?: number; totalClasses?: number };
     attendanceRecords: Array<{
         id: string; attendanceDate: string; checkedInAt: string; source: string; note: string | null;
@@ -100,6 +109,7 @@ function ProfileInfoRow({ icon: Icon, label, value, href, actionLabel }: { icon:
 
 export default function StudentProfileDrawer({ studentId, onClose }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
+    const [editingFeeStart, setEditingFeeStart] = useState(false);
 
     const { data: student, isLoading, isFetching, isError, refetch } = useQuery({
         queryKey: ['studentProfile', studentId],
@@ -143,11 +153,12 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
     }, [student?.marks]);
 
     const feeCollectionPercent = useMemo(() => {
+        if (student?.coachingFeeMode === 'MONTH_COVERAGE') return student.monthCoverageStats?.progressPercent ?? 0;
         const total = student?.balance?.totalFee || 0;
         const paid = student?.balance?.totalPaid || 0;
         if (total <= 0) return 100;
         return Math.min(100, Math.round((paid / total) * 100));
-    }, [student?.balance]);
+    }, [student?.balance, student?.coachingFeeMode, student?.monthCoverageStats?.progressPercent]);
 
     const chartData = useMemo(() => {
         if (!student?.marks?.length) return [];
@@ -338,9 +349,9 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                                                 </p>
                                             </div>
                                             <div className="bg-neutral-50/80 border border-black/[0.06] rounded-xl p-2 text-center">
-                                                <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400 leading-tight">Fee Balance</p>
-                                                <p className={cn('text-sm sm:text-base font-black mt-0.5', (student.balance?.balance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                                                    {formatCurrency(student.balance?.balance)}
+                                                <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400 leading-tight">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Pending months' : 'Fee Balance'}</p>
+                                                <p className={cn('text-sm sm:text-base font-black mt-0.5', (student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.pendingMonths || 0) : (student.balance?.balance || 0)) > 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                    {student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.pendingMonths ?? 0) : formatCurrency(student.balance?.balance)}
                                                 </p>
                                             </div>
                                         </div>
@@ -388,15 +399,20 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                                                     </div>
                                                 </div>
 
+                                                {(student.registrationFields?.length || 0) > 0 && (
+                                                    <div className="bg-neutral-50/60 border border-black/[0.06] rounded-2xl p-3.5 sm:p-4">
+                                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3 px-1">Onboarding details</h3>
+                                                        <ConfiguredStudentFields student={student} fields={student.registrationFields || []} />
+                                                    </div>
+                                                )}
+
                                                 {/* Fee Status Card */}
                                                 <div className="bg-neutral-50/60 border border-black/[0.06] rounded-2xl p-4">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
                                                             Fee Status
                                                         </h3>
-                                                        <span className="text-[11px] font-bold text-neutral-500">
-                                                            {feeCollectionPercent}% Paid
-                                                        </span>
+                                                        {student.coachingFeeMode === 'MONTH_COVERAGE' ? <button type="button" onClick={() => setEditingFeeStart(true)} className="text-[11px] font-black text-neutral-700 underline">Edit start month</button> : <span className="text-[11px] font-bold text-neutral-500">{feeCollectionPercent}% Paid</span>}
                                                     </div>
                                                     
                                                     {/* Progress bar */}
@@ -409,16 +425,16 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
 
                                                     <div className="grid grid-cols-3 gap-2 text-center pt-1">
                                                         <div>
-                                                            <p className="text-[9px] font-bold uppercase text-neutral-400">Total</p>
-                                                            <p className="text-xs sm:text-sm font-black text-black">{formatCurrency(student.balance?.totalFee)}</p>
+                                                            <p className="text-[9px] font-bold uppercase text-neutral-400">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Fee start' : 'Total'}</p>
+                                                            <p className="text-xs sm:text-sm font-black text-black">{student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageProfile?.feeStartMonth || 'Not set') : formatCurrency(student.balance?.totalFee)}</p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-[9px] font-bold uppercase text-emerald-600">Paid</p>
-                                                            <p className="text-xs sm:text-sm font-black text-emerald-700">{formatCurrency(student.balance?.totalPaid)}</p>
+                                                            <p className="text-[9px] font-bold uppercase text-emerald-600">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Paid months' : 'Paid'}</p>
+                                                            <p className="text-xs sm:text-sm font-black text-emerald-700">{student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.receivedMonths ?? 0) : formatCurrency(student.balance?.totalPaid)}</p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-[9px] font-bold uppercase text-rose-500">Balance</p>
-                                                            <p className="text-xs sm:text-sm font-black text-rose-600">{formatCurrency(student.balance?.balance)}</p>
+                                                            <p className="text-[9px] font-bold uppercase text-rose-500">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Overdue' : 'Balance'}</p>
+                                                            <p className="text-xs sm:text-sm font-black text-rose-600">{student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.overdueMonths ?? 0) : formatCurrency(student.balance?.balance)}</p>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -471,7 +487,7 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                                                 </div>
 
                                                 {/* Recent Payments Snapshot */}
-                                                <div>
+                                                {student.coachingFeeMode !== 'MONTH_COVERAGE' && <div>
                                                     <div className="flex items-center justify-between mb-2 px-1">
                                                         <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Recent Payments</h3>
                                                         {student.feePayments?.length > 3 && (
@@ -503,7 +519,7 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                                                     ) : (
                                                         <EmptyState icon={CreditCard} label="No payments recorded" description="Payments will show up here once collected." />
                                                     )}
-                                                </div>
+                                                </div>}
                                             </div>
                                         )}
 
@@ -642,21 +658,21 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                                                 {/* Fee Summary Cards */}
                                                 <div className="grid grid-cols-3 gap-2">
                                                     <div className="bg-neutral-50 border border-black/[0.06] rounded-xl p-3 text-center">
-                                                        <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Total Fee</p>
-                                                        <p className="text-xs sm:text-sm font-black text-black mt-0.5">{formatCurrency(student.balance?.totalFee)}</p>
+                                                        <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Paid months' : 'Total Fee'}</p>
+                                                        <p className="text-xs sm:text-sm font-black text-black mt-0.5">{student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.receivedMonths ?? 0) : formatCurrency(student.balance?.totalFee)}</p>
                                                     </div>
                                                     <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3 text-center">
-                                                        <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">Collected</p>
-                                                        <p className="text-xs sm:text-sm font-black text-emerald-700 mt-0.5">{formatCurrency(student.balance?.totalPaid)}</p>
+                                                        <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Pending months' : 'Collected'}</p>
+                                                        <p className="text-xs sm:text-sm font-black text-emerald-700 mt-0.5">{student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.pendingMonths ?? 0) : formatCurrency(student.balance?.totalPaid)}</p>
                                                     </div>
                                                     <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3 text-center">
-                                                        <p className="text-[9px] font-black uppercase tracking-wider text-rose-600">Pending</p>
-                                                        <p className="text-xs sm:text-sm font-black text-rose-600 mt-0.5">{formatCurrency(student.balance?.balance)}</p>
+                                                        <p className="text-[9px] font-black uppercase tracking-wider text-rose-600">{student.coachingFeeMode === 'MONTH_COVERAGE' ? 'Overdue months' : 'Pending'}</p>
+                                                        <p className="text-xs sm:text-sm font-black text-rose-600 mt-0.5">{student.coachingFeeMode === 'MONTH_COVERAGE' ? (student.monthCoverageStats?.overdueMonths ?? 0) : formatCurrency(student.balance?.balance)}</p>
                                                     </div>
                                                 </div>
 
                                                 {/* Payment History List */}
-                                                <div>
+                                                {student.coachingFeeMode !== 'MONTH_COVERAGE' && <div>
                                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-2 px-1">
                                                         Payment History ({student.feePayments?.length || 0})
                                                     </h3>
@@ -685,7 +701,7 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                                                     ) : (
                                                         <EmptyState icon={IndianRupee} label="No fee payments recorded" description="Payments collected for this student will appear here." />
                                                     )}
-                                                </div>
+                                                </div>}
                                             </div>
                                         )}
                                     </div>
@@ -698,5 +714,17 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
         </AnimatePresence>
     );
 
-    return createPortal(modalContent, document.body);
+    return createPortal(<>{modalContent}{editingFeeStart && student?.batch?.startDate && student.batch.endDate && (
+        <StudentFeeStartDialog
+            student={{ id: student.id, name: student.name, joinedAt: student.createdAt || student.batch.startDate }}
+            batch={{ startDate: student.batch.startDate, endDate: student.batch.endDate }}
+            defaultMonth={student.monthCoverageProfile?.feeStartMonth || student.batch.startDate.slice(0, 7)}
+            onClose={() => setEditingFeeStart(false)}
+            onConfirm={async feeStartMonth => {
+                await confirmStudentFeeProfile(student.id, feeStartMonth);
+                setEditingFeeStart(false);
+                await refetch();
+            }}
+        />
+    )}</>, document.body);
 }
