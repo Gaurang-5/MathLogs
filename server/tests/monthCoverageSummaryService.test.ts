@@ -40,7 +40,8 @@ test('future uncovered months are pending but not overdue', () => {
 
 function source(overrides: Partial<MonthCoverageSummaryStudentSource> = {}): MonthCoverageSummaryStudentSource {
   return {
-    studentId: 'student-1', name: 'Aarav', batchId: 'batch-1', batchName: 'Evening Maths',
+    studentId: 'student-1', name: 'Aarav', humanId: 'ML-001', parentWhatsapp: '9557940807',
+    batchId: 'batch-1', batchName: 'Evening Maths',
     profileStatus: 'ACTIVE', feeStartMonth: '2026-07', feeEndMonth: '2026-12',
     allocations: [
       { coverageMonth: '2026-07', paymentStatus: 'ACTIVE' },
@@ -71,6 +72,8 @@ test('pending setup students are visible but excluded from aggregate denominator
   const result = await getMonthCoverageSummary({ instituteId: 'inst-1', now: new Date('2026-09-10T00:00:00.000Z') }, depsFor([source(), pending]));
 
   assert.equal(result.students.length, 2);
+  assert.equal(result.students[0].humanId, 'ML-001');
+  assert.equal(result.students[0].parentWhatsapp, '9557940807');
   assert.equal(result.students[1].setupRequired, true);
   assert.deepEqual(result.totals, {
     collectedRupees: 1000.25, receivedMonths: 2, pendingMonths: 4,

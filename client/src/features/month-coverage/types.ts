@@ -17,6 +17,8 @@ export type MonthCoveragePreview = {
 export type MonthCoverageStudentSummary = {
   studentId: string;
   name: string;
+  humanId?: string | null;
+  parentWhatsapp?: string | null;
   batchId: string;
   batchName: string;
   setupRequired: boolean;

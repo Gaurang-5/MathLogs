@@ -10,8 +10,8 @@ const { apiMock, loadSummary } = vi.hoisted(() => ({
 
 vi.mock('../utils/api', () => ({ api: apiMock }));
 vi.mock('../features/month-coverage/api', () => ({ loadMonthCoverageSummary: loadSummary }));
-vi.mock('../features/month-coverage/MonthCoveragePaymentDialog', () => ({
-  MonthCoveragePaymentDialog: ({ student }: { student: { name: string } }) => <div data-testid="month-payment">Month payment for {student.name}</div>,
+vi.mock('../features/month-coverage/QuickMonthCoverageFeeForm', () => ({
+  QuickMonthCoverageFeeForm: ({ students }: { students: Array<{ name: string }> }) => <div data-testid="quick-month-payment">Quick payment for {students.map(student => student.name).join(', ')}</div>,
 }));
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 20));
@@ -45,8 +45,6 @@ describe('QuickFeeModal month coverage dispatch', () => {
     await act(async () => { await settle(); });
     expect(apiMock.get).toHaveBeenCalledWith('/institute/me');
     expect(apiMock.get).not.toHaveBeenCalledWith('/fees');
-    expect(container.textContent).toContain('Aarav');
-    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Aarav'))?.click());
-    expect(container.textContent).toContain('Month payment for Aarav');
+    expect(container.textContent).toContain('Quick payment for Aarav');
   });
 });

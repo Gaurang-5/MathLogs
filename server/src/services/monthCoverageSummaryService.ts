@@ -6,6 +6,8 @@ import { prisma } from '../prisma';
 export type MonthCoverageSummaryStudentSource = {
   studentId: string;
   name: string;
+  humanId: string | null;
+  parentWhatsapp: string | null;
   batchId: string;
   batchName: string;
   profileStatus: 'PENDING_SETUP' | 'ACTIVE' | 'CLOSED';
@@ -53,6 +55,8 @@ export type StudentMonthMetrics = {
 export type MonthCoverageStudentSummary = StudentMonthMetrics & {
   studentId: string;
   name: string;
+  humanId: string | null;
+  parentWhatsapp: string | null;
   batchId: string;
   batchName: string;
   setupRequired: boolean;
@@ -154,6 +158,8 @@ export async function getMonthCoverageSummary(
     return {
       studentId: source.studentId,
       name: source.name,
+      humanId: source.humanId,
+      parentWhatsapp: source.parentWhatsapp,
       batchId: source.batchId,
       batchName: source.batchName,
       setupRequired,
@@ -249,6 +255,8 @@ export const prismaMonthCoverageSummaryDeps: MonthCoverageSummaryDeps = {
       select: {
         id: true,
         name: true,
+        humanId: true,
+        parentWhatsapp: true,
         monthCoverageProfile: {
           select: {
             status: true,
@@ -281,6 +289,8 @@ export const prismaMonthCoverageSummaryDeps: MonthCoverageSummaryDeps = {
       return [{
         studentId: row.id,
         name: row.name,
+        humanId: row.humanId,
+        parentWhatsapp: row.parentWhatsapp,
         batchId: profile.batch.id,
         batchName: profile.batch.name,
         profileStatus: profile.status,
