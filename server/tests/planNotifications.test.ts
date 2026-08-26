@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PLAN_NOTIFICATION_TEMPLATES, lifecycleReminderSchedule } from '../src/services/planNotificationService';
 
-test('defines the seven approved paired lifecycle templates', () => {
+test('defines the existing plan and approved AutoPay lifecycle templates', () => {
   assert.deepEqual(Object.keys(PLAN_NOTIFICATION_TEMPLATES), [
     'TRIAL_STARTED', 'PLAN_ACTIVATED', 'EXPIRY_APPROACHING', 'PAYMENT_DUE',
-    'PAYMENT_FAILED', 'PAYMENT_SUCCEEDED', 'MARKETPLACE_FALLBACK'
+    'PAYMENT_FAILED', 'PAYMENT_SUCCEEDED', 'MARKETPLACE_FALLBACK',
+    'AUTOPAY_AUTHORIZED', 'AUTOPAY_ACTIVATED', 'AUTOPAY_CHARGE_UPCOMING',
+    'AUTOPAY_GRACE_ENDING', 'AUTOPAY_RECOVERED', 'AUTOPAY_CANCELLED', 'AUTOPAY_COMPLETED'
   ]);
   assert.ok(Object.values(PLAN_NOTIFICATION_TEMPLATES).every(template => template.subject && template.whatsappEnvironmentKey));
 });

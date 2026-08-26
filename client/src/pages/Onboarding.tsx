@@ -1,15 +1,10 @@
-import React, { useState, useRef, memo, useCallback } from 'react';
+import React, { useState, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, Sparkles, Building, Store, AlertCircle, RotateCcw, Loader2, MapPin, CheckCircle2, ShieldCheck, CreditCard, Plus, MessageCircle } from 'lucide-react';
+import { ArrowRight, Check, Sparkles, Building, Store, AlertCircle, RotateCcw, Loader2, CheckCircle2, CreditCard, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
-
-const SUBJECT_OPTIONS = [
-    'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Science',
-    'English', 'Hindi', 'Social Science', 'Commerce', 'Accountancy',
-    'Economics', 'Computer Science'
-];
+import { onboardingCheckoutOptions, onboardingSuccessMessage, type CheckoutSession, type RazorpayCheckoutResult } from '../features/billing/checkout';
 
 type PlanId = 'MARKETPLACE' | 'QUIZ' | 'ENTERPRISE';
 
@@ -17,16 +12,6 @@ interface TrialResponse {
     success: boolean;
     error?: string;
     setupLink?: string;
-}
-
-interface CreateOrderResponse {
-    success: boolean;
-    error?: string;
-    keyId?: string;
-    orderId?: string;
-    amount?: number;
-    currency?: string;
-    subscriptionId?: string;
 }
 
 interface VerifyPaymentResponse {
@@ -38,43 +23,14 @@ interface ResendSetupResponse {
     message?: string;
 }
 
-interface RazorpayHandlerResponse {
-    razorpay_order_id?: string;
-    razorpay_payment_id?: string;
-    razorpay_signature?: string;
-    razorpay_subscription_id?: string;
-}
-
-interface RazorpayOptions {
-    key?: string;
-    name: string;
-    description: string;
-    handler: (response: RazorpayHandlerResponse) => Promise<void>;
-    prefill: {
-        name: string;
-        email: string;
-        contact: string;
-    };
-    theme: {
-        color: string;
-    };
-    modal: {
-        ondismiss: () => void;
-    };
-    order_id?: string;
-    amount?: number;
-    currency?: string;
-    subscription_id?: string;
-}
-
 interface RazorpayInstance {
     on: (event: 'payment.failed', handler: (response: any) => void) => void;
     open: () => void;
 }
 
-interface WindowWithRazorpay extends Window {
-    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
-}
+type WindowWithRazorpay = {
+    Razorpay?: new (options: Record<string, unknown>) => RazorpayInstance;
+};
 
 const getErrorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 
@@ -94,10 +50,11 @@ const pricingPlans = [
         name: 'Marketplace',
         icon: Store,
         price: 0,
-        tagline: '₹99 one-time · Free for now',
+        yearlyPrice: 0,
+        tagline: '₹99 one-time · Free promotional access',
         period: 'free',
         description: 'Get your coaching center listed on MathLogs city directory to receive direct student inquiries.',
-        trialInfo: 'Promotional free activation · No trial needed',
+        trialInfo: 'Promotional free activation',
         features: [
             'Verified Coaching Profile Page',
             'Public Directory Search Listing',
@@ -107,7 +64,6 @@ const pricingPlans = [
         ],
         popular: false,
         badge: 'PROMO LISTING',
-        isOneTime: false,
         hasTrial: false,
     },
     {
@@ -115,6 +71,7 @@ const pricingPlans = [
         name: 'Quiz',
         icon: Sparkles,
         price: 249,
+        yearlyPrice: 2499,
         tagline: '5 Quiz Credits / Month',
         period: '/ month',
         description: 'AI quiz creation, automatic question generation, proctored online exams & instant analysis.',
@@ -129,7 +86,6 @@ const pricingPlans = [
         ],
         popular: false,
         badge: 'AI QUIZZES',
-        isOneTime: false,
         hasTrial: true,
     },
     {
@@ -137,6 +93,7 @@ const pricingPlans = [
         name: 'Enterprise',
         icon: Building,
         price: 499,
+        yearlyPrice: 4999,
         tagline: 'Complete Coaching ERP',
         period: '/ month',
         description: 'Full coaching ERP — student records, attendance, fee collection, tests & directory listing.',
@@ -151,11 +108,9 @@ const pricingPlans = [
         ],
         popular: true,
         badge: 'MOST POPULAR',
-        isOneTime: false,
         hasTrial: true,
     }
 ];
-
 
 // ─── Animated Background (Signature MathLogs Grid) ─────────────────────────
 
@@ -201,17 +156,6 @@ export default function Onboarding() {
     const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
     const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY' | 'ONE_TIME'>('MONTHLY');
 
-    // Step 3: Marketplace & Checkout Options
-    const [listOnMarketplace, setListOnMarketplace] = useState(true);
-    const [city, setCity] = useState('Muzaffarnagar');
-    const [area, setArea] = useState('');
-    const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-    const [googleMapsUrl, setGoogleMapsUrl] = useState('');
-    const [customSubjectInput, setCustomSubjectInput] = useState('');
-    const [customSubjects, setCustomSubjects] = useState<string[]>([]);
-
-    const [paymentChoice, setPaymentChoice] = useState<'pay_now' | 'pay_later'>('pay_later');
-
     // Consents
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [dpdpAccepted, setDpdpAccepted] = useState(false);
@@ -238,32 +182,15 @@ export default function Onboarding() {
 
     const isQuizOnly = new URLSearchParams(window.location.search).get('plan')?.toUpperCase() === 'QUIZ';
     const selectedPlanData = pricingPlans.find(p => p.id === selectedPlan);
-    const canPayLater = selectedPlan !== 'MARKETPLACE';
 
     const formatPhone = (val: string) => val.replace(/\D/g, '').slice(0, 10);
 
-    const toggleSubject = (sub: string) => {
-        setSelectedSubjects(prev =>
-            prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
-        );
-    };
+    const isStep1Valid = tuitionName.trim() && ownerName.trim() && formatPhone(phone).length === 10 && email.trim() && isPhoneVerified;
 
-    const addCustomSubject = () => {
-        const trimmed = customSubjectInput.trim();
-        if (!trimmed) return;
-        if ([...SUBJECT_OPTIONS, ...customSubjects].some(s => s.toLowerCase() === trimmed.toLowerCase())) {
-            setCustomSubjectInput('');
-            return;
-        }
-        setCustomSubjects(prev => [...prev, trimmed]);
-        setSelectedSubjects(prev => [...prev, trimmed]);
-        setCustomSubjectInput('');
-    };
+    // ── OTP Handlers ──────────────────────────────────────────────────────────
 
-    const isStep1Valid = tuitionName.trim().length > 2 && ownerName.trim().length > 2 && formatPhone(phone).length >= 10 && email.includes('@') && isPhoneVerified;
-
-    const startOtpResendTimer = useCallback(() => {
-        setOtpResendTimer(30);
+    const startOtpTimer = () => {
+        setOtpResendTimer(60);
         if (otpResendRef.current) clearInterval(otpResendRef.current);
         otpResendRef.current = setInterval(() => {
             setOtpResendTimer(prev => {
@@ -274,55 +201,58 @@ export default function Onboarding() {
                 return prev - 1;
             });
         }, 1000);
-    }, []);
+    };
 
-    const handleSendPhoneOtp = useCallback(async () => {
-        const cleanP = formatPhone(phone);
-        if (cleanP.length < 10) {
-            setOtpError('Please enter a valid 10-digit mobile number first.');
+    const handleSendPhoneOtp = async () => {
+        const cleanPhone = formatPhone(phone);
+        if (cleanPhone.length !== 10) {
+            toast.error('Please enter a valid 10-digit phone number');
             return;
         }
-        setOtpError('');
         setOtpSending(true);
+        setOtpError('');
         try {
-            const res = await api.post<{ success: boolean; message?: string; error?: string }>('/auth/send-signup-otp', { phone: cleanP });
+            const res = await api.post<{ success: boolean; error?: string }>('/onboarding/send-phone-otp', { phone: cleanPhone });
             if (res.success) {
                 setPhoneOtpSent(true);
-                setPhoneOtpCode('');
-                startOtpResendTimer();
-                toast.success('OTP sent to your WhatsApp!');
+                startOtpTimer();
+                toast.success('OTP sent via WhatsApp!');
             } else {
-                setOtpError(res.error || 'Failed to send OTP.');
+                setOtpError(res.error || 'Failed to send OTP');
             }
-        } catch (err: any) {
-            setOtpError(err.response?.data?.error || 'Failed to send OTP.');
+        } catch (err: unknown) {
+            setOtpError(getErrorMessage(err, 'Failed to send OTP'));
         } finally {
             setOtpSending(false);
         }
-    }, [phone, startOtpResendTimer]);
+    };
 
-    const handleVerifyPhoneOtp = useCallback(async () => {
+    const handleVerifyPhoneOtp = async () => {
         if (phoneOtpCode.length !== 6) {
-            setOtpError('Please enter the 6-digit OTP.');
+            setOtpError('Please enter a 6-digit OTP');
             return;
         }
-        setOtpError('');
         setOtpVerifying(true);
+        setOtpError('');
         try {
-            const res = await api.post<{ success: boolean; verificationToken?: string; error?: string }>('/auth/verify-signup-otp', { phone: formatPhone(phone), otp: phoneOtpCode });
+            const res = await api.post<{ success: boolean; error?: string }>('/onboarding/verify-phone-otp', {
+                phone: formatPhone(phone),
+                otp: phoneOtpCode,
+            });
             if (res.success) {
                 setIsPhoneVerified(true);
                 setPhoneOtpSent(false);
-                toast.success('Mobile number verified!');
+                setPhoneOtpCode('');
+                toast.success('WhatsApp number verified!');
             } else {
-                setOtpError(res.error || 'Invalid OTP.');
+                setOtpError(res.error || 'Invalid OTP');
             }
-        } catch (err: any) {
-            setOtpError(err.response?.data?.error || 'Invalid OTP.');
+        } catch (err: unknown) {
+            setOtpError(getErrorMessage(err, 'Invalid OTP'));
         } finally {
             setOtpVerifying(false);
         }
-    }, [phone, phoneOtpCode]);
+    };
 
     // ── STEP HANDLERS ─────────────────────────────────────────────────────────
 
@@ -340,7 +270,7 @@ export default function Onboarding() {
 
         if (isQuizOnly) {
             setSelectedPlan('QUIZ');
-            setPaymentChoice('pay_now');
+            setBillingCycle('MONTHLY');
             setActiveStep(3);
         } else {
             setActiveStep(2);
@@ -350,7 +280,6 @@ export default function Onboarding() {
     const handleSelectPlan = async (planId: PlanId) => {
         setSelectedPlan(planId);
         setBillingCycle(planId === 'MARKETPLACE' ? 'ONE_TIME' : 'MONTHLY');
-        setPaymentChoice('pay_later');
 
         try {
             await api.post('/onboarding/lead', {
@@ -371,8 +300,8 @@ export default function Onboarding() {
 
         const cleanPhone = formatPhone(phone);
 
-        // 1) Pay Later / Start Free Trial
-        if (paymentChoice === 'pay_later' && (canPayLater || selectedPlan === 'MARKETPLACE')) {
+        // 1) Marketplace Free Promotional Activation
+        if (selectedPlan === 'MARKETPLACE') {
             try {
                 const res = await api.post<TrialResponse>('/onboarding/start-trial', {
                     tuitionName,
@@ -380,16 +309,12 @@ export default function Onboarding() {
                     phone: cleanPhone,
                     email,
                     planId: selectedPlan,
-                    billingCycle,
-                    listOnMarketplace,
-                    city: city.trim(),
-                    area: area.trim(),
-                    subjectsOffered: selectedSubjects,
-                    googleMapsUrl: googleMapsUrl.trim(),
+                    billingCycle: 'ONE_TIME',
+                    listOnMarketplace: true,
                 });
 
                 if (res.success && res.setupLink) {
-                    toast.success('Trial started successfully! Redirecting...');
+                    toast.success('Marketplace profile activated! Redirecting to setup...');
                     try {
                         await api.post('/onboarding/lead', { phone: cleanPhone, step: 'CONVERTED' });
                     } catch (error) {
@@ -397,19 +322,19 @@ export default function Onboarding() {
                     }
                     setTimeout(() => {
                         window.location.href = res.setupLink!;
-                    }, 1200);
+                    }, 1000);
                 } else {
-                    toast.error(res.error || 'Failed to start trial.');
+                    toast.error(res.error || 'Failed to activate marketplace profile.');
                     setIsLoading(false);
                 }
             } catch (error: unknown) {
-                toast.error(getErrorMessage(error, 'Trial initialization failed.'));
+                toast.error(getErrorMessage(error, 'Marketplace activation failed.'));
                 setIsLoading(false);
             }
             return;
         }
 
-        // 2) Pay Now (Razorpay Flow)
+        // 2) Paid Plans (Monthly AutoPay e-Mandate or Yearly Upfront Order)
         try {
             const isLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
             if (!isLoaded) {
@@ -418,20 +343,17 @@ export default function Onboarding() {
                 return;
             }
 
-            const orderRes = await api.post<CreateOrderResponse>('/onboarding/create-order', {
+            const session = await api.post<CheckoutSession>('/onboarding/create-order', {
                 tuitionName,
                 ownerName,
                 phone: cleanPhone,
                 email,
                 planId: selectedPlan,
                 billingCycle,
+                listOnMarketplace: true,
             });
 
-            if (!orderRes.success || !orderRes.keyId) {
-                toast.error(orderRes.error || 'Failed to create order.');
-                setIsLoading(false);
-                return;
-            }
+            if (session.mode === 'ACTIVATED') throw new Error('Unexpected checkout response.');
 
             try {
                 await api.post('/onboarding/lead', {
@@ -441,32 +363,29 @@ export default function Onboarding() {
                 console.debug('Payment start lead tracking skipped', error);
             }
 
-            const options: RazorpayOptions = {
-                key: orderRes.keyId,
-                name: 'MathLogs',
-                description: `MathLogs ${selectedPlanData?.name || 'Subscription'}`,
-                handler: async (response: RazorpayHandlerResponse) => {
+            const options = {
+                ...onboardingCheckoutOptions(session, {
+                    name: ownerName,
+                    email,
+                    contact: cleanPhone,
+                }, async (response: RazorpayCheckoutResult) => {
                     try {
                         const verifyRes = await api.post<VerifyPaymentResponse>('/onboarding/verify-payment', {
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
-                            razorpay_subscription_id: response.razorpay_subscription_id,
+                            razorpay_subscription_id: response.razorpay_subscription_id || (session.mode === 'SUBSCRIPTION' ? session.subscriptionId : undefined),
                             tuitionName,
                             ownerName,
                             phone: cleanPhone,
                             email,
                             planId: selectedPlan,
                             billingCycle,
-                            listOnMarketplace,
-                            city: city.trim(),
-                            area: area.trim(),
-                            subjectsOffered: selectedSubjects,
-                            googleMapsUrl: googleMapsUrl.trim(),
+                            listOnMarketplace: true,
                         });
 
                         if (verifyRes.success && verifyRes.setupLink) {
-                            toast.success('Payment verified! Redirecting to setup...');
+                            toast.success(onboardingSuccessMessage(session));
                             try {
                                 await api.post('/onboarding/lead', { phone: cleanPhone, step: 'CONVERTED' });
                             } catch (error) {
@@ -474,7 +393,7 @@ export default function Onboarding() {
                             }
                             setTimeout(() => {
                                 window.location.href = verifyRes.setupLink!;
-                            }, 1200);
+                            }, 1000);
                         } else {
                             toast.error('Payment verification failed.');
                             setIsLoading(false);
@@ -483,15 +402,10 @@ export default function Onboarding() {
                         toast.error(getErrorMessage(error, 'Verification Error'));
                         setIsLoading(false);
                     }
-                },
-                prefill: {
-                    name: ownerName,
-                    email: email,
-                    contact: cleanPhone,
-                },
-                theme: {
-                    color: '#000000',
-                },
+                }),
+                description: session.mode === 'SUBSCRIPTION'
+                    ? `MathLogs ${selectedPlanData?.name || 'Subscription'} - 14-Day Trial & Monthly AutoPay`
+                    : `MathLogs ${selectedPlanData?.name || 'Subscription'} - 1 Year Access`,
                 modal: {
                     ondismiss: () => {
                         setIsLoading(false);
@@ -499,7 +413,7 @@ export default function Onboarding() {
                 },
             };
 
-            const rzp = new (window as WindowWithRazorpay).Razorpay!(options);
+            const rzp = new (window as unknown as WindowWithRazorpay).Razorpay!(options);
             rzp.open();
         } catch (error: unknown) {
             toast.error(getErrorMessage(error, 'Payment error occurred.'));
@@ -553,7 +467,7 @@ export default function Onboarding() {
                                 : 'text-neutral-500 hover:text-black disabled:opacity-40'
                         }`}
                     >
-                        03. Checkout
+                        03. Activate
                     </button>
                 </div>
             </div>
@@ -578,7 +492,7 @@ export default function Onboarding() {
                                     Register Coaching.
                                 </h1>
                                 <p className="text-base sm:text-lg text-neutral-400 font-medium tracking-tight">
-                                    Enter your center details to activate your MathLogs portal and directory profile.
+                                    Enter your center details to get started with MathLogs.
                                 </p>
                             </div>
 
@@ -759,7 +673,7 @@ export default function Onboarding() {
                                     Select Scale Protocol.
                                 </h1>
                                 <p className="text-base sm:text-lg text-neutral-400 font-medium tracking-tight max-w-xl mx-auto">
-                                    Choose the capacity level that aligns with your coaching institute's current requirements.
+                                    Choose the capacity level that aligns with your coaching institute's requirements.
                                 </p>
                             </div>
 
@@ -854,7 +768,7 @@ export default function Onboarding() {
                     )}
 
                     {/* ─────────────────────────────────────────────────────────────
-                        STEP 3: PROFILE & CHECKOUT
+                        STEP 3: CHECKOUT & ACTIVATION
                     ───────────────────────────────────────────────────────────── */}
                     {activeStep === 3 && selectedPlanData && (
                         <motion.div
@@ -863,178 +777,104 @@ export default function Onboarding() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                            className="max-w-2xl mx-auto w-full space-y-8"
+                            className="max-w-2xl mx-auto w-full space-y-6"
                         >
                             <div className="text-center sm:text-left">
                                 <h1 className="text-3xl sm:text-4xl font-black tracking-tighter mb-2">
-                                    {paymentChoice === 'pay_later' ? 'Start Free Trial' : 'Complete Activation'}
+                                    {selectedPlan === 'MARKETPLACE'
+                                        ? 'Activate Free Marketplace Listing'
+                                        : billingCycle === 'MONTHLY'
+                                        ? 'Start 14-Day Free Trial'
+                                        : 'Annual Plan Activation'}
                                 </h1>
                                 <p className="text-sm sm:text-base text-neutral-400 font-medium">
-                                    Selected plan: <span className="text-black font-bold">{selectedPlanData.name}</span> · Unlimited students
+                                    Selected plan: <span className="text-black font-bold">{selectedPlanData.name}</span> · Unlimited students &amp; batches
                                 </p>
                             </div>
 
-                            {/* SECTION A: MARKETPLACE PROFILE SETUP */}
-                            <div className="bg-white border-2 border-neutral-200 rounded-3xl p-6 sm:p-8 space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 bg-black text-white rounded-xl">
-                                        <MapPin className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-base font-bold tracking-tight">Marketplace Directory Profile</h3>
-                                        <p className="text-xs text-neutral-400 font-medium">Setup your public profile for local student discovery.</p>
+                            {/* BILLING CYCLE SELECTOR */}
+                            {selectedPlan !== 'MARKETPLACE' && (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setBillingCycle('MONTHLY')}
+                                        className={`rounded-2xl border-2 p-5 text-left transition-all ${
+                                            billingCycle === 'MONTHLY'
+                                                ? 'border-black bg-black text-white shadow-md'
+                                                : 'border-neutral-200 bg-white hover:border-neutral-300'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm sm:text-base font-bold">Monthly · ₹{selectedPlan === 'QUIZ' ? '249' : '499'}</span>
+                                            <span className={`text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full ${
+                                                billingCycle === 'MONTHLY' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800'
+                                            }`}>
+                                                14-Day Free Trial
+                                            </span>
+                                        </div>
+                                        <p className={`text-xs mt-1.5 ${billingCycle === 'MONTHLY' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                                            Monthly AutoPay • ₹0 today, debits after 14 days
+                                        </p>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setBillingCycle('YEARLY')}
+                                        className={`rounded-2xl border-2 p-5 text-left transition-all ${
+                                            billingCycle === 'YEARLY'
+                                                ? 'border-black bg-black text-white shadow-md'
+                                                : 'border-neutral-200 bg-white hover:border-neutral-300'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm sm:text-base font-bold">Yearly · ₹{selectedPlan === 'QUIZ' ? '2,499' : '4,999'}</span>
+                                            <span className={`text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full ${
+                                                billingCycle === 'YEARLY' ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-800'
+                                            }`}>
+                                                Save ~17%
+                                            </span>
+                                        </div>
+                                        <p className={`text-xs mt-1.5 ${billingCycle === 'YEARLY' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                                            Annual upfront • 1 full year access
+                                        </p>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* BENEFIT / MANDATE INFO BANNER */}
+                            {selectedPlan === 'MARKETPLACE' ? (
+                                <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 flex items-start gap-3">
+                                    <Sparkles className="w-5 h-5 text-neutral-900 shrink-0 mt-0.5" />
+                                    <div className="text-xs space-y-1">
+                                        <p className="font-bold text-neutral-900">Free Promotional Activation</p>
+                                        <p className="text-neutral-600 leading-relaxed">
+                                            List your coaching center on MathLogs public directory for free (normally ₹99 one-time). No card or payment details required. Complete your directory profile on the next screen.
+                                        </p>
                                     </div>
                                 </div>
-
-                                {/* Enable listing toggle for Quiz & Enterprise */}
-                                {selectedPlan !== 'MARKETPLACE' && (
-                                    <label className="flex items-center gap-3 p-3 bg-neutral-50 rounded-2xl cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={listOnMarketplace}
-                                            onChange={e => setListOnMarketplace(e.target.checked)}
-                                            className="w-4 h-4 accent-black rounded cursor-pointer"
-                                        />
-                                        <span className="text-xs font-bold text-neutral-700">
-                                            List my coaching center on the MathLogs Public Marketplace Directory (Free)
-                                        </span>
-                                    </label>
-                                )}
-
-                                {listOnMarketplace && (
-                                    <div className="space-y-5 pt-2">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                                                    City *
-                                                </label>
-                                                <select
-                                                    value={city}
-                                                    onChange={e => setCity(e.target.value)}
-                                                    className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-bold outline-none focus:border-black transition-all cursor-pointer"
-                                                >
-                                                    <option value="Muzaffarnagar">Muzaffarnagar</option>
-                                                </select>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                                                    Area / Locality
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={area}
-                                                    onChange={e => setArea(e.target.value)}
-                                                    placeholder="e.g. Kothrud, Baner"
-                                                    className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-medium outline-none focus:border-black transition-all"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">
-                                                Subjects Taught
-                                            </label>
-                                            <div className="flex flex-wrap gap-2">
-                                                {[...SUBJECT_OPTIONS, ...customSubjects].map(sub => (
-                                                    <button
-                                                        key={sub}
-                                                        type="button"
-                                                        onClick={() => toggleSubject(sub)}
-                                                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                                                            selectedSubjects.includes(sub)
-                                                                ? 'bg-black text-white'
-                                                                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                                                        }`}
-                                                    >
-                                                        {sub}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <input
-                                                    type="text"
-                                                    value={customSubjectInput}
-                                                    onChange={e => setCustomSubjectInput(e.target.value)}
-                                                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomSubject())}
-                                                    placeholder="Add a subject..."
-                                                    className="flex-1 px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium outline-none focus:border-black transition-all"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={addCustomSubject}
-                                                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-neutral-900 text-white text-xs font-bold hover:bg-neutral-700 transition-all"
-                                                >
-                                                    <Plus className="w-3 h-3" /> Add
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                                                Google Maps Link <span className="text-neutral-300 font-normal">(Optional)</span>
-                                            </label>
-                                            <input
-                                                type="url"
-                                                value={googleMapsUrl}
-                                                onChange={e => setGoogleMapsUrl(e.target.value)}
-                                                placeholder="https://maps.app.goo.gl/..."
-                                                className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-medium outline-none focus:border-black transition-all"
-                                            />
-                                        </div>
+                            ) : billingCycle === 'MONTHLY' ? (
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-start gap-3">
+                                    <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                                    <div className="text-xs space-y-1.5">
+                                        <p className="font-bold text-emerald-900">14-Day Free Trial with Monthly AutoPay (e-Mandate)</p>
+                                        <p className="text-emerald-700 leading-relaxed">
+                                            Authorize your recurring mandate via UPI AutoPay, Debit/Credit Card, or NetBanking. <strong>₹0 charged today</strong> (or ₹1/₹2 refundable authorization). Your trial starts immediately with 5 quiz credits, and your first monthly charge of <strong>₹{selectedPlan === 'QUIZ' ? '249' : '499'}</strong> will automatically debit only after 14 days. Cancel anytime before the trial ends without charge.
+                                        </p>
                                     </div>
-                                )}
-                            </div>
-
-                            {selectedPlan !== 'MARKETPLACE' && <div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => setBillingCycle('MONTHLY')} className={`rounded-2xl border-2 p-4 font-bold ${billingCycle === 'MONTHLY' ? 'border-black bg-black text-white' : 'border-neutral-200 bg-white'}`}>Monthly · ₹{selectedPlan === 'QUIZ' ? '249' : '499'}</button><button type="button" onClick={() => setBillingCycle('YEARLY')} className={`rounded-2xl border-2 p-4 font-bold ${billingCycle === 'YEARLY' ? 'border-black bg-black text-white' : 'border-neutral-200 bg-white'}`}>Yearly · ₹{selectedPlan === 'QUIZ' ? '2,499' : '4,999'}</button></div>}
-
-                            {/* SECTION B: PAYMENT TIMING OPTIONS */}
-                            {canPayLater && (
-                                <div className="bg-white border-2 border-neutral-200 rounded-3xl p-6 sm:p-8 space-y-4">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-500">
-                                        Choose Activation Mode
-                                    </h3>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentChoice('pay_later')}
-                                            className={`p-4 rounded-2xl border-2 text-left transition-all ${
-                                                paymentChoice === 'pay_later'
-                                                    ? 'border-black bg-black text-white'
-                                                    : 'border-neutral-200 bg-white text-black hover:border-neutral-300'
-                                            }`}
-                                        >
-                                            <Sparkles className="w-5 h-5 mb-2" />
-                                            <p className="text-sm font-bold">Start Free Trial</p>
-                                            <p className={`text-[11px] font-medium mt-1 ${
-                                                paymentChoice === 'pay_later' ? 'text-neutral-300' : 'text-neutral-500'
-                                            }`}>
-                                                {selectedPlanData.trialInfo}
-                                            </p>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentChoice('pay_now')}
-                                            className={`p-4 rounded-2xl border-2 text-left transition-all ${
-                                                paymentChoice === 'pay_now'
-                                                    ? 'border-black bg-black text-white'
-                                                    : 'border-neutral-200 bg-white text-black hover:border-neutral-300'
-                                            }`}
-                                        >
-                                            <CreditCard className="w-5 h-5 mb-2" />
-                                            <p className="text-sm font-bold">Pay Now</p>
-                                            <p className={`text-[11px] font-medium mt-1 ${
-                                                paymentChoice === 'pay_now' ? 'text-neutral-300' : 'text-neutral-500'
-                                            }`}>
-                                                Pay ₹{selectedPlanData.price} via Razorpay
-                                            </p>
-                                        </button>
+                                </div>
+                            ) : (
+                                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-start gap-3">
+                                    <CreditCard className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                                    <div className="text-xs space-y-1">
+                                        <p className="font-bold text-blue-900">Annual One-Time Payment</p>
+                                        <p className="text-blue-700 leading-relaxed">
+                                            Pay ₹{selectedPlan === 'QUIZ' ? '2,499' : '4,999'} upfront for 1 full year of access. Includes 5 quiz credits renewed every month.
+                                        </p>
                                     </div>
                                 </div>
                             )}
 
-                            {/* SECTION C: LEGAL CONSENTS */}
+                            {/* LEGAL CONSENTS */}
                             <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 space-y-3 text-xs">
                                 <label className="flex items-start gap-3 cursor-pointer">
                                     <input
@@ -1061,23 +901,28 @@ export default function Onboarding() {
                                 </label>
                             </div>
 
-                            {/* SECTION D: ACTION BUTTON */}
+                            {/* ACTION BUTTON */}
                             <button
                                 onClick={handleCheckout}
                                 disabled={isLoading || !termsAccepted || !dpdpAccepted}
-                                className="w-full bg-black text-white font-black py-7 text-lg uppercase tracking-widest rounded-none relative overflow-hidden transition-all duration-300 disabled:bg-neutral-200 disabled:text-neutral-400 disabled:cursor-not-allowed hover:bg-neutral-900 active:scale-[0.98] flex items-center justify-center gap-3"
+                                className="w-full bg-black text-white font-black py-6 sm:py-7 text-lg uppercase tracking-widest rounded-2xl relative overflow-hidden transition-all duration-300 disabled:bg-neutral-200 disabled:text-neutral-400 disabled:cursor-not-allowed hover:bg-neutral-900 active:scale-[0.98] flex items-center justify-center gap-3"
                             >
                                 {isLoading ? (
                                     <Loader2 className="w-6 h-6 animate-spin" />
-                                ) : paymentChoice === 'pay_later' ? (
+                                ) : selectedPlan === 'MARKETPLACE' ? (
                                     <>
                                         <Sparkles className="w-5 h-5" />
-                                        <span>Start Free Trial Now</span>
+                                        <span>Activate Free Marketplace Listing</span>
+                                    </>
+                                ) : billingCycle === 'MONTHLY' ? (
+                                    <>
+                                        <Sparkles className="w-5 h-5 text-emerald-400" />
+                                        <span>Start 14-Day Free Trial (Set Up AutoPay)</span>
                                     </>
                                 ) : (
                                     <>
                                         <CreditCard className="w-5 h-5" />
-                                        <span>Pay ₹{selectedPlanData.price} Securely</span>
+                                        <span>Pay ₹{selectedPlan === 'QUIZ' ? '2,499' : '4,999'} Securely</span>
                                     </>
                                 )}
                             </button>

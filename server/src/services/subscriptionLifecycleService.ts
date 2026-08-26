@@ -50,6 +50,11 @@ export function normalizeTrialOwnerIdentity(value: string): string {
   throw new SubscriptionLifecycleError('INVALID_OWNER_IDENTITY');
 }
 
+export function hashTrialOwnerIdentity(value: string, secret = process.env.JWT_SECRET || 'local-lifecycle-secret'): string {
+  const normalized = normalizeTrialOwnerIdentity(value);
+  return crypto.createHmac('sha256', secret).update(normalized).digest('hex');
+}
+
 function toResult(institute: InstituteState, now: Date): LifecycleResult {
   const access = effectiveEntitlements(institute, now);
   return {

@@ -36,7 +36,9 @@ test('billing webhook verification uses raw bytes and stores only a bounded proj
   assert.equal(verifyBillingWebhookSignature(raw, signature, secret), true);
   assert.equal(verifyBillingWebhookSignature(Buffer.from('{}'), signature, secret), false);
   assert.deepEqual(sanitizeBillingWebhook(JSON.parse(raw.toString())), {
-    providerEventId: 'evt_1', eventType: 'payment.failed', paymentId: 'pay_1', orderId: 'order_1', subscriptionId: null, amount: 24_900, currency: 'INR'
+    providerEventId: 'evt_1', eventType: 'payment.failed', paymentId: 'pay_1', orderId: 'order_1', subscriptionId: null,
+    providerPlanId: null, providerStatus: null, currentStart: null, currentEnd: null, chargeAt: null, occurredAt: null,
+    amount: 24_900, currency: 'INR'
   });
 });
 

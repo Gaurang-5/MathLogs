@@ -6,6 +6,7 @@ import { cancelAtPeriodEnd } from '../services/subscriptionLifecycleService';
 import { cancelSatisfiedNotifications, scheduleLifecycleNotifications } from '../services/planNotificationService';
 import { fulfillStoredBillingPayment } from './billingController';
 import { includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
+import { planSubscriptionLifecycleService } from '../services/planSubscriptionLifecycleService';
 
 export type SanitizedBillingWebhook = {
   providerEventId: string;
@@ -13,6 +14,12 @@ export type SanitizedBillingWebhook = {
   paymentId: string | null;
   orderId: string | null;
   subscriptionId: string | null;
+  providerPlanId: string | null;
+  providerStatus: string | null;
+  currentStart: string | null;
+  currentEnd: string | null;
+  chargeAt: string | null;
+  occurredAt: string | null;
   amount: number | null;
   currency: string | null;
 };
@@ -33,9 +40,22 @@ export function sanitizeBillingWebhook(body: any): SanitizedBillingWebhook {
     paymentId: payment.id ? String(payment.id) : null,
     orderId: payment.order_id ? String(payment.order_id) : null,
     subscriptionId: payment.subscription_id ? String(payment.subscription_id) : subscription.id ? String(subscription.id) : null,
+    providerPlanId: subscription.plan_id ? String(subscription.plan_id) : null,
+    providerStatus: subscription.status ? String(subscription.status).toLowerCase() : null,
+    currentStart: parseSeconds(subscription.current_start)?.toISOString() ?? null,
+    currentEnd: parseSeconds(subscription.current_end)?.toISOString() ?? null,
+    chargeAt: parseSeconds(subscription.charge_at)?.toISOString() ?? null,
+    occurredAt: parseSeconds(body?.created_at)?.toISOString() ?? null,
     amount: Number.isFinite(Number(payment.amount)) ? Number(payment.amount) : null,
     currency: payment.currency ? String(payment.currency) : null
   };
+}
+
+function parseSeconds(val: unknown): Date | undefined {
+  if (val === null || val === undefined) return undefined;
+  const num = Number(val);
+  if (!Number.isFinite(num) || num <= 0) return undefined;
+  return new Date(num * 1000);
 }
 
 export async function handleRazorpayBillingWebhook(req: Request, res: Response) {
@@ -69,6 +89,128 @@ export async function handleRazorpayBillingWebhook(req: Request, res: Response) 
   }
 
   try {
+    const subEntity = body?.payload?.subscription?.entity ?? {};
+    const startsAt = parseSeconds(subEntity.start_at);
+    const currentStart = parseSeconds(subEntity.current_start);
+    const currentEnd = parseSeconds(subEntity.current_end);
+    const endedAt = parseSeconds(subEntity.ended_at);
+    const occurredAt = event.occurredAt ? new Date(event.occurredAt) : new Date();
+
+    // 1. Recurring plan subscriptions handling
+    if (event.subscriptionId) {
+      const planSub = await prisma.planSubscription.findUnique({
+        where: { providerSubscriptionId: event.subscriptionId }
+      });
+
+      if (planSub) {
+        if (event.eventType === 'subscription.authenticated') {
+          await planSubscriptionLifecycleService.applySubscriptionEvent({
+            kind: 'AUTHENTICATED',
+            providerSubscriptionId: event.subscriptionId,
+            startsAt,
+            currentStart,
+            currentEnd,
+            rawEventId: event.providerEventId,
+            now: occurredAt
+          });
+          return res.json({ success: true });
+        }
+
+        if (event.eventType === 'subscription.activated') {
+          await planSubscriptionLifecycleService.applySubscriptionEvent({
+            kind: 'ACTIVATED',
+            providerSubscriptionId: event.subscriptionId,
+            currentStart: currentStart || new Date(),
+            currentEnd: currentEnd || new Date(Date.now() + 30 * 86_400_000),
+            rawEventId: event.providerEventId,
+            now: occurredAt
+          });
+          return res.json({ success: true });
+        }
+
+        if (event.eventType === 'subscription.charged' && event.paymentId) {
+          if (event.amount === null || !event.currency || !event.providerPlanId) {
+            throw new Error('SUBSCRIPTION_CHARGE_BINDING_MISSING');
+          }
+          await planSubscriptionLifecycleService.applySubscriptionEvent({
+            kind: 'CHARGED',
+            providerSubscriptionId: event.subscriptionId,
+            paymentId: event.paymentId,
+            amountPaise: event.amount,
+            providerPlanId: event.providerPlanId,
+            currency: event.currency,
+            currentStart: currentStart || new Date(),
+            currentEnd: currentEnd || new Date(Date.now() + 30 * 86_400_000),
+            rawEventId: event.providerEventId,
+            now: occurredAt
+          });
+          return res.json({ success: true });
+        }
+
+        if (event.eventType === 'payment.failed') {
+          await planSubscriptionLifecycleService.applySubscriptionEvent({
+            kind: 'CHARGE_FAILED',
+            providerSubscriptionId: event.subscriptionId,
+            paymentId: event.paymentId || undefined,
+            amountPaise: event.amount || undefined,
+            rawEventId: event.providerEventId,
+            now: occurredAt
+          });
+          return res.json({ success: true });
+        }
+
+        if (event.eventType === 'subscription.pending') {
+          await planSubscriptionLifecycleService.applySubscriptionEvent({
+            kind: 'PENDING', providerSubscriptionId: event.subscriptionId,
+            paymentId: event.paymentId || undefined, amountPaise: event.amount || undefined,
+            rawEventId: event.providerEventId,
+            now: occurredAt
+          });
+          return res.json({ success: true });
+        }
+
+        if (event.eventType === 'subscription.halted') {
+          await planSubscriptionLifecycleService.applySubscriptionEvent({
+            kind: 'HALTED', providerSubscriptionId: event.subscriptionId, rawEventId: event.providerEventId, now: occurredAt
+          });
+          return res.json({ success: true });
+        }
+
+        if (event.eventType === 'subscription.cancelled') {
+          await planSubscriptionLifecycleService.applySubscriptionEvent({
+            kind: 'CANCELLED',
+            providerSubscriptionId: event.subscriptionId,
+            cancelAtPeriodEnd: Boolean(subEntity.cancel_at_cycle_end),
+            endedAt,
+            rawEventId: event.providerEventId,
+            now: occurredAt
+          });
+          return res.json({ success: true });
+        }
+
+        if (event.eventType === 'subscription.completed') {
+          await planSubscriptionLifecycleService.applySubscriptionEvent({
+            kind: 'COMPLETED',
+            providerSubscriptionId: event.subscriptionId,
+            endedAt,
+            rawEventId: event.providerEventId,
+            now: occurredAt
+          });
+          return res.json({ success: true });
+        }
+
+        if (event.eventType === 'subscription.expired') {
+          await planSubscriptionLifecycleService.applySubscriptionEvent({
+            kind: 'EXPIRED', providerSubscriptionId: event.subscriptionId, endedAt,
+            rawEventId: event.providerEventId,
+            now: occurredAt
+          });
+          return res.json({ success: true });
+        }
+      }
+    }
+
+    // 2. Fallback / One-time payment handling
     const payment = event.orderId ? await prisma.billingPayment.findUnique({ where: { providerOrderId: event.orderId } }) : null;
     if (event.eventType === 'payment.failed' && payment) {
       const failed = await prisma.$transaction(async tx => {

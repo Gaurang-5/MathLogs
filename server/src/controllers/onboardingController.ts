@@ -10,6 +10,9 @@ import { getRazorpayConfig } from '../utils/env';
 import { activateMarketplace, SubscriptionLifecycleError, startPlanTrial as startCanonicalTrial } from '../services/subscriptionLifecycleService';
 import { normalizePlanId, resolvePlanPrice, type BillingCycle } from '../domain/plans/planCatalog';
 import { OnboardingPaymentError, persistOnboardingOrder, provisionClaimedOnboardingPayment, verifyAndClaimOnboardingPayment } from '../services/onboardingPaymentService';
+import { planSubscriptionCheckoutService } from '../services/planSubscriptionCheckoutService';
+import { planSubscriptionLifecycleService } from '../services/planSubscriptionLifecycleService';
+import { type ProvisioningInput } from '../services/accountProvisioningService';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -45,18 +48,18 @@ export const trackLead = async (req: Request, res: Response) => {
                 email,
                 planId,
                 billingCycle,
-                step: step || 'STEP_1_STARTED'
+                step: step || 'details_submitted'
             }
         });
 
-        res.json({ success: true, leadId: lead.id });
+        res.json({ success: true, lead });
     } catch (error) {
         console.error('Track Lead Error:', error);
         res.status(500).json({ error: 'Failed to track lead' });
     }
 };
 
-// Create Order (Step 3 checkout initialization)
+// Create Razorpay Order or Subscription
 export const createOrder = async (req: Request, res: Response) => {
     try {
         const { tuitionName, ownerName, phone, email, planId, billingCycle } = req.body;
@@ -84,7 +87,41 @@ export const createOrder = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'An account with this phone number already exists.' });
         }
 
-        // Create Razorpay Order
+        if (cycle === 'MONTHLY') {
+            const provisioning: ProvisioningInput = {
+                kind: 'PUBLIC',
+                instituteName: tuitionName,
+                ownerName,
+                phone,
+                email,
+                marketplace: {
+                    listed: req.body.listOnMarketplace ?? true,
+                    city: req.body.city ? String(req.body.city).trim() : undefined,
+                    area: req.body.area ? String(req.body.area).trim() : undefined,
+                    subjects: Array.isArray(req.body.subjectsOffered) ? req.body.subjectsOffered : undefined,
+                    googleMapsUrl: req.body.googleMapsUrl ? String(req.body.googleMapsUrl).trim() : undefined
+                }
+            };
+            const session = await planSubscriptionCheckoutService.createMonthlySubscriptionCheckout({
+                context: { kind: 'PUBLIC_ONBOARDING', ownerIdentity: phone, provisioning },
+                plan
+            });
+            return res.json({
+                success: true,
+                mode: 'SUBSCRIPTION',
+                subscriptionId: session.subscriptionId,
+                keyId: session.keyId,
+                plan: session.plan,
+                billingCycle: session.billingCycle,
+                amount: session.amount,
+                currency: session.currency,
+                trialEligible: session.trialEligible,
+                firstChargeAt: session.firstChargeAt.toISOString(),
+                totalCount: session.totalCount
+            });
+        }
+
+        // Create Razorpay Order for yearly plans
         let order: any;
         try {
             order = await razorpay.orders.create({
@@ -113,6 +150,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
         return res.json({
             success: true,
+            mode: 'ORDER',
             orderId: order.id,
             amount: order.amount,
             currency: order.currency,
@@ -121,7 +159,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
     } catch (error) {
         console.error('Create Order Error:', error);
-        res.status(500).json({ error: 'Internal server error during order creation.' });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error during order creation.' });
     }
 };
 
@@ -146,6 +184,53 @@ async function createUniqueSlug(name: string) {
 // Verify Payment and Provision Account
 export const verifyPayment = async (req: Request, res: Response) => {
     try {
+        if (req.body.razorpay_subscription_id) {
+            await planSubscriptionCheckoutService.verifyMonthlySubscriptionCheckout({
+                razorpay_payment_id: String(req.body.razorpay_payment_id || ''),
+                razorpay_subscription_id: String(req.body.razorpay_subscription_id || ''),
+                razorpay_signature: String(req.body.razorpay_signature || ''),
+                contextKind: 'PUBLIC_ONBOARDING'
+            });
+            await planSubscriptionLifecycleService.applySubscriptionEvent({
+                kind: 'AUTHENTICATED',
+                providerSubscriptionId: String(req.body.razorpay_subscription_id)
+            });
+            const sub = await prisma.planSubscription.findUniqueOrThrow({
+                where: { providerSubscriptionId: String(req.body.razorpay_subscription_id) }
+            });
+            if (!sub.instituteId) {
+                return res.status(500).json({ error: 'INSTITUTE_PROVISIONING_FAILED' });
+            }
+            const invite = await prisma.inviteToken.findFirst({
+                where: { instituteId: sub.instituteId, isUsed: false },
+                orderBy: { createdAt: 'desc' }
+            });
+            if (!invite) return res.status(409).json({ error: 'Setup already completed.' });
+
+            const payload = (sub.provisioningData as Record<string, any>) || {};
+            const clientUrl = getClientUrl(req);
+            const setupLink = `${clientUrl}/setup?token=${invite.token}`;
+
+            const notificationData = {
+                ownerName: String(payload.ownerName || ''),
+                setupLink,
+                tuitionName: String(payload.instituteName || payload.tuitionName || '')
+            };
+            await Promise.allSettled([
+                sendSetupLinkWhatsApp(String(payload.phone || ''), notificationData),
+                sendSetupLinkEmail(String(payload.email || ''), notificationData)
+            ]);
+
+            secureLogger.info('[ONBOARDING] Subscription account provisioned', { instituteId: sub.instituteId });
+
+            return res.json({
+                success: true,
+                mode: 'SUBSCRIPTION',
+                setupLink,
+                message: 'Mandate verified. Setup link sent to your WhatsApp and email.'
+            });
+        }
+
         const payment = await verifyAndClaimOnboardingPayment({ orderId: String(req.body.razorpay_order_id || ''), paymentId: String(req.body.razorpay_payment_id || ''), signature: String(req.body.razorpay_signature || '') });
         const provisioned = await provisionClaimedOnboardingPayment(payment);
         if (!provisioned.inviteToken) return res.status(409).json({ error: 'Setup already completed.' });
@@ -172,7 +257,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
     } catch (error) {
         if (error instanceof OnboardingPaymentError) return res.status(['ONBOARDING_PAYMENT_ALREADY_USED', 'ONBOARDING_LINK_NOT_AVAILABLE'].includes(error.message) ? 409 : 400).json({ error: error.message });
         console.error('Verify Payment Error:', error);
-        res.status(500).json({ error: 'Internal server error during payment verification.' });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error during payment verification.' });
     }
 };
 

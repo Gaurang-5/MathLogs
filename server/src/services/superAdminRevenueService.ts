@@ -394,10 +394,12 @@ export async function listRevenueSubscriptions(input: { q?: string; plan?: strin
 export async function getInstituteBillingHistory(instituteId: string) {
   const institute = await prisma.institute.findUnique({ where: { id: instituteId }, select: { razorpaySubscriptionId: true, plan: true, billingCycle: true, planStartDate: true, planExpiryDate: true, trialStartedAt: true, trialEndsAt: true, marketplaceAccessGrantedAt: true, includedQuizCredits: true, includedQuizCreditsExpireAt: true, lifetimeQuizCredits: true, quizCreditsRenewAt: true } });
   if (!institute) throw new RevenueServiceError('INSTITUTE_NOT_FOUND');
-  const [operations, notifications, payments, provider] = await Promise.all([
+  const [operations, notifications, payments, subscriptions, charges, provider] = await Promise.all([
     prisma.superAdminBillingOperation.findMany({ where: { instituteId }, orderBy: { createdAt: 'desc' }, take: 100 }),
     prisma.planNotification.findMany({ where: { instituteId }, orderBy: { scheduledAt: 'desc' }, take: 100 }),
     prisma.billingPayment.findMany({ where: { instituteId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+    prisma.planSubscription.findMany({ where: { instituteId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+    prisma.planSubscriptionCharge.findMany({ where: { subscription: { instituteId } }, orderBy: { createdAt: 'desc' }, take: 100 }),
     readBillingProviderHistory(institute.razorpaySubscriptionId)
   ]);
   let plan: CanonicalPlan;
@@ -408,5 +410,5 @@ export async function getInstituteBillingHistory(instituteId: string) {
     includedQuizCredits: institute.includedQuizCredits, lifetimeQuizCredits: institute.lifetimeQuizCredits,
     totalUsableQuizCredits: access.usableQuizCredits,
     includedQuizCreditsExpireAt: institute.includedQuizCreditsExpireAt, quizCreditsRenewAt: institute.quizCreditsRenewAt,
-    operations: operations.map(publicOperation), payments, notifications, ...provider };
+    operations: operations.map(publicOperation), payments, subscription: subscriptions[0] ?? null, subscriptions, charges, notifications, ...provider };
 }

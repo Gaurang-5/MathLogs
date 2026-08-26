@@ -23,12 +23,6 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 const button = (container: HTMLElement, label: string) => Array.from(container.querySelectorAll('button'))
   .find(item => item.textContent?.includes(label)) as HTMLButtonElement;
 
-function setInput(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-  setter?.call(input, value);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
 describe('SetupAccount fee-system selection', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -64,15 +58,6 @@ describe('SetupAccount fee-system selection', () => {
       await flush();
     });
     await act(async () => {
-      button(container, 'Continue').click();
-      await flush();
-    });
-
-    const username = container.querySelector('input[placeholder="e.g. rahul_sir"]') as HTMLInputElement;
-    const password = container.querySelector('input[type="password"]') as HTMLInputElement;
-    await act(async () => {
-      setInput(username, 'teacher');
-      setInput(password, 'secret12');
       (container.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       await flush();
     });

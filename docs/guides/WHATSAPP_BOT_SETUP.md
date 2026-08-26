@@ -80,6 +80,13 @@ WHATSAPP_TEMPLATE_PLAN_PAYMENT_DUE=
 WHATSAPP_TEMPLATE_PLAN_PAYMENT_FAILED=
 WHATSAPP_TEMPLATE_PLAN_PAYMENT_SUCCEEDED=
 WHATSAPP_TEMPLATE_PLAN_MARKETPLACE_FALLBACK=
+WHATSAPP_TEMPLATE_AUTOPAY_AUTHORIZED=
+WHATSAPP_TEMPLATE_AUTOPAY_ACTIVATED=
+WHATSAPP_TEMPLATE_AUTOPAY_CHARGE_UPCOMING=
+WHATSAPP_TEMPLATE_AUTOPAY_GRACE_ENDING=
+WHATSAPP_TEMPLATE_AUTOPAY_RECOVERED=
+WHATSAPP_TEMPLATE_AUTOPAY_CANCELLED=
+WHATSAPP_TEMPLATE_AUTOPAY_COMPLETED=
 ```
 
 Every template uses the same ordered body variables: `owner_name`, `institute_name`, `plan_label`, `billing_cycle`, `formatted_amount`, `due_or_expiry_date`, `payment_link`, and `support_contact`. Keep that order unchanged in Meta. Email uses the configured no-reply SMTP account and the same persisted billing values.

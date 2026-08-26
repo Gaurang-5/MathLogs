@@ -12,6 +12,9 @@ import { OnboardingPaymentError, persistOnboardingOrder, provisionClaimedOnboard
 import { normalizeTrialOwnerIdentity } from '../services/subscriptionLifecycleService';
 import { includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
 import { scheduleLifecycleNotifications } from '../services/planNotificationService';
+import { planSubscriptionCheckoutService } from '../services/planSubscriptionCheckoutService';
+import { planSubscriptionLifecycleService } from '../services/planSubscriptionLifecycleService';
+import { type ProvisioningInput } from '../services/accountProvisioningService';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -43,42 +46,41 @@ export const createAdminOnboardingLink = async (req: Request, res: Response) => 
     if (!['MARKETPLACE', 'QUIZ', 'ENTERPRISE'].includes(String(plan).toUpperCase())) return res.status(400).json({ error: 'Valid canonical plan is required.' });
     const canonicalPlan = String(plan).toUpperCase();
     const canonicalCycle = String(billingCycle).toUpperCase();
-    if (canonicalPlan === 'MARKETPLACE' && (canonicalCycle !== 'ONE_TIME' || startTrial)) return res.status(400).json({ error: 'Marketplace requires ONE_TIME billing and has no trial.' });
-    if (canonicalPlan !== 'MARKETPLACE' && !['MONTHLY', 'YEARLY'].includes(canonicalCycle)) return res.status(400).json({ error: 'Quiz and Enterprise require MONTHLY or YEARLY billing.' });
+    if (canonicalPlan === 'MARKETPLACE' && canonicalCycle !== 'ONE_TIME') return res.status(400).json({ error: 'Marketplace requires ONE_TIME.' });
+    if (canonicalPlan !== 'MARKETPLACE' && !['MONTHLY', 'YEARLY'].includes(canonicalCycle)) return res.status(400).json({ error: 'Paid plans require MONTHLY or YEARLY.' });
+
+    const token = crypto.randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days valid
 
     try {
-        const token = crypto.randomBytes(16).toString('hex');
-
         const link = await prisma.adminOnboardingLink.create({
             data: {
                 token,
                 plan: canonicalPlan,
-                billingCycle: canonicalCycle,
-                discountPercent: 0,
-                customPriceMonthlyPaise: null,
-                customPriceYearlyPaise: null,
+                billingCycle: canonicalCycle === 'YEARLY' ? 'yearly' : 'monthly',
                 isFreeTrial: Boolean(startTrial),
-                trialDays: startTrial ? 14 : null,
-                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+                trialDays: 14,
+                expiresAt
             }
         });
 
         const clientUrl = getClientUrl(req);
-        const onboardUrl = `${clientUrl}/join/${link.token}`;
-
         res.json({
             success: true,
-            link: onboardUrl,
-            token: link.token,
-            id: link.id
+            link: {
+                ...link,
+                url: `${clientUrl}/onboard?token=${token}`,
+                monthlyPrice: getPriceInPaise(link, 'monthly') / 100,
+                yearlyPrice: getPriceInPaise(link, 'yearly') / 100,
+            }
         });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Create Admin Onboarding Link Error:', error);
-        res.status(500).json({ error: 'Failed to create onboarding link.' });
+        res.status(500).json({ error: 'Failed to create link.' });
     }
 };
 
-// PUBLIC: Get onboarding link details (for the join page)
+// PUBLIC: Get details of an onboarding link (for checkout page)
 export const getAdminOnboardingLink = async (req: Request, res: Response) => {
     const { token } = req.params;
 
@@ -87,23 +89,28 @@ export const getAdminOnboardingLink = async (req: Request, res: Response) => {
             where: { token: String(token) }
         });
 
-        if (!link) return res.status(404).json({ error: 'Link not found.' });
-        if (link.status !== 'PENDING') return res.status(400).json({ error: 'This link has already been used.' });
-        if (new Date() > link.expiresAt) return res.status(400).json({ error: 'This link has expired.' });
+        if (!link) {
+            return res.status(404).json({ error: 'Link not found or has been revoked.' });
+        }
 
-        // Calculate prices for display
-        const monthlyPrice = getPriceInPaise(link, 'monthly') / 100;
-        const yearlyPrice = getPriceInPaise(link, 'yearly') / 100;
+        if (link.status !== 'PENDING') {
+            return res.status(400).json({ error: 'This onboarding link has already been used.' });
+        }
+
+        if (new Date() > link.expiresAt) {
+            return res.status(400).json({ error: 'This onboarding link has expired.' });
+        }
 
         res.json({
-            valid: true,
             plan: link.plan,
-            discountPercent: link.discountPercent,
-            monthlyPrice,
-            yearlyPrice,
-            unlimitedStudents: true,
+            billingCycle: link.billingCycle,
             isFreeTrial: link.isFreeTrial,
             trialDays: link.trialDays,
+            monthlyPrice: getPriceInPaise(link, 'monthly') / 100,
+            yearlyPrice: getPriceInPaise(link, 'yearly') / 100,
+            monthlyPricePaise: getPriceInPaise(link, 'monthly'),
+            yearlyPricePaise: getPriceInPaise(link, 'yearly'),
+            expiresAt: link.expiresAt,
         });
     } catch (error) {
         console.error('Get Admin Onboarding Link Error:', error);
@@ -111,7 +118,7 @@ export const getAdminOnboardingLink = async (req: Request, res: Response) => {
     }
 };
 
-// PUBLIC: Create Razorpay order for an admin onboarding link
+// PUBLIC: Create payment order for admin onboarding link
 export const createAdminOnboardingOrder = async (req: Request, res: Response) => {
     const { token, billingCycle, instituteName, teacherName, phoneNumber, email } = req.body;
 
@@ -216,7 +223,7 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
             });
         }
 
-        const selectedBillingCycle = String(link.billingCycle || '').toLowerCase();
+        const selectedBillingCycle = String(billingCycle || link.billingCycle || '').toLowerCase();
         if (link.plan !== 'MARKETPLACE' && !['monthly', 'yearly'].includes(selectedBillingCycle)) return res.status(400).json({ error: 'Onboarding link has an invalid billing cycle.' });
 
         const amountInPaise = link.plan === 'MARKETPLACE' ? 0 : getPriceInPaise(link, selectedBillingCycle as 'monthly' | 'yearly');
@@ -306,7 +313,42 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
             });
         }
 
-        // Create Razorpay Order (for paid plans)
+        if (selectedBillingCycle === 'monthly') {
+            const canonicalPlan = normalizePlanId(link.plan);
+            if (canonicalPlan === 'MARKETPLACE') return res.status(400).json({ error: 'Marketplace does not support monthly recurring mandate.' });
+            const provisioning: ProvisioningInput = {
+                kind: 'INVITE',
+                onboardingLinkId: link.id,
+                instituteName: instituteName || 'New Institute',
+                ownerName: teacherName || '',
+                phone: phoneNumber || '',
+                email: email || ''
+            };
+            const session = await planSubscriptionCheckoutService.createMonthlySubscriptionCheckout({
+                context: {
+                    kind: 'INVITE_ONBOARDING',
+                    onboardingLinkId: link.id,
+                    ownerIdentity: phoneNumber || email || '',
+                    provisioning
+                },
+                plan: canonicalPlan
+            });
+            return res.json({
+                success: true,
+                mode: 'SUBSCRIPTION',
+                subscriptionId: session.subscriptionId,
+                keyId: session.keyId,
+                plan: session.plan,
+                billingCycle: session.billingCycle,
+                amount: session.amount,
+                currency: session.currency,
+                trialEligible: session.trialEligible,
+                firstChargeAt: session.firstChargeAt.toISOString(),
+                totalCount: session.totalCount
+            });
+        }
+
+        // Create Razorpay Order (for yearly paid plans)
         const order = await razorpay.orders.create({
             amount: amountInPaise,
             currency: 'INR',
@@ -328,6 +370,7 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
 
         res.json({
             success: true,
+            mode: 'ORDER',
             orderId: order.id,
             amount: order.amount,
             currency: order.currency,
@@ -338,7 +381,7 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
         if (error instanceof OnboardingPaymentError) return res.status(409).json({ error: error.message });
         if (error?.code === 'P2002') return res.status(409).json({ error: 'TRIAL_ALREADY_USED' });
         console.error('Create Admin Onboarding Order Error:', error);
-        res.status(500).json({ error: 'Failed to create payment order.' });
+        res.status(500).json({ error: error?.message || 'Failed to create payment order.' });
     }
 };
 
@@ -347,8 +390,64 @@ export const verifyAdminOnboardingPayment = async (req: Request, res: Response) 
     try {
         const link = await prisma.adminOnboardingLink.findUnique({ where: { token: String(req.body.token || '') } });
         if (!link) return res.status(404).json({ error: 'Link not found.' });
-        if (link.status !== 'PENDING') return res.status(400).json({ error: 'This link has already been used.' });
-        if (new Date() > link.expiresAt) return res.status(400).json({ error: 'This link has expired.' });
+        const isSubscriptionVerification = Boolean(req.body.razorpay_subscription_id);
+        if (link.status !== 'PENDING' && !isSubscriptionVerification) return res.status(400).json({ error: 'This link has already been used.' });
+        if (!['PENDING', 'PROCESSING', 'USED'].includes(link.status)) return res.status(400).json({ error: 'This link is not available.' });
+        if (link.status === 'PENDING' && new Date() > link.expiresAt) return res.status(400).json({ error: 'This link has expired.' });
+
+        if (req.body.razorpay_subscription_id) {
+            await planSubscriptionCheckoutService.verifyMonthlySubscriptionCheckout({
+                razorpay_payment_id: String(req.body.razorpay_payment_id || ''),
+                razorpay_subscription_id: String(req.body.razorpay_subscription_id || ''),
+                razorpay_signature: String(req.body.razorpay_signature || ''),
+                contextKind: 'INVITE_ONBOARDING',
+                onboardingLinkId: link.id
+            });
+            await planSubscriptionLifecycleService.applySubscriptionEvent({
+                kind: 'AUTHENTICATED',
+                providerSubscriptionId: String(req.body.razorpay_subscription_id)
+            });
+            const sub = await prisma.planSubscription.findUniqueOrThrow({
+                where: { providerSubscriptionId: String(req.body.razorpay_subscription_id) }
+            });
+            if (sub.onboardingLinkId !== link.id || (link.instituteId && sub.instituteId !== link.instituteId)) {
+                return res.status(400).json({ error: 'SUBSCRIPTION_BINDING_MISMATCH' });
+            }
+            if (!sub.instituteId) {
+                return res.status(500).json({ error: 'INSTITUTE_PROVISIONING_FAILED' });
+            }
+            const invite = await prisma.inviteToken.findFirst({
+                where: { instituteId: sub.instituteId, isUsed: false },
+                orderBy: { createdAt: 'desc' }
+            });
+            if (!invite) return res.status(409).json({ error: 'Setup already completed.' });
+
+            const payload = (sub.provisioningData as Record<string, any>) || {};
+            const clientUrl = getClientUrl(req);
+            const setupLink = `${clientUrl}/setup?token=${invite.token}`;
+
+            const notifPhone = String(payload.phone || payload.phoneNumber || '');
+            const notificationData = {
+                ownerName: String(payload.ownerName || payload.teacherName || 'there'),
+                setupLink,
+                tuitionName: String(payload.instituteName || 'New Institute')
+            };
+
+            if (notifPhone) {
+                await Promise.allSettled([
+                    sendSetupLinkWhatsApp(notifPhone, notificationData),
+                    payload.email ? sendSetupLinkEmail(String(payload.email), notificationData) : Promise.resolve()
+                ]);
+            }
+
+            return res.json({
+                success: true,
+                mode: 'SUBSCRIPTION',
+                setupLink,
+                message: 'Mandate verified. Setup link sent to your WhatsApp and email.'
+            });
+        }
+
         const payment = await verifyAndClaimOnboardingPayment({ orderId: String(req.body.razorpay_order_id || ''), paymentId: String(req.body.razorpay_payment_id || ''), signature: String(req.body.razorpay_signature || ''), onboardingLinkId: link.id });
         const provisioned = await provisionClaimedOnboardingPayment(payment);
         if (!provisioned.inviteToken) return res.status(409).json({ error: 'Setup already completed.' });

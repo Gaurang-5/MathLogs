@@ -7,7 +7,11 @@ DECLARE
     v_balance DOUBLE PRECISION;
     v_last_payment TIMESTAMP;
     v_batch_id TEXT;
-BEGIN
+    -- If student ID is null or student does not exist, exit immediately
+    IF p_student_id IS NULL OR NOT EXISTS (SELECT 1 FROM "Student" WHERE id = p_student_id) THEN
+        RETURN;
+    END IF;
+
     -- ATOMIC LOCK: Lock the student row to prevent concurrent recalcs stomping each other
     PERFORM 1 FROM "Student" WHERE id = p_student_id FOR NO KEY UPDATE;
 
@@ -16,15 +20,22 @@ BEGIN
     FROM "Student" s
     WHERE s.id = p_student_id;
 
+    -- If student row disappeared or is no longer present
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
+
     -- If no batch, set defaults and exit
     IF v_batch_id IS NULL THEN
-        INSERT INTO "StudentBalance" ("studentId", "totalFee", "totalPaid", "balance", "lastPaymentDate", "updatedAt")
-        VALUES (p_student_id, 0, 0, 0, NULL, NOW())
-        ON CONFLICT ("studentId") DO UPDATE SET
-            "totalFee" = 0,
-            "totalPaid" = 0,
-            "balance" = 0,
-            "updatedAt" = NOW();
+        IF EXISTS (SELECT 1 FROM "Student" WHERE id = p_student_id) THEN
+            INSERT INTO "StudentBalance" ("studentId", "totalFee", "totalPaid", "balance", "lastPaymentDate", "updatedAt")
+            VALUES (p_student_id, 0, 0, 0, NULL, NOW())
+            ON CONFLICT ("studentId") DO UPDATE SET
+                "totalFee" = 0,
+                "totalPaid" = 0,
+                "balance" = 0,
+                "updatedAt" = NOW();
+        END IF;
         RETURN;
     END IF;
 
@@ -82,15 +93,17 @@ BEGIN
         SELECT MAX(fp.date) as latest_date FROM "FeePayment" fp WHERE fp."studentId" = p_student_id
     ) dates;
 
-    -- Upsert balance
-    INSERT INTO "StudentBalance" ("studentId", "totalFee", "totalPaid", "balance", "lastPaymentDate", "updatedAt")
-    VALUES (p_student_id, v_total_fee, v_total_paid, v_balance, v_last_payment, NOW())
-    ON CONFLICT ("studentId") DO UPDATE SET
-        "totalFee" = EXCLUDED."totalFee",
-        "totalPaid" = EXCLUDED."totalPaid",
-        "balance" = EXCLUDED."balance",
-        "lastPaymentDate" = EXCLUDED."lastPaymentDate",
-        "updatedAt" = NOW();
+    -- Upsert balance only if student still exists
+    IF EXISTS (SELECT 1 FROM "Student" WHERE id = p_student_id) THEN
+        INSERT INTO "StudentBalance" ("studentId", "totalFee", "totalPaid", "balance", "lastPaymentDate", "updatedAt")
+        VALUES (p_student_id, v_total_fee, v_total_paid, v_balance, v_last_payment, NOW())
+        ON CONFLICT ("studentId") DO UPDATE SET
+            "totalFee" = EXCLUDED."totalFee",
+            "totalPaid" = EXCLUDED."totalPaid",
+            "balance" = EXCLUDED."balance",
+            "lastPaymentDate" = EXCLUDED."lastPaymentDate",
+            "updatedAt" = NOW();
+    END IF;
 END;
 $$ LANGUAGE plpgsql;
 

@@ -367,9 +367,10 @@ router.get('/stats/finance-growth', authenticateToken as any, getFinancialGrowth
 router.get('/stats/class-average', authenticateToken as any, getClassAverageStats as any);
 
 
-import { createBillingSession, verifyBillingPayment, cancelSubscription } from '../controllers/billingController';
+import { createBillingSession, verifyBillingPayment, cancelSubscription, getBillingSubscription } from '../controllers/billingController';
 router.post('/billing/create', authenticateToken as any, createBillingSession as any);
 router.post('/billing/verify', authenticateToken as any, verifyBillingPayment as any);
+router.get('/billing/subscription', authenticateToken as any, getBillingSubscription as any);
 router.delete('/billing/cancel', authenticateToken as any, cancelSubscription as any);
 
 import { getMyInstitute, uploadLogo, updateMyInstituteConfig } from '../controllers/instituteController';
@@ -384,6 +385,8 @@ router.get('/invites/:token', publicLimiter, validateInvite as any);
 router.post('/auth/setup-account', publicLimiter, validateRequest(setupAccountSchema), setupAccount as any);
 
 // Onboarding
+router.post('/onboarding/send-phone-otp', publicLimiter, sendSignupOtp as any);
+router.post('/onboarding/verify-phone-otp', publicLimiter, verifySignupOtp as any);
 router.post('/onboarding/lead', publicLimiter, trackLead as any);
 router.post('/onboarding/create-order', publicLimiter, createOrder as any);
 router.post('/onboarding/verify-payment', publicLimiter, verifyPayment as any);

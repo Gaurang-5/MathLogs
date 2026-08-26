@@ -29,6 +29,18 @@ before(async () => {
     }
   });
   instituteId = institute.id;
+  const subscription = await prisma.planSubscription.create({ data: {
+    instituteId: institute.id, ownerIdentityHash: `history-${suffix}`,
+    providerSubscriptionId: `sub_history_${Date.now()}`, providerPlanId: 'plan_enterprise_history',
+    plan: 'ENTERPRISE', billingCycle: 'MONTHLY', amountPaise: 49_900, currency: 'INR', totalCount: 120,
+    trialEligible: false, intendedStartAt: new Date(), status: 'PENDING',
+    nextChargeAt: new Date(Date.now() + 86_400_000), currentPeriodEnd: institute.planExpiryDate,
+    graceEndsAt: new Date(Date.now() + 3 * 86_400_000)
+  } });
+  await prisma.planSubscriptionCharge.create({ data: {
+    planSubscriptionId: subscription.id, providerPaymentId: `pay_history_${Date.now()}`,
+    amountPaise: 49_900, currency: 'INR', periodStart: new Date(), periodEnd: institute.planExpiryDate!, creditedAt: new Date()
+  } });
   const admin = await prisma.admin.create({
     data: { username: `revenue-super-${suffix}`, password: await bcrypt.hash('test', 4), role: 'SUPER_ADMIN' }
   });
@@ -160,6 +172,10 @@ test('billing history separates local operations from sanitized provider state',
   assert.equal(body.data.lifetimeQuizCredits, 22);
   assert.ok(Array.isArray(body.data.notifications));
   assert.ok(Array.isArray(body.data.payments));
+  assert.equal(body.data.subscription.status, 'PENDING');
+  assert.equal(body.data.subscription.amountPaise, 49_900);
+  assert.ok(body.data.subscription.graceEndsAt);
+  assert.equal(body.data.charges.length, 1);
   assert.equal(JSON.stringify(body).includes('key_secret'), false);
   assert.equal(JSON.stringify(body).includes('customer'), false);
 });

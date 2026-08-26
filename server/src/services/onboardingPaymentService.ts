@@ -64,44 +64,80 @@ function safeSlug(name: string, id: string): string {
   return `${base}-${id.replace(/-/g, '').slice(0, 8)}`;
 }
 
+import {
+  provisionInstitute,
+  AccountProvisioningError,
+  type ProvisioningInput,
+  type ProvisioningActivation
+} from './accountProvisioningService';
+
 export async function provisionClaimedOnboardingPayment(payment: OnboardingPayment) {
   if (payment.status === 'COMPLETED' && payment.provisionedInstituteId) {
-    const invite = await prisma.inviteToken.findFirst({ where: { instituteId: payment.provisionedInstituteId, isUsed: false }, orderBy: { createdAt: 'desc' } });
+    const invite = await prisma.inviteToken.findFirst({
+      where: { instituteId: payment.provisionedInstituteId, isUsed: false },
+      orderBy: { createdAt: 'desc' }
+    });
     return { instituteId: payment.provisionedInstituteId, inviteToken: invite?.token ?? null, replay: true };
   }
   if (payment.status !== 'ACTIVATING') throw new OnboardingPaymentError('ONBOARDING_PAYMENT_NOT_CLAIMED');
   const payload = payment.provisioningData as Record<string, any>;
   const now = new Date();
   const planExpiryDate = expiry(now, payment.billingCycle);
-  const period = includedCreditPeriod({ planStartDate: now }, now);
-  const provision = () => prisma.$transaction(async tx => {
-    const current = await tx.onboardingPayment.findUniqueOrThrow({ where: { id: payment.id } });
-    if (current.status !== 'ACTIVATING' || current.provisionedInstituteId) throw new OnboardingPaymentError('ONBOARDING_PAYMENT_ALREADY_USED');
-    const institute = await tx.institute.create({ data: {
-      name: String(payload.tuitionName || payload.instituteName || 'New Institute'),
-      teacherName: String(payload.ownerName || payload.teacherName || ''), phoneNumber: String(payload.phone || payload.phoneNumber || ''),
-      publicPhone: String(payload.phone || payload.phoneNumber || '') || null, whatsappPhone: String(payload.phone || payload.phoneNumber || '') || null,
-      email: String(payload.email || '') || null, slug: safeSlug(String(payload.tuitionName || payload.instituteName || 'coaching'), payment.id),
-      plan: payment.plan, billingCycle: payment.billingCycle, planStartDate: now, planExpiryDate,
-      marketplaceAccessGrantedAt: now, includedQuizCredits: 5, lifetimeQuizCredits: 0, quizCredits: 5,
-      includedQuizCreditsExpireAt: period.includedQuizCreditsExpireAt, quizCreditsRenewAt: period.quizCreditsRenewAt,
-      canonicalPlanMigratedAt: now, isPubliclyListed: payload.listOnMarketplace ?? true,
-      city: payload.city ? String(payload.city).trim() : null, area: payload.area ? String(payload.area).trim() : null,
-      subjectsOffered: Array.isArray(payload.subjectsOffered) ? payload.subjectsOffered : [],
-      googleMapsUrl: payload.googleMapsUrl ? String(payload.googleMapsUrl).trim() : null,
-      config: { requiresGrades: true, allowedClasses: ['Class 6','Class 7','Class 8','Class 9','Class 10','Class 11','Class 12'], subjects: ['Mathematics','Science','Physics','Chemistry','Biology','English'] }
-    } });
-    const invite = await tx.inviteToken.create({ data: { token: crypto.randomBytes(24).toString('hex'), instituteId: institute.id, expiresAt: new Date(now.getTime() + 7 * 86_400_000) } });
-    if (payment.onboardingLinkId) {
-      const link = await tx.adminOnboardingLink.updateMany({ where: { id: payment.onboardingLinkId, status: 'PENDING', expiresAt: { gt: now } }, data: { status: 'USED', instituteId: institute.id } });
-      if (link.count !== 1) throw new OnboardingPaymentError('ONBOARDING_LINK_NOT_AVAILABLE');
+
+  const input: ProvisioningInput = {
+    kind: payment.onboardingLinkId ? 'INVITE' : 'PUBLIC',
+    onboardingLinkId: payment.onboardingLinkId ?? undefined,
+    instituteName: String(payload.tuitionName || payload.instituteName || 'New Institute'),
+    ownerName: String(payload.ownerName || payload.teacherName || ''),
+    phone: String(payload.phone || payload.phoneNumber || ''),
+    email: String(payload.email || ''),
+    marketplace: {
+      listed: payload.listOnMarketplace ?? true,
+      city: payload.city ? String(payload.city).trim() : undefined,
+      area: payload.area ? String(payload.area).trim() : undefined,
+      subjects: Array.isArray(payload.subjectsOffered) ? payload.subjectsOffered : undefined,
+      googleMapsUrl: payload.googleMapsUrl ? String(payload.googleMapsUrl).trim() : undefined
     }
-    await tx.onboardingPayment.update({ where: { id: payment.id }, data: { status: 'COMPLETED', provisionedInstituteId: institute.id, completedAt: now } });
-    return { instituteId: institute.id, inviteToken: invite.token, replay: false };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 120_000, timeout: 120_000 });
+  };
+
+  const activation: ProvisioningActivation = {
+    kind: 'PAID',
+    plan: payment.plan as 'QUIZ' | 'ENTERPRISE',
+    billingCycle: payment.billingCycle as 'MONTHLY' | 'YEARLY',
+    startsAt: now,
+    endsAt: planExpiryDate
+  };
+
+  const provision = () =>
+    prisma.$transaction(
+      async tx => {
+        const current = await tx.onboardingPayment.findUniqueOrThrow({ where: { id: payment.id } });
+        if (current.status !== 'ACTIVATING' || current.provisionedInstituteId) {
+          throw new OnboardingPaymentError('ONBOARDING_PAYMENT_ALREADY_USED');
+        }
+        let provisioned;
+        try {
+          provisioned = await provisionInstitute(tx, input, activation);
+        } catch (error) {
+          if (error instanceof AccountProvisioningError && error.message === 'ONBOARDING_LINK_NOT_AVAILABLE') {
+            throw new OnboardingPaymentError('ONBOARDING_LINK_NOT_AVAILABLE');
+          }
+          throw error;
+        }
+        await tx.onboardingPayment.update({
+          where: { id: payment.id },
+          data: { status: 'COMPLETED', provisionedInstituteId: provisioned.instituteId, completedAt: now }
+        });
+        return { instituteId: provisioned.instituteId, inviteToken: provisioned.inviteToken, replay: false };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 120_000, timeout: 120_000 }
+    );
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    try { return await provision(); }
-    catch (error) {
+    try {
+      return await provision();
+    } catch (error) {
+      if (error instanceof OnboardingPaymentError) throw error;
       const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
       if (!retryable || attempt === 2) throw error;
     }

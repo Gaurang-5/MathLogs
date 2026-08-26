@@ -1,7 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 
-export type PlanNotificationEvent = 'TRIAL_STARTED' | 'PLAN_ACTIVATED' | 'EXPIRY_APPROACHING' | 'PAYMENT_DUE' | 'PAYMENT_FAILED' | 'PAYMENT_SUCCEEDED' | 'MARKETPLACE_FALLBACK';
+export type PlanNotificationEvent =
+  | 'TRIAL_STARTED' | 'PLAN_ACTIVATED' | 'EXPIRY_APPROACHING' | 'PAYMENT_DUE'
+  | 'PAYMENT_FAILED' | 'PAYMENT_SUCCEEDED' | 'MARKETPLACE_FALLBACK'
+  | 'AUTOPAY_AUTHORIZED' | 'AUTOPAY_ACTIVATED' | 'AUTOPAY_CHARGE_UPCOMING'
+  | 'AUTOPAY_GRACE_ENDING' | 'AUTOPAY_RECOVERED' | 'AUTOPAY_CANCELLED' | 'AUTOPAY_COMPLETED';
 export type PlanTemplateVariables = {
   ownerName: string; instituteName: string; planLabel: string; cycle: string;
   amount: string; date: string; paymentLink: string; supportContact: string;
@@ -16,7 +20,14 @@ export const PLAN_NOTIFICATION_TEMPLATES = {
   PAYMENT_DUE: { subject: 'Payment due for your MathLogs plan', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_PLAN_PAYMENT_DUE', render: (v: PlanTemplateVariables) => renderText('Your plan payment is due.', v) },
   PAYMENT_FAILED: { subject: 'MathLogs payment needs attention', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_PLAN_PAYMENT_FAILED', render: (v: PlanTemplateVariables) => renderText('We could not confirm your payment.', v) },
   PAYMENT_SUCCEEDED: { subject: 'MathLogs payment confirmed', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_PLAN_PAYMENT_SUCCEEDED', render: (v: PlanTemplateVariables) => renderText('Your payment was confirmed.', v) },
-  MARKETPLACE_FALLBACK: { subject: 'Your MathLogs Marketplace access continues', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_PLAN_MARKETPLACE_FALLBACK', render: (v: PlanTemplateVariables) => renderText('Your paid features ended; Marketplace access remains active.', v) }
+  MARKETPLACE_FALLBACK: { subject: 'Your MathLogs Marketplace access continues', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_PLAN_MARKETPLACE_FALLBACK', render: (v: PlanTemplateVariables) => renderText('Your paid features ended; Marketplace access remains active.', v) },
+  AUTOPAY_AUTHORIZED: { subject: 'MathLogs AutoPay is authorized', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_AUTOPAY_AUTHORIZED', render: (v: PlanTemplateVariables) => renderText('Your AutoPay mandate is authorized.', v) },
+  AUTOPAY_ACTIVATED: { subject: 'MathLogs AutoPay is active', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_AUTOPAY_ACTIVATED', render: (v: PlanTemplateVariables) => renderText('Your first monthly payment was confirmed and AutoPay is active.', v) },
+  AUTOPAY_CHARGE_UPCOMING: { subject: 'Upcoming MathLogs AutoPay charge', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_AUTOPAY_CHARGE_UPCOMING', render: (v: PlanTemplateVariables) => renderText('Your next monthly AutoPay charge is coming up.', v) },
+  AUTOPAY_GRACE_ENDING: { subject: 'MathLogs AutoPay grace period ending', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_AUTOPAY_GRACE_ENDING', render: (v: PlanTemplateVariables) => renderText('Your AutoPay retry grace period is ending.', v) },
+  AUTOPAY_RECOVERED: { subject: 'MathLogs AutoPay payment recovered', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_AUTOPAY_RECOVERED', render: (v: PlanTemplateVariables) => renderText('Your AutoPay retry succeeded and paid access is active.', v) },
+  AUTOPAY_CANCELLED: { subject: 'MathLogs AutoPay cancellation confirmed', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_AUTOPAY_CANCELLED', render: (v: PlanTemplateVariables) => renderText('Your AutoPay cancellation is confirmed.', v) },
+  AUTOPAY_COMPLETED: { subject: 'MathLogs AutoPay completed', whatsappEnvironmentKey: 'WHATSAPP_TEMPLATE_AUTOPAY_COMPLETED', render: (v: PlanTemplateVariables) => renderText('Your AutoPay subscription has completed.', v) }
 } as const;
 
 export function lifecycleReminderSchedule(expiry: Date) {

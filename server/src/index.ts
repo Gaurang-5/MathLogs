@@ -20,6 +20,7 @@ import { startSuperAdminBillingWorker } from './workers/superAdminBillingWorker'
 import { runLifecycleSweep } from './services/subscriptionLifecycleService';
 import { handleRazorpayBillingWebhook } from './controllers/billingWebhookController';
 import { dispatchDuePlanNotifications } from './services/planNotificationService';
+import { planSubscriptionReconciliationService } from './services/planSubscriptionReconciliationService';
 
 
 
@@ -413,9 +414,11 @@ function startServer() {
         startSuperAdminBillingWorker();
         if (process.env.NODE_ENV !== 'test') {
             void runLifecycleSweep().catch(error => secureLogger.error('[Lifecycle] Initial sweep failed', error));
+            void planSubscriptionReconciliationService.reconcileDueSubscriptions().catch(error => secureLogger.error('[AutoPay] Initial reconciliation failed', error));
             void dispatchDuePlanNotifications().catch(error => secureLogger.error('[Lifecycle] Initial notification dispatch failed', error));
             const lifecycleTimer = setInterval(() => {
                 void runLifecycleSweep().catch(error => secureLogger.error('[Lifecycle] Sweep failed', error));
+                void planSubscriptionReconciliationService.reconcileDueSubscriptions().catch(error => secureLogger.error('[AutoPay] Reconciliation failed', error));
                 void dispatchDuePlanNotifications().catch(error => secureLogger.error('[Lifecycle] Notification dispatch failed', error));
             }, 60 * 60 * 1000);
             lifecycleTimer.unref();

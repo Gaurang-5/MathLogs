@@ -1,5 +1,5 @@
 import { apiRequest } from '../../utils/api';
-import type { BillingOperation, BillingOperationDraft, BillingPreview, RevenueOverviewData, SubscriptionResponse } from './types';
+import type { AutoPayBillingHistory, BillingOperation, BillingOperationDraft, BillingPreview, RevenueOverviewData, SubscriptionResponse } from './types';
 
 type Envelope<T> = { success: boolean; data: T; error?: string; message?: string; replay?: boolean };
 async function request<T>(path: string, method: 'GET' | 'POST' = 'GET', body?: unknown, headers?: Record<string, string>) {
@@ -15,5 +15,5 @@ export const superAdminRevenueApi = {
   subscriptions: (filters: { q?: string; plan?: string; page?: number; pageSize?: number }) => request<SubscriptionResponse>(`/super-admin/revenue/subscriptions${query(filters)}`),
   preview: (instituteId: string, draft: BillingOperationDraft) => request<BillingPreview>(`/super-admin/institutes/${instituteId}/billing-operations/preview`, 'POST', draft),
   apply: (instituteId: string, draft: BillingOperationDraft, idempotencyKey: string, challengeId?: string) => request<BillingOperation>(`/super-admin/institutes/${instituteId}/billing-operations`, 'POST', draft, { 'Idempotency-Key': idempotencyKey, ...(challengeId ? { 'X-Superadmin-Challenge': challengeId } : {}) }),
-  history: (instituteId: string) => request<{ operations: BillingOperation[]; providerState: string; subscriptionPayments: unknown[]; invoices: unknown[] }>(`/super-admin/institutes/${instituteId}/billing-history`)
+  history: (instituteId: string) => request<AutoPayBillingHistory>(`/super-admin/institutes/${instituteId}/billing-history`)
 };

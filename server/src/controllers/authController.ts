@@ -25,7 +25,7 @@ function accessFlags(institute: Parameters<typeof effectiveEntitlements>[0] | nu
 /**
  * Helper to generate and store Short-Lived Access Token (1h) + Long-Lived Refresh Token (30d)
  */
-const generateAuthTokens = async (admin: any, req?: Request, existingSessionId?: string | null) => {
+export const generateAuthTokens = async (admin: any, req?: Request, existingSessionId?: string | null) => {
     // Refresh Token: Cryptographically secure string, 30 day expiry in DB
     const refreshTokenString = crypto.randomBytes(40).toString('hex');
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days

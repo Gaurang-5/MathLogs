@@ -4,27 +4,20 @@ import { motion } from 'framer-motion';
 import { Building2, User, Phone, Mail, CreditCard, Shield, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
+import { onboardingCheckoutOptions, onboardingSuccessMessage, type CheckoutSession, type RazorpayCheckoutResult } from '../features/billing/checkout';
 
-interface CreateOrderResponse {
+interface FreeSetupResponse {
     success: boolean;
     error?: string;
-    freeSetup?: boolean;
-    setupLink?: string;
-    keyId?: string;
-    orderId?: string;
-    amount?: number;
-    currency?: string;
+    freeSetup: true;
+    setupLink: string;
 }
+
+type CreateOrderResponse = FreeSetupResponse | CheckoutSession;
 
 interface VerifyPaymentResponse {
     success: boolean;
     setupLink?: string;
-}
-
-interface RazorpayHandlerResponse {
-    razorpay_order_id?: string;
-    razorpay_payment_id?: string;
-    razorpay_signature?: string;
 }
 
 interface RazorpayFailureResponse {
@@ -33,35 +26,14 @@ interface RazorpayFailureResponse {
     };
 }
 
-interface RazorpayOptions {
-    key?: string;
-    order_id?: string;
-    amount?: number;
-    currency?: string;
-    name: string;
-    description: string;
-    handler: (response: RazorpayHandlerResponse) => Promise<void>;
-    prefill: {
-        name: string;
-        email: string;
-        contact: string;
-    };
-    theme: {
-        color: string;
-    };
-    modal: {
-        ondismiss: () => void;
-    };
-}
-
 interface RazorpayInstance {
     on: (event: 'payment.failed', handler: (response: RazorpayFailureResponse) => void) => void;
     open: () => void;
 }
 
-interface WindowWithRazorpay extends Window {
-    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
-}
+type WindowWithRazorpay = {
+    Razorpay?: new (options: Record<string, unknown>) => RazorpayInstance;
+};
 
 const getErrorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 
@@ -153,14 +125,8 @@ export default function JoinOnboarding() {
                 email
             });
 
-            if (!orderRes.success) {
-                toast.error(orderRes.error || 'Failed to create payment order.');
-                setIsProcessing(false);
-                return;
-            }
-
             // Handle promotional Marketplace activation (100% discount) — skip Razorpay entirely
-            if (orderRes.freeSetup && orderRes.setupLink) {
+            if ('freeSetup' in orderRes) {
                 setPaymentSuccess(true);
                 toast.success('Your free plan has been activated!');
                 setTimeout(() => {
@@ -174,6 +140,8 @@ export default function JoinOnboarding() {
                 return;
             }
 
+            if (orderRes.mode === 'ACTIVATED') throw new Error('Unexpected checkout response.');
+
             // Paid plans — load Razorpay checkout
             const isLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
             if (!isLoaded) {
@@ -182,20 +150,19 @@ export default function JoinOnboarding() {
                 return;
             }
 
-            const options: RazorpayOptions = {
-                key: orderRes.keyId,
-                order_id: orderRes.orderId,
-                amount: orderRes.amount,
-                currency: orderRes.currency,
-                name: 'MathLogs',
-                description: `MathLogs ${linkData.plan} Plan - ${billingCycle}`,
-                handler: async (response: RazorpayHandlerResponse) => {
+            const options = {
+                ...onboardingCheckoutOptions(orderRes, {
+                    name: teacherName,
+                    email,
+                    contact: phoneNumber,
+                }, async (response: RazorpayCheckoutResult) => {
                     try {
                         const verifyRes = await api.post<VerifyPaymentResponse>('/admin-onboarding/verify-payment', {
                             token,
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
+                            razorpay_subscription_id: response.razorpay_subscription_id || (orderRes.mode === 'SUBSCRIPTION' ? orderRes.subscriptionId : undefined),
                             billingCycle,
                             instituteName,
                             teacherName,
@@ -205,13 +172,13 @@ export default function JoinOnboarding() {
 
                         if (verifyRes.success && verifyRes.setupLink) {
                             setPaymentSuccess(true);
-                            toast.success('Payment verified! Redirecting to setup...');
+                            toast.success(onboardingSuccessMessage(orderRes));
                             setTimeout(() => {
                                 try {
-                                    const url = new URL(verifyRes.setupLink);
+                                    const url = new URL(verifyRes.setupLink!);
                                     navigate(`${url.pathname}${url.search}`);
                                 } catch {
-                                    window.location.href = verifyRes.setupLink;
+                                    window.location.href = verifyRes.setupLink!;
                                 }
                             }, 2000);
                         } else {
@@ -222,15 +189,10 @@ export default function JoinOnboarding() {
                         toast.error(getErrorMessage(error, 'Verification Error'));
                         setIsProcessing(false);
                     }
-                },
-                prefill: {
-                    name: teacherName,
-                    email: email,
-                    contact: phoneNumber,
-                },
-                theme: {
-                    color: '#0071e3',
-                },
+                }),
+                description: orderRes.mode === 'SUBSCRIPTION'
+                    ? `MathLogs ${linkData.plan} Plan - Monthly AutoPay`
+                    : `MathLogs ${linkData.plan} Plan - ${billingCycle}`,
                 modal: {
                     ondismiss: () => {
                         setIsProcessing(false);
@@ -238,7 +200,7 @@ export default function JoinOnboarding() {
                 }
             };
 
-            const razorpayWindow = window as WindowWithRazorpay;
+            const razorpayWindow = window as unknown as WindowWithRazorpay;
             if (!razorpayWindow.Razorpay) {
                 toast.error('Payment gateway is unavailable.');
                 setIsProcessing(false);

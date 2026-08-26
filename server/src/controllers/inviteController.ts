@@ -2,14 +2,11 @@ import { CoachingFeeMode, Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-
 import crypto from 'crypto';
 import { secureLogger } from '../utils/secureLogger';
 import { getClientUrl } from '../utils/urlConfig';
 import { paidPlanExpiry } from '../domain/plans/entitlements';
 
-const JWT_SECRET = process.env.JWT_SECRET!;
 const SETUP_REPLAY_WINDOW_MS = 5 * 60 * 1000;
 
 // SUPER ADMIN ONLY
@@ -117,6 +114,8 @@ export const generateInvite = async (req: Request, res: Response) => {
     }
 };
 
+import { generateAuthTokens } from './authController';
+
 // PUBLIC
 export const validateInvite = async (req: Request, res: Response) => {
     const { token } = req.params;
@@ -128,13 +127,22 @@ export const validateInvite = async (req: Request, res: Response) => {
         });
 
         if (!invite) return res.status(404).json({ error: 'Invalid token' });
-        if (invite.isUsed) return res.status(400).json({ error: 'Invite already used' });
-        if (new Date() > invite.expiresAt) return res.status(400).json({ error: 'Invite expired' });
+        if (invite.isUsed) return res.status(400).json({ error: 'This setup link has already been used.' });
+        if (new Date() > invite.expiresAt) return res.status(400).json({ error: 'This setup link has expired.' });
 
         res.json({
             valid: true,
             instituteName: invite.institute.name,
+            teacherName: invite.institute.teacherName,
+            phoneNumber: invite.institute.phoneNumber,
+            email: invite.institute.email,
             plan: invite.institute.plan,
+            billingCycle: invite.institute.billingCycle,
+            city: invite.institute.city,
+            area: invite.institute.area,
+            subjectsOffered: invite.institute.subjectsOffered,
+            googleMapsUrl: invite.institute.googleMapsUrl,
+            isPubliclyListed: invite.institute.isPubliclyListed,
             config: invite.institute.config,
         });
     } catch (e) {
@@ -144,13 +152,29 @@ export const validateInvite = async (req: Request, res: Response) => {
 
 // PUBLIC
 export const setupAccount = async (req: Request, res: Response) => {
-    const { token, username, password, requiresGrades, allowedClasses, subjects, coachingFeeMode } = req.body as {
+    const {
+        token,
+        city,
+        area,
+        subjectsOffered,
+        allowedClasses,
+        requiresGrades,
+        googleMapsUrl,
+        isPubliclyListed = true,
+        tagline,
+        description,
+        coachingFeeMode,
+    } = req.body as {
         token?: string;
-        username?: string;
-        password?: string;
-        requiresGrades?: boolean;
+        city?: string | null;
+        area?: string | null;
+        subjectsOffered?: string[] | string;
         allowedClasses?: string[] | string;
-        subjects?: string[] | string;
+        requiresGrades?: boolean;
+        googleMapsUrl?: string | null;
+        isPubliclyListed?: boolean;
+        tagline?: string | null;
+        description?: string | null;
         coachingFeeMode: CoachingFeeMode;
     };
 
@@ -161,36 +185,42 @@ export const setupAccount = async (req: Request, res: Response) => {
     try {
         const invite = await prisma.inviteToken.findUnique({
             where: { token: String(token) },
-            include: { institute: true }
+            include: { institute: true },
         });
 
         if (!invite || new Date() > invite.expiresAt) {
             return res.status(400).json({ error: 'Invalid or expired token' });
         }
 
-        const sendSetupSuccess = (admin: {
+        const sendSetupSuccess = async (admin: {
             id: string;
             username: string;
             passwordVersion: number;
+            instituteId: string | null;
             role: string;
         }) => {
-            const jwtToken = jwt.sign({
-                id: admin.id,
-                username: admin.username,
-                passwordVersion: admin.passwordVersion,
-                instituteId: invite.instituteId,
-                role: admin.role,
-            }, JWT_SECRET, { expiresIn: '8h' });
-
+            const tokens = await generateAuthTokens(admin, req);
             const isQuizOnly = invite.institute.plan === 'QUIZ';
-            return res.json({ success: true, token: jwtToken, adminId: admin.id, isQuizOnly });
+            const isPageOnly = invite.institute.plan === 'MARKETPLACE';
+
+            return res.json({
+                success: true,
+                token: tokens.token,
+                refreshToken: tokens.refreshToken,
+                adminId: admin.id,
+                role: admin.role,
+                isQuizOnly,
+                isPageOnly,
+                message: 'Account setup complete!',
+            });
         };
 
         if (invite.isUsed) {
-            if (!invite.institute.coachingFeeModeSelectedAt) {
+            const selectedAt = invite.institute.coachingFeeModeSelectedAt;
+            if (!selectedAt) {
                 return res.status(400).json({ error: 'Invalid or expired token' });
             }
-            const selectionAgeMs = Date.now() - invite.institute.coachingFeeModeSelectedAt.getTime();
+            const selectionAgeMs = Date.now() - selectedAt.getTime();
             if (selectionAgeMs < 0 || selectionAgeMs > SETUP_REPLAY_WINDOW_MS) {
                 return res.status(400).json({ error: 'Invalid or expired token' });
             }
@@ -204,25 +234,23 @@ export const setupAccount = async (req: Request, res: Response) => {
             if (!existing || existing.instituteId !== invite.instituteId) {
                 return res.status(400).json({ error: 'Invalid or expired token' });
             }
-
             return sendSetupSuccess(existing);
         }
 
-        const effectiveUsername = (username && username.trim()) ? username.trim() : (invite.institute.phoneNumber || '');
-        const effectivePassword = password || crypto.randomBytes(16).toString('hex');
+        const effectiveUsername = invite.institute.phoneNumber
+            || invite.institute.email
+            || `admin_${invite.instituteId.slice(0, 8)}`;
+        const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        const effectiveTagline = tagline !== undefined ? tagline : description;
 
-        // Check if existing admin for this institute already exists
-        let existing = await prisma.admin.findFirst({
-            where: { instituteId: invite.instituteId }
-        });
-
-        const hashedPassword = await bcrypt.hash(effectivePassword, 10);
-
-        // Transaction: Create Admin + Invalidate Token + Create Default Year + Update Institute Config
-        const result = await prisma.$transaction(async (tx) => {
+        const admin = await prisma.$transaction(async (tx) => {
             const institute = await tx.institute.findUnique({
                 where: { id: invite.instituteId },
-                select: { coachingFeeMode: true, coachingFeeModeSelectedAt: true, config: true },
+                select: {
+                    config: true,
+                    coachingFeeMode: true,
+                    coachingFeeModeSelectedAt: true,
+                },
             });
             if (!institute) throw new Error('Institute not found');
 
@@ -232,44 +260,11 @@ export const setupAccount = async (req: Request, res: Response) => {
                 throw error;
             }
 
-            const instituteData: Prisma.InstituteUpdateInput = {};
-
-            // 1. Update Institute Config with grade settings
-            if (requiresGrades !== undefined && allowedClasses !== undefined) {
-                const currentConfig = (institute.config as Record<string, unknown>) || {};
-
-                // Process Allowed Classes
-                let classList: string[] = [];
-                if (allowedClasses) {
-                    if (Array.isArray(allowedClasses)) classList = allowedClasses;
-                    else if (typeof allowedClasses === 'string') classList = allowedClasses.split(',').map(s => s.trim()).filter(Boolean);
-                }
-
-                // Process Subjects
-                let subjectList: string[] = [];
-                if (subjects) {
-                    if (Array.isArray(subjects)) subjectList = subjects;
-                    else if (typeof subjects === 'string') subjectList = subjects.split(',').map(s => s.trim()).filter(Boolean);
-                }
-
-                instituteData.config = {
-                    ...currentConfig,
-                    requiresGrades,
-                    allowedClasses: classList.length > 0 ? classList : currentConfig.allowedClasses,
-                    subjects: subjectList.length > 0 ? subjectList : currentConfig.subjects,
-                } as Prisma.InputJsonValue;
-            }
-
             if (!institute.coachingFeeModeSelectedAt) {
                 const selection = await tx.institute.updateMany({
                     where: { id: invite.instituteId, coachingFeeModeSelectedAt: null },
-                    data: {
-                        ...instituteData,
-                        coachingFeeMode,
-                        coachingFeeModeSelectedAt: new Date(),
-                    },
+                    data: { coachingFeeMode, coachingFeeModeSelectedAt: new Date() },
                 });
-
                 if (selection.count === 0) {
                     const selectedInstitute = await tx.institute.findUnique({
                         where: { id: invite.instituteId },
@@ -280,53 +275,75 @@ export const setupAccount = async (req: Request, res: Response) => {
                         error.name = 'CoachingFeeModeAlreadySelectedError';
                         throw error;
                     }
-                    if (Object.keys(instituteData).length > 0) {
-                        await tx.institute.update({
-                            where: { id: invite.instituteId },
-                            data: instituteData,
-                        });
-                    }
                 }
-            } else if (Object.keys(instituteData).length > 0) {
-                await tx.institute.update({
-                    where: { id: invite.instituteId },
-                    data: instituteData,
-                });
             }
 
-            // 2. Create or reuse Admin
-            let admin = existing;
-            if (!admin) {
-                admin = await tx.admin.create({
-                    data: {
-                        username: effectiveUsername,
-                        password: hashedPassword,
-                        instituteId: invite.instituteId,
-                        role: 'INSTITUTE_ADMIN'
-                    }
-                });
+            const currentConfig = (institute.config as Record<string, unknown>) || {};
+            let classList = Array.isArray(currentConfig.allowedClasses)
+                ? currentConfig.allowedClasses.filter((value): value is string => typeof value === 'string')
+                : ['Class 9', 'Class 10', 'Class 11', 'Class 12'];
+            if (allowedClasses) {
+                classList = Array.isArray(allowedClasses)
+                    ? allowedClasses
+                    : allowedClasses.split(',').map(value => value.trim()).filter(Boolean);
             }
 
+            let subjectList = Array.isArray(currentConfig.subjects)
+                ? currentConfig.subjects.filter((value): value is string => typeof value === 'string')
+                : ['Mathematics', 'Science', 'Physics', 'Chemistry'];
+            if (subjectsOffered) {
+                subjectList = Array.isArray(subjectsOffered)
+                    ? subjectsOffered
+                    : subjectsOffered.split(',').map(value => value.trim()).filter(Boolean);
+            }
 
-
-            // 5. Invalidate Token
-            await tx.inviteToken.update({
-                where: { id: invite.id },
-                data: { isUsed: true }
-                // Wait, I should check my schema update.
+            await tx.institute.update({
+                where: { id: invite.instituteId },
+                data: {
+                    ...(city !== undefined && { city: city ? String(city).trim() : null }),
+                    ...(area !== undefined && { area: area ? String(area).trim() : null }),
+                    subjectsOffered: subjectList,
+                    ...(googleMapsUrl !== undefined && { googleMapsUrl: googleMapsUrl ? String(googleMapsUrl).trim() : null }),
+                    ...(effectiveTagline !== undefined && { tagline: effectiveTagline ? String(effectiveTagline).trim() : null }),
+                    isPubliclyListed: isPubliclyListed !== undefined ? Boolean(isPubliclyListed) : true,
+                    config: {
+                        ...currentConfig,
+                        ...(requiresGrades !== undefined && { requiresGrades: Boolean(requiresGrades) }),
+                        allowedClasses: classList,
+                        subjects: subjectList,
+                    } as Prisma.InputJsonValue,
+                },
             });
 
-            return admin;
+            let adminUser = await tx.admin.findFirst({
+                where: { instituteId: invite.instituteId },
+            });
+            if (!adminUser) {
+                adminUser = await tx.admin.create({
+                    data: {
+                        username: effectiveUsername,
+                        password: randomPassword,
+                        instituteId: invite.instituteId,
+                        role: 'INSTITUTE_ADMIN',
+                    },
+                });
+            }
+
+            await tx.inviteToken.update({
+                where: { id: invite.id },
+                data: { isUsed: true },
+            });
+
+            return adminUser;
         });
 
-        return sendSetupSuccess(result);
-
-    } catch (e) {
-        if (e instanceof Error && e.name === 'CoachingFeeModeAlreadySelectedError') {
-            return res.status(409).json({ error: e.message });
+        return sendSetupSuccess(admin);
+    } catch (error) {
+        if (error instanceof Error && error.name === 'CoachingFeeModeAlreadySelectedError') {
+            return res.status(409).json({ error: error.message });
         }
-        console.error(e);
-        res.status(500).json({ error: 'Setup failed' });
+        console.error('Setup failed:', error);
+        return res.status(500).json({ error: 'Setup failed' });
     }
 };
 

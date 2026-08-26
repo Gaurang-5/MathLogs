@@ -542,10 +542,6 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
                 };
             });
 
-        if (emailJobs.length === 0) {
-            return res.status(200).json({ message: 'No students had valid email addresses to send results to.' });
-        }
-
         // 4. Batch Insert Jobs
         // Prisma createMany is only supported for some DBs, but Postgres supports it.
         // However, Prisma schema might have issues if options is Json. Let's check.
@@ -590,16 +586,21 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
             secureLogger.warn(`[Test Results WA] ${whatsappSent} sent, ${whatsappFailed} failed for test ${test.id}`);
         }
 
-        await prisma.emailJob.createMany({
-            data: emailJobs.map(job => ({
-                ...job,
-                status: 'PENDING'
-            })) as any
-        });
+        if (emailJobs.length > 0) {
+            await prisma.emailJob.createMany({
+                data: emailJobs.map(job => ({
+                    ...job,
+                    status: 'PENDING'
+                })) as any
+            });
+        }
 
         res.json({
             success: true,
-            message: `Queued ${emailJobs.length} emails for sending.`
+            message: `Queued ${emailJobs.length} emails and ${whatsappSent} WhatsApp message${whatsappSent === 1 ? '' : 's'} for sending.`,
+            emailQueued: emailJobs.length,
+            whatsappQueued: whatsappSent,
+            whatsappFailed
         });
 
     } catch (e) {

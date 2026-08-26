@@ -34,4 +34,16 @@ export type BillingOperation = {
   appliedAt: string | null; error: string | null; attempts: number; maxAttempts: number; retryable: boolean;
   createdAt: string; updatedAt: string;
 };
+
+export type AutoPayBillingHistory = {
+  providerState: 'UNCONFIGURED' | 'NO_SUBSCRIPTION' | 'AVAILABLE' | 'UNAVAILABLE';
+  subscription: null | {
+    status: string; plan: CanonicalPlan; amountPaise: number; nextChargeAt: string | null;
+    currentPeriodEnd: string | null; graceEndsAt: string | null; cancelAtPeriodEnd: boolean;
+    cancelEffectiveAt: string | null;
+  };
+  charges: Array<{ id: string; amountPaise: number; currency: string; providerPaymentId: string; periodEnd: string; createdAt: string }>;
+  subscriptionPayments: Array<{ id: string; method: string | null; status: string; amountPaise: number; createdAt: string }>;
+  operations: BillingOperation[];
+};
 import type { BillingCycle, CanonicalPlan } from '../plans/types';

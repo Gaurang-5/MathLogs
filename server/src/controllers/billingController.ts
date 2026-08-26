@@ -10,6 +10,10 @@ import { PLAN_CATALOG, normalizePlanId, resolvePlanPrice, type BillingCycle, typ
 import { activateMarketplace, cancelAtPeriodEnd } from '../services/subscriptionLifecycleService';
 import { cancelSatisfiedNotifications, scheduleLifecycleNotifications } from '../services/planNotificationService';
 import { includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
+import { planSubscriptionCheckoutService } from '../services/planSubscriptionCheckoutService';
+import { planSubscriptionLifecycleService } from '../services/planSubscriptionLifecycleService';
+
+export const billingControllerDependencies = { activateMarketplace };
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -63,8 +67,6 @@ export async function fulfillStoredBillingPayment(paymentId: string, providerPay
             id: payment.id,
             OR: [
                 { status: 'PENDING', OR: [{ providerPaymentId: null }, { providerPaymentId }] },
-                // A Razorpay order can be retried after a failed attempt. The retry has
-                // a new payment id but remains bound to this server-created order.
                 { status: 'PAYMENT_FAILED' },
                 { status: { in: ['ACTIVATING', 'FULFILLING'] }, providerPaymentId, verifiedAt: { lte: staleBefore } }
             ]
@@ -122,10 +124,31 @@ export const createBillingSession = async (req: Request, res: Response) => {
         }
 
         if (product.kind === 'PLAN' && product.plan === 'MARKETPLACE' && product.amountPaise === 0) {
-            const lifecycle = await activateMarketplace(admin.institute.id);
+            const lifecycle = await billingControllerDependencies.activateMarketplace(admin.institute.id);
             await prisma.institute.update({ where: { id: admin.institute.id }, data: { isPubliclyListed: true } });
             invalidateAuthCache(adminId);
-            return res.json({ success: true, activated: true, amount: 0, plan: lifecycle.effectivePlan });
+            return res.json({ success: true, mode: 'ACTIVATED', plan: lifecycle.effectivePlan });
+        }
+
+        if (product.kind === 'PLAN' && product.billingCycle === 'MONTHLY') {
+            const ownerIdentity = admin.institute.phoneNumber || admin.institute.email || (admin as any).phone || '';
+            const session = await planSubscriptionCheckoutService.createMonthlySubscriptionCheckout({
+                context: { kind: 'INSTITUTE', instituteId: admin.institute.id, ownerIdentity },
+                plan: product.plan
+            });
+            return res.json({
+                success: true,
+                mode: 'SUBSCRIPTION',
+                subscriptionId: session.subscriptionId,
+                keyId: session.keyId,
+                plan: session.plan,
+                billingCycle: session.billingCycle,
+                amount: session.amount,
+                currency: session.currency,
+                trialEligible: session.trialEligible,
+                firstChargeAt: session.firstChargeAt.toISOString(),
+                totalCount: session.totalCount
+            });
         }
 
         const pending = await prisma.billingPayment.create({
@@ -155,6 +178,7 @@ export const createBillingSession = async (req: Request, res: Response) => {
             await prisma.billingPayment.update({ where: { id: pending.id }, data: { providerOrderId: String((order as any).id) } });
             return res.json({
                 success: true,
+                mode: 'ORDER',
                 billingPaymentId: pending.id,
                 orderId: (order as any).id,
                 amount: product.amountPaise,
@@ -167,20 +191,40 @@ export const createBillingSession = async (req: Request, res: Response) => {
         }
     } catch (error) {
         console.error('Create Billing Session Error:', error);
-        res.status(500).json({ error: 'Internal server error during billing initialization.' });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error during billing initialization.' });
     }
 };
 
 export const verifyBillingPayment = async (req: Request, res: Response) => {
     try {
         const adminId = req.user?.id;
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_subscription_id, razorpay_signature } = req.body;
         if (!adminId) return res.status(401).json({ error: 'Unauthorized' });
         const admin = await prisma.admin.findUnique({
             where: { id: adminId },
             include: { institute: true }
         });
         if (!admin?.institute) return res.status(404).json({ error: 'Institute not found' });
+
+        if (razorpay_subscription_id) {
+            await planSubscriptionCheckoutService.verifyMonthlySubscriptionCheckout({
+                razorpay_payment_id,
+                razorpay_subscription_id,
+                razorpay_signature,
+                instituteId: admin.institute.id
+            });
+            await planSubscriptionLifecycleService.applySubscriptionEvent({
+                kind: 'AUTHENTICATED',
+                providerSubscriptionId: razorpay_subscription_id
+            });
+            invalidateAuthCache(adminId);
+            return res.json({
+                success: true,
+                mode: 'SUBSCRIPTION',
+                subscriptionId: razorpay_subscription_id
+            });
+        }
+
         if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
             return res.status(400).json({ error: 'Invalid payment signature.' });
         }
@@ -203,7 +247,7 @@ export const verifyBillingPayment = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Verify Billing Error:', error);
         if (error instanceof Error && error.message === 'PAYMENT_ALREADY_PROCESSING') return res.status(409).json({ error: error.message });
-        res.status(500).json({ error: 'Internal server error during billing verification.' });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error during billing verification.' });
     }
 };
 
@@ -221,34 +265,72 @@ export const cancelSubscription = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Institute not found' });
         }
 
-        // We cancel the active Razorpay subscription from auto-renewing, but we DO NOT instantly strip their plan.
-        // We let them use MathLogs until their current cycle naturally expires at planExpiryDate.
-        if (admin.institute.razorpaySubscriptionId) {
-            try {
-                // Cancel at the end of the current billing cycle
-                await razorpay.subscriptions.cancel(admin.institute.razorpaySubscriptionId, true);
-                secureLogger.info(`Cancelled Razorpay auto-renewal at cycle end: ${admin.institute.razorpaySubscriptionId}`);
-            } catch (rzpErr: any) {
-                console.error('Razorpay Sub Cancel Error:', rzpErr);
-                // We proceed even if RZP fails (e.g., already cancelled)
+        let cancellation: { cancelled: boolean; cancelAtPeriodEnd: boolean; effectiveUntil: Date | null };
+        try {
+            cancellation = await planSubscriptionLifecycleService.cancelSubscriptionForInstitute({
+                instituteId: admin.institute.id
+            });
+        } catch (err: any) {
+            if (err?.message !== 'ACTIVE_SUBSCRIPTION_NOT_FOUND') {
+                console.error('Error cancelling plan subscription:', err);
             }
+            if (admin.institute.razorpaySubscriptionId) {
+                try {
+                    await razorpay.subscriptions.cancel(admin.institute.razorpaySubscriptionId, true);
+                } catch {}
+            }
+            await cancelAtPeriodEnd(admin.institute.id);
+            cancellation = {
+                cancelled: true,
+                cancelAtPeriodEnd: true,
+                effectiveUntil: admin.institute.planExpiryDate || null
+            };
         }
 
-        await prisma.institute.update({
-            where: { id: admin.institute.id },
-            data: {
-                 // Wipe Razorpay IDs so frontend knows it's cancelled
-                 razorpaySubscriptionId: null,
-                 razorpayOrderId: null
-                 // Coaching-fee verification never changes subscription state or registration availability.
-                 // This ensures their plan safely continues working until `planExpiryDate` naturally expires!
-            }
+        invalidateAuthCache(adminId);
+        res.json({
+            success: true,
+            cancelled: cancellation.cancelled,
+            cancelAtPeriodEnd: cancellation.cancelAtPeriodEnd,
+            effectiveAt: cancellation.effectiveUntil?.toISOString() ?? null
         });
-        await cancelAtPeriodEnd(admin.institute.id);
-
-        res.json({ success: true, message: 'Subscription cancelled successfully.' });
     } catch (error) {
         console.error('Cancel Subscription Error:', error);
         res.status(500).json({ error: 'Failed to cancel subscription.' });
+    }
+};
+
+export const getBillingSubscription = async (req: Request, res: Response) => {
+    try {
+        const adminId = req.user?.id;
+        if (!adminId) return res.status(401).json({ error: 'Unauthorized' });
+        const admin = await prisma.admin.findUnique({ where: { id: adminId }, include: { institute: true } });
+        if (!admin?.institute) return res.status(404).json({ error: 'Institute not found' });
+        const subscription = await prisma.planSubscription.findFirst({
+            where: { instituteId: admin.institute.id },
+            orderBy: { createdAt: 'desc' },
+            select: {
+                status: true,
+                plan: true,
+                amountPaise: true,
+                nextChargeAt: true,
+                currentPeriodEnd: true,
+                graceEndsAt: true,
+                cancelAtPeriodEnd: true,
+                cancelEffectiveAt: true
+            }
+        });
+        return res.json({
+            subscription: subscription ? {
+                ...subscription,
+                nextChargeAt: subscription.nextChargeAt?.toISOString() ?? null,
+                currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
+                graceEndsAt: subscription.graceEndsAt?.toISOString() ?? null,
+                cancelEffectiveAt: subscription.cancelEffectiveAt?.toISOString() ?? null
+            } : null
+        });
+    } catch (error) {
+        console.error('Get Billing Subscription Error:', error);
+        return res.status(500).json({ error: 'Failed to load subscription status.' });
     }
 };

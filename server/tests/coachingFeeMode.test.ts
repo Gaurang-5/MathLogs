@@ -152,6 +152,8 @@ test('guard rejects requests without institute context', async () => {
 test('used invite with the selected mode returns a reusable login without rewriting mode', async () => {
   replaceMethod(prisma.inviteToken, 'findUnique', (async () => usedInvite('MONTH_COVERAGE')) as typeof prisma.inviteToken.findUnique);
   replaceMethod(prisma.admin, 'findFirst', (async () => reusableAdmin) as typeof prisma.admin.findFirst);
+  replaceMethod(prisma.adminSession, 'create', (async () => ({ id: 'session-1' }) as never) as typeof prisma.adminSession.create);
+  replaceMethod(prisma.refreshToken, 'create', (async () => ({ id: 'refresh-1' }) as never) as typeof prisma.refreshToken.create);
   let transactionCalls = 0;
   replaceMethod(prisma, '$transaction', (async () => {
     transactionCalls += 1;
@@ -168,8 +170,12 @@ test('used invite with the selected mode returns a reusable login without rewrit
   }, {
     success: true,
     token: 'string',
+    refreshToken: (res.body as Record<string, unknown>).refreshToken,
     adminId: 'admin-1',
+    role: 'INSTITUTE_ADMIN',
     isQuizOnly: false,
+    isPageOnly: true,
+    message: 'Account setup complete!',
   });
   assert.equal(transactionCalls, 0);
 });

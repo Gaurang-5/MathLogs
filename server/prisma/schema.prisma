@@ -34,7 +34,7 @@ model Institute {
   lifetimeQuizCredits             Int                               @default(0)
   quizCreditsRenewAt              DateTime?
   canonicalPlanMigratedAt         DateTime?                         @default(now())
-  coachingFeeMode                 CoachingFeeMode                  @default(CURRENT_DUE_BASED)
+  coachingFeeMode                 CoachingFeeMode                   @default(CURRENT_DUE_BASED)
   coachingFeeModeSelectedAt       DateTime?
   timezone                        String                            @default("Asia/Kolkata")
   razorpayOrderId                 String?
@@ -94,6 +94,7 @@ model Institute {
   monthCoveragePayments           MonthCoveragePayment[]
   monthCoverageAllocations        MonthCoverageAllocation[]
   monthCoverageAuditEvents        MonthCoverageAuditEvent[]
+  planSubscriptions               PlanSubscription[]
 }
 
 model BillingPayment {
@@ -116,6 +117,66 @@ model BillingPayment {
 
   @@index([instituteId, createdAt])
   @@index([status, createdAt])
+}
+
+model PlanSubscription {
+  id                     String                   @id @default(uuid())
+  instituteId            String?
+  onboardingLinkId       String?
+  ownerIdentityHash      String                   @db.VarChar(128)
+  providerSubscriptionId String?                  @unique
+  providerPlanId         String
+  plan                   Tier
+  billingCycle           BillingCycle             @default(MONTHLY)
+  amountPaise            Int
+  currency               String                   @default("INR")
+  totalCount             Int                      @default(120)
+  trialEligible          Boolean                  @default(false)
+  trialClaimedAt         DateTime?
+  intendedStartAt        DateTime
+  trialEndsAt            DateTime?
+  status                 String                   @default("CREATING")
+  providerCreatedAt      DateTime?
+  firstChargedAt         DateTime?
+  lastChargedAt          DateTime?
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  nextChargeAt           DateTime?
+  paymentFailedAt        DateTime?
+  graceEndsAt            DateTime?
+  cancelRequestedAt      DateTime?
+  cancelAtPeriodEnd      Boolean                  @default(false)
+  cancelEffectiveAt      DateTime?
+  endedAt                DateTime?
+  provisioningData       Json?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  institute              Institute?               @relation(fields: [instituteId], references: [id], onDelete: Restrict)
+  charges                PlanSubscriptionCharge[]
+  webhookEvents          BillingWebhookEvent[]
+
+  @@index([status, nextChargeAt])
+  @@index([status, graceEndsAt])
+  @@index([onboardingLinkId])
+  @@index([ownerIdentityHash, createdAt])
+}
+
+model PlanSubscriptionCharge {
+  id                 String           @id @default(uuid())
+  planSubscriptionId String
+  providerPaymentId  String           @unique
+  providerInvoiceId  String?          @unique
+  amountPaise        Int
+  currency           String           @default("INR")
+  periodStart        DateTime
+  periodEnd          DateTime
+  creditedAt         DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  subscription       PlanSubscription @relation(fields: [planSubscriptionId], references: [id], onDelete: Restrict)
+
+  @@unique([planSubscriptionId, periodStart], name: "PlanSubscriptionCharge_one_period")
+  @@index([planSubscriptionId, createdAt])
 }
 
 model OnboardingPayment {
@@ -154,21 +215,24 @@ model PlanTrialClaim {
 }
 
 model BillingWebhookEvent {
-  id              String     @id @default(uuid())
-  instituteId     String?
-  providerEventId String     @unique
-  eventType       String
-  payload         Json
-  status          String     @default("RECEIVED")
-  receivedAt      DateTime   @default(now())
-  processedAt     DateTime?
-  processingError String?    @db.Text
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  institute       Institute? @relation(fields: [instituteId], references: [id], onDelete: SetNull)
+  id                 String            @id @default(uuid())
+  instituteId        String?
+  planSubscriptionId String?
+  providerEventId    String            @unique
+  eventType          String
+  payload            Json
+  status             String            @default("RECEIVED")
+  receivedAt         DateTime          @default(now())
+  processedAt        DateTime?
+  processingError    String?           @db.Text
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  institute          Institute?        @relation(fields: [instituteId], references: [id], onDelete: SetNull)
+  planSubscription   PlanSubscription? @relation(fields: [planSubscriptionId], references: [id], onDelete: SetNull)
 
   @@index([status, receivedAt])
   @@index([instituteId, receivedAt])
+  @@index([planSubscriptionId])
 }
 
 model PlanNotification {
@@ -230,43 +294,43 @@ model Admin {
   internalCaseNotes              InternalCaseNote[]
   targetedCommunicationSends     TargetedCommunicationSend[]
   deletionRequests               SuperAdminDeletionRequest[]
-  monthCoverageProfilesConfirmed StudentMonthCoverageProfile[] @relation("MonthCoverageProfileConfirmer")
+  monthCoverageProfilesConfirmed StudentMonthCoverageProfile[]   @relation("MonthCoverageProfileConfirmer")
   monthCoveragePaymentsCreated   MonthCoveragePayment[]          @relation("MonthCoveragePaymentCreator")
   monthCoveragePaymentsVoided    MonthCoveragePayment[]          @relation("MonthCoveragePaymentVoider")
   monthCoverageAuditEvents       MonthCoverageAuditEvent[]       @relation("MonthCoverageAuditActor")
 }
 
 model Batch {
-  id                  String               @id @default(uuid())
-  name                String
-  subject             String?
-  className           String?
-  timeSlot            String?
-  feeAmount           Float                @default(0)
-  whatsappGroupLink   String?
-  autoSendWelcome     Boolean              @default(false)
-  isRegistrationOpen  Boolean              @default(true)
-  isRegistrationEnded Boolean              @default(false)
-  batchNumber         Int?
-  startDate           DateTime?
-  endDate             DateTime?
-  teacherId           String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  instituteId         String?
-  institute           Institute?           @relation(fields: [instituteId], references: [id])
-  teacher             Admin?               @relation(fields: [teacherId], references: [id])
-  feeInstallments     FeeInstallment[]
-  students            Student[]
-  attendanceRecords   AttendanceRecord[]
-  attendanceSweepRuns AttendanceSweepRun[]
-  studentLeads        StudentLead[]
-  tests               Test[]
-  sharedTests         Test[]               @relation("TestBatches")
-  onlineQuizzes       OnlineQuiz[]
-  sharedOnlineQuizzes OnlineQuiz[]         @relation("OnlineQuizBatches")
-  monthCoverageProfiles StudentMonthCoverageProfile[]
-  monthCoveragePayments MonthCoveragePayment[]
+  id                       String                        @id @default(uuid())
+  name                     String
+  subject                  String?
+  className                String?
+  timeSlot                 String?
+  feeAmount                Float                         @default(0)
+  whatsappGroupLink        String?
+  autoSendWelcome          Boolean                       @default(false)
+  isRegistrationOpen       Boolean                       @default(true)
+  isRegistrationEnded      Boolean                       @default(false)
+  batchNumber              Int?
+  startDate                DateTime?
+  endDate                  DateTime?
+  teacherId                String?
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  instituteId              String?
+  institute                Institute?                    @relation(fields: [instituteId], references: [id])
+  teacher                  Admin?                        @relation(fields: [teacherId], references: [id])
+  feeInstallments          FeeInstallment[]
+  students                 Student[]
+  attendanceRecords        AttendanceRecord[]
+  attendanceSweepRuns      AttendanceSweepRun[]
+  studentLeads             StudentLead[]
+  tests                    Test[]
+  sharedTests              Test[]                        @relation("TestBatches")
+  onlineQuizzes            OnlineQuiz[]
+  sharedOnlineQuizzes      OnlineQuiz[]                  @relation("OnlineQuizBatches")
+  monthCoverageProfiles    StudentMonthCoverageProfile[]
+  monthCoveragePayments    MonthCoveragePayment[]
   monthCoverageAllocations MonthCoverageAllocation[]
 
   @@index([teacherId, className])
@@ -274,34 +338,34 @@ model Batch {
 }
 
 model Student {
-  id                      String                     @id @default(uuid())
-  humanId                 String?
-  name                    String
-  parentName              String
-  parentWhatsapp          String
-  parentEmail             String?
-  status                  String                     @default("PENDING") // PENDING, ACTIVE, LEFT
-  leaveReason             String?
-  leftAt                  DateTime?
-  batchId                 String?
-  createdAt               DateTime                   @default(now())
-  updatedAt               DateTime                   @updatedAt
-  schoolName              String?
-  additionalData          Json?
-  instituteId             String?
-  feePayments             FeePayment[]
-  feeInstallments         FeeInstallment[]
-  feeAssignments          FeeInstallmentAssignment[]
-  fees                    FeeRecord[]
-  marks                   Mark[]
-  attendanceRecords       AttendanceRecord[]
-  batch                   Batch?                     @relation(fields: [batchId], references: [id])
-  institute               Institute?                 @relation(fields: [instituteId], references: [id])
-  balance                 StudentBalance?
-  upiPaymentVerifications UpiPaymentVerification[]
-  quizSubmissions         QuizSubmission[]
-  monthCoverageProfile    StudentMonthCoverageProfile?
-  monthCoveragePayments   MonthCoveragePayment[]
+  id                       String                       @id @default(uuid())
+  humanId                  String?
+  name                     String
+  parentName               String
+  parentWhatsapp           String
+  parentEmail              String?
+  status                   String                       @default("PENDING") // PENDING, ACTIVE, LEFT
+  leaveReason              String?
+  leftAt                   DateTime?
+  batchId                  String?
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
+  schoolName               String?
+  additionalData           Json?
+  instituteId              String?
+  feePayments              FeePayment[]
+  feeInstallments          FeeInstallment[]
+  feeAssignments           FeeInstallmentAssignment[]
+  fees                     FeeRecord[]
+  marks                    Mark[]
+  attendanceRecords        AttendanceRecord[]
+  batch                    Batch?                       @relation(fields: [batchId], references: [id])
+  institute                Institute?                   @relation(fields: [instituteId], references: [id])
+  balance                  StudentBalance?
+  upiPaymentVerifications  UpiPaymentVerification[]
+  quizSubmissions          QuizSubmission[]
+  monthCoverageProfile     StudentMonthCoverageProfile?
+  monthCoveragePayments    MonthCoveragePayment[]
   monthCoverageAllocations MonthCoverageAllocation[]
 
   @@unique([humanId, instituteId])
@@ -317,21 +381,21 @@ model Student {
 }
 
 model StudentMonthCoverageProfile {
-  id                 String                     @id @default(uuid())
-  instituteId        String
-  batchId            String
-  studentId          String                     @unique
-  feeStartMonth      String?                    @db.VarChar(7)
-  feeEndMonth        String?                    @db.VarChar(7)
-  status             MonthCoverageProfileStatus @default(PENDING_SETUP)
-  confirmedAt        DateTime?
-  confirmedById      String?
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
-  institute          Institute                  @relation(fields: [instituteId], references: [id], onDelete: Cascade)
-  batch              Batch                      @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  student            Student                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  confirmedBy        Admin?                     @relation("MonthCoverageProfileConfirmer", fields: [confirmedById], references: [id], onDelete: SetNull)
+  id            String                     @id @default(uuid())
+  instituteId   String
+  batchId       String
+  studentId     String                     @unique
+  feeStartMonth String?                    @db.VarChar(7)
+  feeEndMonth   String?                    @db.VarChar(7)
+  status        MonthCoverageProfileStatus @default(PENDING_SETUP)
+  confirmedAt   DateTime?
+  confirmedById String?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  institute     Institute                  @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  batch         Batch                      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  student       Student                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  confirmedBy   Admin?                     @relation("MonthCoverageProfileConfirmer", fields: [confirmedById], references: [id], onDelete: SetNull)
 
   @@index([instituteId, status])
   @@index([batchId, status])
@@ -410,7 +474,7 @@ model FeeRecord {
   date      DateTime @default(now())
   status    String   @default("PAID")
   studentId String
-  student   Student  @relation(fields: [studentId], references: [id])
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId])
   @@index([date])
