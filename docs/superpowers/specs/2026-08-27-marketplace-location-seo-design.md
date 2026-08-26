@@ -5,7 +5,7 @@ Status: Approved design, awaiting specification review
 
 ## Objective
 
-Make Muzaffarnagar the only marketplace city for the current launch, prevent incomplete or unsupported city data from hiding valid listings, and create scalable search-engine landing pages for real combinations of locality, class, and subject.
+Make Muzaffarnagar the only marketplace city for the current launch, prevent incomplete or unsupported city data from hiding valid listings, create scalable search-engine landing pages for real combinations of locality, class, and subject, and maximize truthful exact-name discoverability for every public coaching profile.
 
 The system must never create an indexable landing page unless at least one active, publicly listed coaching institute genuinely matches every facet in that page.
 
@@ -35,6 +35,7 @@ The current SEO implementation gives `/coaching` and individual coaching profile
 - Unique metadata, canonical URLs, visible headings/copy, breadcrumbs, structured data, internal links, and sitemap entries for valid landing pages.
 - `noindex` behavior for invalid or empty facet combinations.
 - Improved coaching-profile metadata using real location, subject, and class data.
+- Exact coaching-name SEO signals for public profiles, including duplicate-name disambiguation.
 - Automated tests and production verification.
 
 ### Excluded
@@ -202,6 +203,22 @@ An invalid or currently empty combination will:
 
 Individual coaching profile metadata will include the canonical city, locality, real subjects, and real classes without keyword stuffing. Structured data will describe the institute as an educational/local business only where the visible profile supports those facts. Breadcrumb markup will connect the profile to `/coaching` and to applicable real facet pages.
 
+### Exact coaching-name discovery
+
+Every active public profile will be optimized as the authoritative MathLogs page for its exact institute name:
+
+- the exact stored coaching name leads the server-rendered title and visible `h1`;
+- the canonical profile URL uses the stable name-derived slug assigned when the listing is created;
+- the exact name appears in `EducationalOrganization`/`LocalBusiness` structured data, breadcrumbs, marketplace cards, and internal-link anchor text;
+- profile descriptions naturally include the name, locality, city, real subjects, and real classes;
+- profile sitemap entries include `lastmod` so material listing updates can be recrawled;
+- a connected Google Maps or Business Profile URL is included as `sameAs` only when it genuinely belongs to that coaching;
+- renamed institutes retain a stable canonical URL unless a separately designed redirect migration changes it, preventing broken indexed links.
+
+If multiple institutes have the same name, MathLogs will not merge or fabricate identity signals. Titles and descriptions will distinguish them with locality and, when necessary, teacher name. Each listing keeps its own canonical profile and structured-data entity.
+
+Teachers should be advised to set their MathLogs profile URL as the website link in their verified Google Business Profile when appropriate. That external account change is operational work and requires the teacher's authorization; MathLogs will not perform it automatically.
+
 ## Sitemap strategy
 
 The dynamic sitemap will continue to include static pages and active public coaching profiles. It will additionally enumerate deduplicated facet URLs derived from public listing data.
@@ -243,6 +260,8 @@ Implementation follows test-driven development.
 - private, inactive, and delisted records do not generate facets;
 - sitemap output contains valid facet URLs and excludes empty combinations;
 - server-rendered facet HTML contains the expected canonical URL, robots value, and structured data.
+- server-rendered coaching profiles lead with the exact institute name and disambiguate duplicate names using real location or teacher data;
+- profile sitemap entries expose the listing's current `updatedAt` value as `lastmod`.
 
 Existing marketplace tests that use Jaipur as a valid public city will be rewritten to use Muzaffarnagar because multi-city support is explicitly out of scope.
 
@@ -282,6 +301,7 @@ Existing marketplace tests that use Jaipur as a valid public city will be rewrit
 - ADL appears when the Muzaffarnagar marketplace filter is active.
 - No public listing can have a missing, misspelled, or unsupported city.
 - Teachers and administrators can select only Muzaffarnagar in marketplace city controls.
+- An exact coaching-name query has a dedicated, indexable profile whose title, heading, canonical URL, structured data, internal links, and sitemap entry consistently identify that coaching.
 - Every indexable facet URL corresponds to at least one active public matching coaching.
 - Empty combinations are not indexed or included in the sitemap.
 - Metadata, visible content, canonical links, structured data, API filters, and sitemap entries agree on the same facets.
