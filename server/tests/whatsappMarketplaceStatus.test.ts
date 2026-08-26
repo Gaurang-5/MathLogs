@@ -114,3 +114,15 @@ test('worker credential diagnostics expose configuration state without credentia
   });
   assert.doesNotMatch(JSON.stringify(state), /phone-id-secret|access-token-secret/);
 });
+
+test('AutoPay templates use positional Meta parameters matching {{1}} through {{8}}', () => {
+  const parameters = (whatsappWorker as any).buildDefaultTemplateParameters(
+    'mathlogs_autopay_authorized',
+    ['Owner', 'Institute', 'ENTERPRISE', 'MONTHLY', 'See billing page', '2026-09-01', 'https://mathlogs.app/billing', 'support@mathlogs.app'],
+    { WHATSAPP_TEMPLATE_AUTOPAY_AUTHORIZED: 'mathlogs_autopay_authorized' }
+  );
+
+  assert.equal(parameters.length, 8);
+  assert.deepEqual(parameters[0], { type: 'text', text: 'Owner' });
+  assert.equal(parameters.some((parameter: any) => 'parameter_name' in parameter), false);
+});

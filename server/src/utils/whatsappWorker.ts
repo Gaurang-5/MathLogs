@@ -115,6 +115,34 @@ export const processWhatsappQueue = async () => {
  */
 type MetaPost = typeof axios.post;
 
+const POSITIONAL_TEMPLATE_ENV_KEYS = [
+    'WHATSAPP_TEMPLATE_PLAN_PAYMENT_FAILED',
+    'WHATSAPP_TEMPLATE_PLAN_PAYMENT_SUCCEEDED',
+    'WHATSAPP_TEMPLATE_AUTOPAY_AUTHORIZED',
+    'WHATSAPP_TEMPLATE_AUTOPAY_ACTIVATED',
+    'WHATSAPP_TEMPLATE_AUTOPAY_CHARGE_UPCOMING',
+    'WHATSAPP_TEMPLATE_AUTOPAY_GRACE_ENDING',
+    'WHATSAPP_TEMPLATE_AUTOPAY_RECOVERED',
+    'WHATSAPP_TEMPLATE_AUTOPAY_CANCELLED',
+    'WHATSAPP_TEMPLATE_AUTOPAY_COMPLETED'
+] as const;
+
+export const buildDefaultTemplateParameters = (
+    templateId: string,
+    bodyValues: string[],
+    env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env
+) => {
+    const usesPositionalVariables = POSITIONAL_TEMPLATE_ENV_KEYS.some(
+        key => env[key]?.trim() === templateId
+    );
+
+    return bodyValues.map((val, index) => ({
+        type: 'text',
+        ...(!usesPositionalVariables ? { parameter_name: `var_${index + 1}` } : {}),
+        text: val ? val.toString() : ''
+    }));
+};
+
 export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) => {
     const claimLinkWhere = {
         OR: [
@@ -215,11 +243,7 @@ export const processWhatsappJob = async (job: any, post: MetaPost = axios.post) 
             // Strict default mapping for completely unknown templates
             components.push({
                 type: 'body',
-                parameters: bodyValues.map((val, index) => ({
-                    type: 'text',
-                    parameter_name: `var_${index + 1}`,
-                    text: val ? val.toString() : ''
-                }))
+                parameters: buildDefaultTemplateParameters(job.templateId, bodyValues)
             });
         }
 
