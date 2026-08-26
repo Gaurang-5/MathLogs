@@ -46,7 +46,7 @@ MathLogs supports the operational lifecycle of a tuition center:
 - Student registration, approval/rejection workflows, manual student creation, status tracking, and institute-scoped student IDs.
 - Fee installments, custom invoices, payment collection, pending-fee reports, monthly transaction reports, and UPI payment verification.
 - Test creation, mark entry, report downloads, AI-assisted test generation, online quizzes, quiz analytics, and live quiz monitoring.
-- OCR-assisted score and receipt scanning using Gemini and optional AWS Textract comparison.
+- OCR-assisted score and receipt scanning using Gemini.
 - Parent/student communication through email and WhatsApp templates, with queue processing in production.
 - Student portal routes for institute-specific login, dashboards, payments, and online quiz taking.
 - Health checks, Sentry monitoring hooks, secure logging, rate limiting, CORS allowlists, and production hardening utilities.
@@ -69,8 +69,8 @@ MathLogs supports the operational lifecycle of a tuition center:
           +------------------+-------------------+
           |                  |                   |
           v                  v                   v
-   Email/SMTP          WhatsApp queue       S3/Textract/Gemini
-   notifications       production worker    AI/OCR integrations
+   Email/SMTP          WhatsApp queue       R2 and Gemini
+   notifications       production worker    storage/AI integrations
 ```
 
 The Express server serves API routes under `/api`, exposes health endpoints, and serves the built web client in production. The Vite client uses `/api` in production and `VITE_API_URL` or localhost during development. The Expo app uses `EXPO_PUBLIC_API_URL` in development and the production MathLogs domain by default.
@@ -112,8 +112,8 @@ The Express server serves API routes under `/api`, exposes health endpoints, and
 | API server | Node.js 22, Express 5, TypeScript, Prisma, PostgreSQL |
 | Auth and security | JWT, refresh tokens, bcrypt, Helmet, CORS allowlists, rate limiting, Zod validation |
 | Data and jobs | Prisma Client, PostgreSQL triggers/migrations, optional Redis, production WhatsApp worker |
-| Files and reports | PDFKit, QR/barcode generation, S3-compatible payment screenshot storage |
-| AI/OCR | Google Gemini, AWS Textract, AI test generation, OCR result caching |
+| Files and reports | PDFKit, QR/barcode generation, private Cloudflare R2 storage |
+| AI/OCR | Google Gemini, AI test generation, OCR result caching |
 | Monitoring | Sentry server/client integrations, health endpoints, slow request logging |
 | Native packaging | Capacitor for client Android/iOS, Expo/EAS for mobile |
 
@@ -130,7 +130,7 @@ Optional services for full integration testing:
 
 - Redis for production-style caching/rate-limit backing.
 - Google Gemini API key for AI test generation and OCR.
-- AWS credentials for Textract and payment screenshot storage.
+- Cloudflare R2 credentials for private payment screenshot and support attachment storage.
 - SMTP credentials for email delivery.
 - Meta WhatsApp Cloud API credentials for WhatsApp messaging.
 - Razorpay credentials for billing and onboarding payment flows.
@@ -247,9 +247,10 @@ The checked-in example file is `server/.env.example`. Important server variables
 | `CLIENT_URL` | No | Local/web origin used by generated links |
 | `FRONTEND_URL` | No | Public frontend base URL for payment and messaging links |
 | `GEMINI_API_KEY` | Optional | AI test generation and OCR |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Optional | Textract and payment screenshot storage |
-| `AWS_REGION` | Optional | AWS region, defaults to `ap-south-1` in several utilities |
-| `PAYMENT_PHOTO_BUCKET` | Optional | S3 bucket for payment screenshots |
+| `R2_ACCOUNT_ID` | Production storage | Cloudflare account containing the private R2 buckets |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Production storage | Cloudflare R2 API token credentials |
+| `PAYMENT_PHOTO_BUCKET` | Optional | R2 bucket for payment screenshots |
+| `SUPPORT_ATTACHMENT_BUCKET` | Optional | R2 bucket for private support attachments |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Optional | Billing and onboarding payment flows |
 | `EMAIL_USER` / `EMAIL_PASS` | Optional | Default SMTP sender |
 | `EMAIL_USER_NOREPLY`, `EMAIL_USER_WELCOME`, `EMAIL_USER_SUPPORT`, `EMAIL_USER_ADMIN` | Optional | Specialized SMTP sender accounts |

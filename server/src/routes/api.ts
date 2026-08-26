@@ -17,7 +17,7 @@ import { validateInvite, setupAccount } from '../controllers/inviteController';
 import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } from '../controllers/onboardingController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
-import { processOCRTextract } from '../utils/ocrTextract';
+import { buildGeminiOcrResult } from '../utils/ocrResult';
 import { secureLogger } from '../utils/secureLogger';
 
 import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
@@ -201,42 +201,13 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
             return res.json(cached);
         }
 
-        // DUAL ENGINE: Textract + Gemini run in parallel
-        // Parse maxMarks from form data (sent alongside the image)
-        const maxMarks = req.body.maxMarks ? parseFloat(req.body.maxMarks) : undefined;
-
-        const [geminiResult, textractResult] = await Promise.allSettled([
-            processOCR(imageBuffer),
-            processOCRTextract(imageBuffer, maxMarks).catch((err: any) => {
-                console.warn("⚠️ Textract failed:", err.message);
-                return { score: "TEXTRACT_ERROR", confidence: 0, raw: err.message, rawTexts: [] };
-            })
-        ]);
-
-        const gemini = geminiResult.status === 'fulfilled'
-            ? geminiResult.value
-            : { score: "GEMINI_ERROR", confidence: 0, raw: (geminiResult as any).reason?.message || "Unknown error" };
-
-        const textract = textractResult.status === 'fulfilled'
-            ? textractResult.value
-            : { score: "TEXTRACT_ERROR", confidence: 0, raw: (textractResult as any).reason?.message || "Unknown error", rawTexts: [] };
-
-        const match = gemini.score === (textract as any).score;
-        secureLogger.debug('OCR completed', { sourceMatch: match, source: match ? 'both' : 'fallback' });
-
-        const geminiOk = gemini.score && !gemini.score.includes('ERROR');
-        const textractOk = (textract as any).score && !(textract as any).score.includes('ERROR');
-        let primary: { score: string; confidence: number; raw: string; source: string };
-
-        if (geminiOk && textractOk && match) {
-            primary = { score: gemini.score, confidence: Math.min(1, gemini.confidence + 0.1), raw: gemini.raw, source: 'both' };
-        } else if (geminiOk) {
-            primary = { score: gemini.score, confidence: gemini.confidence, raw: gemini.raw, source: 'gemini' };
-        } else if (textractOk) {
-            primary = { score: (textract as any).score, confidence: (textract as any).confidence, raw: (textract as any).raw, source: 'textract' };
-        } else {
-            primary = { score: "ERROR_UNCERTAIN", confidence: 0, raw: "Both engines failed", source: 'none' };
-        }
+        const gemini = await processOCR(imageBuffer).catch((error: any) => ({
+            score: 'GEMINI_ERROR',
+            confidence: 0,
+            raw: error?.message || 'Unknown error',
+        }));
+        const primary = buildGeminiOcrResult(gemini);
+        secureLogger.debug('OCR completed', { source: primary.source });
 
         await setOcrCache(hash, primary);
         res.json({ score: primary.score, confidence: primary.confidence, raw: primary.raw, source: primary.source });

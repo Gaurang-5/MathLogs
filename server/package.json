@@ -19,8 +19,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.922.0",
-    "@aws-sdk/client-textract": "^3.1003.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "5.22.0",
     "@sentry/node": "^10.38.0",
@@ -32,6 +30,7 @@
     "@types/node": "^25.0.10",
     "@types/nodemailer": "^7.0.5",
     "@types/pdfkit": "^0.17.4",
+    "aws4fetch": "^1.0.20",
     "axios": "1.13.5",
     "bcryptjs": "^3.0.3",
     "bwip-js": "^4.8.0",

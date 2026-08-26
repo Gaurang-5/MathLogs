@@ -1,15 +1,6 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
 import { randomUUID, createHmac, timingSafeEqual } from 'crypto';
 import { requireEnv } from './env';
-
-export const s3 = new S3Client({
-    region: process.env.AWS_REGION || 'ap-south-1',
-    credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
-    },
-    maxAttempts: 5 // Exponential backoff for throttling S3 rate limits
-});
+import { getR2ObjectStorage } from './r2ObjectStorage';
 
 const BUCKET = process.env.PAYMENT_PHOTO_BUCKET || 'mathlogs-payment-receipts';
 const SCREENSHOT_SIGNING_SECRET = requireEnv('PAYMENT_SCREENSHOT_SIGNING_SECRET', {
@@ -17,7 +8,7 @@ const SCREENSHOT_SIGNING_SECRET = requireEnv('PAYMENT_SCREENSHOT_SIGNING_SECRET'
     devDefault: 'dev-payment-screenshot-secret',
 });
 
-// In-memory concurrency queue to prevent S3 throttling during bursts
+// In-memory concurrency queue to keep object-storage bursts bounded.
 class ConcurrencyQueue {
     private concurrency: number;
     private running: number = 0;
@@ -98,33 +89,13 @@ export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buff
 
     return uploadQueue.add(async () => {
         try {
-            await s3.send(new PutObjectCommand({
-                Bucket: BUCKET,
-                Key: key,
-                Body: buffer,
-                ContentType: contentType
-            }));
+            await getR2ObjectStorage().putObject({ bucket: BUCKET, key, body: buffer, contentType });
             return key;
         } catch (e: any) {
-            if (e.name === 'NoSuchBucket' || e.Code === 'NoSuchBucket') {
-                secureLogger.info(`[Storage] Bucket ${BUCKET} not found. Attempting to create it...`);
-                try {
-                    const region = process.env.AWS_REGION || 'ap-south-1';
-                    await s3.send(new CreateBucketCommand({
-                        Bucket: BUCKET,
-                        ...(region !== 'us-east-1' ? { CreateBucketConfiguration: { LocationConstraint: region as any } } : {})
-                    }));
-                    await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buffer, ContentType: contentType }));
-                    return key;
-                } catch (createErr: any) {
-                    console.error("[Storage] Failed to auto-create S3 bucket.", createErr.message || createErr);
-                }
-            } else {
-                console.error("[Storage] S3 Upload Failed.", e.message || e);
-            }
+            secureLogger.error('[Storage] R2 upload failed.', { error: e?.message || String(e) });
+            if (process.env.NODE_ENV === 'production') throw e;
 
-            // --- LOCAL FALLBACK ---
-            secureLogger.info("[Storage] Falling back to LOCAL disk storage...");
+            secureLogger.info('[Storage] Using local development storage.');
             const localFileName = key.replace(/\//g, '_');
             await fs.mkdir(LOCAL_UPLOAD_DIR, { recursive: true });
             await fs.writeFile(path.join(LOCAL_UPLOAD_DIR, localFileName), buffer);
@@ -134,7 +105,7 @@ export const storePaymentScreenshotAsync = async ({ instituteId, studentId, buff
 };
 
 /**
- * Reads a payment screenshot from S3 as a Buffer.
+ * Reads a payment screenshot from private object storage as a Buffer.
  */
 export const readPaymentScreenshot = async (key: string): Promise<Buffer | null> => {
     if (key.startsWith('LOCAL:')) {
@@ -146,22 +117,8 @@ export const readPaymentScreenshot = async (key: string): Promise<Buffer | null>
     }
 
     try {
-        const response = await s3.send(new GetObjectCommand({
-            Bucket: BUCKET,
-            Key: key
-        }));
-        
-        if (!response.Body) return null;
-        
-        const chunks: any[] = [];
-        for await (const chunk of response.Body as any) {
-            chunks.push(chunk);
-        }
-        return Buffer.concat(chunks);
+        return await getR2ObjectStorage().getObject(BUCKET, key);
     } catch (e: any) {
-        if (e.name === 'NoSuchKey' || e.$metadata?.httpStatusCode === 404) {
-            return null;
-        }
         throw e;
     }
 };
@@ -180,11 +137,9 @@ export const deletePaymentScreenshot = async (key: string): Promise<void> => {
     }
 
     try {
-        await s3.send(new DeleteObjectCommand({
-            Bucket: BUCKET,
-            Key: key
-        }));
+        await getR2ObjectStorage().deleteObject(BUCKET, key);
     } catch (e: any) {
-        console.error(`[paymentStorage] Failed to delete S3 file at key: ${key}`, e.message || e);
+        secureLogger.error('[paymentStorage] Failed to delete R2 object.', { key, error: e?.message || String(e) });
+        if (process.env.NODE_ENV === 'production') throw e;
     }
 };

@@ -59,7 +59,7 @@ async function preprocessImage(imageBase64: string): Promise<string> {
  *   1. Eliminate the student name (may contain numbers like "Class 10")
  *   2. Eliminate the "MARKS:" label text
  *   3. Eliminate any writing/numbers outside the sticker borders
- *   4. Give Textract a tiny, focused image → faster + more accurate
+ *   4. Give Gemini a focused image for faster, more accurate recognition
  */
 async function cropMarksRegion(warpedBase64: string): Promise<string> {
     return new Promise((resolve) => {
@@ -205,4 +205,3 @@ export async function extractMarksFromSticker(
 
     return { score: "", confidence: 0, debugImage: processedImage };
 }
-
