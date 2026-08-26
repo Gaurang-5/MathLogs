@@ -1,7 +1,7 @@
 # Marketplace Location Integrity and Data-Backed SEO Design
 
 Date: 2026-08-27
-Status: Approved design, awaiting specification review
+Status: Reviewed and approved
 
 ## Objective
 
@@ -136,7 +136,7 @@ The server-side HTML metadata handler and sitemap generator will both use the sa
 
 ### Persistence enforcement
 
-Server validation is the primary enforcement layer. A database check constraint will additionally prevent an institute from being publicly listed with a missing or unsupported city. Private legacy/test records may retain other city values, but they cannot be published until corrected.
+Server validation is the primary enforcement layer. A database check constraint will additionally prevent an institute from being publicly listed with a missing or unsupported city. Private legacy/test records may retain other city values unchanged, but they cannot be published until corrected.
 
 The migration order is:
 
