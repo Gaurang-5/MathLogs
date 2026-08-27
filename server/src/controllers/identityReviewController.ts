@@ -13,7 +13,8 @@ export async function listIdentityReviews(req: Request, res: Response) {
   const rows = await prisma.studentIdentityReview.findMany({
     where: { instituteId: req.user.instituteId, status: 'PENDING' },
     include: {
-      batch: { select: { id: true, name: true } },
+      batch: { select: { id: true, name: true, startDate: true, endDate: true, feeInstallments: { select: { id: true, name: true, amount: true, studentId: true } } } },
+      institute: { select: { coachingFeeMode: true } },
     },
     orderBy: { createdAt: 'asc' },
   });
