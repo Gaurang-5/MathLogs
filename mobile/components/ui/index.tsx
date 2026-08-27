@@ -25,6 +25,11 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows, Animation } from '../../constants/theme';
 
+export { Feedback } from './Feedback';
+export { TeacherPage, TeacherSection, TEACHER_TAB_CONTENT_INSET } from './Page';
+export { PressableScale } from './PressableScale';
+export { Surface } from './Surface';
+
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 // ─── Branded Button ────────────────────────────────────────
@@ -157,7 +162,6 @@ export function GlassCard({ children, style, onPress, intensity = 30 }: GlassCar
   const handlePressIn = useCallback(() => {
     if (onPress) {
       scale.value = withSpring(0.98, Animation.spring);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, [onPress]);
 

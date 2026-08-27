@@ -1,27 +1,27 @@
 import React from 'react';
-import { Platform, View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet, useColorScheme } from 'react-native';
 import { Tabs } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
-import { LayoutDashboard, Users, FileText, Receipt, IndianRupee, Brain } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LayoutDashboard, Users, FileText, Receipt, IndianRupee } from 'lucide-react-native';
+import { Colors } from '../../constants/theme';
 
-const T = { accent: '#111827', text: '#1D1D1F', muted: '#AEAEB2' };
-
-function TabIcon({ Icon, focused, label }: { Icon: any; focused: boolean; label: string }) {
+function TabIcon({ Icon, focused, label, text, muted }: { Icon: any; focused: boolean; label: string; text: string; muted: string }) {
   return (
     <View style={styles.iconWrap}>
       <Icon
         size={24}
-        color={focused ? T.text : T.muted}
+        color={focused ? text : muted}
         strokeWidth={focused ? 2.5 : 2}
       />
       <Text style={{
         fontSize: 10, fontWeight: focused ? '700' : '500',
-        color: focused ? T.text : T.muted, marginTop: 4,
+        color: focused ? text : muted, marginTop: 4,
       }}>
         {label}
       </Text>
-      {focused && <View style={styles.dot} />}
+      {focused && <View style={[styles.dot, { backgroundColor: text }]} />}
     </View>
   );
 }
@@ -37,45 +37,59 @@ function CenterButton() {
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const colors = Colors[scheme];
+
   return (
     <Tabs
       screenListeners={{
-        tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+        tabPress: () => void Haptics.selectionAsync(),
       }}
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
         tabBarBackground: () => (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.1)' }]} />
+          <BlurView
+            intensity={55}
+            tint={scheme}
+            style={[
+              StyleSheet.absoluteFill,
+              styles.material,
+              { backgroundColor: colors.material, borderColor: colors.border },
+            ]}
+          />
         ),
         tabBarStyle: {
           position: 'absolute',
-          bottom: 0,
-          left: 0, right: 0,
-          height: Platform.OS === 'ios' ? 88 : 72,
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 0, elevation: 0,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          bottom: Math.max(insets.bottom, 10),
+          left: 12, right: 12,
+          height: 68,
+          backgroundColor: 'transparent',
+          borderTopWidth: 0,
+          elevation: 0,
+          paddingBottom: 0,
           paddingHorizontal: 8,
+          borderRadius: 24,
         },
       }}
     >
-      <Tabs.Screen name="index" options={{ tabBarIcon: ({ focused }) => <TabIcon Icon={LayoutDashboard} focused={focused} label="Home" /> }} />
-      <Tabs.Screen name="batches" options={{ tabBarIcon: ({ focused }) => <TabIcon Icon={Users} focused={focused} label="Batches" /> }} />
+      <Tabs.Screen name="index" options={{ tabBarAccessibilityLabel: 'Dashboard', tabBarIcon: ({ focused }) => <TabIcon Icon={LayoutDashboard} focused={focused} label="Home" text={colors.text} muted={colors.textMuted} /> }} />
+      <Tabs.Screen name="batches" options={{ tabBarAccessibilityLabel: 'Batches', tabBarIcon: ({ focused }) => <TabIcon Icon={Users} focused={focused} label="Batches" text={colors.text} muted={colors.textMuted} /> }} />
       <Tabs.Screen 
         name="quick-fee" 
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             e.preventDefault();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             navigation.navigate('quick-fee-modal');
           },
         })}
-        options={{ tabBarIcon: () => <CenterButton /> }} 
+        options={{ tabBarAccessibilityLabel: 'Record fee payment', tabBarIcon: () => <CenterButton /> }}
       />
-      <Tabs.Screen name="tests" options={{ tabBarIcon: ({ focused }) => <TabIcon Icon={FileText} focused={focused} label="Tests" /> }} />
+      <Tabs.Screen name="tests" options={{ tabBarAccessibilityLabel: 'Tests', tabBarIcon: ({ focused }) => <TabIcon Icon={FileText} focused={focused} label="Tests" text={colors.text} muted={colors.textMuted} /> }} />
       <Tabs.Screen name="quizzes" options={{ href: null }} />
-      <Tabs.Screen name="fees" options={{ tabBarIcon: ({ focused }) => <TabIcon Icon={Receipt} focused={focused} label="Fees" /> }} />
+      <Tabs.Screen name="fees" options={{ tabBarAccessibilityLabel: 'Fees', tabBarIcon: ({ focused }) => <TabIcon Icon={Receipt} focused={focused} label="Fees" text={colors.text} muted={colors.textMuted} /> }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
@@ -86,7 +100,8 @@ const styles = StyleSheet.create({
     width: 56, height: 56, justifyContent: 'center', alignItems: 'center',
     position: 'relative', top: Platform.OS === 'ios' ? 14 : 0,
   },
-  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: T.text, position: 'absolute', bottom: -6 },
+  dot: { width: 4, height: 4, borderRadius: 2, position: 'absolute', bottom: -6 },
+  material: { borderWidth: 1, borderRadius: 24, overflow: 'hidden' },
   centerButtonWrapper: {
     position: 'absolute', top: Platform.OS === 'ios' ? -22 : -32,
     alignItems: 'center', justifyContent: 'center', width: 80, height: 80, zIndex: 20,

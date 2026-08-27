@@ -41,6 +41,8 @@ export const Colors = {
     textSecondary: '#86868b',
     textMuted: '#636366',
     overlay: 'rgba(0, 0, 0, 0.65)',
+    material: 'rgba(28, 28, 30, 0.82)',
+    focus: '#f5f5f7',
     tabBar: '#1c1c1e',
     tabBarBorder: 'rgba(255, 255, 255, 0.15)',
   },
@@ -57,10 +59,18 @@ export const Colors = {
     textSecondary: '#86868b',
     textMuted: '#a1a1a6',
     overlay: 'rgba(0, 0, 0, 0.4)',
+    material: 'rgba(255, 255, 255, 0.78)',
+    focus: '#111827',
     tabBar: 'rgba(255, 255, 255, 0.9)',
     tabBarBorder: 'rgba(0, 0, 0, 0.08)',
   },
 } as const;
+
+export type ThemeScheme = 'light' | 'dark';
+
+export function getThemeColors(scheme: ThemeScheme) {
+  return Colors[scheme];
+}
 
 export const Spacing = {
   xs: 4,
@@ -104,6 +114,19 @@ export const FontWeight = {
   extrabold: '800' as const,
 };
 
+export const TypeScale = {
+  pageTitle: { fontSize: FontSize['2xl'], lineHeight: 34, fontWeight: FontWeight.bold, letterSpacing: -0.6 },
+  sectionTitle: { fontSize: FontSize.md, lineHeight: 23, fontWeight: FontWeight.semibold, letterSpacing: -0.2 },
+  body: { fontSize: FontSize.base, lineHeight: 22, fontWeight: FontWeight.regular, letterSpacing: 0 },
+  label: { fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.semibold, letterSpacing: 0.1 },
+  caption: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.medium, letterSpacing: 0.2 },
+} as const;
+
+export const TouchTarget = {
+  minimum: 44,
+  comfortable: 48,
+} as const;
+
 export const Shadows = {
   sm: {
     shadowColor: '#000',
@@ -135,18 +158,29 @@ export const Shadows = {
   }),
 } as const;
 
+export const Motion = {
+  press: {
+    damping: 30,
+    stiffness: 420,
+    mass: 0.8,
+  },
+  default: {
+    damping: 30,
+    stiffness: 350,
+    mass: 0.8,
+  },
+  momentum: {
+    damping: 22,
+    stiffness: 300,
+    mass: 0.9,
+  },
+  reducedDuration: 120,
+} as const;
+
 export const Animation = {
   fast: 150,
   normal: 250,
   slow: 400,
-  spring: {
-    damping: 15,
-    stiffness: 150,
-    mass: 0.8,
-  },
-  springBouncy: {
-    damping: 10,
-    stiffness: 120,
-    mass: 0.6,
-  },
+  spring: Motion.default,
+  springBouncy: Motion.momentum,
 } as const;
