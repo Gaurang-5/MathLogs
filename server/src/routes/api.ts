@@ -4,7 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireCoachingFeeMode } from '../middleware/requireCoachingFeeMode';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resolveIdentityReviewSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
 import { addStudentManually, approveStudent, archiveStudent, confirmMonthCoverageProfileController, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
@@ -29,6 +29,7 @@ import { requireSupportFeature } from '../middleware/supportFeatureGate';
 import { getPublicPlanCatalogue } from '../controllers/planCatalogController';
 import { monthCoverageHandlers } from '../controllers/monthCoverageController';
 import { deleteEmptyStudentController, endEnrollmentController, enrollExistingStudentController, getDeletionEligibilityController, previewEnrollmentFeesController, searchEnrollmentCandidatesController } from '../controllers/enrollmentController';
+import { listIdentityReviews, resolveIdentityReview } from '../controllers/identityReviewController';
 
 const router = Router();
 const requireCurrentDueFeeMode = requireCoachingFeeMode('CURRENT_DUE_BASED');
@@ -260,7 +261,7 @@ router.post('/batches/:id/installments', authenticateToken as any, requireCurren
 router.put('/installments/:id', authenticateToken as any, requireCurrentDueFeeMode as any, updateFeeInstallment as any);
 router.delete('/installments/:id', authenticateToken as any, requireCurrentDueFeeMode as any, deleteFeeInstallment as any);
 router.post('/batches/:id/whatsapp-invite', authenticateToken as any, bulkNotifyLimiter, sendBatchWhatsappInvite as any);
-router.post('/batches/:id/invite', authenticateToken as any, inviteStudentToBatch as any);
+router.post('/batches/:id/invite', authenticateToken as any, validateRequest(inviteStudentEnrollmentSchema), inviteStudentToBatch as any);
 router.post('/students/:id/whatsapp-invite', authenticateToken as any, sendStudentWhatsappInvite as any);
 
 // Students
@@ -276,6 +277,8 @@ router.post('/students/:id/approve', authenticateToken as any, approveStudent as
 router.post('/students/:id/reject', authenticateToken as any, rejectStudent as any);
 router.delete('/students/:id/archive', authenticateToken as any, archiveStudent as any);
 router.put('/students/:id', authenticateToken as any, validateRequest(updateStudentSchema), updateStudent as any);
+router.get('/identity-reviews', authenticateToken as any, listIdentityReviews as any);
+router.post('/identity-reviews/:id/resolve', authenticateToken as any, validateRequest(resolveIdentityReviewSchema), resolveIdentityReview as any);
 router.get('/students/lookup/:humanId', authenticateToken as any, getStudentByHumanId as any);
 router.get('/students/:id/profile', authenticateToken as any, getStudentProfile as any);
 router.put('/month-coverage/students/:studentId/profile', authenticateToken as any, requireMonthCoverageFeeMode as any, validateRequest(confirmMonthCoverageProfileSchema), confirmMonthCoverageProfileController as any);

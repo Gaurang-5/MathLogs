@@ -13,6 +13,7 @@ import { sendStudentAlertForStudent } from '../services/studentAlertRecipientSer
 import { getJwtSecret } from '../utils/env';
 import { buildBatchExportRows, parseBatchExportColumnIds, resolveBatchExportColumns } from '../services/batchExportService';
 import { getMonthCoverageSummary } from '../services/monthCoverageSummaryService';
+import { compareMonths, currentMonthInTimezone, parseMonth } from '../domain/monthCoverage/calendar';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -1042,7 +1043,7 @@ export const downloadBatchQRPDF = async (req: Request, res: Response) => {
 
 export const inviteStudentToBatch = async (req: Request, res: Response) => {
     const { id } = req.params;
-    let { whatsappNumber } = req.body;
+    let { whatsappNumber, fee } = req.body;
 
     if (!whatsappNumber) {
         return res.status(400).json({ error: "WhatsApp number is required" });
@@ -1056,7 +1057,7 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
     try {
         const batch = await prisma.batch.findUnique({
             where: { id: String(id) },
-            include: { institute: true }
+            include: { institute: true, feeInstallments: { select: { id: true } } }
         });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
@@ -1064,10 +1065,44 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
         const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
+        if (fee.mode !== batch.institute?.coachingFeeMode) {
+            return res.status(400).json({ error: 'FEE_MODE_MISMATCH' });
+        }
+        if (fee.mode === 'MONTH_COVERAGE') {
+            if (!batch.startDate || !batch.endDate || !batch.institute?.timezone) {
+                return res.status(400).json({ error: 'BATCH_DATES_REQUIRED' });
+            }
+            parseMonth(fee.feeStartMonth);
+            const first = currentMonthInTimezone(batch.startDate, batch.institute.timezone);
+            const last = currentMonthInTimezone(batch.endDate, batch.institute.timezone);
+            if (compareMonths(fee.feeStartMonth, first) < 0 || compareMonths(fee.feeStartMonth, last) > 0) {
+                return res.status(400).json({ error: 'INVALID_FEE_START_MONTH' });
+            }
+        } else {
+            const allowed = new Set(batch.feeInstallments.map(item => item.id));
+            if (fee.installmentIds.some((installmentId: string) => !allowed.has(installmentId))) {
+                return res.status(400).json({ error: 'INVALID_INSTALLMENT_SELECTION' });
+            }
+        }
+
+        const nonce = crypto.randomBytes(24).toString('hex');
+        const expiresAt = new Date(Date.now() + (60 * 60 * 24 * 7 * 1000));
+        await prisma.inviteToken.create({
+            data: {
+                token: nonce,
+                instituteId: user.instituteId,
+                expiresAt,
+                enrollmentIntent: { batchId: batch.id, fee, issuedById: user.id } as any,
+            },
+        });
         const payload = {
+            instituteId: user.instituteId,
             batchId: String(id),
             whatsapp: whatsappNumber,
-            exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days expiration
+            fee,
+            issuedById: user.id,
+            nonce,
+            exp: Math.floor(expiresAt.getTime() / 1000),
         };
         const token = jwt.sign(payload, JWT_SECRET);
         const fullUrl = `${getClientUrl(req)}/register/${batch.id}?token=${token}`;

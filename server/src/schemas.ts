@@ -247,6 +247,26 @@ const enrollmentFeeChoiceSchema = z.discriminatedUnion('mode', [
     })
 ]);
 
+export const inviteStudentEnrollmentSchema = z.object({
+    body: z.object({
+        whatsappNumber: z.string().regex(phoneRegex, 'Invalid phone number'),
+        fee: enrollmentFeeChoiceSchema
+    })
+});
+
+export const resolveIdentityReviewSchema = z.object({
+    body: z.object({
+        action: z.enum(['USE_EXISTING', 'CREATE_NEW']),
+        studentId: z.string().uuid('Invalid Student ID').optional(),
+        startedAt: z.string().datetime(),
+        fee: enrollmentFeeChoiceSchema,
+        idempotencyKey: z.string().trim().min(8).max(200)
+    }).refine(value => value.action !== 'USE_EXISTING' || Boolean(value.studentId), {
+        message: 'Student ID is required when using an existing profile',
+        path: ['studentId']
+    })
+});
+
 export const previewEnrollmentSchema = z.object({
     body: z.object({
         studentId: z.string().uuid('Invalid Student ID'),
