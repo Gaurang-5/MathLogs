@@ -11,7 +11,7 @@ import {
   X, LogOut, Mail, Phone, ChevronRight, Eye, EyeOff, Bell, Scan, Sparkles,
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { OfflineBanner, SkeletonLoader } from '../../components/ui';
+import { OfflineBanner, SkeletonLoader, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import api from '../../services/api';
 
 const { width } = Dimensions.get('window');
@@ -90,6 +90,7 @@ export default function DashboardScreen() {
         <View style={s.navRight}>
           <TouchableOpacity
             style={[s.navIconBtn, { backgroundColor: '#F3E8FF', borderColor: '#D8B4FE' }]}
+            accessibilityLabel="Open quizzes"
             onPress={() => router.push('/(tabs)/quizzes' as any)}
             activeOpacity={0.75}
           >
@@ -97,6 +98,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={s.navIconBtn}
+            accessibilityLabel="Scan marks"
             onPress={() => router.push('/scan' as any)}
             activeOpacity={0.75}
           >
@@ -104,6 +106,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={s.navIconBtn}
+            accessibilityLabel={isPrivate ? 'Show fee amounts' : 'Hide fee amounts'}
             onPress={() => setIsPrivate(p => !p)}
             activeOpacity={0.75}
           >
@@ -111,7 +114,7 @@ export default function DashboardScreen() {
               ? <EyeOff size={18} color={T.text} />
               : <Eye size={18} color={T.text} />}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setIsProfileOpen(true)} activeOpacity={0.85} style={s.navAvatarWrap}>
+          <TouchableOpacity accessibilityLabel="Open profile" onPress={() => setIsProfileOpen(true)} activeOpacity={0.85} style={s.navAvatarWrap}>
             <Image source={{ uri: logoUri }} style={s.navAvatar} resizeMode="contain" />
           </TouchableOpacity>
         </View>
@@ -178,7 +181,7 @@ export default function DashboardScreen() {
         <Animated.View entering={FadeInDown.duration(500).delay(240)}>
           <View style={s.sectionHeader}>
             <Text style={s.sectionTitle}>Batch Pending Dues</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/fees' as any)} style={s.seeAllBtn}>
+            <TouchableOpacity accessibilityLabel="Manage fees" onPress={() => router.push('/(tabs)/fees' as any)} style={s.seeAllBtn}>
               <Text style={s.seeAllText}>Manage</Text>
               <ChevronRight size={14} color={T.accent} />
             </TouchableOpacity>
@@ -216,7 +219,7 @@ export default function DashboardScreen() {
         <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
           <View style={s.profileModalHeader}>
             <Text style={s.profileModalTitle}>Profile</Text>
-            <TouchableOpacity onPress={() => setIsProfileOpen(false)} style={s.profileClose}>
+            <TouchableOpacity accessibilityLabel="Close profile" onPress={() => setIsProfileOpen(false)} style={s.profileClose}>
               <X size={20} color={T.text} />
             </TouchableOpacity>
           </View>
@@ -265,7 +268,7 @@ function StatPill({ icon, value, label, color }: { icon: React.ReactNode; value:
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.bg },
-  scroll: { paddingHorizontal: 20, paddingBottom: 130, paddingTop: 8, gap: 0 },
+  scroll: { paddingHorizontal: 20, paddingBottom: TEACHER_TAB_CONTENT_INSET, paddingTop: 8, gap: 0 },
 
   // Navbar
   navbar: {

@@ -8,7 +8,7 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Receipt, TrendingUp, TrendingDown, IndianRupee, History, Mail, CheckCircle2, X, ChevronRight, CheckCircle, Filter, Download } from 'lucide-react-native';
 import api from '../../services/api';
-import { SkeletonLoader } from '../../components/ui';
+import { SkeletonLoader, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
@@ -211,15 +211,15 @@ export default function FeesDashboardScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
-        <Text style={s.headerTitle}>Fees & Finances</Text>
+        <Text accessibilityRole="header" style={s.headerTitle}>Fees & Finances</Text>
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <TouchableOpacity style={s.iconBtn} onPress={() => setShowFilterModal(true)}>
+          <TouchableOpacity accessibilityLabel="Filter fee records" style={s.iconBtn} onPress={() => setShowFilterModal(true)}>
             <Filter size={20} color={T.text} />
             {(selectedBatch !== 'All' || listSort === 'date' || searchTerm !== '') && (
                <View style={{position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: T.red}} />
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={s.iconBtn} onPress={() => setShowReportModal(true)}>
+          <TouchableOpacity accessibilityLabel="Download fee report" style={s.iconBtn} onPress={() => setShowReportModal(true)}>
             <Download size={20} color={T.text} />
           </TouchableOpacity>
         </View>
@@ -572,7 +572,7 @@ const s = StyleSheet.create({
   header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { fontSize: 28, fontWeight: '700', color: T.text, letterSpacing: -0.5 },
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: T.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.border },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: TEACHER_TAB_CONTENT_INSET },
   
   singleStatCard: {
     backgroundColor: T.white, borderRadius: 24, padding: 24, marginHorizontal: 4, marginBottom: 24,

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
-import { GlassCard, BrandButton } from '../../components/ui';
+import { GlassCard, BrandButton, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import { clearCache } from '../../services/offlineSync';
 import { Colors, Spacing, FontSize, FontWeight, BorderRadius } from '../../constants/theme';
 
@@ -85,7 +85,7 @@ export default function SettingsScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Animated.View entering={FadeInDown.duration(400)}>
-          <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Settings</Text>
         </Animated.View>
 
         {/* Profile Section */}
@@ -138,7 +138,6 @@ export default function SettingsScreen() {
           <BrandButton title="Sign Out" variant="danger" onPress={handleLogout} size="lg" />
         </Animated.View>
 
-        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -146,7 +145,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: Spacing.xl },
+  scrollContent: { padding: Spacing.xl, paddingBottom: TEACHER_TAB_CONTENT_INSET },
   title: { fontSize: FontSize['2xl'], fontWeight: FontWeight.bold, marginBottom: Spacing['2xl'] },
   sectionLabel: {
     fontSize: FontSize.xs,

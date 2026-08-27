@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { SkeletonLoader } from '../../components/ui';
+import { SkeletonLoader, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import { Search, FileText, Calendar, ChevronRight, BarChart2, Plus, X, CheckSquare, Square } from 'lucide-react-native';
 import api from '../../services/api';
 import * as Haptics from 'expo-haptics';
@@ -57,7 +57,7 @@ function TestCard({ item, index }: { item: Test; index: number }) {
 
   return (
     <Animated.View entering={FadeInRight.duration(400).delay(index * 50)}>
-      <TouchableOpacity activeOpacity={0.7} style={s.card} onPress={() => router.push(`/test/${item.id}`)}>
+      <TouchableOpacity accessibilityLabel={`Open test ${item.name}`} activeOpacity={0.7} style={s.card} onPress={() => router.push(`/test/${item.id}`)}>
         <View style={[s.testIcon, { backgroundColor: `${st.color}12` }]}>
           <FileText size={20} color={st.color} />
         </View>
@@ -170,10 +170,10 @@ export default function TestsScreen() {
       <Animated.View entering={FadeInDown.duration(400)} style={s.headerArea}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View>
-            <Text style={s.title}>Tests</Text>
+            <Text accessibilityRole="header" style={s.title}>Tests</Text>
             <Text style={s.subtitle}>{tests?.length ?? 0} total tests</Text>
           </View>
-          <TouchableOpacity style={s.createBtn} onPress={() => setShowForm(true)}>
+          <TouchableOpacity accessibilityLabel="Create test" style={s.createBtn} onPress={() => setShowForm(true)}>
             <Plus size={16} color={T.white} />
             <Text style={s.createBtnText}>New Test</Text>
           </TouchableOpacity>
@@ -343,7 +343,7 @@ const s = StyleSheet.create({
   },
   miniValue: { fontSize: 22, fontWeight: '700' },
   miniLabel: { color: T.textSec, fontSize: 11, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
-  listContent: { padding: 24, paddingTop: 12, paddingBottom: 120 },
+  listContent: { padding: 24, paddingTop: 12, paddingBottom: TEACHER_TAB_CONTENT_INSET },
   card: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
     borderRadius: 16, padding: 16, marginBottom: 10,

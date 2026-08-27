@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInRight, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
-import { SkeletonLoader } from '../../components/ui';
+import { SkeletonLoader, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import { Search, Users as UsersIcon, BookOpen, ChevronRight, Plus, Clock, ExternalLink, X, Type, GraduationCap, Hash } from 'lucide-react-native';
 import api from '../../services/api';
 import * as Haptics from 'expo-haptics';
@@ -52,6 +52,7 @@ function BatchCard({ item, index }: { item: Batch; index: number }) {
       <TouchableOpacity 
         activeOpacity={0.7} 
         style={s.card}
+        accessibilityLabel={`Open batch ${item.name}`}
         onPress={() => router.push(`/batch/${item.id}`)}
       >
         <View style={[s.batchIcon, { backgroundColor: `${c}12` }]}>
@@ -171,11 +172,12 @@ export default function BatchesScreen() {
       <Animated.View entering={FadeInDown.duration(400)} style={s.headerArea}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View>
-            <Text style={s.title}>Batches</Text>
+            <Text accessibilityRole="header" style={s.title}>Batches</Text>
             <Text style={s.subtitle}>{batches?.length ?? 0} batches • {totalStudents} students</Text>
           </View>
           <TouchableOpacity 
             style={s.createBtn}
+            accessibilityLabel="Create batch"
             onPress={() => setShowForm(true)}
           >
             <Plus size={16} color={T.white} />
@@ -306,7 +308,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: T.border,
   },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: T.text, fontWeight: '500' },
-  listContent: { padding: 24, paddingTop: 12, paddingBottom: 120 },
+  listContent: { padding: 24, paddingTop: 12, paddingBottom: TEACHER_TAB_CONTENT_INSET },
   card: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
     borderRadius: 16, padding: 16, marginBottom: 10,
