@@ -41,6 +41,20 @@ export type MarketplaceLandingRequest = {
   subjectSlug?: string;
 };
 
+export function parseMarketplaceLandingPath(pathname: string): MarketplaceLandingRequest | null {
+  const match = pathname.match(/^\/coaching\/muzaffarnagar(?:\/areas\/([^/]+))?(?:\/classes\/([^/]+))?(?:\/subjects\/([^/]+))?\/?$/i);
+  if (!match || !match.slice(1).some(Boolean)) return null;
+  const decode = (value?: string) => {
+    if (!value) return undefined;
+    try { return decodeURIComponent(value); } catch { return value; }
+  };
+  return {
+    ...(match[1] ? { areaSlug: decode(match[1]) } : {}),
+    ...(match[2] ? { classSlug: decode(match[2]) } : {}),
+    ...(match[3] ? { subjectSlug: decode(match[3]) } : {}),
+  };
+}
+
 export type MarketplaceLandingPage = {
   valid: boolean;
   indexable: boolean;

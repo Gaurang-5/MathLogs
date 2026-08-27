@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { Star, MapPin, Phone, MessageCircle, CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, Send, Loader2, MessageSquarePlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+import MarketplaceBreadcrumbs from '../components/MarketplaceBreadcrumbs';
+import { buildMarketplaceLandingPath } from '../features/marketplace/location';
 import { useMetaTags } from '../hooks/useMetaTags';
 
 interface GoogleReviewItem {
@@ -103,10 +105,15 @@ export default function CoachingProfile() {
 
   useMetaTags({
     title: profile?.name
-      ? `${profile.name} in ${profile.city} | Reviews, Courses & Contact`
+      ? `${profile.name} in ${profile.area ? `${profile.area}, ` : ''}${profile.city} | Classes & Contact`
       : 'Coaching Institute Profile | MathLogs Marketplace',
     description: profile?.name
-      ? `${profile.name}${profile.area ? ` in ${profile.area}` : ''}, ${profile.city}. View subjects, classes, ratings, student reviews, batch details and direct contact information.`
+      ? [
+          `Discover ${profile.name} in ${profile.area ? `${profile.area}, ` : ''}${profile.city}.`,
+          profile.classesOffered.length ? `Classes: ${profile.classesOffered.join(', ')}.` : '',
+          profile.subjectsOffered.length ? `Subjects: ${profile.subjectsOffered.join(', ')}.` : '',
+          'View verified details and contact information on MathLogs.',
+        ].filter(Boolean).join(' ')
       : 'View subjects, classes, ratings, student reviews, batch details and contact information for this coaching institute.',
     canonicalPath: `/coaching/${profile?.slug || slug || ''}`,
     image: profile?.logoUrl || 'https://mathlogs.app/dashboard.webp',
@@ -304,6 +311,17 @@ export default function CoachingProfile() {
   const mapsUrl = profile.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${profile.name}, ${profile.address}, ${profile.city}`)}`
     : null;
+  const relatedPages = [
+    ...(profile.area ? [{ label: `Coaching in ${profile.area}`, path: buildMarketplaceLandingPath({ area: profile.area }) }] : []),
+    ...profile.classesOffered.map(className => ({
+      label: `${className} coaching`,
+      path: buildMarketplaceLandingPath({ className }),
+    })),
+    ...profile.subjectsOffered.map(subject => ({
+      label: `${subject} coaching`,
+      path: buildMarketplaceLandingPath({ subject }),
+    })),
+  ];
 
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col font-sans pb-16 text-neutral-900 selection:bg-neutral-900 selection:text-white">
@@ -324,6 +342,10 @@ export default function CoachingProfile() {
 
       {/* Profile Header Banner */}
       <section className="bg-white border-b border-neutral-200/80 py-10 px-6">
+        <MarketplaceBreadcrumbs items={[
+          { name: 'Coaching in Muzaffarnagar', path: '/coaching' },
+          { name: profile.name, path: `/coaching/${profile.slug}` },
+        ]} />
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             {profile.logoUrl ? (
@@ -395,6 +417,15 @@ export default function CoachingProfile() {
             )}
           </div>
         </div>
+        {relatedPages.length ? (
+          <nav aria-label="Related coaching searches" className="mx-auto mt-7 flex max-w-7xl flex-wrap gap-2">
+            {relatedPages.map(item => (
+              <Link key={item.path} to={item.path} className="rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs font-bold text-neutral-700 hover:border-neutral-400">
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
       </section>
 
       {/* Main Content Details Grid */}
