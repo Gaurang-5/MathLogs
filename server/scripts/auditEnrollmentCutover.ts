@@ -18,8 +18,8 @@ export const CUTOVER_QUERIES = {
     FROM "Enrollment" enrollment
     JOIN "Student" student ON student.id = enrollment."studentId"
     JOIN "Batch" batch ON batch.id = enrollment."batchId"
-    WHERE enrollment."instituteId" <> student."instituteId"
-       OR enrollment."instituteId" <> batch."instituteId"`,
+    WHERE enrollment."instituteId" IS DISTINCT FROM student."instituteId"
+       OR enrollment."instituteId" IS DISTINCT FROM batch."instituteId"`,
   unlinkedMonthCoverageRows: `
     SELECT COALESCE(SUM(rows.count), 0)::int AS count
     FROM (
@@ -32,14 +32,15 @@ export const CUTOVER_QUERIES = {
   pendingReconciliationEntries: `
     SELECT COUNT(*)::int AS count
     FROM "Student" student
-    WHERE student.status = 'APPROVED'
-      AND student."batchId" IS NOT NULL
-      AND NOT EXISTS (
-        SELECT 1
-        FROM "Enrollment" enrollment
-        WHERE enrollment."studentId" = student.id
-          AND enrollment."batchId" = student."batchId"
-          AND enrollment.status = 'ACTIVE'
+    WHERE NOT EXISTS (
+        SELECT 1 FROM "Enrollment" enrollment WHERE enrollment."studentId" = student.id
+      )
+      AND (
+        student."batchId" IS NOT NULL
+        OR EXISTS (SELECT 1 FROM "StudentMonthCoverageProfile" profile WHERE profile."studentId" = student.id)
+        OR EXISTS (SELECT 1 FROM "FeeInstallment" installment WHERE installment."studentId" = student.id)
+        OR EXISTS (SELECT 1 FROM "FeePayment" payment WHERE payment."studentId" = student.id)
+        OR EXISTS (SELECT 1 FROM "Mark" mark WHERE mark."studentId" = student.id)
       )`,
   unresolvedIdentityReviews: `SELECT COUNT(*)::int AS count FROM "StudentIdentityReview" WHERE status = 'PENDING'`,
   lifecycleNotificationFailures: `SELECT COUNT(*)::int AS count FROM "WhatsappJob" WHERE status = 'FAILED' AND "eventKey" LIKE 'enrollment:%'`,
