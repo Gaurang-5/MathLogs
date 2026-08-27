@@ -55,17 +55,18 @@ afterEach(() => {
 });
 
 // Mock helpers for payInstallment
-function setupPayInstallmentMock(installmentOverrides: any, existingPaymentsCount: number = 0) {
+function setupPayInstallmentMock(installmentOverrides: any, existingPaymentsCount: number = 0, batchIds = ['batch-1']) {
     replaceMethod(prisma.student, 'findUnique', (async () => ({
         id: 'student-1',
         name: 'Target Student',
-        batchId: 'batch-1',
         createdAt: new Date('2026-03-01T00:00:00Z'), // Joined March 1st
         instituteId: 'inst-1',
-        batch: {
-            teacherId: 'teacher-1',
-            institute: { name: 'Institute' },
-        },
+        enrollments: batchIds.map(batchId => ({
+            batchId,
+            startedAt: new Date('2026-03-01T00:00:00Z'),
+            batch: { teacherId: 'teacher-1', institute: { name: 'Institute' } },
+        })),
+        feeAssignments: [],
     }) as never) as typeof prisma.student.findUnique);
 
     replaceMethod(prisma.feePayment, 'findMany', (async () => {
@@ -174,6 +175,22 @@ test('payInstallment security: CAN pay towards global installment before join da
     assert.equal(res.statusCode, 200);
 });
 
+test('payInstallment accepts an installment from either active enrollment', async () => {
+    setupPayInstallmentMock({
+        studentId: null,
+        batchId: 'batch-2',
+        createdAt: new Date('2026-04-01T00:00:00Z')
+    }, 0, ['batch-1', 'batch-2']);
+
+    const req = {
+        body: { studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
+        user: { id: 'teacher-1', instituteId: 'inst-1' }
+    } as MockRequest;
+    const res = createMockResponse();
+    await payInstallment(req as never, res as never);
+    assert.equal(res.statusCode, 200);
+});
+
 
 // Mock helpers for sendFeeReminder
 test('sendFeeReminder: Ignores client amountDue and uses server-calculated balance', async () => {
@@ -182,11 +199,11 @@ test('sendFeeReminder: Ignores client amountDue and uses server-calculated balan
         name: 'Aarav Sharma',
         parentEmail: 'parent@test.com',
         createdAt: new Date('2026-01-01T00:00:00Z'),
-        batch: {
-            teacherId: 'teacher-1',
-            feeAmount: 5000,
-            feeInstallments: []
-        },
+        enrollments: [{ startedAt: new Date('2026-01-01T00:00:00Z'), batch: {
+            teacherId: 'teacher-1', name: 'Class 10', feeAmount: 5000, feeInstallments: [],
+            institute: { name: 'Institute', email: null, slug: 'institute' }
+        } }],
+        feeAssignments: [],
         fees: [],
         feePayments: []
     }) as never) as typeof prisma.student.findUnique);
@@ -219,11 +236,11 @@ test('sendFeeReminder: balance 0 gets 400 response and no email', async () => {
         name: 'Aarav Sharma',
         parentEmail: 'parent@test.com',
         createdAt: new Date('2026-01-01T00:00:00Z'),
-        batch: {
-            teacherId: 'teacher-1',
-            feeAmount: 5000,
-            feeInstallments: []
-        },
+        enrollments: [{ startedAt: new Date('2026-01-01T00:00:00Z'), batch: {
+            teacherId: 'teacher-1', name: 'Class 10', feeAmount: 5000, feeInstallments: [],
+            institute: { name: 'Institute', email: null, slug: 'institute' }
+        } }],
+        feeAssignments: [],
         fees: [{ status: 'PAID', amount: 5000 }], // Fully paid
         feePayments: []
     }) as never) as typeof prisma.student.findUnique);
@@ -253,11 +270,11 @@ test('sendFeeReminder: negative (overpaid) balance gets 400 response, never nega
         name: 'Kushagra Bhargav',
         parentEmail: 'parent@test.com',
         createdAt: new Date('2026-01-01T00:00:00Z'),
-        batch: {
-            teacherId: 'teacher-1',
-            feeAmount: 5000,
-            feeInstallments: []
-        },
+        enrollments: [{ startedAt: new Date('2026-01-01T00:00:00Z'), batch: {
+            teacherId: 'teacher-1', name: 'Class 10', feeAmount: 5000, feeInstallments: [],
+            institute: { name: 'Institute', email: null, slug: 'institute' }
+        } }],
+        feeAssignments: [],
         fees: [{ status: 'PAID', amount: 6000 }], // Overpaid by 1000
         feePayments: []
     }) as never) as typeof prisma.student.findUnique);

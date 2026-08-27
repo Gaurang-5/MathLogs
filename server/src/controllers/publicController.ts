@@ -154,16 +154,10 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
             where: {
                 instituteId: institute.id,
                 parentWhatsapp: { contains: last10 },
-                status: 'APPROVED'
+                enrollments: { some: { status: 'ACTIVE' } }
             },
             include: {
-                batch: {
-                    include: {
-                        feeInstallments: {
-                            orderBy: { createdAt: 'asc' }
-                        }
-                    }
-                },
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { feeInstallments: { orderBy: { createdAt: 'asc' } } } } } },
                 feeAssignments: { select: { installmentId: true } },
                 feePayments: true,
                 fees: { where: { status: 'PAID' } },
@@ -180,12 +174,14 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
 
         const studentData = students.map(student => {
             const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+            const installments = student.enrollments.flatMap(enrollment => enrollment.batch.feeInstallments)
+                .filter((installment, index, rows) => assignedIds.has(installment.id) && rows.findIndex(row => row.id === installment.id) === index);
 
             return {
                 studentId: student.id,
                 studentName: student.name,
-                batchName: student.batch?.name || 'N/A',
-                feeInstallments: (student.batch?.feeInstallments || []).filter(inst => assignedIds.has(inst.id)),
+                batchName: student.enrollments.map(enrollment => enrollment.batch.name).join(', ') || 'N/A',
+                feeInstallments: installments,
                 feePayments: student.feePayments || [],
                 feeRecords: student.fees || [],
                 pendingVerifications: student.upiPaymentVerifications || []
@@ -251,15 +247,10 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
             where: {
                 id: studentId,
                 instituteId: institute.id,
-                status: 'APPROVED'
+                enrollments: { some: { status: 'ACTIVE' } }
             },
             include: {
-                batch: {
-                    include: {
-                        feeInstallments: true
-                    }
-                },
-                feeAssignments: { select: { installmentId: true } },
+                feeAssignments: { select: { installmentId: true, installment: true } },
                 feePayments: true,
                 fees: { where: { status: 'PAID' } }
             }
@@ -269,13 +260,14 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
         }
 
         if (installmentId) {
-            if (!student.batchId) {
-                return res.status(400).json({ error: 'Student batch is missing; installment payment is not possible.' });
-            }
             const installment = await prisma.feeInstallment.findFirst({
                 where: {
                     id: installmentId,
-                    batchId: student.batchId
+                    batch: { enrollments: { some: { studentId: student.id, status: 'ACTIVE' } } },
+                    OR: [
+                        { studentId: student.id },
+                        { assignments: { some: { studentId: student.id } } },
+                    ],
                 },
                 select: { id: true, amount: true }
             });
@@ -295,8 +287,7 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
                 return res.status(400).json({ error: `Amount exceeds pending installment balance (₹${pendingForInstallment.toLocaleString()}).` });
             }
         } else {
-            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
-            const installments = (student.batch?.feeInstallments || []).filter(inst => assignedIds.has(inst.id));
+            const installments = (student.feeAssignments || []).map(assignment => assignment.installment);
             const totalFee = installments.reduce((sum, inst) => sum + Number(inst.amount || 0), 0);
 
             const validInstallmentIds = new Set(installments.map(inst => inst.id));

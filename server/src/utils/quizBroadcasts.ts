@@ -19,18 +19,18 @@ export async function sendQuizScheduleBroadcast(quizId: string) {
             batch: {
                 select: {
                     id: true,
-                    students: {
-                        where: { status: 'APPROVED' },
-                        select: { id: true, name: true, parentWhatsapp: true }
+                    enrollments: {
+                        where: { status: 'ACTIVE' },
+                        select: { student: { select: { id: true, name: true, parentWhatsapp: true } } }
                     }
                 }
             },
             batches: {
                 select: {
                     id: true,
-                    students: {
-                        where: { status: 'APPROVED' },
-                        select: { id: true, name: true, parentWhatsapp: true }
+                    enrollments: {
+                        where: { status: 'ACTIVE' },
+                        select: { student: { select: { id: true, name: true, parentWhatsapp: true } } }
                     }
                 }
             }
@@ -41,8 +41,8 @@ export async function sendQuizScheduleBroadcast(quizId: string) {
 
     // Union all students from the single batch and multiple batches
     const studentMap = new Map<string, { id: string; name: string; parentWhatsapp: string }>();
-    if (quiz.batch?.students) {
-        for (const s of quiz.batch.students) {
+    if (quiz.batch?.enrollments) {
+        for (const { student: s } of quiz.batch.enrollments) {
             if (s.parentWhatsapp) {
                 studentMap.set(s.id, s as any);
             }
@@ -50,7 +50,7 @@ export async function sendQuizScheduleBroadcast(quizId: string) {
     }
     if (quiz.batches) {
         for (const b of quiz.batches) {
-            for (const s of b.students) {
+            for (const { student: s } of b.enrollments) {
                 if (s.parentWhatsapp) {
                     studentMap.set(s.id, s as any);
                 }
@@ -104,8 +104,7 @@ export async function sendQuizMarksBroadcast(quizId: string) {
 
     const students = await prisma.student.findMany({
         where: {
-            batchId: { in: batchIds },
-            status: 'APPROVED'
+            enrollments: { some: { batchId: { in: batchIds }, status: 'ACTIVE' } }
         },
         select: {
             id: true,

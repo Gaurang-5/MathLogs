@@ -164,7 +164,7 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
                 instituteId: user.instituteId
             },
             include: {
-                batch: true,
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: true } },
                 marks: testId ? { where: { testId: String(testId) } } : true
             }
         });
@@ -173,11 +173,11 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
             res.status(404).json({ error: 'Student not found' });
             return;
         }
-        if (student.batch?.teacherId && student.batch.teacherId !== teacherId) {
+        if (!student.enrollments.some(enrollment => !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId)) {
             res.status(403).json({ error: 'Unauthorized' });
             return;
         }
-        res.json(student);
+        res.json({ ...student, batch: student.enrollments[0]?.batch || null });
     } catch (e) {
         console.error('Student lookup error:', e);
         res.status(500).json({ error: 'Lookup failed' });
@@ -363,8 +363,7 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
             if (linkedBatchIds.length > 0) {
                 return prisma.student.findMany({
                     where: {
-                        batchId: { in: linkedBatchIds },
-                        status: 'APPROVED',
+                        enrollments: { some: { batchId: { in: linkedBatchIds }, status: 'ACTIVE' } },
                         marks: {
                             none: {
                                 testId: String(id)
@@ -372,9 +371,7 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
                         }
                     },
                     include: {
-                        batch: {
-                            select: { name: true }
-                        }
+                        enrollments: { where: { batchId: { in: linkedBatchIds }, status: 'ACTIVE' }, select: { batch: { select: { name: true } } } }
                     },
                     orderBy: { name: 'asc' }
                 });
@@ -382,10 +379,7 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
                 // Fallback for older tests that only had className
                 return prisma.student.findMany({
                     where: {
-                        batch: {
-                            className: testData.className || undefined
-                        },
-                        status: 'APPROVED',
+                        enrollments: { some: { status: 'ACTIVE', batch: { className: testData.className || undefined } } },
                         marks: {
                             none: {
                                 testId: String(id)
@@ -393,9 +387,7 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
                         }
                     },
                     include: {
-                        batch: {
-                            select: { name: true }
-                        }
+                        enrollments: { where: { status: 'ACTIVE', batch: { className: testData.className || undefined } }, select: { batch: { select: { name: true } } } }
                     },
                     orderBy: { name: 'asc' }
                 });
@@ -405,7 +397,7 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
         const eligibleStudents = students.map((s: any) => ({
             id: s.id,
             name: s.name,
-            batchName: s.batch?.name,
+            batchName: s.enrollments?.map((enrollment: any) => enrollment.batch.name).join(', '),
             humanId: s.humanId,
             parentWhatsapp: s.parentWhatsapp
         }));
@@ -456,8 +448,7 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
             // Precise batch scoped tests don't need marks to know who should get messages!
             students = await prisma.student.findMany({
                 where: {
-                    batchId: { in: testBatchIds },
-                    status: 'APPROVED'
+                    enrollments: { some: { batchId: { in: testBatchIds }, status: 'ACTIVE' } }
                 },
                 include: {
                     marks: {
@@ -471,11 +462,11 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
             // We have to trace backwards from who has marks to figure out which batches to message
             const testMarks = await prisma.mark.findMany({
                 where: { testId: test.id },
-                select: { student: { select: { batchId: true } } }
+                select: { student: { select: { enrollments: { select: { batchId: true } } } } }
             });
 
             const fallbackBatchIds = Array.from(new Set(
-                testMarks.map(m => m.student?.batchId).filter(Boolean)
+                testMarks.flatMap(mark => mark.student?.enrollments.map(enrollment => enrollment.batchId) || [])
             )) as string[];
 
             if (fallbackBatchIds.length === 0) {
@@ -484,10 +475,7 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
 
             students = await prisma.student.findMany({
                 where: {
-                    batchId: {
-                        in: fallbackBatchIds
-                    },
-                    status: 'APPROVED'
+                    enrollments: { some: { batchId: { in: fallbackBatchIds }, status: 'ACTIVE' } }
                 },
                 include: {
                     marks: {
@@ -901,13 +889,9 @@ export const getOnlineQuizzes = async (req: Request, res: Response) => {
                         id: true,
                         name: true,
                         className: true,
-                        students: {
-                            where: { status: 'APPROVED' },
-                            select: {
-                                id: true,
-                                name: true,
-                                humanId: true
-                            }
+                        enrollments: {
+                            where: { status: 'ACTIVE' },
+                            select: { student: { select: { id: true, name: true, humanId: true } } }
                         }
                     }
                 },
@@ -916,13 +900,9 @@ export const getOnlineQuizzes = async (req: Request, res: Response) => {
                         id: true,
                         name: true,
                         className: true,
-                        students: {
-                            where: { status: 'APPROVED' },
-                            select: {
-                                id: true,
-                                name: true,
-                                humanId: true
-                            }
+                        enrollments: {
+                            where: { status: 'ACTIVE' },
+                            select: { student: { select: { id: true, name: true, humanId: true } } }
                         }
                     }
                 },
@@ -965,7 +945,19 @@ export const getOnlineQuizzes = async (req: Request, res: Response) => {
                 _count: { select: { submissions: true } }
             }
         });
-        res.json(quizzes);
+        res.json(quizzes.map(quiz => ({
+            ...quiz,
+            batch: quiz.batch ? {
+                ...quiz.batch,
+                students: quiz.batch.enrollments.map(enrollment => enrollment.student),
+                enrollments: undefined,
+            } : null,
+            batches: quiz.batches.map(batch => ({
+                ...batch,
+                students: batch.enrollments.map(enrollment => enrollment.student),
+                enrollments: undefined,
+            })),
+        })));
     } catch (e: any) {
         console.error("Fetch quizzes error:", e);
         res.status(500).json({ error: 'Failed to fetch online quizzes' });
