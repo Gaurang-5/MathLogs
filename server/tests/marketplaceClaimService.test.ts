@@ -19,6 +19,7 @@ async function createInstitute(config?: Prisma.InputJsonObject) {
   const institute = await prisma.institute.create({
     data: {
       name: unique('Marketplace claim institute'),
+      city: 'Muzaffarnagar',
       config: config ?? undefined
     }
   });

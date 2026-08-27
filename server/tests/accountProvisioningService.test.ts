@@ -18,8 +18,8 @@ test('public provisioning creates one institute and invite token idempotently', 
     email: `sunita_${Date.now()}@example.com`,
     marketplace: {
       listed: true,
-      city: 'Delhi',
-      area: 'Rohini',
+      city: 'Muaffarnagar',
+      area: 'Gandhi Colony',
       subjects: ['Math', 'Science']
     }
   };
@@ -40,6 +40,8 @@ test('public provisioning creates one institute and invite token idempotently', 
   assert.equal(inst.phoneNumber, phone);
   assert.equal(inst.plan, 'QUIZ');
   assert.equal(inst.includedQuizCredits, 5);
+  assert.equal(inst.isPubliclyListed, false);
+  assert.equal(inst.city, 'Muzaffarnagar');
 
   // Replay returns the existing institute and valid invite token
   const replay = await prisma.$transaction(tx => provisionInstitute(tx, input, activation));

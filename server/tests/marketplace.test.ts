@@ -31,9 +31,9 @@ before(async () => {
         phoneNumber: '9876543210',
         publicPhone: '9876543210',
         whatsappPhone: '9876543210',
-        city: 'Jaipur',
-        area: 'Malviya Nagar',
-        address: '123 Main Street, Jaipur',
+        city: 'Muzaffarnagar',
+        area: 'Gandhi Colony',
+        address: '123 Main Street, Muzaffarnagar',
         tagline: 'Excellence in Class 10-12 Mathematics',
         subjectsOffered: ['Mathematics', 'Physics'],
         classesOffered: ['Class 10', 'Class 11', 'Class 12'],
@@ -68,7 +68,7 @@ after(async () => {
 });
 
 test('GET /api/marketplace/search should return listed coachings', async () => {
-  const res = await fetch(`${baseUrl}/api/marketplace/search?city=Jaipur&q=${encodeURIComponent(testInstituteName)}`);
+  const res = await fetch(`${baseUrl}/api/marketplace/search?city=Muzaffarnagar&q=${encodeURIComponent(testInstituteName)}`);
   assert.equal(res.status, 200);
 
   const body: any = await res.json();
@@ -99,7 +99,7 @@ test('POST /api/marketplace/coaching/:id/reviews should submit review', async ()
       reviewerName: 'Rohan Verma',
       reviewerRole: 'Student',
       rating: 5,
-      comment: 'Best math teacher in Jaipur! Clear concepts and great guidance.'
+      comment: 'Best math teacher in Muzaffarnagar! Clear concepts and great guidance.'
     })
   });
 
@@ -163,8 +163,8 @@ test('POST /api/marketplace/register-teacher should create new external listing'
       username,
       password: 'password123',
       phoneNumber: '9123456789',
-      city: 'Jaipur',
-      area: 'Raja Park',
+      city: 'Muaffarnagar',
+      area: 'Civil Lines',
       subjectsOffered: ['Physics'],
       classesOffered: ['Class 11', 'Class 12']
     })
@@ -175,10 +175,39 @@ test('POST /api/marketplace/register-teacher should create new external listing'
   assert.equal(body.success, true);
   assert.ok(body.token);
   assert.equal(body.institute.teacherName, 'Dr. Verma');
+  assert.equal(body.institute.city, 'Muzaffarnagar');
 
   // Clean up registered test institute and admin
   if (body.institute.id) {
     await prisma.admin.deleteMany({ where: { instituteId: body.institute.id } });
     await prisma.institute.delete({ where: { id: body.institute.id } });
+  }
+});
+
+test('POST /api/marketplace/register-teacher rejects unsupported marketplace cities', async () => {
+  const response = await fetch(`${baseUrl}/api/marketplace/register-teacher`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      coachingName: 'Outside City Academy',
+      teacherName: 'Teacher',
+      username: `outside-${Date.now()}`,
+      password: 'password123',
+      phoneNumber: '9123456789',
+      city: 'Jaipur',
+      subjectsOffered: ['Mathematics'],
+      classesOffered: ['Class 9']
+    })
+  });
+
+  const body = await response.json() as any;
+  try {
+    assert.equal(response.status, 400);
+    assert.match(body.message, /Muzaffarnagar/);
+  } finally {
+    if (body.institute?.id) {
+      await prisma.admin.deleteMany({ where: { instituteId: body.institute.id } });
+      await prisma.institute.deleteMany({ where: { id: body.institute.id } });
+    }
   }
 });

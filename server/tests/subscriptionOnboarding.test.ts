@@ -4,6 +4,7 @@ import { createOrder } from '../src/controllers/onboardingController';
 import { createAdminOnboardingOrder, verifyAdminOnboardingPayment } from '../src/controllers/adminOnboardingController';
 import { prisma } from '../src/prisma';
 import { planSubscriptionCheckoutService } from '../src/services/planSubscriptionCheckoutService';
+import { provisionInstitute } from '../src/services/accountProvisioningService';
 
 const restores: Array<() => void> = [];
 function replace<T extends object, K extends keyof T>(target: T, key: K, value: T[K]) {
@@ -103,4 +104,28 @@ test('invite subscription verification replay returns the original unused setup 
 
   assert.equal(res.statusCode, 200);
   assert.equal((res.body as { setupLink: string }).setupLink, 'https://mathlogs.app/setup?token=setup-token');
+});
+
+test('newly provisioned institutes remain private until setup and normalize a supplied city', async () => {
+  const suffix = `${Date.now()}-${Math.random()}`;
+  let instituteId = '';
+  try {
+    const result = await prisma.$transaction((tx) => provisionInstitute(tx, {
+      kind: 'PUBLIC',
+      instituteName: `Private Before Setup ${suffix}`,
+      ownerName: 'Teacher',
+      phone: `94${String(Date.now()).slice(-8)}`,
+      email: `private-${suffix}@example.com`,
+      marketplace: { listed: true, city: 'Muaffarnagar' }
+    }, { kind: 'MARKETPLACE', startsAt: new Date() }));
+    instituteId = result.instituteId;
+    const institute = await prisma.institute.findUniqueOrThrow({ where: { id: instituteId } });
+    assert.equal(institute.isPubliclyListed, false);
+    assert.equal(institute.city, 'Muzaffarnagar');
+  } finally {
+    if (instituteId) {
+      await prisma.inviteToken.deleteMany({ where: { instituteId } });
+      await prisma.institute.delete({ where: { id: instituteId } });
+    }
+  }
 });

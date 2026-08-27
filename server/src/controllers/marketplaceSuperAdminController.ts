@@ -17,6 +17,10 @@ import {
 import { writeMarketplaceAudit } from '../services/marketplaceAuditService';
 import { fetchGooglePlaceDetails, searchGooglePlaces } from '../services/googlePlacesService';
 import {
+  MarketplaceCityValidationError,
+  validateMarketplacePublication,
+} from '../domain/marketplace/location';
+import {
   enqueueWhatsAppTracked,
   type MarketplaceWhatsAppTracking,
   type TrackedWhatsAppEnqueueResult
@@ -433,6 +437,19 @@ export async function updateMarketplaceListing(req: any, res: Response) {
   }
   const before = await prisma.institute.findUnique({ where: { id }, select: listingSelect });
   if (!before) return res.status(404).json({ success: false, message: 'Listing not found' });
+  try {
+    const nextIsPubliclyListed = (data as any).isPubliclyListed ?? before.isPubliclyListed;
+    const nextCity = Object.prototype.hasOwnProperty.call(data, 'city') ? (data as any).city : before.city;
+    (data as any).city = validateMarketplacePublication({
+      isPubliclyListed: nextIsPubliclyListed,
+      city: nextCity,
+    });
+  } catch (error) {
+    if (error instanceof MarketplaceCityValidationError) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    throw error;
+  }
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.institute.updateMany({ where: { id, updatedAt: new Date(expectedUpdatedAt) }, data });
     if (!result.count) return null;

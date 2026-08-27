@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { includedCreditPeriod } from '../domain/plans/entitlements';
+import { requireMarketplaceCity } from '../domain/marketplace/location';
 
 export type ProvisioningInput = {
   kind: 'PUBLIC' | 'INVITE';
@@ -168,9 +169,9 @@ export async function provisionInstitute(
       whatsappPhone: input.phone || null,
       email: input.email || null,
       slug: uniqueSlug,
-      isPubliclyListed: input.marketplace?.listed ?? true,
+      isPubliclyListed: false,
       isExclusive: false,
-      city: input.marketplace?.city ? input.marketplace.city.trim() : null,
+      city: input.marketplace?.city ? requireMarketplaceCity(input.marketplace.city) : null,
       area: input.marketplace?.area ? input.marketplace.area.trim() : null,
       subjectsOffered: Array.isArray(input.marketplace?.subjects) ? input.marketplace.subjects : [],
       googleMapsUrl: input.marketplace?.googleMapsUrl ? input.marketplace.googleMapsUrl.trim() : null,

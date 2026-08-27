@@ -4,6 +4,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { normalizeMarketplacePhone, submitMarketplaceClaim } from '../services/marketplaceClaimService';
 import { createMarketplaceLead } from '../services/marketplaceLeadService';
+import {
+  MarketplaceCityValidationError,
+  requireMarketplaceCity,
+  validateMarketplacePublication,
+} from '../domain/marketplace/location';
 
 const LEGACY_CLAIM_MARKER = '[CLAIM REQUEST]';
 
@@ -497,6 +502,8 @@ export async function registerExternalTeacher(req: Request, res: Response) {
       });
     }
 
+    const canonicalCity = requireMarketplaceCity(city);
+
     // Check if username is already taken
     const existingAdmin = await prisma.admin.findUnique({
       where: { username: username.trim() }
@@ -528,7 +535,7 @@ export async function registerExternalTeacher(req: Request, res: Response) {
           phoneNumber: phoneNumber.trim(),
           publicPhone: phoneNumber.trim(),
           whatsappPhone: phoneNumber.trim(),
-          city: city.trim(),
+          city: canonicalCity,
           area: area ? area.trim() : null,
           address: address ? address.trim() : null,
           googleMapsUrl: googleMapsUrl ? googleMapsUrl.trim() : null,
@@ -584,6 +591,9 @@ export async function registerExternalTeacher(req: Request, res: Response) {
       }
     });
   } catch (error: any) {
+    if (error instanceof MarketplaceCityValidationError) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     console.error('Error in registerExternalTeacher:', error);
     return res.status(500).json({ success: false, message: 'Failed to register teacher listing', error: error.message });
   }
@@ -666,13 +676,29 @@ export async function updateMarketplaceProfile(req: any, res: Response) {
       isPubliclyListed
     } = req.body;
 
-    const updateData: any = {};
+    const currentInstitute = await prisma.institute.findUnique({
+      where: { id: instituteId },
+      select: { city: true, isPubliclyListed: true },
+    });
+    if (!currentInstitute) {
+      return res.status(404).json({ success: false, message: 'Institute not found' });
+    }
+
+    const nextIsPubliclyListed = isPubliclyListed !== undefined
+      ? Boolean(isPubliclyListed)
+      : currentInstitute.isPubliclyListed;
+    const nextCity = city !== undefined ? city : currentInstitute.city;
+    const validatedCity = validateMarketplacePublication({
+      isPubliclyListed: nextIsPubliclyListed,
+      city: nextCity,
+    });
+
+    const updateData: any = { city: validatedCity };
 
     if (name !== undefined) updateData.name = name.trim();
     if (teacherName !== undefined) updateData.teacherName = teacherName.trim();
     if (publicPhone !== undefined) updateData.publicPhone = publicPhone.trim();
     if (whatsappPhone !== undefined) updateData.whatsappPhone = whatsappPhone.trim();
-    if (city !== undefined) updateData.city = city.trim();
     if (area !== undefined) updateData.area = area.trim();
     if (address !== undefined) updateData.address = address.trim();
     if (tagline !== undefined) updateData.tagline = tagline.trim();
@@ -714,6 +740,9 @@ export async function updateMarketplaceProfile(req: any, res: Response) {
       data: updated
     });
   } catch (error: any) {
+    if (error instanceof MarketplaceCityValidationError) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     console.error('Error in updateMarketplaceProfile:', error);
     return res.status(500).json({ success: false, message: 'Failed to update marketplace profile', error: error.message });
   }

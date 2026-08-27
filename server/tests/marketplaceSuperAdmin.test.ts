@@ -28,14 +28,16 @@ before(async () => {
   const institute = await prisma.institute.create({
     data: {
       name: `Operations ${suffix}`, teacherName: 'Teacher One', phoneNumber: '9000000000', publicPhone: '9000000001',
-      whatsappPhone: '9000000002', city: 'Jaipur', area: 'Malviya Nagar', address: 'One Street', tagline: 'Learn well',
+      whatsappPhone: '9000000002', city: 'Muzaffarnagar', area: 'Gandhi Colony', address: 'One Street', tagline: 'Learn well',
       aboutUs: 'Detailed profile', logoUrl: 'https://example.com/logo.png', subjectsOffered: ['Math'], classesOffered: ['10'],
       ownershipStatus: 'CLAIMED', isPubliclyListed: true, isVerified: false, googleRating: 4.5, googleReviewCount: 20,
       plan: 'ENTERPRISE', planExpiryDate: new Date('2099-01-01T00:00:00Z'), marketplaceAccessGrantedAt: new Date()
     }
   });
   instituteId = institute.id;
-  const foreign = await prisma.institute.create({ data: { name: `Foreign ${suffix}`, ownershipStatus: 'UNCLAIMED' } });
+  const foreign = await prisma.institute.create({
+    data: { name: `Foreign ${suffix}`, ownershipStatus: 'UNCLAIMED', city: 'Muzaffarnagar' }
+  });
   foreignInstituteId = foreign.id;
   const pageOnlyInstitute = await prisma.institute.create({
     data: { name: `Marketplace only ${suffix}`, ownershipStatus: 'CLAIMED', plan: 'MARKETPLACE', marketplaceAccessGrantedAt: new Date() }
@@ -276,6 +278,21 @@ test('listing update protects Google data, detects stale edits, and writes audit
   assert.equal(((await conflict.json()) as any).data.name, 'Operations Updated');
   assert.equal((await prisma.institute.findUniqueOrThrow({ where: { id: instituteId } })).googleRating, 4.5);
   assert.equal(await prisma.marketplaceAuditLog.count({ where: { instituteId, action: 'LISTING_UPDATED' } }), 1);
+});
+
+test('listing update rejects publishing a missing or unsupported city', async () => {
+  const detail = await fetch(`${baseUrl}/api/marketplace/super-admin/listings/${instituteId}`, { headers: auth(superToken) });
+  const current: any = (await detail.json() as any).data;
+
+  for (const city of ['', 'Jaipur']) {
+    const response = await fetch(`${baseUrl}/api/marketplace/super-admin/listings/${instituteId}`, {
+      method: 'PATCH',
+      headers: auth(superToken),
+      body: JSON.stringify({ expectedUpdatedAt: current.updatedAt, city, isPubliclyListed: true })
+    });
+    assert.equal(response.status, 400);
+    assert.match(((await response.json()) as any).message, /Muzaffarnagar|required/i);
+  }
 });
 
 test('overview, review moderation, lead delivery and activity use dedicated operational state', async () => {

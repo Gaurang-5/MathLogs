@@ -12,6 +12,10 @@ import { cancelSatisfiedNotifications, scheduleLifecycleNotifications } from '..
 import { includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
 import { planSubscriptionCheckoutService } from '../services/planSubscriptionCheckoutService';
 import { planSubscriptionLifecycleService } from '../services/planSubscriptionLifecycleService';
+import {
+    MarketplaceCityValidationError,
+    requireMarketplaceCity,
+} from '../domain/marketplace/location';
 
 export const billingControllerDependencies = { activateMarketplace };
 
@@ -124,8 +128,12 @@ export const createBillingSession = async (req: Request, res: Response) => {
         }
 
         if (product.kind === 'PLAN' && product.plan === 'MARKETPLACE' && product.amountPaise === 0) {
+            const canonicalCity = requireMarketplaceCity(admin.institute.city);
             const lifecycle = await billingControllerDependencies.activateMarketplace(admin.institute.id);
-            await prisma.institute.update({ where: { id: admin.institute.id }, data: { isPubliclyListed: true } });
+            await prisma.institute.update({
+                where: { id: admin.institute.id },
+                data: { isPubliclyListed: true, city: canonicalCity },
+            });
             invalidateAuthCache(adminId);
             return res.json({ success: true, mode: 'ACTIVATED', plan: lifecycle.effectivePlan });
         }
@@ -190,6 +198,9 @@ export const createBillingSession = async (req: Request, res: Response) => {
             throw error;
         }
     } catch (error) {
+        if (error instanceof MarketplaceCityValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
         console.error('Create Billing Session Error:', error);
         res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error during billing initialization.' });
     }

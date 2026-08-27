@@ -5,6 +5,10 @@ import { invalidateAuthCache } from '../middleware/auth';
 import { writeSuperAdminAudit } from './superAdminAuditService';
 import { normalizePlanId, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
 import { effectiveEntitlements, includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
+import {
+  MarketplaceCityValidationError,
+  validateMarketplacePublication,
+} from '../domain/marketplace/location';
 
 const instituteDirectorySelect = {
   id: true,
@@ -414,13 +418,29 @@ export function previewInstituteOnboarding(value: unknown): {
   if ((plan === 'QUIZ' || plan === 'ENTERPRISE') && billingCycle === 'ONE_TIME') errors.push({ field: 'subscription.billingCycle', code: 'INVALID_PLAN_CYCLE', message: 'Quiz and Enterprise use monthly or yearly billing.' });
   if (typeof input.marketplace?.isPubliclyListed !== 'boolean') errors.push({ field: 'marketplace.isPubliclyListed', code: 'INVALID_BOOLEAN', message: 'Marketplace visibility is required.' });
   if (typeof input.marketplace?.isVerified !== 'boolean') errors.push({ field: 'marketplace.isVerified', code: 'INVALID_BOOLEAN', message: 'Verification state is required.' });
+  const rawCity = String(input.institute?.city || '').trim() || null;
+  let normalizedCity = rawCity;
+  if (typeof input.marketplace?.isPubliclyListed === 'boolean') {
+    try {
+      normalizedCity = validateMarketplacePublication({
+        isPubliclyListed: input.marketplace.isPubliclyListed,
+        city: rawCity,
+      });
+    } catch (error) {
+      if (error instanceof MarketplaceCityValidationError) {
+        errors.push({ field: 'institute.city', code: error.code, message: error.message });
+      } else {
+        throw error;
+      }
+    }
+  }
   if (errors.length) return { valid: false, errors };
 
   const normalized: NormalizedOnboarding = {
     owner: { name: ownerName, phone, ...(email ? { email } : {}) },
     institute: {
       name: instituteName,
-      ...(String(input.institute?.city || '').trim() ? { city: String(input.institute.city).trim() } : {}),
+      ...(normalizedCity ? { city: normalizedCity } : {}),
       ...(String(input.institute?.area || '').trim() ? { area: String(input.institute.area).trim() } : {}),
       ...(String(input.institute?.address || '').trim() ? { address: String(input.institute.address).trim() } : {})
     },

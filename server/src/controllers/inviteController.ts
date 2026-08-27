@@ -6,6 +6,10 @@ import crypto from 'crypto';
 import { secureLogger } from '../utils/secureLogger';
 import { getClientUrl } from '../utils/urlConfig';
 import { paidPlanExpiry } from '../domain/plans/entitlements';
+import {
+    MarketplaceCityValidationError,
+    validateMarketplacePublication,
+} from '../domain/marketplace/location';
 
 const SETUP_REPLAY_WINDOW_MS = 5 * 60 * 1000;
 
@@ -250,6 +254,8 @@ export const setupAccount = async (req: Request, res: Response) => {
                     config: true,
                     coachingFeeMode: true,
                     coachingFeeModeSelectedAt: true,
+                    city: true,
+                    isPubliclyListed: true,
                 },
             });
             if (!institute) throw new Error('Institute not found');
@@ -278,6 +284,13 @@ export const setupAccount = async (req: Request, res: Response) => {
                 }
             }
 
+            const nextIsPubliclyListed = Boolean(isPubliclyListed);
+            const nextCity = city !== undefined ? city : institute.city;
+            const validatedCity = validateMarketplacePublication({
+                isPubliclyListed: nextIsPubliclyListed,
+                city: nextCity,
+            });
+
             const currentConfig = (institute.config as Record<string, unknown>) || {};
             let classList = Array.isArray(currentConfig.allowedClasses)
                 ? currentConfig.allowedClasses.filter((value): value is string => typeof value === 'string')
@@ -300,12 +313,12 @@ export const setupAccount = async (req: Request, res: Response) => {
             await tx.institute.update({
                 where: { id: invite.instituteId },
                 data: {
-                    ...(city !== undefined && { city: city ? String(city).trim() : null }),
+                    city: validatedCity,
                     ...(area !== undefined && { area: area ? String(area).trim() : null }),
                     subjectsOffered: subjectList,
                     ...(googleMapsUrl !== undefined && { googleMapsUrl: googleMapsUrl ? String(googleMapsUrl).trim() : null }),
                     ...(effectiveTagline !== undefined && { tagline: effectiveTagline ? String(effectiveTagline).trim() : null }),
-                    isPubliclyListed: isPubliclyListed !== undefined ? Boolean(isPubliclyListed) : true,
+                    isPubliclyListed: nextIsPubliclyListed,
                     config: {
                         ...currentConfig,
                         ...(requiresGrades !== undefined && { requiresGrades: Boolean(requiresGrades) }),
@@ -339,6 +352,9 @@ export const setupAccount = async (req: Request, res: Response) => {
 
         return sendSetupSuccess(admin);
     } catch (error) {
+        if (error instanceof MarketplaceCityValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
         if (error instanceof Error && error.name === 'CoachingFeeModeAlreadySelectedError') {
             return res.status(409).json({ error: error.message });
         }

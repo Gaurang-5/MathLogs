@@ -3,6 +3,10 @@ import { prisma } from '../prisma';
 import { secureLogger } from '../utils/secureLogger';
 import { deleteMonthCoverageData } from '../services/monthCoverageDeletionService';
 import { clearPublicBatchCache } from './batchController';
+import {
+    MarketplaceCityValidationError,
+    validateMarketplacePublication,
+} from '../domain/marketplace/location';
 
 
 export const getGlobalAnalytics = async (req: Request, res: Response) => {
@@ -480,7 +484,11 @@ export const bulkImportInstitutes = async (req: Request, res: Response) => {
 
             const name = item.name.trim();
             const teacherName = item.teacherName ? item.teacherName.trim() : null;
-            const city = item.city ? item.city.trim() : 'Muzaffarnagar';
+            const isPubliclyListed = item.isPubliclyListed !== false;
+            const city = validateMarketplacePublication({
+                isPubliclyListed,
+                city: item.city ? item.city.trim() : 'Muzaffarnagar',
+            });
             const area = item.area ? item.area.trim() : null;
             const address = item.address ? item.address.trim() : null;
             const phone = item.phone || item.publicPhone || item.phoneNumber || null;
@@ -537,7 +545,7 @@ export const bulkImportInstitutes = async (req: Request, res: Response) => {
                     googleMapsUrl,
                     subjectsOffered,
                     classesOffered,
-                    isPubliclyListed: item.isPubliclyListed !== false, // default true
+                    isPubliclyListed,
                     isVerified: item.isVerified === true, // default false (unverified public listing)
                     status: 'ACTIVE',
                     plan: 'MARKETPLACE',
@@ -556,6 +564,9 @@ export const bulkImportInstitutes = async (req: Request, res: Response) => {
             institutes: createdInstitutes
         });
     } catch (error: any) {
+        if (error instanceof MarketplaceCityValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
         console.error('Error in bulkImportInstitutes:', error);
         res.status(500).json({ error: 'Failed to bulk import institutes: ' + error.message });
     }
@@ -575,8 +586,21 @@ export const toggleInstituteStatus = async (req: Request, res: Response) => {
         const id = req.params.id as string;
         const { isPubliclyListed, isVerified } = req.body;
 
+        const current = await prisma.institute.findUnique({
+            where: { id },
+            select: { city: true, isPubliclyListed: true },
+        });
+        if (!current) return res.status(404).json({ error: 'Institute not found' });
+
         const dataToUpdate: any = {};
-        if (isPubliclyListed !== undefined) dataToUpdate.isPubliclyListed = Boolean(isPubliclyListed);
+        const nextIsPubliclyListed = isPubliclyListed !== undefined
+            ? Boolean(isPubliclyListed)
+            : current.isPubliclyListed;
+        dataToUpdate.city = validateMarketplacePublication({
+            isPubliclyListed: nextIsPubliclyListed,
+            city: current.city,
+        });
+        if (isPubliclyListed !== undefined) dataToUpdate.isPubliclyListed = nextIsPubliclyListed;
         if (isVerified !== undefined) dataToUpdate.isVerified = Boolean(isVerified);
 
         const updated = await prisma.institute.update({
@@ -586,8 +610,10 @@ export const toggleInstituteStatus = async (req: Request, res: Response) => {
 
         res.json({ success: true, message: 'Institute listing status updated.', updated });
     } catch (error: any) {
+        if (error instanceof MarketplaceCityValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
         console.error('Error toggling institute status:', error);
         res.status(500).json({ error: 'Failed to update institute status' });
     }
 };
-
