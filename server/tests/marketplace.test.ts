@@ -10,6 +10,7 @@ let baseUrl: string;
 let testInstituteId: string;
 let testSlug: string;
 let testInstituteName: string;
+const facetInstituteIds: string[] = [];
 
 before(async () => {
   try {
@@ -44,6 +45,27 @@ before(async () => {
       }
     });
     testInstituteId = inst.id;
+
+    const facetSuffix = `${Date.now()}-${Math.random()}`;
+    const facetInstitutes = await Promise.all([
+      prisma.institute.create({ data: {
+        name: `Exact Apex ${facetSuffix}`, slug: `exact-apex-${facetSuffix}`, city: 'Muzaffarnagar', area: 'Gandhi Colony',
+        subjectsOffered: ['Mathematics'], classesOffered: ['Class 9'], isPubliclyListed: true, status: 'ACTIVE'
+      } }),
+      prisma.institute.create({ data: {
+        name: `Broad Scholar ${facetSuffix}`, slug: `broad-scholar-${facetSuffix}`, city: 'Muzaffarnagar', area: 'New Gandhi Colony',
+        subjectsOffered: ['Mathematics Advanced'], classesOffered: ['Class 9 Foundation'], isPubliclyListed: true, status: 'ACTIVE'
+      } }),
+      prisma.institute.create({ data: {
+        name: `Private Apex ${facetSuffix}`, slug: `private-apex-${facetSuffix}`, city: 'Muzaffarnagar', area: 'Gandhi Colony',
+        subjectsOffered: ['Mathematics'], classesOffered: ['Class 9'], isPubliclyListed: false, status: 'ACTIVE'
+      } }),
+      prisma.institute.create({ data: {
+        name: `Inactive Apex ${facetSuffix}`, slug: `inactive-apex-${facetSuffix}`, city: 'Muzaffarnagar', area: 'Gandhi Colony',
+        subjectsOffered: ['Mathematics'], classesOffered: ['Class 9'], isPubliclyListed: true, status: 'INACTIVE'
+      } }),
+    ]);
+    facetInstituteIds.push(...facetInstitutes.map(item => item.id));
   } catch (err) {
     console.error('Test before setup failed:', err);
     throw err;
@@ -57,6 +79,9 @@ after(async () => {
     await prisma.marketplaceClaim.deleteMany({ where: { instituteId: testInstituteId } });
     await prisma.leadInquiry.deleteMany({ where: { instituteId: testInstituteId } });
     await prisma.institute.delete({ where: { id: testInstituteId } });
+  }
+  if (facetInstituteIds.length) {
+    await prisma.institute.deleteMany({ where: { id: { in: facetInstituteIds } } });
   }
 
   if (server) {
@@ -78,6 +103,17 @@ test('GET /api/marketplace/search should return listed coachings', async () => {
   assert.ok(found);
   assert.equal(found.teacherName, 'Prof. Sharma');
   assert.equal(found.isExclusive, true);
+});
+
+test('GET /api/marketplace/search uses case-insensitive exact facet filters', async () => {
+  const res = await fetch(`${baseUrl}/api/marketplace/search?city=muzaffarnagar&area=gAnDhI%20cOlOnY&classGrade=cLaSs%209&subject=mAtHeMaTiCs`);
+  assert.equal(res.status, 200);
+  const body: any = await res.json();
+  const matchingFacetFixtures = body.data.filter((item: any) => facetInstituteIds.includes(item.id));
+  assert.equal(matchingFacetFixtures.length, 1);
+  assert.match(matchingFacetFixtures[0].name, /^Exact Apex/);
+  assert.deepEqual(body.availableFilters.cities, ['Muzaffarnagar']);
+  assert.ok(body.availableFilters.areas.includes('Gandhi Colony'));
 });
 
 test('GET /api/marketplace/coaching/:slug should return public profile details', async () => {

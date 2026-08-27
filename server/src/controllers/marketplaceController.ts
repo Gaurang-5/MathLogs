@@ -9,6 +9,7 @@ import {
   requireMarketplaceCity,
   validateMarketplacePublication,
 } from '../domain/marketplace/location';
+import { searchMarketplaceListings } from '../services/marketplaceSearchService';
 
 const LEGACY_CLAIM_MARKER = '[CLAIM REQUEST]';
 
@@ -30,218 +31,38 @@ function slugify(text: string): string {
  */
 export async function searchMarketplace(req: Request, res: Response) {
   try {
-    const {
-      q,
-      subject,
-      classGrade,
-      class: classParam,
-      className,
-      city,
-      area,
-      sortBy = 'rating',
-      page = '1',
-      limit = '12'
-    } = req.query;
-
-    const targetClassParam = (classGrade || classParam || className) as string | undefined;
-
-    const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit as string, 10) || 12));
-    const skip = (pageNum - 1) * limitNum;
-
-    const where: any = {
-      isPubliclyListed: true,
-      status: 'ACTIVE',
-    };
-
-    if (q) {
-      const searchTerm = (q as string).trim();
-      where.AND = where.AND || [];
-      where.AND.push({
-        OR: [
-          { name: { contains: searchTerm, mode: 'insensitive' } },
-          { teacherName: { contains: searchTerm, mode: 'insensitive' } },
-          { tagline: { contains: searchTerm, mode: 'insensitive' } },
-          { area: { contains: searchTerm, mode: 'insensitive' } },
-          { city: { contains: searchTerm, mode: 'insensitive' } },
-        ]
-      });
-    }
-
-    if (city) {
-      const c = (city as string).trim().toLowerCase();
-      if (c.includes('muzaffarnagar') || c.includes('muaffarnagar')) {
-        where.city = { in: ['Muzaffarnagar', 'Muaffarnagar', 'muzaffarnagar', 'muaffarnagar'], mode: 'insensitive' };
-      } else {
-        where.city = { equals: (city as string).trim(), mode: 'insensitive' };
-      }
-    }
-
-    if (area) {
-      where.area = { contains: (area as string).trim(), mode: 'insensitive' };
-    }
-
-    // Fetch matching institutes
-    const institutes = await prisma.institute.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        teacherName: true,
-        publicPhone: true,
-        phoneNumber: true,
-        whatsappPhone: true,
-        city: true,
-        area: true,
-        address: true,
-        tagline: true,
-        aboutUs: true,
-        logoUrl: true,
-        googlePlaceId: true,
-        googleMapsUrl: true,
-        googleRating: true,
-        googleReviewCount: true,
-        subjectsOffered: true,
-        classesOffered: true,
-        plan: true,
-        isExclusive: true,
-        isVerified: true,
-        reviews: {
-          where: { status: 'APPROVED' },
-          select: { rating: true }
-        }
-      }
-    });
-
-    // Filter by subject if specified (in memory since subjectsOffered is Json)
-    let filtered = institutes;
-    if (subject) {
-      const targetSubject = (subject as string).toLowerCase().trim();
-      filtered = filtered.filter(inst => {
-        const subjects = inst.subjectsOffered as string[] | null;
-        if (!subjects || !Array.isArray(subjects)) return false;
-        return subjects.some(s => typeof s === 'string' && s.toLowerCase().includes(targetSubject));
-      });
-    }
-
-    // Filter by classGrade if specified (in memory since classesOffered is Json)
-    if (targetClassParam) {
-      const targetClass = targetClassParam.toLowerCase().trim();
-      filtered = filtered.filter(inst => {
-        const classes = inst.classesOffered as string[] | null;
-        if (!classes || !Array.isArray(classes)) return false;
-        return classes.some(c => {
-          if (typeof c !== 'string') return false;
-          const cLower = c.toLowerCase().trim();
-          if (cLower === targetClass) return true;
-          if (targetClass.includes('jee') || targetClass.includes('neet')) {
-            return cLower.includes('jee') || cLower.includes('neet');
-          }
-          const digits = targetClass.match(/\d+/);
-          if (digits && digits[0]) {
-            return cLower.includes(digits[0]);
-          }
-          return cLower.includes(targetClass);
-        });
-      });
-    }
-
-    // Map and compute average ratings & exclusive status
-    const mapped = filtered.map(inst => {
-      const isSubscribedExclusive = inst.isExclusive || ['QUIZ', 'ENTERPRISE'].includes(inst.plan);
-      const reviewCount = inst.reviews.length;
-      const mathlogsAvgRating = reviewCount > 0
-        ? Number((inst.reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount).toFixed(1))
-        : 0;
-
-      // Combine Google rating if available
-      const displayRating = inst.googleRating || mathlogsAvgRating;
-      const totalReviewsCount = (inst.googleReviewCount || 0) + reviewCount;
-
-      // Extract phone numbers prioritizing explicit public phone
-      const phone = inst.publicPhone || inst.phoneNumber || null;
-      const whatsapp = inst.whatsappPhone || inst.publicPhone || inst.phoneNumber || null;
-
-      const rawCity = inst.city || 'Local';
-      const normalizedCity = (rawCity.toLowerCase().includes('muzaffarnagar') || rawCity.toLowerCase().includes('muaffarnagar'))
-        ? 'Muzaffarnagar'
-        : rawCity;
-
-      return {
-        id: inst.id,
-        name: inst.name,
-        slug: inst.slug || inst.id,
-        teacherName: inst.teacherName || 'Faculty',
-        phone,
-        whatsappPhone: whatsapp,
-        city: normalizedCity,
-        area: inst.area || '',
-        address: inst.address || '',
-        tagline: inst.tagline || '',
-        aboutUs: inst.aboutUs || '',
-        logoUrl: inst.logoUrl || null,
-        googleMapsUrl: inst.googleMapsUrl || null,
-        googleRating: inst.googleRating || null,
-        googleReviewCount: inst.googleReviewCount || 0,
-        subjectsOffered: (inst.subjectsOffered as string[]) || [],
-        classesOffered: (inst.classesOffered as string[]) || [],
-        isExclusive: isSubscribedExclusive,
-        isVerified: inst.isVerified || false,
-        avgRating: displayRating,
-        reviewCount: totalReviewsCount
-      };
-    });
-
-    // Sort by rating (default) or review count
-    mapped.sort((a, b) => {
-      if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
-      return b.reviewCount - a.reviewCount;
-    });
-
-    // Pagination
-    const total = mapped.length;
-    const paginatedItems = mapped.slice(skip, skip + limitNum);
-
-    // Extract unique cities, subjects & classes for filter option dropdowns
-    const normalizeCityName = (cityStr: string) => {
-      const lower = cityStr.trim().toLowerCase();
-      if (lower.includes('muzaffarnagar') || lower.includes('muaffarnagar')) return 'Muzaffarnagar';
-      return cityStr.trim();
-    };
-    const allCities = Array.from(new Set(institutes.map(i => i.city).filter((c): c is string => Boolean(c)).map(normalizeCityName)));
-    const allSubjectsSet = new Set<string>();
-    const allClassesSet = new Set<string>();
-
-    institutes.forEach(i => {
-      const subs = i.subjectsOffered as string[] | null;
-      if (Array.isArray(subs)) {
-        subs.forEach(s => typeof s === 'string' && allSubjectsSet.add(s));
-      }
-      const cls = i.classesOffered as string[] | null;
-      if (Array.isArray(cls)) {
-        cls.forEach(c => typeof c === 'string' && allClassesSet.add(c));
-      }
+    const targetClass = req.query.classGrade || req.query.class || req.query.className;
+    const result = await searchMarketplaceListings({
+      q: req.query.q ? String(req.query.q) : undefined,
+      city: req.query.city ? String(req.query.city) : undefined,
+      area: req.query.area ? String(req.query.area) : undefined,
+      className: targetClass ? String(targetClass) : undefined,
+      subject: req.query.subject ? String(req.query.subject) : undefined,
+      sortBy: ['rating', 'reviews', 'newest'].includes(String(req.query.sortBy))
+        ? String(req.query.sortBy) as 'rating' | 'reviews' | 'newest'
+        : 'rating',
+      page: Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1),
+      limit: Math.min(50, Math.max(1, Number.parseInt(String(req.query.limit || '12'), 10) || 12)),
     });
 
     return res.json({
       success: true,
-      data: paginatedItems,
+      data: result.items,
       pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum)
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / result.limit),
       },
-      availableFilters: {
-        cities: allCities,
-        subjects: Array.from(allSubjectsSet),
-        classes: Array.from(allClassesSet)
-      }
+      availableFilters: result.availableFilters,
     });
   } catch (error: any) {
     console.error('Error in searchMarketplace:', error);
-    return res.status(500).json({ success: false, message: 'Failed to search marketplace', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to search marketplace',
+      error: error.message,
+    });
   }
 }
 
