@@ -15,6 +15,7 @@ const MAX_CHEATING_WARNINGS = 5;
 const autosaveWriteTimes = new Map<string, number>();
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
+const ACCOUNT_SELECTION_EXPIRY = '5m';
 
 
 
@@ -97,6 +98,36 @@ function createStudentToken(studentId: string, instituteId: string): string {
         JWT_SECRET,
         { expiresIn: '30d' }
     );
+}
+
+type StudentAccountSelectionClaims = {
+    purpose: 'STUDENT_ACCOUNT_SELECTION';
+    instituteId: string;
+    normalizedPhone: string;
+    studentIds: string[];
+};
+
+function createStudentSelectionToken(instituteId: string, normalizedPhone: string, studentIds: string[]): string {
+    return jwt.sign({
+        purpose: 'STUDENT_ACCOUNT_SELECTION',
+        instituteId,
+        normalizedPhone,
+        studentIds,
+    } satisfies StudentAccountSelectionClaims, JWT_SECRET, { expiresIn: ACCOUNT_SELECTION_EXPIRY });
+}
+
+function safeStudentAccount(student: {
+    id: string;
+    humanId: string | null;
+    name: string;
+    enrollments: Array<{ batch: { name: string } }>;
+}) {
+    return {
+        id: student.id,
+        humanId: student.humanId,
+        name: student.name,
+        activeBatchNames: student.enrollments.map(enrollment => enrollment.batch.name),
+    };
 }
 
 function getStudentIdFromRequest(req: Request, res: Response): string | null {
@@ -338,22 +369,40 @@ export const verifyStudentLoginOtp = async (req: Request, res: Response): Promis
         }
 
         const variants = getMobileVariants(cleanMobile);
-        const student = await prisma.student.findFirst({
+        const students = await prisma.student.findMany({
             where: {
                 instituteId: institute.id,
                 parentWhatsapp: { in: variants }
             },
-            include: {
-                batch: { select: { id: true, name: true } }
-            }
+            select: {
+                id: true,
+                humanId: true,
+                name: true,
+                enrollments: {
+                    where: { status: 'ACTIVE' },
+                    select: { batch: { select: { name: true } } },
+                    orderBy: { startedAt: 'asc' },
+                },
+            },
+            orderBy: [{ name: 'asc' }, { createdAt: 'asc' }],
         });
 
-        if (!student) {
+        if (students.length === 0) {
             res.status(404).json({ error: 'This mobile number is not registered. Please contact your teacher.' });
             return;
         }
 
         await prisma.otpToken.delete({ where: { identifier: otpIdentifier } });
+        if (students.length > 1) {
+            res.json({
+                success: true,
+                selectionToken: createStudentSelectionToken(institute.id, cleanMobile, students.map(student => student.id)),
+                students: students.map(safeStudentAccount),
+            });
+            return;
+        }
+
+        const student = students[0];
         const token = createStudentToken(student.id, institute.id);
 
         res.json({
@@ -362,13 +411,73 @@ export const verifyStudentLoginOtp = async (req: Request, res: Response): Promis
             student: {
                 id: student.id,
                 name: student.name,
-                batchName: student.batch?.name || 'N/A',
+                batchName: student.enrollments[0]?.batch.name || 'N/A',
                 instituteName: institute.name
             }
         });
     } catch (error) {
         console.error('[STUDENT_OTP_VERIFY_ERROR]', error);
         res.status(500).json({ error: 'Failed to verify OTP' });
+    }
+};
+
+// POST /api/student-portal/select-account
+// Body: { selectionToken: string, studentId: string }
+export const selectStudentAccount = async (req: Request, res: Response): Promise<void> => {
+    const { selectionToken, studentId } = req.body || {};
+    if (typeof selectionToken !== 'string' || typeof studentId !== 'string') {
+        res.status(400).json({ error: 'Selection token and student are required' });
+        return;
+    }
+
+    try {
+        const claims = jwt.verify(selectionToken, JWT_SECRET) as Partial<StudentAccountSelectionClaims>;
+        const validClaims = claims.purpose === 'STUDENT_ACCOUNT_SELECTION' &&
+            typeof claims.instituteId === 'string' &&
+            typeof claims.normalizedPhone === 'string' &&
+            Array.isArray(claims.studentIds) &&
+            claims.studentIds.every(id => typeof id === 'string');
+        if (!validClaims) {
+            res.status(401).json({ error: 'Invalid or expired account selection' });
+            return;
+        }
+        if (!claims.studentIds!.includes(studentId)) {
+            res.status(403).json({ error: 'Student is not available for this login' });
+            return;
+        }
+
+        const student = await prisma.student.findFirst({
+            where: {
+                id: studentId,
+                instituteId: claims.instituteId,
+                parentWhatsapp: { in: getMobileVariants(claims.normalizedPhone!) },
+            },
+            select: {
+                id: true,
+                humanId: true,
+                name: true,
+                enrollments: {
+                    where: { status: 'ACTIVE' },
+                    select: { batch: { select: { name: true } } },
+                    orderBy: { startedAt: 'asc' },
+                },
+            },
+        });
+        if (!student) {
+            res.status(403).json({ error: 'Student is not available for this login' });
+            return;
+        }
+
+        res.json({
+            success: true,
+            token: createStudentToken(student.id, claims.instituteId!),
+            student: {
+                ...safeStudentAccount(student),
+                batchName: student.enrollments[0]?.batch.name || 'N/A',
+            },
+        });
+    } catch {
+        res.status(401).json({ error: 'Invalid or expired account selection' });
     }
 };
 
