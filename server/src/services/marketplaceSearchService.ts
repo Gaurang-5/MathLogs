@@ -125,7 +125,7 @@ export async function searchMarketplaceListings(
   filters: MarketplaceSearchFilters,
 ): Promise<MarketplaceSearchResult> {
   const page = Math.max(1, filters.page || 1);
-  const limit = Math.min(50, Math.max(1, filters.limit || 12));
+  const limit = Math.min(500, Math.max(1, filters.limit || 12));
   const requestedCity = filters.city?.trim();
   const canonicalCity = requestedCity ? normalizeMarketplaceCity(requestedCity) : null;
   const where: Prisma.InstituteWhereInput = {

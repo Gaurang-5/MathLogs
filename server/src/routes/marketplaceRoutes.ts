@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   searchMarketplace,
+  getMarketplaceLanding,
   getCoachingPublicProfile,
   submitReview,
   submitInquiry,
@@ -39,6 +40,7 @@ const router = Router();
 
 // Public Marketplace Endpoints
 router.get('/search', searchMarketplace);
+router.get('/landing', getMarketplaceLanding);
 router.get('/coaching/:slug', getCoachingPublicProfile);
 router.post('/coaching/:id/reviews', submitReview);
 router.post('/coaching/:id/inquire', submitInquiry);

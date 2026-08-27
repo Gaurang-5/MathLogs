@@ -116,6 +116,21 @@ test('GET /api/marketplace/search uses case-insensitive exact facet filters', as
   assert.ok(body.availableFilters.areas.includes('Gandhi Colony'));
 });
 
+test('GET /api/marketplace/landing returns only data-backed facet pages', async () => {
+  const valid = await fetch(`${baseUrl}/api/marketplace/landing?areaSlug=gandhi-colony&classSlug=class-9&subjectSlug=mathematics`);
+  assert.equal(valid.status, 200);
+  const validBody: any = await valid.json();
+  assert.equal(validBody.data.indexable, true);
+  assert.equal(validBody.data.canonicalPath, '/coaching/muzaffarnagar/areas/gandhi-colony/classes/class-9/subjects/mathematics');
+  assert.ok(validBody.data.items.some((item: any) => facetInstituteIds.includes(item.id) && /^Exact Apex/.test(item.name)));
+
+  const empty = await fetch(`${baseUrl}/api/marketplace/landing?areaSlug=gandhi-colony&subjectSlug=accountancy`);
+  assert.equal(empty.status, 200);
+  const emptyBody: any = await empty.json();
+  assert.equal(emptyBody.data.indexable, false);
+  assert.equal(emptyBody.data.total, 0);
+});
+
 test('GET /api/marketplace/coaching/:slug should return public profile details', async () => {
   const res = await fetch(`${baseUrl}/api/marketplace/coaching/${testSlug}`);
   assert.equal(res.status, 200);

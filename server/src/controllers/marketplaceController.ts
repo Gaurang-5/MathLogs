@@ -10,6 +10,7 @@ import {
   validateMarketplacePublication,
 } from '../domain/marketplace/location';
 import { searchMarketplaceListings } from '../services/marketplaceSearchService';
+import { resolveMarketplaceLanding } from '../services/marketplaceSeoService';
 
 const LEGACY_CLAIM_MARKER = '[CLAIM REQUEST]';
 
@@ -61,6 +62,29 @@ export async function searchMarketplace(req: Request, res: Response) {
     return res.status(500).json({
       success: false,
       message: 'Failed to search marketplace',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Public, data-backed marketplace landing page.
+ * GET /api/marketplace/landing
+ */
+export async function getMarketplaceLanding(req: Request, res: Response) {
+  try {
+    const data = await resolveMarketplaceLanding({
+      areaSlug: req.query.areaSlug ? String(req.query.areaSlug) : undefined,
+      classSlug: req.query.classSlug ? String(req.query.classSlug) : undefined,
+      subjectSlug: req.query.subjectSlug ? String(req.query.subjectSlug) : undefined,
+    });
+
+    return res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('Error in getMarketplaceLanding:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load marketplace landing page',
       error: error.message,
     });
   }
