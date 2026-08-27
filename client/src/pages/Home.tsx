@@ -222,7 +222,7 @@ export default function Home() {
 
     useMetaTags({
         title: 'MathLogs | Coaching Marketplace, AI Quiz Generator & Management Software',
-        description: 'Find coaching institutes, generate AI-powered online quizzes, and manage attendance, fees, tests and parent communication with MathLogs.',
+        description: 'Find coaching institutes, generate AI-powered online quizzes, and manage students, fees, tests and parent communication with MathLogs.',
         canonicalPath: '/',
         structuredData: HOME_STRUCTURED_DATA
     });

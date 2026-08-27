@@ -8,7 +8,6 @@ import { secureLogger } from '../utils/secureLogger';
 import { getJwtSecret } from '../utils/env';
 import {
     activateStudentFeeProfileAutomatically,
-    closeStudentFeeProfile,
     confirmStudentFeeProfile,
     createPendingStudentFeeProfile,
     studentMonthCoverageDepsFor,
@@ -17,6 +16,10 @@ import { MonthCoverageError } from '../domain/monthCoverage/types';
 import { currentMonthInTimezone } from '../domain/monthCoverage/calendar';
 import { summarizeStudent } from '../services/monthCoverageSummaryService';
 import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
+import { prismaIdentityReviewService } from '../services/prismaIdentityReviewService';
+import type { EnrollmentFeeChoice } from '../domain/enrollments/types';
+import { applyEnrollmentFees } from '../services/enrollmentFeeService';
+import { enrollmentFeeDepsFor } from '../services/prismaEnrollmentService';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -139,6 +142,7 @@ const MAX_RETRIES = 15;
 
 export const registerStudent = async (req: Request, res: Response) => {
     let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, token, additionalData } = req.body;
+    let signedEnrollmentIntent: { instituteId: string; batchId: string; fee: EnrollmentFeeChoice; issuedById: string; nonce: string } | null = null;
 
     // Data Normalization (Fix for typical duplications)
     if (typeof name === 'string') name = name.trim();
@@ -153,6 +157,10 @@ export const registerStudent = async (req: Request, res: Response) => {
             if (decoded.batchId !== batchId) {
                 return res.status(403).json({ error: 'This invite link is for a different batch.' });
             }
+            if (!decoded.instituteId || !decoded.fee || !decoded.issuedById || !decoded.nonce) {
+                return res.status(403).json({ error: 'Registration link is expired or invalid.' });
+            }
+            signedEnrollmentIntent = decoded;
             // Strongly override the whatsapp number to prevent tampering
             parentWhatsapp = decoded.whatsapp; 
         } catch (err) {
@@ -174,6 +182,20 @@ export const registerStudent = async (req: Request, res: Response) => {
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
+        if (signedEnrollmentIntent) {
+            if (signedEnrollmentIntent.instituteId !== batch.instituteId) {
+                return res.status(403).json({ error: 'Registration link is for another institute.' });
+            }
+            const storedIntent = await prisma.inviteToken.findUnique({ where: { token: signedEnrollmentIntent.nonce } });
+            const persisted = storedIntent?.enrollmentIntent as Record<string, any> | null;
+            if (!storedIntent || storedIntent.isUsed || storedIntent.expiresAt.getTime() < Date.now()
+                || persisted?.batchId !== batch.id
+                || JSON.stringify(persisted?.fee) !== JSON.stringify(signedEnrollmentIntent.fee)
+                || persisted?.issuedById !== signedEnrollmentIntent.issuedById) {
+                return res.status(403).json({ error: 'Registration link is expired, used, or invalid.' });
+            }
+        }
+
         if (batch.institute && !token) {
             const isPlanExpired = batch.institute.planExpiryDate && new Date(batch.institute.planExpiryDate).getTime() < Date.now();
             if (batch.institute.areRegistrationsPaused || isPlanExpired) {
@@ -188,6 +210,15 @@ export const registerStudent = async (req: Request, res: Response) => {
 
         // Multi-Tenant: Ensure Student inherits instituteId from Batch
         if (!batch.instituteId) return res.status(500).json({ error: 'Batch has no institute assigned' });
+
+        const reviewResult = await prismaIdentityReviewService.reviewPublicRegistration({
+            instituteId: batch.instituteId,
+            batchId,
+            submittedData: { name, parentName, parentWhatsapp, parentEmail, schoolName, additionalData },
+        });
+        if (reviewResult.code === 'IDENTITY_REVIEW_REQUIRED') {
+            return res.status(202).json(reviewResult);
+        }
 
         // Idempotency Check: Strict One-Phone-Number-Per-Batch logic
         const existingStudent = await prisma.student.findFirst({
@@ -206,12 +237,12 @@ export const registerStudent = async (req: Request, res: Response) => {
         let retries = 0;
         let success = false;
         let student;
+        let createdEnrollmentId: string | null = null;
 
         while (!success && retries < MAX_RETRIES) {
             try {
                 const humanId = await generateHumanId(batch);
-                student = await prisma.student.create({
-                    data: {
+                const studentData = {
                         batchId,
                         name,
                         parentName,
@@ -222,8 +253,50 @@ export const registerStudent = async (req: Request, res: Response) => {
                         status: 'APPROVED', // Auto-approve
                         humanId,
                         instituteId: batch.instituteId
-                    }
-                });
+                };
+                if (signedEnrollmentIntent) {
+                    const created = await prisma.$transaction(async tx => {
+                        const createdStudent = await tx.student.create({ data: studentData });
+                        const enrollment = await tx.enrollment.create({
+                            data: {
+                                instituteId: batch.instituteId!,
+                                studentId: createdStudent.id,
+                                batchId: batch.id,
+                                startedAt: new Date(),
+                                createdById: signedEnrollmentIntent!.issuedById,
+                            },
+                        });
+                        await applyEnrollmentFees(enrollment, signedEnrollmentIntent!.fee, enrollmentFeeDepsFor(tx));
+                        const consumed = await tx.inviteToken.updateMany({
+                            where: {
+                                token: signedEnrollmentIntent!.nonce,
+                                isUsed: false,
+                                expiresAt: { gt: new Date() },
+                            },
+                            data: { isUsed: true },
+                        });
+                        if (consumed.count !== 1) throw new Error('INVITE_ALREADY_USED');
+                        return { student: createdStudent, enrollmentId: enrollment.id };
+                    });
+                    student = created.student;
+                    createdEnrollmentId = created.enrollmentId;
+                } else {
+                    const created = await prisma.$transaction(async tx => {
+                        const createdStudent = await tx.student.create({ data: studentData });
+                        const enrollment = await tx.enrollment.create({
+                            data: {
+                                instituteId: batch.instituteId!,
+                                studentId: createdStudent.id,
+                                batchId: batch.id,
+                                startedAt: createdStudent.createdAt,
+                                createdById: batch.teacherId,
+                            },
+                        });
+                        return { student: createdStudent, enrollmentId: enrollment.id };
+                    });
+                    student = created.student;
+                    createdEnrollmentId = created.enrollmentId;
+                }
                 success = true;
             } catch (error: any) {
                 if (error.code === 'P2002') {
@@ -264,8 +337,15 @@ export const registerStudent = async (req: Request, res: Response) => {
 
         // Auto-send welcome invite if enabled
         await autoSendWelcomeInvite(student!, batch);
-        if (student && batch.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
+        if (student && signedEnrollmentIntent) {
+            // The signed teacher choice was applied transactionally with the enrollment above.
+        } else if (student && batch.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
             await createPendingStudentFeeProfile({ instituteId: batch.instituteId!, studentId: student.id });
+            if (createdEnrollmentId) {
+                await prisma.studentMonthCoverageProfile.update({
+                    where: { studentId: student.id }, data: { enrollmentId: createdEnrollmentId },
+                });
+            }
         } else if (student && batch) {
             await autoAssignGlobalInstallments(student.id, batch.id, student.createdAt);
         }
@@ -278,123 +358,11 @@ export const registerStudent = async (req: Request, res: Response) => {
     }
 };
 
-export const addStudentManually = async (req: Request, res: Response) => {
-    let { batchId, name, parentName, parentWhatsapp, parentEmail, schoolName, additionalData } = req.body;
-
-    // Data Normalization
-    if (typeof name === 'string') name = name.trim();
-    if (typeof parentWhatsapp === 'string') {
-        parentWhatsapp = parentWhatsapp.replace(/\D/g, '');
-        if (parentWhatsapp.length > 10) parentWhatsapp = parentWhatsapp.slice(-10);
-    }
-
-    try {
-        const teacherId = req.user?.id;
-        const batch = await prisma.batch.findUnique({
-            where: { id: batchId },
-            include: {
-                institute: { select: { ...AUTO_INVITE_INSTITUTE_SELECT } }
-            }
-        });
-        if (!batch) return res.status(404).json({ error: 'Batch not found' });
-
-        const user = req.user;
-        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
-        // Idempotency Check: Strict One-Phone-Number-Per-Batch logic
-        const existingStudent = await prisma.student.findFirst({
-            where: { batchId, parentWhatsapp, instituteId: user.instituteId }
-        });
-        if (existingStudent) return res.json(existingStudent);
-
-        let retries = 0;
-        let success = false;
-        let student;
-
-        while (!success && retries < MAX_RETRIES) {
-            try {
-                const humanId = await generateHumanId(batch);
-                if (batch.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
-                    const result = await prisma.$transaction(async tx => {
-                        const createdStudent = await tx.student.create({
-                            data: {
-                                batchId,
-                                name,
-                                parentName,
-                                parentWhatsapp,
-                                parentEmail,
-                                schoolName,
-                                additionalData,
-                                status: 'APPROVED',
-                                humanId,
-                                instituteId: batch.instituteId
-                            }
-                        });
-                        const confirmation = await activateStudentFeeProfileAutomatically({
-                            instituteId: batch.instituteId!,
-                            studentId: createdStudent.id,
-                            actorId: teacherId!,
-                        }, studentMonthCoverageDepsFor(tx));
-                        return { student: createdStudent, confirmation };
-                    });
-                    student = {
-                        ...result.student,
-                        monthCoverageProfile: result.confirmation.profile,
-                        feeStartWarning: result.confirmation.warning,
-                    } as typeof student;
-                } else {
-                    student = await prisma.student.create({
-                        data: {
-                            batchId,
-                            name,
-                            parentName,
-                            parentWhatsapp,
-                            parentEmail,
-                            schoolName,
-                            additionalData,
-                            status: 'APPROVED',
-                            humanId,
-                            instituteId: batch.instituteId
-                        }
-                    });
-                }
-                success = true;
-            } catch (error: any) {
-                if (error.code === 'P2002') {
-                    const target = error.meta?.target;
-                    if (target?.includes('student_natural_key') || target?.includes('name_parentWhatsapp_batchId')) {
-                        // Natural key collision - fetch existing student
-                        const existing = await prisma.student.findFirst({
-                            where: { batchId, name, parentWhatsapp, instituteId: user.instituteId }
-                        });
-                        if (!existing) {
-                            console.error('[Idempotency] Natural key collision but student not found - concurrent deletion');
-                            return res.status(409).json({
-                                error: 'Concurrent modification detected. Please retry registration.'
-                            });
-                        }
-                        return res.json(existing);
-                    } else {
-                        retries++;
-                    }
-                } else {
-                    throw error;
-                }
-            }
-        }
-
-        if (!success) throw new Error('Failed to generate unique ID');
-
-        // Auto-send invite if enabled
-        await autoSendWelcomeInvite(student!, batch);
-        if (student && batch.institute?.coachingFeeMode !== 'MONTH_COVERAGE') {
-            await autoAssignGlobalInstallments(student.id, batch.id, student.createdAt);
-        }
-
-        res.json(student);
-    } catch (e) {
-        console.error("Manual add error", e);
-        res.status(500).json({ error: 'Failed to add student' });
-    }
+export const addStudentManually = async (_req: Request, res: Response) => {
+    return res.status(410).json({
+        error: 'USE_ENROLLMENT_CREATE_ENDPOINT',
+        message: 'Use the batch enrollment flow to select a profile and fee start point.',
+    });
 };
 
 const autoAssignGlobalInstallments = async (studentId: string, batchId: string, studentCreatedAt: Date) => {
@@ -590,90 +558,11 @@ export const rejectStudent = async (req: Request, res: Response) => {
     }
 };
 
-export const archiveStudent = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { leaveReason } = req.body || {};
-
-    try {
-        const user = (req as any).user;
-
-        const student = await prisma.student.findUnique({
-            where: { id: String(id) },
-            include: {
-                fees: true,
-                feePayments: true,
-                attendanceRecords: true,
-                marks: true,
-                quizSubmissions: true,
-                batch: {
-                    include: {
-                        institute: { select: { id: true, coachingFeeMode: true, timezone: true } }
-                    }
-                }
-            }
-        });
-
-        if (!student) return res.status(404).json({ error: 'Student not found' });
-        if (student.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
-
-        const isMonthCoverage = student.batch?.institute?.coachingFeeMode === 'MONTH_COVERAGE';
-        const leaveAt = new Date();
-        if (isMonthCoverage) {
-            await closeStudentFeeProfile({
-                instituteId: user.instituteId,
-                studentId: student.id,
-                leaveAt,
-            });
-        }
-
-        const hasActivity = isMonthCoverage ||
-            student.fees.length > 0 || 
-            student.feePayments.length > 0 || 
-            student.attendanceRecords.length > 0 || 
-            student.marks.length > 0 || 
-            student.quizSubmissions.length > 0;
-
-        if (hasActivity) {
-            // Soft Delete / Archive
-            await prisma.student.update({
-                where: { id: String(id) },
-                data: {
-                    status: 'LEFT',
-                    leaveReason: leaveReason || 'No reason provided',
-                    leftAt: leaveAt,
-                    batchId: null
-                }
-            });
-            return res.json({ success: true, action: 'archived' });
-        } else {
-            // Hard Delete with Log
-            await prisma.$transaction([
-                prisma.systemLog.create({
-                    data: {
-                        instituteId: user.instituteId,
-                        action: 'STUDENT_HARD_DELETE',
-                        entityName: student.name,
-                        details: {
-                            leaveReason: leaveReason || 'No activity',
-                            deletedAt: new Date().toISOString(),
-                            studentData: {
-                                humanId: student.humanId,
-                                parentName: student.parentName,
-                                parentWhatsapp: student.parentWhatsapp
-                            }
-                        } as any
-                    }
-                }),
-                prisma.student.delete({
-                    where: { id: String(id) }
-                })
-            ]);
-            return res.json({ success: true, action: 'hard_deleted' });
-        }
-    } catch (e) {
-        console.error("Archive error:", e);
-        res.status(500).json({ error: 'Failed to remove or archive student' });
-    }
+export const archiveStudent = async (_req: Request, res: Response) => {
+    return res.status(410).json({
+        error: 'USE_ENROLLMENT_END_ENDPOINT',
+        message: 'End the student enrollment from the selected batch instead.',
+    });
 };
 
 export const confirmMonthCoverageProfileController = async (req: Request, res: Response) => {
@@ -901,11 +790,13 @@ export const getStudentProfile = async (req: Request, res: Response) => {
                 institute: {
                     select: { coachingFeeMode: true, timezone: true, config: true }
                 },
-                batch: {
-                    select: { name: true, className: true, subject: true, startDate: true, endDate: true }
-                },
-                monthCoverageProfile: {
-                    select: { id: true, batchId: true, feeStartMonth: true, feeEndMonth: true, status: true }
+                enrollments: {
+                    select: {
+                        id: true, status: true, startedAt: true, endedAt: true, endReason: true,
+                        batch: { select: { id: true, name: true, className: true, subject: true, startDate: true, endDate: true } },
+                        monthCoverageProfile: { select: { id: true, batchId: true, feeStartMonth: true, feeEndMonth: true, status: true } }
+                    },
+                    orderBy: { startedAt: 'desc' }
                 },
                 monthCoverageAllocations: {
                     select: { coverageMonth: true, payment: { select: { status: true } } }
@@ -919,17 +810,6 @@ export const getStudentProfile = async (req: Request, res: Response) => {
                     orderBy: { test: { date: 'desc' } },
                     take: 100
                 },
-                attendanceRecords: {
-                    select: {
-                        id: true,
-                        attendanceDate: true,
-                        checkedInAt: true,
-                        source: true,
-                        note: true
-                    },
-                    orderBy: { attendanceDate: 'desc' },
-                    take: 50 // Recent 50 records
-                }
             }
         });
 
@@ -941,30 +821,21 @@ export const getStudentProfile = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        // Calculate summary stats
-        const totalClasses = student.attendanceRecords.length;
-        const classesAttended = student.attendanceRecords.filter(r => r.source === 'KIOSK' || r.note === 'PRESENT').length; // Assuming some convention or just count total records if they only record presence
-        // Actually, let's just return raw records and let client process or process simple stats:
-        // Wait, what does attendance actually store? Let's check: attendanceRecords usually store when present.
-        const attendancePercentage = totalClasses > 0 ? Math.round((classesAttended / totalClasses) * 100) : null;
-
         const config = student.institute?.config as { registrationForm?: { fields?: unknown } } | null;
         const registrationFields = Array.isArray(config?.registrationForm?.fields)
             ? config.registrationForm.fields
             : [];
         const common = {
             ...student,
+            status: student.enrollments.some(enrollment => enrollment.status === 'ACTIVE') ? 'ACTIVE' : 'INACTIVE',
+            batch: student.enrollments.find(enrollment => enrollment.status === 'ACTIVE')?.batch || null,
             coachingFeeMode: student.institute?.coachingFeeMode ?? 'CURRENT_DUE_BASED',
-            registrationFields,
-            stats: {
-                attendancePercentage,
-                attendedClasses: classesAttended,
-                totalClasses
-            }
+            registrationFields
         };
 
         if (student.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
-            const profile = student.monthCoverageProfile;
+            const profile = student.enrollments.find(enrollment => enrollment.status === 'ACTIVE')?.monthCoverageProfile
+                || student.enrollments.find(enrollment => enrollment.monthCoverageProfile)?.monthCoverageProfile;
             const monthCoverageStats = profile?.feeStartMonth && profile.feeEndMonth
                 ? summarizeStudent({
                     feeStartMonth: profile.feeStartMonth,

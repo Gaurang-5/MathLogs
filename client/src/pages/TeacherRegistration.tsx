@@ -600,7 +600,7 @@ export default function TeacherRegistration() {
           <Sparkles className="w-6 h-6 text-amber-400 mx-auto mb-2" />
           <h3 className="text-base font-extrabold">Need Complete Coaching Management Software?</h3>
           <p className="text-xs text-neutral-400 font-medium mt-1 max-w-sm mx-auto">
-            Upgrade to MathLogs ERP for digital student attendance, automated fee tracking, WhatsApp messaging, test series, and more.
+            Upgrade to MathLogs ERP for student records, automated fee tracking, WhatsApp messaging, test series, and more.
           </p>
           <Link
             to="/onboarding"

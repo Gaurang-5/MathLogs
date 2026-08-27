@@ -15,6 +15,7 @@ const MAX_CHEATING_WARNINGS = 5;
 const autosaveWriteTimes = new Map<string, number>();
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
+const ACCOUNT_SELECTION_EXPIRY = '5m';
 
 
 
@@ -97,6 +98,36 @@ function createStudentToken(studentId: string, instituteId: string): string {
         JWT_SECRET,
         { expiresIn: '30d' }
     );
+}
+
+type StudentAccountSelectionClaims = {
+    purpose: 'STUDENT_ACCOUNT_SELECTION';
+    instituteId: string;
+    normalizedPhone: string;
+    studentIds: string[];
+};
+
+function createStudentSelectionToken(instituteId: string, normalizedPhone: string, studentIds: string[]): string {
+    return jwt.sign({
+        purpose: 'STUDENT_ACCOUNT_SELECTION',
+        instituteId,
+        normalizedPhone,
+        studentIds,
+    } satisfies StudentAccountSelectionClaims, JWT_SECRET, { expiresIn: ACCOUNT_SELECTION_EXPIRY });
+}
+
+function safeStudentAccount(student: {
+    id: string;
+    humanId: string | null;
+    name: string;
+    enrollments: Array<{ batch: { name: string } }>;
+}) {
+    return {
+        id: student.id,
+        humanId: student.humanId,
+        name: student.name,
+        activeBatchNames: student.enrollments.map(enrollment => enrollment.batch.name),
+    };
 }
 
 function getStudentIdFromRequest(req: Request, res: Response): string | null {
@@ -338,22 +369,40 @@ export const verifyStudentLoginOtp = async (req: Request, res: Response): Promis
         }
 
         const variants = getMobileVariants(cleanMobile);
-        const student = await prisma.student.findFirst({
+        const students = await prisma.student.findMany({
             where: {
                 instituteId: institute.id,
                 parentWhatsapp: { in: variants }
             },
-            include: {
-                batch: { select: { id: true, name: true } }
-            }
+            select: {
+                id: true,
+                humanId: true,
+                name: true,
+                enrollments: {
+                    where: { status: 'ACTIVE' },
+                    select: { batch: { select: { name: true } } },
+                    orderBy: { startedAt: 'asc' },
+                },
+            },
+            orderBy: [{ name: 'asc' }, { createdAt: 'asc' }],
         });
 
-        if (!student) {
+        if (students.length === 0) {
             res.status(404).json({ error: 'This mobile number is not registered. Please contact your teacher.' });
             return;
         }
 
         await prisma.otpToken.delete({ where: { identifier: otpIdentifier } });
+        if (students.length > 1) {
+            res.json({
+                success: true,
+                selectionToken: createStudentSelectionToken(institute.id, cleanMobile, students.map(student => student.id)),
+                students: students.map(safeStudentAccount),
+            });
+            return;
+        }
+
+        const student = students[0];
         const token = createStudentToken(student.id, institute.id);
 
         res.json({
@@ -362,13 +411,73 @@ export const verifyStudentLoginOtp = async (req: Request, res: Response): Promis
             student: {
                 id: student.id,
                 name: student.name,
-                batchName: student.batch?.name || 'N/A',
+                batchName: student.enrollments[0]?.batch.name || 'N/A',
                 instituteName: institute.name
             }
         });
     } catch (error) {
         console.error('[STUDENT_OTP_VERIFY_ERROR]', error);
         res.status(500).json({ error: 'Failed to verify OTP' });
+    }
+};
+
+// POST /api/student-portal/select-account
+// Body: { selectionToken: string, studentId: string }
+export const selectStudentAccount = async (req: Request, res: Response): Promise<void> => {
+    const { selectionToken, studentId } = req.body || {};
+    if (typeof selectionToken !== 'string' || typeof studentId !== 'string') {
+        res.status(400).json({ error: 'Selection token and student are required' });
+        return;
+    }
+
+    try {
+        const claims = jwt.verify(selectionToken, JWT_SECRET) as Partial<StudentAccountSelectionClaims>;
+        const validClaims = claims.purpose === 'STUDENT_ACCOUNT_SELECTION' &&
+            typeof claims.instituteId === 'string' &&
+            typeof claims.normalizedPhone === 'string' &&
+            Array.isArray(claims.studentIds) &&
+            claims.studentIds.every(id => typeof id === 'string');
+        if (!validClaims) {
+            res.status(401).json({ error: 'Invalid or expired account selection' });
+            return;
+        }
+        if (!claims.studentIds!.includes(studentId)) {
+            res.status(403).json({ error: 'Student is not available for this login' });
+            return;
+        }
+
+        const student = await prisma.student.findFirst({
+            where: {
+                id: studentId,
+                instituteId: claims.instituteId,
+                parentWhatsapp: { in: getMobileVariants(claims.normalizedPhone!) },
+            },
+            select: {
+                id: true,
+                humanId: true,
+                name: true,
+                enrollments: {
+                    where: { status: 'ACTIVE' },
+                    select: { batch: { select: { name: true } } },
+                    orderBy: { startedAt: 'asc' },
+                },
+            },
+        });
+        if (!student) {
+            res.status(403).json({ error: 'Student is not available for this login' });
+            return;
+        }
+
+        res.json({
+            success: true,
+            token: createStudentToken(student.id, claims.instituteId!),
+            student: {
+                ...safeStudentAccount(student),
+                batchName: student.enrollments[0]?.batch.name || 'N/A',
+            },
+        });
+    } catch {
+        res.status(401).json({ error: 'Invalid or expired account selection' });
     }
 };
 
@@ -469,6 +578,7 @@ export const registerPublicQuiz = async (req: Request, res: Response): Promise<v
             });
         }
 
+        const isEnrolled = await prisma.enrollment.count({ where: { studentId: student.id, status: 'ACTIVE' } }) > 0;
         const token = jwt.sign(
             {
                 studentId: student.id,
@@ -484,7 +594,7 @@ export const registerPublicQuiz = async (req: Request, res: Response): Promise<v
             student: {
                 id: student.id,
                 name: student.name,
-                batchName: student.batchId ? 'Enrolled' : 'Guest',
+                batchName: isEnrolled ? 'Enrolled' : 'Guest',
                 instituteName: (quiz as { institute?: { name?: string | null } }).institute?.name || 'N/A'
             }
         });
@@ -543,7 +653,7 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
             prisma.student.findUnique({
                 where: { id: studentId },
                 include: {
-                    batch: true,
+                    enrollments: { where: { status: 'ACTIVE' }, include: { batch: true } },
                     balance: true,
                     institute: { select: { isQuizOnly: true } },
                     feePayments: {
@@ -562,20 +672,21 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                 where: { 
                     OR: [
                         { studentId },
-                        { batch: { students: { some: { id: studentId } } } }
+                        { batch: { enrollments: { some: { studentId, status: 'ACTIVE' } } } }
                     ]
                 },
                 include: {
                     payments: { where: { studentId } }
                 }
             }),
-            prisma.student.findUnique({ where: { id: studentId }, select: { batchId: true } }).then(s => {
-                if (!s?.batchId) return [];
+            prisma.enrollment.findMany({ where: { studentId, status: 'ACTIVE' }, select: { batchId: true } }).then(enrollments => {
+                const batchIds = enrollments.map(enrollment => enrollment.batchId);
+                if (batchIds.length === 0) return [];
                 return prisma.test.findMany({
                     where: {
                         OR: [
-                            { batchId: s.batchId },
-                            { batches: { some: { id: s.batchId } } },
+                            { batchId: { in: batchIds } },
+                            { batches: { some: { id: { in: batchIds } } } },
                             { marks: { some: { studentId } } }
                         ]
                     },
@@ -589,14 +700,13 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
             return;
         }
 
-        const studentJoinDate = new Date(student.createdAt);
-
         const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
         
         const eligibleInstallments = batchInstallments.filter((inst: any) => {
             if (inst.studentId && inst.studentId !== studentId) return false;
             if (inst.studentId === studentId) return true;
-            return new Date(inst.createdAt) >= studentJoinDate || inst.payments.length > 0 || assignedIds.has(inst.id);
+            const enrollment = student.enrollments.find((item: any) => item.batchId === inst.batchId);
+            return Boolean(enrollment) && (new Date(inst.createdAt) >= new Date(enrollment.startedAt) || inst.payments.length > 0 || assignedIds.has(inst.id));
         });
 
         // Build a map of testId -> mark for fast lookup
@@ -652,7 +762,7 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
                 parentName: student.parentName,
                 parentWhatsapp: student.parentWhatsapp,
                 parentEmail: student.parentEmail || null,
-                batchName: student.batch?.name || 'N/A',
+                batchName: student.enrollments.map((item: any) => item.batch.name).join(', ') || 'N/A',
                 schoolName: student.schoolName || null,
                 humanId: student.humanId || null,
                 status: student.status,
@@ -700,7 +810,7 @@ export const getStudentQuizzes = async (req: Request, res: Response): Promise<vo
         const student = await prisma.student.findUnique({
             where: { id: studentId },
             select: { 
-                batchId: true, 
+                enrollments: { where: { status: 'ACTIVE' }, select: { batchId: true } },
                 createdAt: true,
                 instituteId: true
             }
@@ -718,14 +828,15 @@ export const getStudentQuizzes = async (req: Request, res: Response): Promise<vo
 
         let quizzes: any[];
 
-        if (student.batchId) {
+        const activeBatchIds = student.enrollments.map(enrollment => enrollment.batchId);
+        if (activeBatchIds.length > 0) {
             // Normal student with a batch — existing logic
             // Auto-finalize any expired submissions for assigned quizzes in parallel
             const candidateQuizzes = await prisma.onlineQuiz.findMany({
                 where: {
                     OR: [
-                        { batchId: student.batchId },
-                        { batches: { some: { id: student.batchId } } },
+                        { batchId: { in: activeBatchIds } },
+                        { batches: { some: { id: { in: activeBatchIds } } } },
                         { submissions: { some: { studentId } } }
                     ]
                 },
@@ -736,8 +847,8 @@ export const getStudentQuizzes = async (req: Request, res: Response): Promise<vo
             quizzes = await prisma.onlineQuiz.findMany({
                 where: {
                     OR: [
-                        { batchId: student.batchId },
-                        { batches: { some: { id: student.batchId } } },
+                        { batchId: { in: activeBatchIds } },
+                        { batches: { some: { id: { in: activeBatchIds } } } },
                         { submissions: { some: { studentId } } }
                     ]
                 },
@@ -850,6 +961,7 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
         const student = await prisma.student.findUnique({
             where: { id: studentId },
             include: {
+                enrollments: { where: { status: 'ACTIVE' }, select: { batchId: true } },
                 quizSubmissions: {
                     where: { quizId },
                     include: { cheatingEvents: { select: { id: true } } }
@@ -886,16 +998,17 @@ export const startOnlineQuiz = async (req: Request, res: Response): Promise<void
             return;
         }
 
-        if (!student.batchId && !quiz.isPublic) {
+        const activeBatchIds = student.enrollments.map(enrollment => enrollment.batchId);
+        if (activeBatchIds.length === 0 && !quiz.isPublic) {
             res.status(404).json({ error: 'Student batch not found' });
             return;
         }
 
         // Security: Check if student has access to this quiz (multi-batch aware)
         const quizBatches = Array.isArray((quiz as any).batches) ? (quiz as any).batches : [];
-        const hasAccess = quiz.isPublic || 
-                          quiz.batchId === student.batchId || 
-                          quizBatches.some((b: any) => b.id === student.batchId);
+        const hasAccess = quiz.isPublic ||
+                          activeBatchIds.includes(quiz.batchId) ||
+                          quizBatches.some((batch: any) => activeBatchIds.includes(batch.id));
 
         if (!hasAccess) {
             res.status(404).json({ error: 'Quiz not found or no access' });

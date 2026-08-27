@@ -21,22 +21,20 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
         const instituteId = user?.instituteId;
         const role = user?.role;
 
-        const whereClause: any = {
-            status: 'APPROVED',
-        };
+        const whereClause: any = { enrollments: { some: { status: 'ACTIVE' } } };
 
         if (instituteId) {
             whereClause.instituteId = instituteId;
         }
 
         if (role !== 'SUPER_ADMIN') {
-            whereClause.batch = { teacherId };
+            whereClause.enrollments = { some: { status: 'ACTIVE', batch: { teacherId } } };
         }
 
         const students = await prisma.student.findMany({
             where: whereClause,
             include: {
-                batch: { include: { feeInstallments: true } },
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { feeInstallments: true } } } },
                 fees: true,
                 feePayments: true
             },
@@ -50,7 +48,7 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
             return {
                 humanId: student.humanId || '-',
                 name: student.name,
-                batch: student.batch?.name || 'N/A',
+                batch: student.enrollments.map((enrollment: any) => enrollment.batch.name).join(', ') || 'N/A',
                 parentName: student.parentName || '-',
                 phone: student.parentWhatsapp || '-',
                 balance,
@@ -87,11 +85,11 @@ export const getPaymentHistory = async (req: Request, res: Response) => {
     try {
         const student = await prisma.student.findUnique({
             where: { id: String(studentId) },
-            include: { batch: true }
+            include: { enrollments: { where: { status: 'ACTIVE' }, select: { batch: { select: { teacherId: true } } } } }
         });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
-        if (student.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+        if (!student.enrollments.some(enrollment => !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId)) return res.status(403).json({ error: 'Unauthorized' });
 
         const history = await prisma.feePayment.findMany({
             where: { studentId: String(studentId) },
@@ -141,16 +139,14 @@ export const getFeeSummary = async (req: Request, res: Response) => {
         const role = user?.role;
         const installmentFilter = (req.query.installment as string) || 'All';
 
-        const whereClause: any = {
-            status: 'APPROVED',
-        };
+        const whereClause: any = { enrollments: { some: { status: 'ACTIVE' } } };
 
         if (instituteId) {
             whereClause.instituteId = instituteId;
         }
 
         if (role !== 'SUPER_ADMIN') {
-            whereClause.batch = { teacherId };
+            whereClause.enrollments = { some: { status: 'ACTIVE', batch: { teacherId } } };
         }
 
         const students = await prisma.student.findMany({
@@ -161,11 +157,11 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 name: true,
                 parentWhatsapp: true,
                 createdAt: true, // Needed for oldestDue fallback
-                batch: {
+                enrollments: {
+                    where: { status: 'ACTIVE' },
                     select: {
-                        name: true,
-                        feeAmount: true,
-                        feeInstallments: {
+                        startedAt: true,
+                        batch: { select: { name: true, feeAmount: true, feeInstallments: {
                             select: {
                                 id: true,
                                 name: true,
@@ -174,7 +170,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                                 createdAt: true
                             },
                             orderBy: { createdAt: 'asc' }
-                        }
+                        } } }
                     }
                 },
                 fees: {
@@ -203,16 +199,14 @@ export const getFeeSummary = async (req: Request, res: Response) => {
         // Collect all distinct installment names across all students
         const allInstallmentNamesSet = new Set<string>();
         students.forEach((s: any) => {
-            (s.batch?.feeInstallments || []).forEach((inst: any) => {
+            s.enrollments.flatMap((enrollment: any) => enrollment.batch.feeInstallments).forEach((inst: any) => {
                 if (inst.name) allInstallmentNamesSet.add(inst.name.trim());
             });
         });
 
         const summary = students.map((student: any) => {
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const allBatchInstallments = student.batch?.feeInstallments || [];
-
-            const isBatchInstallmentActive = allBatchInstallments.some((inst: any) => !inst.studentId);
+            const allBatchInstallments = student.enrollments.flatMap((enrollment: any) =>
+                enrollment.batch.feeInstallments.map((installment: any) => ({ ...installment, enrollmentStartedAt: enrollment.startedAt })));
 
             // Build a set of installment IDs that have existing payments for this student
             const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
@@ -226,7 +220,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 if (inst.studentId) {
                     return inst.studentId === student.id;
                 }
-                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
+                const isAfterJoin = new Date(inst.createdAt) >= new Date(inst.enrollmentStartedAt);
                 const hasPayment = paidInstallmentIds.has(inst.id);
                 const isAssigned = assignedIds.has(inst.id);
                 return isAfterJoin || hasPayment || isAssigned;
@@ -288,7 +282,11 @@ export const getFeeSummary = async (req: Request, res: Response) => {
             if (installmentFilter !== 'All') {
                 totalFee = globalInstallmentsTotal + customInstallmentsTotal;
             } else {
-                totalFee = (isBatchInstallmentActive ? globalInstallmentsTotal : (student.batch?.feeAmount || 0)) + customInstallmentsTotal;
+                const fallbackBatchFees = student.enrollments.reduce((sum: number, enrollment: any) => {
+                    const hasGlobals = enrollment.batch.feeInstallments.some((installment: any) => !installment.studentId);
+                    return sum + (hasGlobals ? 0 : Number(enrollment.batch.feeAmount || 0));
+                }, 0);
+                totalFee = globalInstallmentsTotal + fallbackBatchFees + customInstallmentsTotal;
             }
 
             const totalPaid = paidSimple + paidInstallments;
@@ -312,7 +310,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 humanId: student.humanId,
                 name: student.name,
                 phone: student.parentWhatsapp,
-                batchName: student.batch?.name || 'N/A',
+                batchName: student.enrollments.map((enrollment: any) => enrollment.batch.name).join(', ') || 'N/A',
                 totalFee,
                 totalPaid,
                 balance,
@@ -351,37 +349,37 @@ export const recordPayment = async (req: Request, res: Response) => {
             const student = await tx.student.findUnique({
                 where: { id: studentId },
                 include: {
-                    batch: { include: { feeInstallments: { orderBy: { createdAt: 'asc' } }, institute: true } },
+                    enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { feeInstallments: { orderBy: { createdAt: 'asc' } }, institute: true } } } },
                     feePayments: true,
                     fees: true
                 }
             });
 
-            if (student?.batch?.teacherId && student.batch.teacherId !== teacherId) {
-                throw { statusCode: 403, message: 'Unauthorized' };
-            }
-
             if (!student) {
                 throw { statusCode: 404, message: 'Student not found' };
             }
+            if (!student.enrollments.some(enrollment => !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId)) {
+                throw { statusCode: 403, message: 'Unauthorized' };
+            }
 
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const allBatchInstallments = student.batch?.feeInstallments || [];
+            const allBatchInstallments = student.enrollments.flatMap(enrollment =>
+                enrollment.batch.feeInstallments.map(installment => ({ ...installment, enrollmentStartedAt: enrollment.startedAt })));
             const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
             const installments = allBatchInstallments.filter((inst: any) => {
                 if (inst.studentId) {
                     return inst.studentId === studentId;
                 }
-                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
+                const isAfterJoin = new Date(inst.createdAt) >= new Date(inst.enrollmentStartedAt);
                 const hasPayment = paidInstallmentIds.has(inst.id);
                 return isAfterJoin || hasPayment;
             });
             const validInstallmentIds = new Set(installments.map(i => i.id));
 
             // Validation: Prevent Overpayment
-            const batchHasInstallments = allBatchInstallments.length > 0;
             const installmentSum = installments.reduce((sum, i) => sum + i.amount, 0);
-            const totalFee = batchHasInstallments ? installmentSum : (student.batch?.feeAmount || 0);
+            const fallbackFees = student.enrollments.reduce((sum, enrollment) =>
+                sum + (enrollment.batch.feeInstallments.length > 0 ? 0 : enrollment.batch.feeAmount), 0);
+            const totalFee = installmentSum + fallbackFees;
 
             const paidGeneric = student.fees
                 .filter((f: any) => f.status === 'PAID')
@@ -453,8 +451,8 @@ export const recordPayment = async (req: Request, res: Response) => {
 
         // Send WhatsApp receipt OUTSIDE transaction (fire-and-forget)
         if (result.parentWhatsapp) {
-            const studentJoinDate = result.createdAt ? new Date(result.createdAt) : new Date(0);
-            const installments = (result.batch?.feeInstallments || []).filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
+            const installments = result.enrollments.flatMap(enrollment => enrollment.batch.feeInstallments
+                .filter(inst => new Date(inst.createdAt) >= new Date(enrollment.startedAt)));
             const allocatedInstallments = installments
                 .filter(inst => {
                     const paidBefore = result.feePayments.filter(p => p.installmentId === inst.id).reduce((s, p) => s + p.amountPaid, 0);
@@ -468,7 +466,7 @@ export const recordPayment = async (req: Request, res: Response) => {
                     studentName: result.name,
                     amountPaid: `Rs. ${parsedAmount.toLocaleString()}`,
                     installmentName: allocatedInstallments,
-                    instituteName: result.batch?.institute?.name || 'our institute',
+                    instituteName: result.enrollments[0]?.batch.institute?.name || 'our institute',
                     instituteId: result.instituteId || undefined
                 })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
             });
@@ -503,23 +501,23 @@ export const payInstallment = async (req: Request, res: Response) => {
         const student = await prisma.student.findUnique({
             where: { id: studentId },
             include: {
-                batch: { include: { institute: true } },
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { institute: true } } } },
                 feeAssignments: { select: { installmentId: true } }
             }
         });
 
-        secureLogger.debug('Student found', student ? { id: student.id, name: student.name, batchId: student.batchId, hasBatch: !!student.batch } : 'NOT FOUND');
+        secureLogger.debug('Student found', student ? { id: student.id, name: student.name, activeEnrollmentCount: student.enrollments.length } : 'NOT FOUND');
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
 
         // ✅ SECURITY: Defense-in-depth - validate instituteId directly
-        if (!student.batch) {
-            return res.status(400).json({ error: 'Student has no batch assigned' });
+        if (student.enrollments.length === 0) {
+            return res.status(400).json({ error: 'Student has no active enrollment' });
         }
         if (student.instituteId && student.instituteId !== user.instituteId) {
             return res.status(403).json({ error: 'Unauthorized: Cross-institute access denied' });
         }
-        if (student.batch.teacherId && student.batch.teacherId !== teacherId) {
+        if (!student.enrollments.some(enrollment => !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId)) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
@@ -539,10 +537,12 @@ export const payInstallment = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Installment not found' });
         }
 
-        const isSameBatch = installment.batchId === student.batchId;
+        const isSameBatch = student.enrollments.some(enrollment => enrollment.batchId === installment.batchId);
         const isAssigned = student.feeAssignments?.some((assignment) => assignment.installmentId === installment.id) ?? false;
         const isExistingPayment = existingPayments.length > 0;
-        const isAfterJoin = new Date(installment.createdAt).getTime() >= new Date(student.createdAt).getTime();
+        const matchingEnrollment = student.enrollments.find(enrollment => enrollment.batchId === installment.batchId);
+        const isAfterJoin = Boolean(matchingEnrollment)
+            && new Date(installment.createdAt).getTime() >= new Date(matchingEnrollment!.startedAt).getTime();
         const isValidCustomInstallment = Boolean(installment.studentId) && installment.studentId === student.id && isSameBatch;
         const isValidBatchInstallment = !installment.studentId && isSameBatch && (isAfterJoin || isExistingPayment || isAssigned);
 
@@ -606,7 +606,7 @@ export const payInstallment = async (req: Request, res: Response) => {
                     studentName: student.name,
                     amountPaid: `Rs. ${newPaymentAmount.toLocaleString()}`,
                     installmentName: installment.name,
-                    instituteName: student.batch?.institute?.name || 'our institute',
+                    instituteName: student.enrollments.find(enrollment => enrollment.batchId === installment.batchId)?.batch.institute?.name || 'our institute',
                     instituteId: student.instituteId || undefined
                 })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
             });
@@ -628,18 +628,17 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
         const student = await prisma.student.findUnique({
             where: { id: studentId },
             include: {
-                batch: { include: { feeInstallments: true, institute: true } },
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { feeInstallments: true, institute: true } } } },
                 feePayments: true,
                 feeAssignments: { select: { installmentId: true } },
                 fees: true
             }
         });
 
-        if (student?.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
-
         if (!student || !student.parentEmail) {
             return res.status(400).json({ error: 'Student email not found' });
         }
+        if (!student.enrollments.some(enrollment => !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId)) return res.status(403).json({ error: 'Unauthorized' });
 
         const snapshot = calculateStudentFeeSnapshot(student);
         const totalPendingCalc = Math.max(0, snapshot.balance);
@@ -649,14 +648,16 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
         const breakdownLines = [`- Outstanding Balance: Rs. ${totalPendingCalc.toLocaleString()}`];
 
         const subject = `Fee Payment Reminder for ${student.name}`;
-        const senderName = student.batch?.institute?.name || 'Coaching Administration';
-        const replyTo = student.batch?.institute?.email || undefined;
+        const institute = student.enrollments[0]?.batch.institute;
+        const batchNames = student.enrollments.map(enrollment => enrollment.batch.name).join(', ') || 'Class';
+        const senderName = institute?.name || 'Coaching Administration';
+        const replyTo = institute?.email || undefined;
 
         const body = `Dear ${student.parentName || 'Parent/Guardian'},
 
 We hope you are doing well.
 
-This is a gentle reminder regarding the pending fee for your child, ${student.name} (${student.batch?.name || 'Class'}).
+This is a gentle reminder regarding the pending fee for your child, ${student.name} (${batchNames}).
 
 Fee Breakdown:
 ${breakdownLines.join('\n')}
@@ -677,7 +678,7 @@ ${senderName}`;
                 body,
                 status: 'PENDING',
                 options: { senderName, replyTo, senderType: 'NOREPLY' },
-                instituteId: student.batch?.instituteId
+                instituteId: student.instituteId
             } as any
         });
 
@@ -688,14 +689,14 @@ ${senderName}`;
                 const feeBreakupText = breakdownLines.join(' | ');
 
                 const phoneDigits = student.parentWhatsapp!.replace(/\D/g, '').slice(-10);
-                const upiLink = `${process.env.FRONTEND_URL || 'https://mathlogs.com'}/pay/${student.batch?.institute?.slug}?phone=${phoneDigits}`;
+                const upiLink = `${process.env.FRONTEND_URL || 'https://mathlogs.com'}/pay/${institute?.slug}?phone=${phoneDigits}`;
 
                 void sendStudentAlertForStudent(student.id, phone => sendFeeReminderUpiWhatsApp(phone, {
                         studentName: student.name,
-                        batchName: student.batch?.name || "the batch",
+                        batchName: batchNames,
                         feeBreakup: feeBreakupText,
                         totalAmount: totalPendingCalc.toLocaleString(),
-                        instituteName: student.batch?.institute?.name || "our institute",
+                        instituteName: institute?.name || "our institute",
                         upiPaymentLink: upiLink,
                         instituteId: student.instituteId || undefined
                     }
@@ -1404,7 +1405,7 @@ export const assignFeeInstallment = async (req: Request, res: Response) => {
 
         const student = await prisma.student.findUnique({
             where: { id: String(studentId) },
-            include: { batch: true }
+            include: { enrollments: { where: { status: 'ACTIVE' }, select: { batchId: true } } }
         });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -1417,7 +1418,7 @@ export const assignFeeInstallment = async (req: Request, res: Response) => {
         });
 
         if (!installment) return res.status(404).json({ error: 'Installment not found' });
-        if (installment.batchId !== student.batchId) {
+        if (!student.enrollments.some(enrollment => enrollment.batchId === installment.batchId)) {
             return res.status(400).json({ error: 'Installment does not belong to student batch' });
         }
 

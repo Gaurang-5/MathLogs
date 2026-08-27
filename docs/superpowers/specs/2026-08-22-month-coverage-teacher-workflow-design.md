@@ -78,7 +78,7 @@ A centralized server-side recipient resolver accepts the student and institute r
 
 The resolver removes blanks, rejects malformed numbers, and deduplicates normalized recipients. If a custom field is removed or `sendAlerts` is disabled, its stored value no longer receives future notifications.
 
-Every student-scoped WhatsApp pathway must use the resolver, including welcome messages, fee reminders and receipts, attendance alerts, test results, quiz messages, and batch announcements. One recipient failing must not prevent attempts to the remaining recipients. Logs must continue to redact phone numbers.
+Every student-scoped WhatsApp pathway must use the resolver, including welcome messages, fee reminders and receipts, test results, quiz messages, and batch announcements. One recipient failing must not prevent attempts to the remaining recipients. Logs must continue to redact phone numbers.
 
 ## Dashboard Ownership
 
@@ -136,7 +136,7 @@ Tests must cover:
 - profile view/edit rendering configured system and custom fields;
 - alert-field checkbox persistence;
 - recipient normalization, deduplication, disabled fields, malformed values, and multi-recipient failure isolation;
-- representative welcome, fee, attendance, test, quiz, and announcement send paths using the resolver;
+- representative welcome, fee, test, quiz, and announcement send paths using the resolver;
 - absence of recent fee history in Batch Details and its presence in Fees;
 - void dialog portal, stacking, scrolling, and visible mobile actions;
 - idempotent demo seeding and expected scenario counts;

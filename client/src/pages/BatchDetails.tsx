@@ -18,9 +18,13 @@ import type { MonthCoverageProfile, MonthCoverageStudentSummary, MonthCoverageSu
 import { MonthCoveragePaymentDialog } from '../features/month-coverage/MonthCoveragePaymentDialog';
 import { formatCoverageRange, monthStatusCopy } from '../features/month-coverage/monthCoverageViewModel';
 import { BatchExportDialog, type BatchExportColumn } from '../features/batch-export/BatchExportDialog';
+import { AddStudentFlow } from '../features/enrollments/AddStudentFlow';
+import { EndEnrollmentDialog } from '../features/enrollments/EndEnrollmentDialog';
 
 interface Student {
     id: string;
+    enrollmentId: string;
+    enrollmentStartedAt?: string;
     humanId: string | null;
     name: string;
     parentName: string;
@@ -179,8 +183,6 @@ export default function BatchDetails() {
         });
         return (totalNormalized / student.marks.length).toFixed(1);
     };
-
-    const [newWhatsapp, setNewWhatsapp] = useState('');
 
     // Edit Batch State
     const [showEditBatch, setShowEditBatch] = useState(false);
@@ -490,21 +492,6 @@ export default function BatchDetails() {
         }
     };
 
-    const handleAddStudent = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const toastId = toast.loading('Sending invite...');
-        try {
-            await apiRequest(`/batches/${id}/invite`, 'POST', {
-                whatsappNumber: newWhatsapp
-            });
-            toast.success('Invite link sent to WhatsApp!', { id: toastId });
-            setShowAddStudent(false);
-            setNewWhatsapp('');
-        } catch {
-            toast.error('Failed to send invite', { id: toastId });
-        }
-    };
-
     const setStudentFeeStart = async (feeStartMonth: string) => {
         if (!feeStartStudent) return;
         const result = await confirmStudentFeeProfile(feeStartStudent.id, feeStartMonth);
@@ -519,32 +506,9 @@ export default function BatchDetails() {
     };
 
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
-    const [deleteInput, setDeleteInput] = useState('');
-    const [leaveReason, setLeaveReason] = useState('');
 
     const handleDelete = (student: Student) => {
         setStudentToDelete(student);
-        setDeleteInput('');
-        setLeaveReason('');
-    };
-
-    const confirmDeleteStudent = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (deleteInput.toLowerCase() !== 'delete' || !studentToDelete) return;
-
-        const toastId = toast.loading('Removing student...');
-        try {
-            const res = await apiRequest(`/students/${studentToDelete.id}/archive`, 'DELETE', { leaveReason });
-            if (res.action === 'archived') {
-                toast.success('Student has been archived', { id: toastId });
-            } else {
-                toast.success('Student permanently deleted', { id: toastId });
-            }
-            setStudentToDelete(null);
-            setTimeout(() => fetchDetails(), 300);
-        } catch {
-            toast.error('Failed to remove student', { id: toastId });
-        }
     };
 
 
@@ -1989,146 +1953,16 @@ export default function BatchDetails() {
                 )}
             </AnimatePresence>
 
-            {/* Add Student Modal */}
-            <AnimatePresence>
-                {
-                    showAddStudent && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute inset-0 bg-black/40 backdrop-blur-md"
-                                onClick={() => setShowAddStudent(false)}
-                            />
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
-                            >
-                                <div className="flex justify-between items-center mb-8">
-                                    <div>
-                                        <h3 className="text-xl font-bold text-app-text">Invite Student</h3>
-                                        <p className="text-sm text-app-text-tertiary">Send a secure registration link via WhatsApp.</p>
-                                    </div>
-                                    <button onClick={() => setShowAddStudent(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
-                                </div>
+            {showAddStudent && batch ? <AddStudentFlow batch={batch} onClose={() => setShowAddStudent(false)} onComplete={fetchDetails} /> : null}
 
-                                <form onSubmit={handleAddStudent} className="grid grid-cols-1 gap-6">
-                                    <div className="space-y-4 pt-2">
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider ml-1">Student's WhatsApp</label>
-                                            <div className="relative">
-                                                <Phone className="absolute left-3 top-3 w-4 h-4 text-app-text-tertiary" />
-                                                <input
-                                                    type="tel"
-                                                    maxLength={10}
-                                                    value={newWhatsapp}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(/\D/g, '');
-                                                        if (val.length <= 10) setNewWhatsapp(val);
-                                                    }}
-                                                    className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                                    required
-                                                    autoFocus
-                                                    placeholder="10-digit Number"
-                                                />
-                                            </div>
-                                            <p className="text-xs text-app-text-tertiary ml-1 mt-1">A unique 24-hour validity link will be sent.</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end pt-2">
-                                        <button
-                                            type="submit"
-                                            className="!bg-black hover:!bg-neutral-800 !text-white border-2 !border-black  px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center"
-                                        >
-                                            <Mail className="w-4 h-4 mr-2" /> Send Invite Link
-                                        </button>
-                                    </div>
-                                    <div className="h-4 md:hidden"></div>
-                                </form>
-                            </motion.div>
-                        </div>
-                    )
-                }
-            </AnimatePresence >
-
-            {/* Delete Student Confirmation Modal */}
-            <AnimatePresence>
-                {studentToDelete && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-md"
-                            onClick={() => setStudentToDelete(null)}
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-8 max-w-md w-full shadow-2xl relative z-10"
-                        >
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center mb-4">
-                                        <Trash2 className="w-6 h-6" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-app-text">Remove Student?</h3>
-                                    <p className="text-app-text-secondary mt-1 text-sm">
-                                        If the student has fee or attendance records, they will be <span className="font-bold text-app-text">Archived</span>. Otherwise, they will be permanently deleted.
-                                    </p>
-                                </div>
-                                <button type="button" onClick={() => setStudentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
-                            </div>
-
-                            <form onSubmit={confirmDeleteStudent} className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider mb-2 block">
-                                        Reason for leaving (Optional)
-                                    </label>
-                                    <input
-                                        value={leaveReason}
-                                        onChange={(e) => setLeaveReason(e.target.value)}
-                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-black/20 outline-none transition-all mb-4 placeholder:text-app-text-tertiary/50"
-                                        placeholder="e.g. Graduated, Transferred, Dropped out"
-                                    />
-                                    <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider mb-2 block">
-                                        Type <span className="text-red-500">delete</span> to confirm
-                                    </label>
-                                    <input
-                                        value={deleteInput}
-                                        onChange={(e) => setDeleteInput(e.target.value)}
-                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                        placeholder="Type 'delete'"
-                                        autoFocus
-                                    />
-                                </div>
-
-                                <div className="flex gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setStudentToDelete(null)}
-                                        className="flex-1 py-3 rounded-xl font-bold bg-neutral-50/50 border-[1.5px] border-black/5 text-app-text hover:bg-neutral-50/50-hover transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={deleteInput.toLowerCase() !== 'delete'}
-                                        className="flex-1 py-3 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            {studentToDelete && batch ? <EndEnrollmentDialog
+                batchId={batch.id}
+                batchName={batch.name}
+                enrollmentId={studentToDelete.enrollmentId}
+                studentName={studentToDelete.name}
+                onClose={() => setStudentToDelete(null)}
+                onEnded={fetchDetails}
+            /> : null}
 
             <AnimatePresence>
                 {

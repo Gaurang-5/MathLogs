@@ -235,3 +235,78 @@ export const createCustomInvoiceSchema = z.object({
         { message: "Either installmentId or name and amount are required" }
     )
 });
+
+const enrollmentFeeChoiceSchema = z.discriminatedUnion('mode', [
+    z.object({
+        mode: z.literal('MONTH_COVERAGE'),
+        feeStartMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Fee start month must be YYYY-MM')
+    }),
+    z.object({
+        mode: z.literal('CURRENT_DUE_BASED'),
+        installmentIds: z.array(z.string().uuid('Invalid installment ID')).default([])
+    })
+]);
+
+export const inviteStudentEnrollmentSchema = z.object({
+    body: z.object({
+        whatsappNumber: z.string().regex(phoneRegex, 'Invalid phone number'),
+        fee: enrollmentFeeChoiceSchema
+    })
+});
+
+export const resolveIdentityReviewSchema = z.object({
+    body: z.object({
+        action: z.enum(['USE_EXISTING', 'CREATE_NEW']),
+        studentId: z.string().uuid('Invalid Student ID').optional(),
+        startedAt: z.string().datetime(),
+        fee: enrollmentFeeChoiceSchema,
+        idempotencyKey: z.string().trim().min(8).max(200)
+    }).refine(value => value.action !== 'USE_EXISTING' || Boolean(value.studentId), {
+        message: 'Student ID is required when using an existing profile',
+        path: ['studentId']
+    })
+});
+
+export const previewEnrollmentSchema = z.object({
+    body: z.object({
+        studentId: z.string().uuid('Invalid Student ID'),
+        startedAt: z.string().datetime(),
+        fee: enrollmentFeeChoiceSchema
+    })
+});
+
+export const createEnrollmentSchema = z.object({
+    body: z.object({
+        studentId: z.string().uuid('Invalid Student ID'),
+        startedAt: z.string().datetime(),
+        fee: enrollmentFeeChoiceSchema,
+        idempotencyKey: z.string().trim().min(8).max(200)
+    })
+});
+
+export const endEnrollmentSchema = z.object({
+    body: z.object({
+        endedAt: z.string().datetime().optional(),
+        reason: z.string().trim().min(3).max(500),
+        idempotencyKey: z.string().trim().min(8).max(200)
+    })
+});
+
+export const deleteEmptyStudentSchema = z.object({
+    body: z.object({
+        reason: z.string().trim().min(3).max(500),
+        confirmation: z.string().trim().min(1).max(200)
+    })
+});
+
+export const retryEnrollmentNotificationSchema = z.object({
+    body: z.object({
+        eventKey: z.string().regex(/^enrollment:[^:]+:(ADDED|READDED|REMOVED|RESEND:[^:]+)$/)
+    })
+});
+
+export const resendEnrollmentNotificationSchema = z.object({
+    body: z.object({
+        idempotencyKey: z.string().trim().min(8).max(200)
+    })
+});

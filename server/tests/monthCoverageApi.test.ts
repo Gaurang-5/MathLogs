@@ -128,7 +128,7 @@ test('month student profile returns configured fields and month counts without l
       batch: { name: 'Target', className: null, subject: 'Maths', startDate: new Date('2026-07-01'), endDate: new Date('2026-09-30') },
       monthCoverageProfile: { id: 'profile-1', batchId: 'batch-1', feeStartMonth: '2026-07', feeEndMonth: '2026-09', status: 'ACTIVE' },
       monthCoverageAllocations: [{ coverageMonth: '2026-07', payment: { status: 'ACTIVE' } }],
-      marks: [], attendanceRecords: [],
+      marks: [],
     } as never;
   }) as typeof prisma.student.findUnique);
   const res = response();
@@ -148,7 +148,7 @@ test('month student profile returns configured fields and month counts without l
 
 test('student profile forbids a student from another institute', async () => {
   replaceMethod(prisma.student, 'findUnique', (async () => ({
-    id: 'student-foreign', instituteId: 'inst-2', attendanceRecords: [], institute: null,
+    id: 'student-foreign', instituteId: 'inst-2', institute: null,
   }) as never) as typeof prisma.student.findUnique);
   const res = response();
 

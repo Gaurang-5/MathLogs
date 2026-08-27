@@ -26,18 +26,12 @@ interface StudentProfileData {
         className: string | null;
         subject: string | null;
     };
+    enrollments?: Array<{
+        id: string; status: 'ACTIVE' | 'ENDED'; startedAt: string; endedAt: string | null; endReason: string | null;
+        batch: { id: string; name: string; className: string | null; subject: string | null };
+    }>;
     status: string;
     createdAt?: string;
-    stats: {
-        attendancePercentage: number | null;
-    };
-    attendanceRecords: Array<{
-        id: string;
-        attendanceDate: string;
-        checkedInAt: string;
-        source: string;
-        note: string | null;
-    }>;
     marks: Array<{
         id: string;
         score: number;
@@ -296,6 +290,18 @@ export default function StudentProfile() {
                                     <ConfiguredStudentFields student={student} fields={student.registrationFields || []} />
                                 </div>
                             )}
+
+                            <div className="bg-neutral-50/60 border border-black/[0.06] rounded-2xl p-4 sm:p-5">
+                                <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3">Batch enrollment history</h3>
+                                <div className="space-y-2">
+                                    {(student.enrollments || []).map(enrollment => <div key={enrollment.id} className="rounded-xl border border-black/[0.06] bg-white p-3">
+                                        <div className="flex items-center justify-between gap-3"><strong className="text-sm">{enrollment.batch.name}</strong><span className={cn('rounded-full px-2 py-0.5 text-[10px] font-black', enrollment.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{enrollment.status}</span></div>
+                                        <p className="mt-1 text-xs text-neutral-500">{formatDate(enrollment.startedAt)} → {enrollment.endedAt ? formatDate(enrollment.endedAt) : 'Present'}</p>
+                                        {enrollment.endReason ? <p className="mt-1 text-xs text-neutral-600">Reason: {enrollment.endReason}</p> : null}
+                                    </div>)}
+                                    {(student.enrollments || []).length === 0 ? <p className="text-sm text-neutral-400">No enrollment periods recorded.</p> : null}
+                                </div>
+                            </div>
 
                             {/* Recent Performance */}
                             <div>

@@ -1,5 +1,5 @@
 import express from 'express';
-import { loginStudent, verifyStudentLoginOtp, lookupPublicStudent, registerPublicQuiz, getPublicQuizInfo, getStudentDashboard, getInstituteBranding, getStudentQuizzes, startOnlineQuiz, autosaveOnlineQuiz, logQuizCheatingEvent, submitOnlineQuiz, getOnlineQuizResult, sendQuizHeartbeat } from '../controllers/studentPortalController';
+import { loginStudent, verifyStudentLoginOtp, selectStudentAccount, lookupPublicStudent, registerPublicQuiz, getPublicQuizInfo, getStudentDashboard, getInstituteBranding, getStudentQuizzes, startOnlineQuiz, autosaveOnlineQuiz, logQuizCheatingEvent, submitOnlineQuiz, getOnlineQuizResult, sendQuizHeartbeat } from '../controllers/studentPortalController';
 import { studentLoginLimiter, quizActivityLimiter, studentPortalLimiter } from '../middleware/security';
 
 const router = express.Router();
@@ -13,6 +13,7 @@ router.post('/quizzes/:id/lookup-public', lookupPublicStudent); // public — ph
 router.post('/quizzes/:id/register-public', registerPublicQuiz); // public
 router.post('/login', studentLoginLimiter, loginStudent);
 router.post('/verify-login-otp', studentLoginLimiter, verifyStudentLoginOtp);
+router.post('/select-account', studentLoginLimiter, selectStudentAccount);
 router.get('/dashboard', getStudentDashboard);
 router.get('/quizzes', getStudentQuizzes);
 router.post('/quizzes/:id/start', quizActivityLimiter, startOnlineQuiz);

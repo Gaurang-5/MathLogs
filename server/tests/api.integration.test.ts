@@ -292,11 +292,16 @@ test('POST /api/fees/pay-installment records a payment for an authenticated teac
         parentWhatsapp: '',
         instituteId: 'inst-1',
         createdAt: new Date('2026-01-01T00:00:00Z'),
-        batch: {
-            id: 'batch-1',
-            teacherId: 'teacher-1',
-            institute: { name: 'MathLogs Institute' },
-        },
+        enrollments: [{
+            batchId: 'batch-1',
+            startedAt: new Date('2026-01-01T00:00:00Z'),
+            batch: {
+                id: 'batch-1',
+                teacherId: 'teacher-1',
+                institute: { name: 'MathLogs Institute' },
+            },
+        }],
+        feeAssignments: [],
     }) as never) as typeof prisma.student.findUnique);
     replaceMethod(prisma.feePayment, 'findMany', (async () => [] as never) as typeof prisma.feePayment.findMany);
     replaceMethod(prisma.feeInstallment, 'findUnique', (async () => ({
@@ -528,7 +533,10 @@ test('POST /api/fees/pay is idempotent and prevents double-payment', async () =>
         name: 'Idempotency Test',
         instituteId: 'inst-1',
         createdAt: new Date(),
-        batch: { teacherId: 'teacher-1', feeAmount: 1000, feeInstallments: [] },
+        enrollments: [{
+            startedAt: new Date(),
+            batch: { teacherId: 'teacher-1', feeAmount: 1000, feeInstallments: [] },
+        }],
         fees: [...createdRecords],
         feePayments: []
     }) as never) as typeof prisma.student.findUnique);
@@ -577,7 +585,12 @@ test('POST /api/fees/pay-installment is idempotent and prevents double-payment',
         instituteId: 'inst-1',
         batchId: 'batch-1',
         createdAt: new Date('2026-01-01T00:00:00Z'),
-        batch: { id: 'batch-1', teacherId: 'teacher-1', institute: { name: 'Inst' } }
+        enrollments: [{
+            batchId: 'batch-1',
+            startedAt: new Date('2026-01-01T00:00:00Z'),
+            batch: { id: 'batch-1', teacherId: 'teacher-1', institute: { name: 'Inst' } },
+        }],
+        feeAssignments: [],
     }) as never) as typeof prisma.student.findUnique);
 
     replaceMethod(prisma.feeInstallment, 'findUnique', (async () => ({
