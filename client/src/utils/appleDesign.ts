@@ -24,6 +24,12 @@ export const appleSpringSnappy: Transition = {
   damping: 32,
 };
 
+export function getApplePageTransition(reduceMotion: boolean): Transition {
+  return reduceMotion
+    ? { duration: 0.16, ease: 'easeOut' }
+    : appleSpringDefault;
+}
+
 // Container stagger variants for grid items
 export const appleStaggerContainer: Variants = {
   hidden: { opacity: 0 },
