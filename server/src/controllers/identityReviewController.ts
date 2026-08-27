@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { prismaIdentityReviewService } from '../services/prismaIdentityReviewService';
+import { enrollmentNotificationService } from '../services/enrollmentNotificationService';
 
 function fail(res: Response, error: unknown) {
   const code = error instanceof Error ? error.message : 'IDENTITY_REVIEW_OPERATION_FAILED';
@@ -41,7 +42,13 @@ export async function resolveIdentityReview(req: Request, res: Response) {
     const data = req.body.action === 'USE_EXISTING'
       ? await prismaIdentityReviewService.resolveWithExisting({ ...common, studentId: req.body.studentId })
       : await prismaIdentityReviewService.resolveAsNew(common);
-    return res.json({ success: true, data });
+    const eventKey = 'notificationEventKey' in data ? data.notificationEventKey : undefined;
+    const parts = eventKey?.split(':') || [];
+    const type = eventKey ? parts[parts.length - 1] as 'ADDED' | 'READDED' : null;
+    const notification = type && eventKey
+      ? await enrollmentNotificationService.enqueue({ enrollmentId: data.enrollmentId, type, eventKey })
+      : undefined;
+    return res.json({ success: true, data: { ...data, notification } });
   } catch (error) {
     return fail(res, error);
   }

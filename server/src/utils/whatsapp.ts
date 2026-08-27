@@ -92,6 +92,14 @@ export interface PaymentRejectionWAData {
     instituteId?: string;
 }
 
+export type EnrollmentLifecycleTemplate = 'ADDED' | 'READDED' | 'REMOVED';
+
+export function enrollmentLifecycleTemplate(type: EnrollmentLifecycleTemplate) {
+    if (type === 'REMOVED') return process.env.WHATSAPP_TEMPLATE_BATCH_REMOVED || 'student_batch_removed';
+    if (type === 'READDED') return process.env.WHATSAPP_TEMPLATE_BATCH_READDED || 'student_batch_readded';
+    return process.env.WHATSAPP_TEMPLATE_BATCH_ADDED || 'student_batch_added';
+}
+
 /**
  * Enqueues a WhatsApp message using the DB queue pattern.
  * The `whatsappWorker.ts` script will pick this up and hit the Meta Graph API.

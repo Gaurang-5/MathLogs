@@ -3,6 +3,8 @@ import { prisma } from '../prisma';
 import { previewEnrollmentFees } from '../services/enrollmentFeeService';
 import { searchEnrollmentCandidates } from '../services/enrollmentQueryService';
 import { enrollmentFeeDepsFor, prismaEnrollmentService } from '../services/prismaEnrollmentService';
+import { enrollmentNotificationService } from '../services/enrollmentNotificationService';
+import type { EnrollmentResult } from '../domain/enrollments/types';
 
 function failure(res: Response, error: unknown) {
   const code = error instanceof Error ? error.message : 'ENROLLMENT_OPERATION_FAILED';
@@ -18,6 +20,25 @@ async function requireBatch(instituteId: string, batchId: string) {
     select: { id: true },
   });
   if (!batch) throw new Error('BATCH_NOT_FOUND');
+}
+
+async function enqueueResultNotification(result: EnrollmentResult) {
+  if (!('notificationEventKey' in result) || !result.notificationEventKey) return undefined;
+  const parts = result.notificationEventKey.split(':');
+  const type = parts[parts.length - 1] as 'ADDED' | 'READDED' | 'REMOVED';
+  return enrollmentNotificationService.enqueue({
+    enrollmentId: result.enrollmentId,
+    type,
+    eventKey: result.notificationEventKey,
+  });
+}
+
+async function requireEnrollment(instituteId: string, enrollmentId: string) {
+  const enrollment = await prisma.enrollment.findFirst({
+    where: { id: enrollmentId, instituteId }, select: { id: true },
+  });
+  if (!enrollment) throw new Error('ENROLLMENT_NOT_FOUND');
+  return enrollment;
 }
 
 export async function searchEnrollmentCandidatesController(req: Request, res: Response) {
@@ -61,7 +82,8 @@ export async function enrollExistingStudentController(req: Request, res: Respons
       fee: req.body.fee,
       idempotencyKey: req.body.idempotencyKey,
     });
-    return res.status(data.outcome === 'ALREADY_ENROLLED' ? 200 : 201).json({ success: true, data });
+    const notification = await enqueueResultNotification(data);
+    return res.status(data.outcome === 'ALREADY_ENROLLED' ? 200 : 201).json({ success: true, data: { ...data, notification } });
   } catch (error) {
     return failure(res, error);
   }
@@ -84,6 +106,35 @@ export async function endEnrollmentController(req: Request, res: Response) {
       enrollmentId: enrollment.id,
       endedAt: req.body.endedAt ? new Date(req.body.endedAt) : new Date(),
       reason: req.body.reason,
+      idempotencyKey: req.body.idempotencyKey,
+    });
+    const notification = await enqueueResultNotification(data);
+    return res.json({ success: true, data: { ...data, notification } });
+  } catch (error) {
+    return failure(res, error);
+  }
+}
+
+export async function retryEnrollmentNotificationController(req: Request, res: Response) {
+  try {
+    const enrollmentId = String(req.params.enrollmentId);
+    await requireEnrollment(req.user.instituteId, enrollmentId);
+    if (!req.body.eventKey.startsWith(`enrollment:${enrollmentId}:`)) {
+      return res.status(400).json({ success: false, error: 'NOTIFICATION_EVENT_MISMATCH' });
+    }
+    const data = await enrollmentNotificationService.retry({ eventKey: req.body.eventKey });
+    return res.json({ success: true, data });
+  } catch (error) {
+    return failure(res, error);
+  }
+}
+
+export async function resendEnrollmentNotificationController(req: Request, res: Response) {
+  try {
+    const enrollmentId = String(req.params.enrollmentId);
+    await requireEnrollment(req.user.instituteId, enrollmentId);
+    const data = await enrollmentNotificationService.resend({
+      enrollmentId,
       idempotencyKey: req.body.idempotencyKey,
     });
     return res.json({ success: true, data });

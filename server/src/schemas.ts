@@ -298,3 +298,15 @@ export const deleteEmptyStudentSchema = z.object({
         confirmation: z.string().trim().min(1).max(200)
     })
 });
+
+export const retryEnrollmentNotificationSchema = z.object({
+    body: z.object({
+        eventKey: z.string().regex(/^enrollment:[^:]+:(ADDED|READDED|REMOVED|RESEND:[^:]+)$/)
+    })
+});
+
+export const resendEnrollmentNotificationSchema = z.object({
+    body: z.object({
+        idempotencyKey: z.string().trim().min(8).max(200)
+    })
+});

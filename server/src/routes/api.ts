@@ -4,7 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireCoachingFeeMode } from '../middleware/requireCoachingFeeMode';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resolveIdentityReviewSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resendEnrollmentNotificationSchema, resolveIdentityReviewSchema, retryEnrollmentNotificationSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
 import { addStudentManually, approveStudent, archiveStudent, confirmMonthCoverageProfileController, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
@@ -28,7 +28,7 @@ import { parseSupportAttachments } from '../middleware/supportUpload';
 import { requireSupportFeature } from '../middleware/supportFeatureGate';
 import { getPublicPlanCatalogue } from '../controllers/planCatalogController';
 import { monthCoverageHandlers } from '../controllers/monthCoverageController';
-import { deleteEmptyStudentController, endEnrollmentController, enrollExistingStudentController, getDeletionEligibilityController, previewEnrollmentFeesController, searchEnrollmentCandidatesController } from '../controllers/enrollmentController';
+import { deleteEmptyStudentController, endEnrollmentController, enrollExistingStudentController, getDeletionEligibilityController, previewEnrollmentFeesController, resendEnrollmentNotificationController, retryEnrollmentNotificationController, searchEnrollmentCandidatesController } from '../controllers/enrollmentController';
 import { listIdentityReviews, resolveIdentityReview } from '../controllers/identityReviewController';
 
 const router = Router();
@@ -248,6 +248,8 @@ router.get('/batches/:batchId/enrollment-candidates', authenticateToken as any, 
 router.post('/batches/:batchId/enrollments/preview', authenticateToken as any, validateRequest(previewEnrollmentSchema), previewEnrollmentFeesController as any);
 router.post('/batches/:batchId/enrollments', authenticateToken as any, validateRequest(createEnrollmentSchema), enrollExistingStudentController as any);
 router.delete('/batches/:batchId/enrollments/:enrollmentId', authenticateToken as any, validateRequest(endEnrollmentSchema), endEnrollmentController as any);
+router.post('/enrollments/:enrollmentId/notification/retry', authenticateToken as any, validateRequest(retryEnrollmentNotificationSchema), retryEnrollmentNotificationController as any);
+router.post('/enrollments/:enrollmentId/notification/resend', authenticateToken as any, validateRequest(resendEnrollmentNotificationSchema), resendEnrollmentNotificationController as any);
 router.get('/batches', authenticateToken as any, getBatches as any);
 router.post('/batches', authenticateToken as any, validateRequest(createBatchSchema), createBatch as any);
 router.get('/batches/:id', authenticateToken as any, getBatchDetails as any);

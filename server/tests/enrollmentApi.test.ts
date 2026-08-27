@@ -18,4 +18,6 @@ test('authenticated enrollment routes are registered', () => {
   assert.match(routes, /\/batches\/:batchId\/enrollments\/preview/);
   assert.match(routes, /\/batches\/:batchId\/enrollments/);
   assert.match(routes, /\/batches\/:batchId\/enrollments\/:enrollmentId/);
+  assert.match(routes, /\/enrollments\/:enrollmentId\/notification\/retry/);
+  assert.match(routes, /\/enrollments\/:enrollmentId\/notification\/resend/);
 });
