@@ -10,7 +10,7 @@ import { Search, IndianRupee, CheckCircle2, User as UserIcon } from 'lucide-reac
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { BrandButton } from '../components/ui';
+import { BrandButton, TEACHER_TAB_CONTENT_INSET } from '../components/ui';
 
 const { width } = Dimensions.get('window');
 
@@ -105,7 +105,7 @@ export default function QuickFeeScreen() {
     <SafeAreaView style={s.container} edges={['top']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView 
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 120 }} 
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: TEACHER_TAB_CONTENT_INSET }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >

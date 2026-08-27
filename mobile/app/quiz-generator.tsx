@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Sparkles, ArrowLeft, Loader2, Layers, AlertCircle, Save } from 'lucide-react-native';
 import api from '../services/api';
 import { getItemAsync } from '../services/storage';
+import { TEACHER_TAB_CONTENT_INSET } from '../components/ui';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
@@ -203,7 +204,7 @@ export default function QuizGeneratorScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to quizzes">
           <ArrowLeft size={20} color={T.text} />
         </TouchableOpacity>
         <View style={s.headerTitleWrap}>
@@ -463,7 +464,7 @@ const s = StyleSheet.create({
   headerTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: 18, fontWeight: '800', color: T.text },
   
-  content: { padding: 24, paddingBottom: 100 },
+  content: { padding: 24, paddingBottom: TEACHER_TAB_CONTENT_INSET },
   form: { gap: 20 },
   row: { flexDirection: 'row', gap: 16 },
   inputGroup: { gap: 8 },

@@ -10,7 +10,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, FileText, Calendar, BarChart2, Scan, Hash, Users, X, PenLine, Check, Edit2 } from 'lucide-react-native';
 import api from '../../services/api';
-import { SkeletonLoader, BrandButton } from '../../components/ui';
+import { SkeletonLoader, BrandButton, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
@@ -125,7 +125,7 @@ export default function TestDetailScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.navBar}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to tests">
           <ChevronLeft size={24} color={T.text} />
         </TouchableOpacity>
         <Text style={s.navTitle} numberOfLines={1}>{test?.name || 'Test Details'}</Text>
@@ -264,7 +264,7 @@ export default function TestDetailScreen() {
             <FlatList
               data={candidateStudents}
               keyExtractor={item => item.id}
-              contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 120 }}
+              contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: TEACHER_TAB_CONTENT_INSET }}
               ListHeaderComponent={loadingCandidates ? (
                 <View style={{ gap: 10, marginBottom: 8 }}>
                   {[1,2,3].map(i => <SkeletonLoader key={i} width={width - 32} height={60} borderRadius={16} />)}
@@ -366,7 +366,7 @@ const s = StyleSheet.create({
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -12 },
   navTitle: { fontSize: 17, fontWeight: '700', color: T.text, flex: 1, textAlign: 'center' },
   navRight: { width: 44, alignItems: 'flex-end', justifyContent: 'center' },
-  scrollContent: { padding: 16, paddingBottom: 120 },
+  scrollContent: { padding: 16, paddingBottom: TEACHER_TAB_CONTENT_INSET },
 
   empty: { padding: 40, alignItems: 'center', justifyContent: 'center', marginTop: 100 },
   emptyTitle: { fontSize: 18, color: T.textMuted, fontWeight: '700', marginTop: 12 },

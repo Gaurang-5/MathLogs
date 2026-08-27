@@ -145,10 +145,10 @@ export default function GlobalScanScreen() {
   if (!permission.granted) return (
     <SafeAreaView style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
       <Text style={{ color: T.white }}>No access to camera</Text>
-      <TouchableOpacity onPress={requestPermission} style={{ marginTop: 20 }}>
+      <TouchableOpacity onPress={requestPermission} style={{ marginTop: 20 }} accessibilityRole="button" accessibilityLabel="Grant camera permission">
          <Text style={{ color: T.blue }}>Grant Permission</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
+      <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }} accessibilityRole="button" accessibilityLabel="Go back">
          <Text style={{ color: T.textMuted }}>Go Back</Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -168,7 +168,7 @@ export default function GlobalScanScreen() {
 
       <SafeAreaView edges={['top']} style={s.overlay}>
         <View style={s.header}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Close marks scanner">
             <ChevronLeft size={28} color={T.white} />
           </TouchableOpacity>
           <View style={s.titleWrap}>

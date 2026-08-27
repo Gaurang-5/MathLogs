@@ -18,6 +18,7 @@ import api from '../../services/api';
 import QuizLiveMonitor from '../../components/quiz/QuizLiveMonitor';
 import QuizAnalytics from '../../components/quiz/QuizAnalytics';
 import QuizSubmissionInspector, { InspectorData } from '../../components/quiz/QuizSubmissionInspector';
+import { TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 
 const T = {
   bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
@@ -56,7 +57,7 @@ export default function QuizDashboardScreen() {
       <SafeAreaView style={s.container}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={s.header}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to quizzes">
             <ArrowLeft size={20} color={T.text} />
           </TouchableOpacity>
         </View>
@@ -201,10 +202,10 @@ export default function QuizDashboardScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to quizzes">
           <ArrowLeft size={20} color={T.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={s.headerIconBtn} onPress={() => setShowOptions(true)}>
+        <TouchableOpacity style={s.headerIconBtn} onPress={() => setShowOptions(true)} accessibilityRole="button" accessibilityLabel="Quiz options">
           <MoreVertical size={20} color={T.text} />
         </TouchableOpacity>
       </View>
@@ -431,7 +432,7 @@ const s = StyleSheet.create({
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.white, alignItems: 'center', justifyContent: 'center' },
   headerIconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.border },
   
-  content: { padding: 24, paddingBottom: 100 },
+  content: { padding: 24, paddingBottom: TEACHER_TAB_CONTENT_INSET },
   titleSection: { marginBottom: 24 },
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
   badgeLive: { backgroundColor: `${T.emerald}10`, borderColor: `${T.emerald}30` },

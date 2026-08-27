@@ -13,7 +13,7 @@ import {
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import api from '../../services/api';
-import { SkeletonLoader, BrandButton } from '../../components/ui';
+import { SkeletonLoader, BrandButton, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { getItemAsync } from '../../services/storage';
@@ -309,13 +309,13 @@ export default function BatchDetailScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.navBar}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to batches">
           <ChevronLeft size={24} color={T.text} />
         </TouchableOpacity>
         <Text style={s.navTitle} numberOfLines={1}>{batch?.name || 'Batch Details'}</Text>
         <View style={s.navRight}>
            {!isLoading && batch && (
-             <TouchableOpacity style={s.headerActionBtn} onPress={openBatchSettings}>
+             <TouchableOpacity style={s.headerActionBtn} onPress={openBatchSettings} accessibilityRole="button" accessibilityLabel="Batch settings">
                <Settings size={20} color={T.text} />
              </TouchableOpacity>
            )}
@@ -838,7 +838,7 @@ const s = StyleSheet.create({
   navTitle: { fontSize: 17, fontWeight: '700', color: T.text, flex: 1, textAlign: 'center' },
   navRight: { width: 44, alignItems: 'flex-end', justifyContent: 'center' },
   headerActionBtn: { padding: 8 },
-  scrollContent: { padding: 16, paddingBottom: 120 },
+  scrollContent: { padding: 16, paddingBottom: TEACHER_TAB_CONTENT_INSET },
   
   empty: { padding: 40, alignItems: 'center', justifyContent: 'center', marginTop: 100 },
   emptyTitle: { fontSize: 18, color: T.textMuted, fontWeight: '700', marginTop: 12 },
