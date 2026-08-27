@@ -263,7 +263,7 @@ Run: `cd server && JWT_SECRET=test-secret NODE_ENV=test npx tsx --test tests/mar
 
 - [ ] **Step 3: Add a tracked enqueue primitive without changing current callers**
 
-Extract the current job creation into `enqueueWhatsAppTracked`. Keep `enqueueWhatsApp` as a wrapper returning `result.queued`, so welcome, fee, quiz, attendance, and OTP callers remain source-compatible.
+Extract the current job creation into `enqueueWhatsAppTracked`. Keep `enqueueWhatsApp` as a wrapper returning `result.queued`, so welcome, fee, quiz, and OTP callers remain source-compatible.
 
 - [ ] **Step 4: Implement the three marketplace notification helpers**
 

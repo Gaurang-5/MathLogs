@@ -281,7 +281,7 @@ export default function StudentPortalLogin() {
                                 <p className="text-app-text-secondary text-sm">
                                     {step === 'otp'
                                         ? `Enter the 6-digit verification code sent to WhatsApp ${cleanMobile ? `ending in ${cleanMobile.slice(-4)}` : ''}.`
-                                        : 'Enter your registered mobile number to view your progress, attendance, fees, and quizzes.'}
+                                        : 'Enter your registered mobile number to view your progress, fees, tests, and quizzes.'}
                                 </p>
                             </div>
 

@@ -288,7 +288,7 @@ npx prisma generate
 
 Use `db push` for quick local schema sync when you do not need a migration. Use migrations for production-bound schema changes.
 
-The schema is multi-tenant around `Institute` and includes admins, batches, students, tests, marks, fees, balances, attendance, online quizzes, student leads, WhatsApp jobs, refresh tokens, invoices, and UPI payment verification records.
+The schema is multi-tenant around `Institute` and includes admins, batches, students, tests, marks, fees, balances, online quizzes, student leads, WhatsApp jobs, refresh tokens, invoices, and UPI payment verification records.
 
 ## Available Scripts
 

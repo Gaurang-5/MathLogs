@@ -273,7 +273,7 @@ export function createApp() {
         }
 
         let title = 'MathLogs | Coaching Marketplace & AI Quiz Generator';
-        let description = 'Find coaching institutes, generate AI-powered online quizzes, and manage attendance, fees, tests and parent communication with MathLogs.';
+        let description = 'Find coaching institutes, generate AI-powered online quizzes, and manage students, fees, tests and parent communication with MathLogs.';
         let ogTitle = title;
         let ogDesc = description;
         let canonicalUrl = `${PUBLIC_SITE_URL}${req.path === '/' ? '/' : req.path.replace(/\/$/, '')}`;

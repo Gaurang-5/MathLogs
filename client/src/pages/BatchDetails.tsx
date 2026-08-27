@@ -2079,7 +2079,7 @@ export default function BatchDetails() {
                                     </div>
                                     <h3 className="text-xl font-bold text-app-text">Remove Student?</h3>
                                     <p className="text-app-text-secondary mt-1 text-sm">
-                                        If the student has fee or attendance records, they will be <span className="font-bold text-app-text">Archived</span>. Otherwise, they will be permanently deleted.
+                                        Academic and financial history is preserved. Empty mistaken profiles can be permanently deleted separately.
                                     </p>
                                 </div>
                                 <button type="button" onClick={() => setStudentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>

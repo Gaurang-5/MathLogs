@@ -32,10 +32,6 @@ interface StudentProfileData {
     status: string;
     createdAt?: string;
     batch?: { name: string; className: string | null; subject: string | null; startDate?: string | null; endDate?: string | null };
-    stats: { attendancePercentage: number | null; attendedClasses?: number; totalClasses?: number };
-    attendanceRecords: Array<{
-        id: string; attendanceDate: string; checkedInAt: string; source: string; note: string | null;
-    }>;
     marks: Array<{
         id: string; score: number;
         test: { name: string; date: string; maxMarks: number; subject: string };

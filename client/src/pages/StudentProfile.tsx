@@ -28,16 +28,6 @@ interface StudentProfileData {
     };
     status: string;
     createdAt?: string;
-    stats: {
-        attendancePercentage: number | null;
-    };
-    attendanceRecords: Array<{
-        id: string;
-        attendanceDate: string;
-        checkedInAt: string;
-        source: string;
-        note: string | null;
-    }>;
     marks: Array<{
         id: string;
         score: number;

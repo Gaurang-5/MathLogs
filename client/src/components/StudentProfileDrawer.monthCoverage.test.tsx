@@ -22,8 +22,7 @@ describe('StudentProfileDrawer month coverage', () => {
       registrationFields: [{ id: 'emergencyPhone', label: 'Emergency phone', type: 'tel' }],
       monthCoverageProfile: { feeStartMonth: '2026-08', feeEndMonth: '2027-03', status: 'ACTIVE' },
       monthCoverageStats: { receivedMonths: 3, pendingMonths: 5, overdueMonths: 1, progressPercent: 38 },
-      stats: { attendancePercentage: null, attendedClasses: 0, totalClasses: 0 },
-      attendanceRecords: [], marks: [], feePayments: [], balance: null,
+      marks: [], feePayments: [], balance: null,
       batch: { name: 'Target', className: null, subject: 'Maths' },
     });
     container = document.createElement('div');

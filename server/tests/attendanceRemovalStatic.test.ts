@@ -22,3 +22,25 @@ test('server runtime and current Prisma schema contain no attendance subsystem',
     /AttendanceRecord|AttendanceSweepRun|AttendanceSource|attendanceRecords|attendancePercentage|sendAttendance/i,
   );
 });
+
+const productFiles = [
+  '../client/index.html',
+  '../client/src/pages/AboutUs.tsx',
+  '../client/src/pages/Home.tsx',
+  '../client/src/pages/MarketplaceSettings.tsx',
+  '../client/src/pages/Onboarding.tsx',
+  '../client/src/pages/StudentPortalLogin.tsx',
+  '../client/src/pages/TeacherRegistration.tsx',
+  '../client/src/pages/StudentProfile.tsx',
+  '../client/src/components/StudentProfileDrawer.tsx',
+  '../README.md',
+  'src/index.ts',
+];
+
+test('client contracts and product copy make no attendance claim', () => {
+  const source = productFiles
+    .map(file => readFileSync(path.join(root, file), 'utf8'))
+    .join('\n');
+
+  assert.doesNotMatch(source, /attendance/i);
+});
