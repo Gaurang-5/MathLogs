@@ -5,7 +5,9 @@ import type { EnrollmentFeeChoice, EnrollmentResult } from '../domain/enrollment
 import { createEnrollmentService, type EnrollmentServiceTx } from './enrollmentService';
 import { applyEnrollmentFees, type EnrollmentFeeDeps } from './enrollmentFeeService';
 
-function feeDeps(tx: Prisma.TransactionClient): EnrollmentFeeDeps {
+type EnrollmentFeeClient = Pick<Prisma.TransactionClient, 'student' | 'batch' | 'studentMonthCoverageProfile' | 'feeInstallmentAssignment'>;
+
+export function enrollmentFeeDepsFor(tx: EnrollmentFeeClient): EnrollmentFeeDeps {
   return {
     async loadContext(context) {
       const [student, batch] = await Promise.all([
@@ -94,7 +96,7 @@ function transactionAdapter(tx: Prisma.TransactionClient): EnrollmentServiceTx {
       return tx.enrollment.create({ data: input }) as any;
     },
     async applyFees(enrollment, choice: EnrollmentFeeChoice) {
-      await applyEnrollmentFees(enrollment, choice, feeDeps(tx));
+      await applyEnrollmentFees(enrollment, choice, enrollmentFeeDepsFor(tx));
     },
     findEnrollment(id) {
       return tx.enrollment.findUnique({ where: { id } }) as any;

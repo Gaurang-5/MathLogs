@@ -235,3 +235,46 @@ export const createCustomInvoiceSchema = z.object({
         { message: "Either installmentId or name and amount are required" }
     )
 });
+
+const enrollmentFeeChoiceSchema = z.discriminatedUnion('mode', [
+    z.object({
+        mode: z.literal('MONTH_COVERAGE'),
+        feeStartMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Fee start month must be YYYY-MM')
+    }),
+    z.object({
+        mode: z.literal('CURRENT_DUE_BASED'),
+        installmentIds: z.array(z.string().uuid('Invalid installment ID')).default([])
+    })
+]);
+
+export const previewEnrollmentSchema = z.object({
+    body: z.object({
+        studentId: z.string().uuid('Invalid Student ID'),
+        startedAt: z.string().datetime(),
+        fee: enrollmentFeeChoiceSchema
+    })
+});
+
+export const createEnrollmentSchema = z.object({
+    body: z.object({
+        studentId: z.string().uuid('Invalid Student ID'),
+        startedAt: z.string().datetime(),
+        fee: enrollmentFeeChoiceSchema,
+        idempotencyKey: z.string().trim().min(8).max(200)
+    })
+});
+
+export const endEnrollmentSchema = z.object({
+    body: z.object({
+        endedAt: z.string().datetime().optional(),
+        reason: z.string().trim().min(3).max(500),
+        idempotencyKey: z.string().trim().min(8).max(200)
+    })
+});
+
+export const deleteEmptyStudentSchema = z.object({
+    body: z.object({
+        reason: z.string().trim().min(3).max(500),
+        confirmation: z.string().trim().min(1).max(200)
+    })
+});
