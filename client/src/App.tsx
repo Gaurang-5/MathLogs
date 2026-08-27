@@ -143,6 +143,14 @@ function App() {
 
             {/* Marketplace Routes */}
             <Route path="/coaching" element={<MarketplaceHome />} />
+            <Route path="/coaching/muzaffarnagar" element={<Navigate to="/coaching" replace />} />
+            <Route path="/coaching/muzaffarnagar/areas/:areaSlug" element={<MarketplaceHome />} />
+            <Route path="/coaching/muzaffarnagar/classes/:classSlug" element={<MarketplaceHome />} />
+            <Route path="/coaching/muzaffarnagar/subjects/:subjectSlug" element={<MarketplaceHome />} />
+            <Route path="/coaching/muzaffarnagar/areas/:areaSlug/classes/:classSlug" element={<MarketplaceHome />} />
+            <Route path="/coaching/muzaffarnagar/areas/:areaSlug/subjects/:subjectSlug" element={<MarketplaceHome />} />
+            <Route path="/coaching/muzaffarnagar/classes/:classSlug/subjects/:subjectSlug" element={<MarketplaceHome />} />
+            <Route path="/coaching/muzaffarnagar/areas/:areaSlug/classes/:classSlug/subjects/:subjectSlug" element={<MarketplaceHome />} />
             <Route path="/coaching-in/:citySlug" element={<Navigate to="/coaching" replace />} />
             <Route path="/coaching/:slug" element={<CoachingProfile />} />
             <Route path="/list-coaching" element={<Navigate to="/onboarding" replace />} />
