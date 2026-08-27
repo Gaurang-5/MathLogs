@@ -30,6 +30,7 @@ vi.mock('../../components/GooglePlaceConnectModal', () => ({
 
 const listing: MarketplaceListingDetail = {
   id: 'listing-1', name: 'Apex Academy', isPubliclyListed: true, isVerified: false,
+  city: 'Delhi',
   updatedAt: '2026-08-15T00:00:00.000Z',
 };
 const latest: MarketplaceListingDetail = {
@@ -94,6 +95,18 @@ describe('ListingEditorDrawer conflict handling', () => {
       name: 'My draft name',
       expectedUpdatedAt: '2026-08-15T01:00:00.000Z',
     }));
+  });
+
+  it('offers only canonical Muzaffarnagar in the city selector', async () => {
+    await act(async () => {
+      root.render(<ListingEditorDrawer listingId="listing-1" onClose={vi.fn()} onChanged={vi.fn()} onDirtyChange={vi.fn()} />);
+      await flush();
+    });
+
+    const city = container.querySelector('select[name="marketplace-city"]') as HTMLSelectElement;
+    expect(city).toBeTruthy();
+    expect(city.value).toBe('Muzaffarnagar');
+    expect(Array.from(city.options).map(option => option.value)).toEqual(['Muzaffarnagar']);
   });
 
   it('keeps a dirty editor open when discard is declined for close or Google sync', async () => {

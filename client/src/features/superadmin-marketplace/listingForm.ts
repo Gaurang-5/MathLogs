@@ -1,4 +1,5 @@
 import type { ListingUpdateInput, MarketplaceListingDetail } from './types';
+import { MARKETPLACE_CITY, normalizeMarketplaceCitySelection } from '../marketplace/location';
 
 export type ListingForm = Omit<ListingUpdateInput, 'subjectsOffered' | 'classesOffered' | 'expectedUpdatedAt'> & {
   subjectsText: string;
@@ -14,7 +15,7 @@ const list = (value: string) => value.split(',').map(item => item.trim()).filter
 
 export const listingFormFromDetail = (listing: MarketplaceListingDetail): ListingForm => ({
   name: listing.name ?? '', teacherName: listing.teacherName ?? '', phoneNumber: listing.phoneNumber ?? '',
-  publicPhone: listing.publicPhone ?? '', whatsappPhone: listing.whatsappPhone ?? '', city: listing.city ?? '',
+  publicPhone: listing.publicPhone ?? '', whatsappPhone: listing.whatsappPhone ?? '', city: MARKETPLACE_CITY,
   area: listing.area ?? '', address: listing.address ?? '', tagline: listing.tagline ?? '', aboutUs: listing.aboutUs ?? '',
   logoUrl: listing.logoUrl ?? '', subjectsText: (listing.subjectsOffered ?? []).join(','),
   classesText: (listing.classesOffered ?? []).join(','), isPubliclyListed: listing.isPubliclyListed,
@@ -26,7 +27,7 @@ export const buildListingUpdate = (form: ListingForm): ListingUpdateInput => {
   if (!name) throw new Error('Coaching name is required');
   return {
     name, teacherName: trimmed(form.teacherName), phoneNumber: normalizePhone(form.phoneNumber),
-    publicPhone: normalizePhone(form.publicPhone), whatsappPhone: normalizePhone(form.whatsappPhone), city: trimmed(form.city),
+    publicPhone: normalizePhone(form.publicPhone), whatsappPhone: normalizePhone(form.whatsappPhone), city: normalizeMarketplaceCitySelection(form.city),
     area: trimmed(form.area), address: trimmed(form.address), tagline: trimmed(form.tagline), aboutUs: trimmed(form.aboutUs),
     logoUrl: trimmed(form.logoUrl), subjectsOffered: list(form.subjectsText), classesOffered: list(form.classesText),
     isPubliclyListed: form.isPubliclyListed, isVerified: form.isVerified,

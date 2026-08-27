@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { GraduationCap, User, Phone, MapPin, Lock, Loader2, CheckCircle2, Sparkles, ArrowRight, ArrowLeft, Building2, Plus, MessageCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { MARKETPLACE_CITY, MARKETPLACE_CITY_OPTIONS } from '../features/marketplace/location';
 
 const SUBJECT_OPTIONS = [
   'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Science',
@@ -21,7 +22,7 @@ export default function TeacherRegistration() {
   const [coachingName, setCoachingName] = useState('');
   const [teacherName, setTeacherName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [city, setCity] = useState('Muzaffarnagar');
+  const [city, setCity] = useState<string>(MARKETPLACE_CITY);
   const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
@@ -371,11 +372,14 @@ export default function TeacherRegistration() {
                 <div>
                   <label className="block text-xs font-bold text-neutral-700 mb-1.5">City *</label>
                   <select
+                    name="marketplace-city"
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
+                    onChange={() => setCity(MARKETPLACE_CITY)}
                     className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 cursor-pointer"
                   >
-                    <option value="Muzaffarnagar">Muzaffarnagar</option>
+                    {MARKETPLACE_CITY_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
 

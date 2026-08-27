@@ -4,6 +4,7 @@ import { Store, Sparkles, MapPin, Phone, MessageCircle, Save, Loader2, Globe, Ch
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ownerLeadStatusLabel, ownerLeadStatuses, type OwnerLeadStatus } from '../features/superadmin-marketplace/ownerLeadState';
+import { MARKETPLACE_CITY, MARKETPLACE_CITY_OPTIONS } from '../features/marketplace/location';
 
 interface MarketplaceProfileData {
   id: string;
@@ -61,7 +62,7 @@ export default function MarketplaceSettings() {
   const [teacherName, setTeacherName] = useState('');
   const [publicPhone, setPublicPhone] = useState('');
   const [whatsappPhone, setWhatsappPhone] = useState('');
-  const [city, setCity] = useState('Muzaffarnagar');
+  const [city, setCity] = useState<string>(MARKETPLACE_CITY);
   const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
   const [tagline, setTagline] = useState('');
@@ -92,7 +93,7 @@ export default function MarketplaceSettings() {
         setTeacherName(p.teacherName || '');
         setPublicPhone(p.publicPhone || p.phoneNumber || '');
         setWhatsappPhone(p.whatsappPhone || p.phoneNumber || '');
-        setCity(p.city || '');
+        setCity(MARKETPLACE_CITY);
         setArea(p.area || '');
         setAddress(p.address || '');
         setTagline(p.tagline || '');
@@ -423,11 +424,14 @@ export default function MarketplaceSettings() {
                 <div>
                   <label className="block text-xs font-bold text-neutral-700 mb-1.5">City *</label>
                   <select
-                    value={city || 'Muzaffarnagar'}
-                    onChange={(e) => setCity(e.target.value)}
+                    name="marketplace-city"
+                    value={city}
+                    onChange={() => setCity(MARKETPLACE_CITY)}
                     className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-900 outline-none focus:bg-white focus:ring-2 focus:ring-neutral-900 cursor-pointer"
                   >
-                    <option value="Muzaffarnagar">Muzaffarnagar</option>
+                    {MARKETPLACE_CITY_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
 

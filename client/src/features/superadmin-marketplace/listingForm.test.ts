@@ -10,7 +10,7 @@ const listing: MarketplaceListingDetail = {
   phoneNumber: '+91 98765 43210',
   publicPhone: ' 98765 43210 ',
   whatsappPhone: '98765-43210',
-  city: ' Delhi ',
+  city: ' Muaffarnagar ',
   area: ' Rohini ',
   address: ' Sector 7 ',
   tagline: ' Learn better ',
@@ -41,7 +41,7 @@ describe('listing form helpers', () => {
   it('trims, normalizes and removes blank subject/class entries for an update', () => {
     expect(buildListingUpdate(listingFormFromDetail(listing))).toEqual({
       name: 'Apex Academy', teacherName: 'Riya', phoneNumber: '9876543210', publicPhone: '9876543210',
-      whatsappPhone: '9876543210', city: 'Delhi', area: 'Rohini', address: 'Sector 7', tagline: 'Learn better',
+      whatsappPhone: '9876543210', city: 'Muzaffarnagar', area: 'Rohini', address: 'Sector 7', tagline: 'Learn better',
       aboutUs: 'Detail', logoUrl: 'https://example.test/logo.png', subjectsOffered: ['Mathematics', 'Physics'],
       classesOffered: ['Class 10'], isPubliclyListed: true, isVerified: false,
     });
