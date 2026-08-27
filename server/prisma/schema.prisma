@@ -45,8 +45,6 @@ model Institute {
   invites                         InviteToken[]
   students                        Student[]
   tests                           Test[]
-  attendanceRecords               AttendanceRecord[]
-  attendanceSweepRuns             AttendanceSweepRun[]
   studentLeads                    StudentLead[]
   systemLogs                      SystemLog[]
   upiPaymentVerifications         UpiPaymentVerification[]
@@ -277,7 +275,6 @@ model Admin {
   institute                      Institute?                      @relation(fields: [instituteId], references: [id])
   batches                        Batch[]
   tests                          Test[]
-  manualAttendanceRecords        AttendanceRecord[]              @relation("ManualAttendanceBy")
   refreshTokens                  RefreshToken[]
   onlineQuizzes                  OnlineQuiz[]
   marketplaceClaimsDecided       MarketplaceClaim[]              @relation("MarketplaceClaimsDecided")
@@ -322,8 +319,6 @@ model Batch {
   teacher                  Admin?                        @relation(fields: [teacherId], references: [id])
   feeInstallments          FeeInstallment[]
   students                 Student[]
-  attendanceRecords        AttendanceRecord[]
-  attendanceSweepRuns      AttendanceSweepRun[]
   studentLeads             StudentLead[]
   tests                    Test[]
   sharedTests              Test[]                        @relation("TestBatches")
@@ -358,7 +353,6 @@ model Student {
   feeAssignments           FeeInstallmentAssignment[]
   fees                     FeeRecord[]
   marks                    Mark[]
-  attendanceRecords        AttendanceRecord[]
   batch                    Batch?                       @relation(fields: [batchId], references: [id])
   institute                Institute?                   @relation(fields: [instituteId], references: [id])
   balance                  StudentBalance?
@@ -576,49 +570,6 @@ model StudentBalance {
 
   @@index([balance], map: "idx_balance_desc")
   @@index([updatedAt])
-}
-
-model AttendanceRecord {
-  id                String           @id @default(uuid())
-  studentId         String
-  batchId           String
-  instituteId       String
-  attendanceDate    DateTime
-  checkedInAt       DateTime         @default(now())
-  photoStorageKey   String?
-  photoUrl          String?
-  photoUrlExpiresAt DateTime?
-  photoMimeType     String?
-  note              String?
-  source            AttendanceSource @default(KIOSK)
-  manualMarkedById  String?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  student           Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  batch             Batch            @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  institute         Institute        @relation(fields: [instituteId], references: [id], onDelete: Cascade)
-  manualMarkedBy    Admin?           @relation("ManualAttendanceBy", fields: [manualMarkedById], references: [id])
-
-  @@unique([studentId, attendanceDate])
-  @@index([batchId, attendanceDate, checkedInAt])
-  @@index([instituteId, attendanceDate, checkedInAt])
-}
-
-model AttendanceSweepRun {
-  id             String    @id @default(uuid())
-  batchId        String
-  instituteId    String
-  attendanceDate DateTime
-  scheduledFor   DateTime
-  status         String    @default("COMPLETED")
-  createdAt      DateTime  @default(now())
-  completedAt    DateTime?
-  batch          Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  institute      Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
-
-  @@unique([batchId, attendanceDate])
-  @@index([scheduledFor])
-  @@index([instituteId, attendanceDate])
 }
 
 model IdCounter {
@@ -1110,11 +1061,6 @@ enum JobStatus {
   PROCESSING
   COMPLETED
   FAILED
-}
-
-enum AttendanceSource {
-  KIOSK
-  MANUAL
 }
 
 model SystemAlert {

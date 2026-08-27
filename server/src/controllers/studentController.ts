@@ -602,7 +602,6 @@ export const archiveStudent = async (req: Request, res: Response) => {
             include: {
                 fees: true,
                 feePayments: true,
-                attendanceRecords: true,
                 marks: true,
                 quizSubmissions: true,
                 batch: {
@@ -629,7 +628,6 @@ export const archiveStudent = async (req: Request, res: Response) => {
         const hasActivity = isMonthCoverage ||
             student.fees.length > 0 || 
             student.feePayments.length > 0 || 
-            student.attendanceRecords.length > 0 || 
             student.marks.length > 0 || 
             student.quizSubmissions.length > 0;
 
@@ -919,17 +917,6 @@ export const getStudentProfile = async (req: Request, res: Response) => {
                     orderBy: { test: { date: 'desc' } },
                     take: 100
                 },
-                attendanceRecords: {
-                    select: {
-                        id: true,
-                        attendanceDate: true,
-                        checkedInAt: true,
-                        source: true,
-                        note: true
-                    },
-                    orderBy: { attendanceDate: 'desc' },
-                    take: 50 // Recent 50 records
-                }
             }
         });
 
@@ -941,13 +928,6 @@ export const getStudentProfile = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        // Calculate summary stats
-        const totalClasses = student.attendanceRecords.length;
-        const classesAttended = student.attendanceRecords.filter(r => r.source === 'KIOSK' || r.note === 'PRESENT').length; // Assuming some convention or just count total records if they only record presence
-        // Actually, let's just return raw records and let client process or process simple stats:
-        // Wait, what does attendance actually store? Let's check: attendanceRecords usually store when present.
-        const attendancePercentage = totalClasses > 0 ? Math.round((classesAttended / totalClasses) * 100) : null;
-
         const config = student.institute?.config as { registrationForm?: { fields?: unknown } } | null;
         const registrationFields = Array.isArray(config?.registrationForm?.fields)
             ? config.registrationForm.fields
@@ -955,12 +935,7 @@ export const getStudentProfile = async (req: Request, res: Response) => {
         const common = {
             ...student,
             coachingFeeMode: student.institute?.coachingFeeMode ?? 'CURRENT_DUE_BASED',
-            registrationFields,
-            stats: {
-                attendancePercentage,
-                attendedClasses: classesAttended,
-                totalClasses
-            }
+            registrationFields
         };
 
         if (student.institute?.coachingFeeMode === 'MONTH_COVERAGE') {

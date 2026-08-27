@@ -322,7 +322,7 @@ test('archiving a month-mode student closes the profile before clearing the batc
   const archivedStudent = {
     id: 'student-1', name: 'Aarav', humanId: 'MA-MTH26-001', parentName: 'Parent', parentWhatsapp: '9876543210',
     instituteId: 'inst-1', batchId: 'batch-1', createdAt: new Date('2026-08-10T00:00:00.000Z'), leftAt: null,
-    fees: [], feePayments: [], attendanceRecords: [], marks: [], quizSubmissions: [],
+    fees: [], feePayments: [], marks: [], quizSubmissions: [],
     batch: { id: 'batch-1', instituteId: 'inst-1', startDate: new Date('2026-07-01T00:00:00.000Z'), endDate: new Date('2026-12-31T00:00:00.000Z'), institute: { id: 'inst-1', coachingFeeMode: 'MONTH_COVERAGE', timezone: 'Asia/Kolkata' } },
   };
   replaceMethod(prisma.student, 'findUnique', (async () => archivedStudent as never) as typeof prisma.student.findUnique);
