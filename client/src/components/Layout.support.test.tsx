@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { getInstituteNavigation } from './layoutNavigation';
+import { getInstituteNavigation, isInstitutePathActive } from './layoutNavigation';
 import { reconcileSupportSession } from '../features/superadmin-shell/supportSession';
 
 describe('institute Support holdback', () => {
@@ -28,5 +28,14 @@ describe('institute Support holdback', () => {
     sessionStorage.setItem('superAdminSupportSession', JSON.stringify({ sessionId: 'session-1' }));
     reconcileSupportSession(false);
     expect(sessionStorage.getItem('superAdminSupportSession')).toBeNull();
+  });
+});
+
+describe('teacher navigation matching', () => {
+  it('keeps parent navigation active on teacher detail routes', () => {
+    expect(isInstitutePathActive('/batches/batch-1', '/batches')).toBe(true);
+    expect(isInstitutePathActive('/tests/test-1', '/tests')).toBe(true);
+    expect(isInstitutePathActive('/dashboard', '/dashboard')).toBe(true);
+    expect(isInstitutePathActive('/fees', '/batches')).toBe(false);
   });
 });

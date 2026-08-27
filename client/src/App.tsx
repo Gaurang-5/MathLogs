@@ -32,7 +32,7 @@ const SuperAdminRevenue = lazy(() => import('./pages/superadmin/SuperAdminRevenu
 const SuperAdminSupport = lazy(() => import('./pages/superadmin/SuperAdminSupport'));
 const SuperAdminCommunications = lazy(() => import('./pages/superadmin/SuperAdminCommunications'));
 const SuperAdminSystem = lazy(() => import('./pages/superadmin/SuperAdminSystem'));
-const Support = lazy(() => import('./pages/Support'));
+const TeacherSupport = lazy(() => import('./pages/TeacherSupport'));
 const JoinOnboarding = lazy(() => import('./pages/JoinOnboarding'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const StudentPaymentPortal = lazy(() => import('./pages/StudentPaymentPortal'));
@@ -132,7 +132,7 @@ function App() {
             <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
             <Route path="/marketplace-settings" element={<PrivateRoute><MarketplaceSettings /></PrivateRoute>} />
             <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
-            <Route path="/support" element={<SupportRouteBoundary enabled={supportFeatureEnabled} scope="institute"><PrivateRoute><Support /></PrivateRoute></SupportRouteBoundary>} />
+            <Route path="/support" element={<SupportRouteBoundary enabled={supportFeatureEnabled} scope="institute"><PrivateRoute><TeacherSupport /></PrivateRoute></SupportRouteBoundary>} />
 
             <Route path="/approvals" element={<PrivateRoute><Approvals /></PrivateRoute>} />
 

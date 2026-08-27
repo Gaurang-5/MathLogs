@@ -154,6 +154,37 @@ textarea {
     opacity: 0.5;
 }
 
+/* Shared treatment for legacy teacher pages while they migrate to primitives. */
+.teacher-shell :where(button, a[href]) {
+    touch-action: manipulation;
+}
+
+.teacher-shell :where(button, a[href]):focus-visible,
+.teacher-shell :where(input, select, textarea):focus-visible {
+    outline: none;
+    box-shadow: var(--teacher-focus);
+}
+
+.teacher-shell :where(input, select, textarea) {
+    min-height: var(--teacher-control-height);
+    font: inherit;
+}
+
+.teacher-shell :where(button):not(:disabled):active,
+.teacher-shell :where(a[href]):active {
+    transform: scale(var(--teacher-press-scale));
+}
+
+.teacher-shell :where(button, a[href]) {
+    transition-property: transform, background-color, border-color, color, box-shadow, opacity;
+    transition-duration: 140ms;
+    transition-timing-function: ease-out;
+}
+
+.teacher-shell :where([role="dialog"], [data-modal-open]) {
+    border-radius: var(--teacher-radius-sheet);
+}
+
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
 

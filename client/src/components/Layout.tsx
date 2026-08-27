@@ -1,7 +1,7 @@
 
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { LayoutDashboard, Users, FileText, Sparkles, Scan, ReceiptIndianRupee, LogOut, Menu, X, PanelLeftClose, PanelLeftOpen, IndianRupee, Settings, CreditCard, Store, Headphones } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
@@ -12,7 +12,8 @@ import PWAInstallPrompt from './PWAInstallPrompt';
 import { SupportSessionBanner } from '../features/superadmin-shell/SupportSessionBanner';
 import { reconcileSupportSession } from '../features/superadmin-shell/supportSession';
 import { supportFeatureEnabled } from '../config/featureFlags';
-import { getInstituteNavigation } from './layoutNavigation';
+import { getApplePageTransition } from '../utils/appleDesign';
+import { getInstituteNavigation, isInstitutePathActive } from './layoutNavigation';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -24,6 +25,7 @@ interface LayoutProps {
 export default function Layout({ children, title, headerAction, hideMobileNav = false }: LayoutProps) {
     const location = useLocation();
     const navigate = useNavigate();
+    const reduceMotion = useReducedMotion();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [quizCredits, setQuizCredits] = useState<number>(() => {
         return parseInt(localStorage.getItem('quizCredits') || '0', 10);
@@ -39,6 +41,13 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
     }, []);
 
     useEffect(() => { reconcileSupportSession(supportFeatureEnabled); }, []);
+
+    useEffect(() => {
+        if (!mobileMenuOpen) return;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = previousOverflow; };
+    }, [mobileMenuOpen]);
 
     // Default to collapsed on screens smaller than 1280px (xl) to prevent squashed content on tablets/laptops
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -83,11 +92,9 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
     };
 
     const handleTouchEnd = () => {
-        if (pullY >= 60) {
+        if (pullY >= 60 && !isModalOpen) {
             setIsRefreshing(true);
-            setTimeout(() => {
-                window.location.reload();
-            }, 300);
+            window.location.reload();
         }
         setPullY(0);
         startYRef.current = 0;
@@ -115,7 +122,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
     const navItems = getInstituteNavigation({ isPageOnly, isQuizOnly, supportEnabled: supportFeatureEnabled });
 
     return (
-        <div className="flex min-h-screen bg-app-bg text-app-text transition-colors duration-500 font-sans selection:bg-accent-subtle selection:text-accent">
+        <div data-teacher-shell className="teacher-shell flex min-h-screen font-sans selection:bg-accent-subtle selection:text-accent">
             {supportFeatureEnabled ? <SupportSessionBanner /> : null}
             <ToastProvider />
             <QuickFeeModal isOpen={showQuickFeeModal} onClose={() => setShowQuickFeeModal(false)} />
@@ -135,6 +142,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                     )}
                     <button
                         onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                         className={cn(
                             "text-app-text-tertiary hover:text-app-text transition-colors p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5",
                             !isSidebarCollapsed && "bg-transparent"
@@ -145,13 +153,14 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                     </button>
                 </div>
 
-                <nav className="flex-1 px-4 space-y-2 overflow-y-auto py-2 scroll-smooth">
+                <nav aria-label="Teacher sidebar navigation" className="flex-1 px-4 space-y-2 overflow-y-auto py-2 scroll-smooth">
                     {navItems.map((item) => {
-                        const isActive = location.pathname === item.path;
+                        const isActive = isInstitutePathActive(location.pathname, item.path);
                         return (
                             <Link
                                 key={item.path}
                                 to={item.path}
+                                aria-current={isActive ? 'page' : undefined}
                                 className={cn(
                                     "flex items-center rounded-2xl text-[15px] font-medium transition-all group relative",
                                     isSidebarCollapsed ? "justify-center px-0 py-3" : "px-4 py-3",
@@ -199,6 +208,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                     {!isQuizOnly && (
                         <button
                             onClick={() => setShowQuickFeeModal(true)}
+                            aria-label="Record fee payment"
                             className={cn(
                                 "flex items-center justify-center bg-gray-900 text-white hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95 group relative overflow-hidden",
                                 isSidebarCollapsed ? "w-12 h-12 rounded-[18px] mx-auto" : "w-full py-3 rounded-2xl"
@@ -245,6 +255,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                         <div className="flex items-center gap-2">
                             <Link
                                 to="/marketplace-settings"
+                                aria-label="Marketplace listing"
                                 className="w-9 h-9 flex items-center justify-center rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all active:scale-90"
                                 title="Marketplace Listing"
                             >
@@ -252,17 +263,24 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                             </Link>
                             <Link
                                 to="/quizzes"
+                                aria-label="Quizzes"
                                 className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:text-blue-700 hover:bg-blue-100 transition-all active:scale-90"
                             >
                                 <Sparkles className="w-[18px] h-[18px]" strokeWidth={2.5} />
                             </Link>
                             <Link
                                 to="/scan"
+                                aria-label="Scan marks"
                                 className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90"
                             >
                                 <Scan className="w-[18px] h-[18px]" strokeWidth={2.5} />
                             </Link>
-                            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="w-9 h-9 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text transition-all active:scale-90">
+                            <button
+                                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                                aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                                aria-expanded={mobileMenuOpen}
+                                className="teacher-interactive w-11 h-11 flex items-center justify-center rounded-full bg-app-surface-opaque text-app-text-secondary hover:text-app-text"
+                            >
                                 {mobileMenuOpen ? <X size={20} strokeWidth={2.5} /> : <Menu size={20} strokeWidth={2.5} />}
                             </button>
                         </div>
@@ -274,13 +292,14 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
             <AnimatePresence>
                 {mobileMenuOpen && (
                     <motion.div
-                        initial={{ opacity: 0 }}
+                        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
                         animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
+                        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+                        transition={getApplePageTransition(Boolean(reduceMotion))}
                         className="fixed inset-0 z-40 bg-app-bg px-6 xl:hidden backdrop-blur-3xl overflow-y-auto"
                         style={{ paddingTop: 'calc(5.5rem + env(safe-area-inset-top))' }}
                     >
-                        <nav className="space-y-2 pb-12">
+                        <nav aria-label="Teacher menu" className="space-y-2 pb-12">
                             <div className="pt-2 space-y-1.5">
                                 <Link
                                     to="/coaching"
@@ -357,7 +376,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                 onTouchEnd={handleTouchEnd}
                 className={cn(
                     "flex-1 flex flex-col min-h-screen bg-app-bg relative transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] min-w-0 xl:pb-0",
-                    showMobileNav ? "pb-44" : "pb-6",
+                    showMobileNav ? "pb-[var(--teacher-bottom-nav-space)]" : "pb-6",
                     isSidebarCollapsed ? "xl:pl-[8rem]" : "xl:pl-[20rem]"
                 )}
             >
@@ -373,22 +392,22 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
 
                 {!hideMobileNav && <div className="xl:hidden" style={{ height: 'calc(4rem + env(safe-area-inset-top))' }}></div>} {/* Spacer for mobile header with safe area */}
 
-                <div className="flex-1 p-4 lg:p-8 w-full max-w-full mx-auto animate-fadeIn relative z-0 overflow-x-hidden">
+                <div className="teacher-page flex-1 p-[var(--teacher-gutter)] relative z-0 overflow-x-hidden">
                     {title && (
                         <div className="mb-8 flex items-center justify-between gap-4 flex-wrap">
-                            <motion.h2
+                            <motion.h1
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
-                                className="text-2xl md:text-3xl font-semibold text-app-text tracking-tight"
+                                transition={getApplePageTransition(Boolean(reduceMotion))}
+                                className="text-2xl md:text-3xl font-semibold text-app-text tracking-[-0.025em]"
                             >
                                 {title}
-                            </motion.h2>
+                            </motion.h1>
                             {headerAction && (
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.4 }}
+                                    transition={getApplePageTransition(Boolean(reduceMotion))}
                                 >
                                     {headerAction}
                                 </motion.div>
@@ -402,32 +421,32 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
 
             {/* Mobile Bottom Navigation (Floating Island) */}
             {showMobileNav && !isModalOpen && (
-                <nav className="fixed bottom-6 left-4 right-4 z-50 bg-app-surface/80 backdrop-blur-3xl border border-app-border shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] rounded-[32px] h-[72px] xl:hidden">
+                <nav aria-label="Primary teacher navigation" data-mobile-nav className="teacher-material fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] rounded-[28px] h-[72px] xl:hidden">
 
                     {isQuizOnly ? (
                         <div className="grid grid-cols-4 items-center h-full w-full relative z-10 px-2">
-                            <Link to="/dashboard" className="flex flex-col items-center justify-center group h-full">
+                            <Link to="/dashboard" aria-current={location.pathname === '/dashboard' ? 'page' : undefined} className="flex flex-col items-center justify-center group h-full">
                                 <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname === '/dashboard' ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
                                     <LayoutDashboard className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname === '/dashboard' ? 2.5 : 1.5} />
                                     <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname === '/dashboard' ? 'opacity-100' : 'opacity-70'}`}>Home</span>
                                     {location.pathname === '/dashboard' && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
                                 </div>
                             </Link>
-                            <Link to="/quizzes" className="flex flex-col items-center justify-center group h-full">
+                            <Link to="/quizzes" aria-current={isInstitutePathActive(location.pathname, '/quizzes') ? 'page' : undefined} className="flex flex-col items-center justify-center group h-full">
                                 <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/quizzes') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
                                     <Sparkles className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/quizzes') ? 2.5 : 1.5} />
                                     <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/quizzes') ? 'opacity-100' : 'opacity-70'}`}>Quizzes</span>
                                     {location.pathname.startsWith('/quizzes') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
                                 </div>
                             </Link>
-                            <Link to="/billing" className="flex flex-col items-center justify-center group h-full">
+                            <Link to="/billing" aria-current={isInstitutePathActive(location.pathname, '/billing') ? 'page' : undefined} className="flex flex-col items-center justify-center group h-full">
                                 <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/billing') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
                                     <CreditCard className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/billing') ? 2.5 : 1.5} />
                                     <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/billing') ? 'opacity-100' : 'opacity-70'}`}>Credits</span>
                                     {location.pathname.startsWith('/billing') && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-app-text animate-in zoom-in" />}
                                 </div>
                             </Link>
-                            <Link to="/settings" className="flex flex-col items-center justify-center group h-full">
+                            <Link to="/settings" aria-current={isInstitutePathActive(location.pathname, '/settings') ? 'page' : undefined} className="flex flex-col items-center justify-center group h-full">
                                 <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/settings') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
                                     <Settings className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/settings') ? 2.5 : 1.5} />
                                     <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/settings') ? 'opacity-100' : 'opacity-70'}`}>Settings</span>
@@ -438,7 +457,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                     ) : (
                         <>
                             <div className="grid grid-cols-5 items-center h-full w-full relative z-10 px-2">
-                                <Link to="/dashboard" className="flex flex-col items-center justify-center group h-full">
+                                <Link to="/dashboard" aria-current={location.pathname === '/dashboard' ? 'page' : undefined} className="flex flex-col items-center justify-center group h-full">
                                     <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname === '/dashboard' ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
                                         <LayoutDashboard className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname === '/dashboard' ? 2.5 : 1.5} />
                                         <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname === '/dashboard' ? 'opacity-100' : 'opacity-70'}`}>Home</span>
@@ -446,7 +465,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                                     </div>
                                 </Link>
 
-                                <Link to="/batches" className="flex flex-col items-center justify-center group h-full">
+                                <Link to="/batches" aria-current={isInstitutePathActive(location.pathname, '/batches') ? 'page' : undefined} className="flex flex-col items-center justify-center group h-full">
                                     <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/batches') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
                                         <Users className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/batches') ? 2.5 : 1.5} />
                                         <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/batches') ? 'opacity-100' : 'opacity-70'}`}>Batches</span>
@@ -457,7 +476,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                                 {/* Spacer for Center Button */}
                                 <div></div>
 
-                                <Link to="/tests" className="flex flex-col items-center justify-center group h-full">
+                                <Link to="/tests" aria-current={isInstitutePathActive(location.pathname, '/tests') ? 'page' : undefined} className="flex flex-col items-center justify-center group h-full">
                                     <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/tests') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
                                         <FileText className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/tests') ? 2.5 : 1.5} />
                                         <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/tests') ? 'opacity-100' : 'opacity-70'}`}>Tests</span>
@@ -465,7 +484,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                                     </div>
                                 </Link>
 
-                                <Link to="/fees" className="flex flex-col items-center justify-center group h-full">
+                                <Link to="/fees" aria-current={isInstitutePathActive(location.pathname, '/fees') ? 'page' : undefined} className="flex flex-col items-center justify-center group h-full">
                                     <div className={`flex flex-col items-center justify-center w-14 h-11 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/fees') ? 'text-app-text' : 'text-app-text-tertiary active:scale-90 hover:text-app-text-secondary'}`}>
                                         <ReceiptIndianRupee className="w-[22px] h-[22px] mb-1" strokeWidth={location.pathname.startsWith('/fees') ? 2.5 : 1.5} />
                                         <span className={`text-[9px] font-bold tracking-wide transition-opacity duration-300 ${location.pathname.startsWith('/fees') ? 'opacity-100' : 'opacity-70'}`}>Fees</span>
@@ -478,7 +497,8 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[74px] h-[74px] z-20">
                                 <button
                                     onClick={() => setShowQuickFeeModal(true)}
-                                    className="relative flex w-full h-full bg-app-text rounded-full items-center justify-center text-app-bg shadow-[0_8px_24px_rgba(30,41,59,0.3)] border-[5px] border-app-surface/95 overflow-hidden active:scale-90 transition-all duration-300 group"
+                                    aria-label="Record fee payment"
+                                    className="teacher-interactive relative flex w-full h-full bg-app-text rounded-full items-center justify-center text-app-bg shadow-[0_8px_24px_rgba(30,41,59,0.3)] border-[5px] border-app-surface/95 overflow-hidden group"
                                 >
                                     <IndianRupee className="w-7 h-7" strokeWidth={2.5} />
                                     <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
