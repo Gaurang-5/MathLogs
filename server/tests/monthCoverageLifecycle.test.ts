@@ -1,5 +1,6 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../src/prisma';
 import { createBatch, getBatchDetails } from '../src/controllers/batchController';
 import {
@@ -100,7 +101,11 @@ test('batch details expose fee mode, timezone, dates, and student setup status',
     id: 'batch-1', instituteId: 'inst-1', startDate: new Date('2026-07-01T00:00:00.000Z'),
     endDate: new Date('2026-12-31T00:00:00.000Z'), tests: [], sharedTests: [],
     institute: { config: {}, coachingFeeMode: 'MONTH_COVERAGE', timezone: 'Asia/Kolkata' },
-    students: [{ id: 'student-1', monthCoverageProfile: { status: 'PENDING_SETUP' } }],
+    enrollments: [{
+      id: 'enrollment-1', startedAt: new Date('2026-08-10T00:00:00.000Z'),
+      monthCoverageProfile: { status: 'PENDING_SETUP' },
+      student: { id: 'student-1' },
+    }],
   }) as never) as typeof prisma.batch.findUnique);
   const res = response();
 
@@ -113,7 +118,7 @@ test('batch details expose fee mode, timezone, dates, and student setup status',
   assert.deepEqual((body.students as Array<{ monthCoverageProfile: { status: string } }>)[0].monthCoverageProfile.status, 'PENDING_SETUP');
 });
 
-test('manual month-mode admission automatically creates an active profile in one transaction', async () => {
+test('legacy manual month-mode admission cannot bypass enrollment fee selection', async () => {
   const batch = {
     id: 'batch-1', name: 'Evening Maths', subject: 'Maths', className: null, timeSlot: null,
     createdAt: new Date('2026-07-01T00:00:00.000Z'), startDate: new Date('2026-07-01T00:00:00.000Z'),
@@ -165,10 +170,12 @@ test('manual month-mode admission automatically creates an active profile in one
     user: { id: 'teacher-1', instituteId: 'inst-1' },
   } as never, res as never);
 
-  assert.equal(res.statusCode, 200);
-  assert.equal(transactionCalls, 1);
-  assert.equal((res.body as { monthCoverageProfile: { status: string } }).monthCoverageProfile.status, 'ACTIVE');
-  assert.equal((res.body as { monthCoverageProfile: { feeStartMonth: string } }).monthCoverageProfile.feeStartMonth, '2026-08');
+  assert.equal(res.statusCode, 410);
+  assert.equal(transactionCalls, 0);
+  assert.deepEqual(res.body, {
+    error: 'USE_ENROLLMENT_CREATE_ENDPOINT',
+    message: 'Use the batch enrollment flow to select a profile and fee start point.',
+  });
 });
 
 test('month-mode approval automatically activates the profile in one transaction', async () => {
@@ -257,16 +264,28 @@ test('self-registered month-mode student receives pending setup without legacy a
     if (where.id === 'student-1') return { ...student, institute: batch.institute, batch } as never;
     return null;
   }) as typeof prisma.student.findFirst);
-  replaceMethod(prisma.student, 'create', (async ({ data }: { data: Record<string, unknown> }) => {
-    student = { id: 'student-1', createdAt: new Date('2026-08-10T00:00:00.000Z'), ...data };
-    return student as never;
-  }) as typeof prisma.student.create);
+  replaceMethod(prisma.student, 'findMany', (async () => []) as typeof prisma.student.findMany);
+  replaceMethod(prisma.student, 'create', (async () => assert.fail('student must be created by the enrollment transaction')) as typeof prisma.student.create);
+  const fakeTx = {
+    student: { create: async ({ data }: { data: Record<string, unknown> }) => {
+      student = { id: 'student-1', createdAt: new Date('2026-08-10T00:00:00.000Z'), ...data };
+      return student;
+    } },
+    enrollment: { create: async () => ({ id: 'enrollment-1' }) },
+  };
+  replaceMethod(prisma, '$transaction', (async (operation: unknown) => (
+    operation as (tx: typeof fakeTx) => Promise<unknown>
+  )(fakeTx)) as typeof prisma.$transaction);
   replaceMethod(prisma.studentMonthCoverageProfile, 'findUnique', (async () => null) as typeof prisma.studentMonthCoverageProfile.findUnique);
   let profileWrite: Record<string, unknown> | undefined;
   replaceMethod(prisma.studentMonthCoverageProfile, 'create', (async ({ data }: { data: Record<string, unknown> }) => {
     profileWrite = data;
     return { id: 'profile-1', confirmedAt: null, confirmedById: null, createdAt: new Date(), updatedAt: new Date(), ...data } as never;
   }) as typeof prisma.studentMonthCoverageProfile.create);
+  replaceMethod(prisma.studentMonthCoverageProfile, 'update', (async ({ data }: { data: Record<string, unknown> }) => ({
+    id: 'profile-1', ...profileWrite, ...data,
+  })) as typeof prisma.studentMonthCoverageProfile.update);
+  replaceMethod(prisma.enrollment, 'create', (async () => assert.fail('enrollment must use the same transaction client')) as typeof prisma.enrollment.create);
   replaceMethod(prisma.feeInstallment, 'findMany', (async () => assert.fail('month mode must not read legacy installments')) as typeof prisma.feeInstallment.findMany);
   const res = response();
 
@@ -281,6 +300,71 @@ test('self-registered month-mode student receives pending setup without legacy a
     instituteId: 'inst-1', batchId: 'batch-1', studentId: 'student-1',
     feeStartMonth: null, feeEndMonth: null, status: 'PENDING_SETUP',
   });
+});
+
+test('signed registration creates the student and enrollment in the same transaction', async () => {
+  const fee = { mode: 'CURRENT_DUE_BASED' as const, installmentIds: [] };
+  const signedIntent = {
+    instituteId: 'inst-1', batchId: 'batch-1', fee, issuedById: 'teacher-1',
+    nonce: 'invite-nonce', whatsapp: '9876543210',
+  };
+  const token = jwt.sign(signedIntent, 'test-secret', { expiresIn: '1h' });
+  const batch = {
+    id: 'batch-1', name: 'Class 10', subject: 'Maths', createdAt: new Date('2026-08-01'),
+    startDate: new Date('2026-08-01'), endDate: new Date('2027-03-31'), teacherId: 'teacher-1',
+    autoSendWelcome: false, whatsappGroupLink: null, isRegistrationOpen: false, isRegistrationEnded: true,
+    instituteId: 'inst-1', institute: {
+      id: 'inst-1', name: 'MathLogs', coachingFeeMode: 'CURRENT_DUE_BASED', timezone: 'Asia/Kolkata',
+      areRegistrationsPaused: false, plan: 'ENTERPRISE', planExpiryDate: null,
+    },
+  };
+  replaceMethod(prisma.batch, 'findUnique', (async () => batch as never) as typeof prisma.batch.findUnique);
+  replaceMethod(prisma.inviteToken, 'findUnique', (async () => ({
+    token: 'invite-nonce', isUsed: false, expiresAt: new Date(Date.now() + 60_000),
+    enrollmentIntent: { batchId: 'batch-1', fee, issuedById: 'teacher-1' },
+  }) as never) as typeof prisma.inviteToken.findUnique);
+  replaceMethod(prisma.student, 'findMany', (async () => []) as typeof prisma.student.findMany);
+  replaceMethod(prisma.student, 'findFirst', (async () => null) as typeof prisma.student.findFirst);
+  replaceMethod(prisma.institute, 'findUnique', (async () => ({ name: 'MathLogs' }) as never) as typeof prisma.institute.findUnique);
+  replaceMethod(prisma.idCounter, 'upsert', (async () => ({ seq: 1 }) as never) as typeof prisma.idCounter.upsert);
+  replaceMethod(prisma.student, 'create', (async () => assert.fail('student must be created by the transaction client')) as typeof prisma.student.create);
+
+  let transactionCalls = 0;
+  const createdStudent = {
+    id: 'student-1', humanId: 'MA-MTH26-001', name: 'Aarav', parentName: 'Parent',
+    parentWhatsapp: '9876543210', parentEmail: null, instituteId: 'inst-1', batchId: 'batch-1',
+    createdAt: new Date('2026-08-27T00:00:00.000Z'),
+  };
+  const fakeTx = {
+    student: {
+      create: async () => createdStudent,
+      findFirst: async () => ({ id: 'student-1' }),
+    },
+    batch: { findFirst: async () => ({
+      startDate: batch.startDate, endDate: batch.endDate,
+      institute: { coachingFeeMode: 'CURRENT_DUE_BASED', timezone: 'Asia/Kolkata' },
+      feeInstallments: [],
+    }) },
+    enrollment: { create: async () => ({
+      id: 'enrollment-1', instituteId: 'inst-1', studentId: 'student-1', batchId: 'batch-1', status: 'ACTIVE',
+    }) },
+    inviteToken: { updateMany: async () => ({ count: 1 }) },
+    studentMonthCoverageProfile: {},
+    feeInstallmentAssignment: { createMany: async () => ({ count: 0 }) },
+  };
+  replaceMethod(prisma, '$transaction', (async (operation: unknown) => {
+    transactionCalls += 1;
+    return (operation as (tx: typeof fakeTx) => Promise<unknown>)(fakeTx);
+  }) as typeof prisma.$transaction);
+  const res = response();
+
+  await registerStudent({ body: {
+    batchId: 'batch-1', name: 'Aarav', parentName: 'Parent', parentWhatsapp: '0000000000', token,
+  } } as never, res as never);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(transactionCalls, 1);
+  assert.equal((res.body as { id: string }).id, 'student-1');
 });
 
 test('teacher can confirm a pending student fee profile through the lifecycle controller', async () => {
@@ -317,7 +401,7 @@ test('teacher can confirm a pending student fee profile through the lifecycle co
   assert.equal((res.body as { profile: { status: string } }).profile.status, 'ACTIVE');
 });
 
-test('archiving a month-mode student closes the profile before clearing the batch', async () => {
+test('legacy archive cannot clear month-mode batch membership globally', async () => {
   const leaveAt = new Date('2026-09-15T00:00:00.000Z');
   const archivedStudent = {
     id: 'student-1', name: 'Aarav', humanId: 'MA-MTH26-001', parentName: 'Parent', parentWhatsapp: '9876543210',
@@ -351,7 +435,10 @@ test('archiving a month-mode student closes the profile before clearing the batc
     monthCoverageLeaveAt: leaveAt,
   } as never, res as never);
 
-  assert.equal(res.statusCode, 200);
-  assert.equal(archiveWrite?.status, 'LEFT');
-  assert.equal(archiveWrite?.batchId, null);
+  assert.equal(res.statusCode, 410);
+  assert.equal(archiveWrite, undefined);
+  assert.deepEqual(res.body, {
+    error: 'USE_ENROLLMENT_END_ENDPOINT',
+    message: 'End the student enrollment from the selected batch instead.',
+  });
 });

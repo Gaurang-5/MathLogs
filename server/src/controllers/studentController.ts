@@ -237,12 +237,12 @@ export const registerStudent = async (req: Request, res: Response) => {
         let retries = 0;
         let success = false;
         let student;
+        let createdEnrollmentId: string | null = null;
 
         while (!success && retries < MAX_RETRIES) {
             try {
                 const humanId = await generateHumanId(batch);
-                student = await prisma.student.create({
-                    data: {
+                const studentData = {
                         batchId,
                         name,
                         parentName,
@@ -253,8 +253,50 @@ export const registerStudent = async (req: Request, res: Response) => {
                         status: 'APPROVED', // Auto-approve
                         humanId,
                         instituteId: batch.instituteId
-                    }
-                });
+                };
+                if (signedEnrollmentIntent) {
+                    const created = await prisma.$transaction(async tx => {
+                        const createdStudent = await tx.student.create({ data: studentData });
+                        const enrollment = await tx.enrollment.create({
+                            data: {
+                                instituteId: batch.instituteId!,
+                                studentId: createdStudent.id,
+                                batchId: batch.id,
+                                startedAt: new Date(),
+                                createdById: signedEnrollmentIntent!.issuedById,
+                            },
+                        });
+                        await applyEnrollmentFees(enrollment, signedEnrollmentIntent!.fee, enrollmentFeeDepsFor(tx));
+                        const consumed = await tx.inviteToken.updateMany({
+                            where: {
+                                token: signedEnrollmentIntent!.nonce,
+                                isUsed: false,
+                                expiresAt: { gt: new Date() },
+                            },
+                            data: { isUsed: true },
+                        });
+                        if (consumed.count !== 1) throw new Error('INVITE_ALREADY_USED');
+                        return { student: createdStudent, enrollmentId: enrollment.id };
+                    });
+                    student = created.student;
+                    createdEnrollmentId = created.enrollmentId;
+                } else {
+                    const created = await prisma.$transaction(async tx => {
+                        const createdStudent = await tx.student.create({ data: studentData });
+                        const enrollment = await tx.enrollment.create({
+                            data: {
+                                instituteId: batch.instituteId!,
+                                studentId: createdStudent.id,
+                                batchId: batch.id,
+                                startedAt: createdStudent.createdAt,
+                                createdById: batch.teacherId,
+                            },
+                        });
+                        return { student: createdStudent, enrollmentId: enrollment.id };
+                    });
+                    student = created.student;
+                    createdEnrollmentId = created.enrollmentId;
+                }
                 success = true;
             } catch (error: any) {
                 if (error.code === 'P2002') {
@@ -284,35 +326,6 @@ export const registerStudent = async (req: Request, res: Response) => {
         }
 
         if (!success) throw new Error('Failed to generate unique Human ID after retries');
-
-        let createdEnrollmentId: string | null = null;
-        if (student && signedEnrollmentIntent) {
-            await prisma.$transaction(async tx => {
-                const enrollment = await tx.enrollment.create({
-                    data: {
-                        instituteId: batch.instituteId!,
-                        studentId: student!.id,
-                        batchId: batch.id,
-                        startedAt: new Date(),
-                        createdById: signedEnrollmentIntent!.issuedById,
-                    },
-                });
-                createdEnrollmentId = enrollment.id;
-                await applyEnrollmentFees(enrollment, signedEnrollmentIntent!.fee, enrollmentFeeDepsFor(tx));
-                await tx.inviteToken.update({
-                    where: { token: signedEnrollmentIntent!.nonce },
-                    data: { isUsed: true },
-                });
-            });
-        } else if (student) {
-            const enrollment = await prisma.enrollment.create({
-                data: {
-                    instituteId: batch.instituteId!, studentId: student.id, batchId: batch.id,
-                    startedAt: student.createdAt, createdById: batch.teacherId,
-                },
-            });
-            createdEnrollmentId = enrollment.id;
-        }
 
         const latencyMs = Date.now() - startTime;
         logger.registration.success(batchId, student!.id, student!.humanId || '', latencyMs);
