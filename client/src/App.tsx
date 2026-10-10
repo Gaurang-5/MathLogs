@@ -15,6 +15,7 @@ const Approvals = lazy(() => import('./pages/Approvals'));
 const TestList = lazy(() => import('./pages/TestList'));
 const QuizList = lazy(() => import('./pages/QuizList'));
 const TestDetails = lazy(() => import('./pages/TestDetails'));
+const BulkScanMarks = lazy(() => import('./pages/BulkScanMarks'));
 const ScanMarks = lazy(() => import('./pages/ScanMarks'));
 const Fees = lazy(() => import('./pages/Fees'));
 const Home = lazy(() => import('./pages/Home'));
@@ -43,7 +44,6 @@ const StudentProfile = lazy(() => import('./pages/StudentProfile'));
 
 const MarketplaceHome = lazy(() => import('./pages/MarketplaceHome'));
 const CoachingProfile = lazy(() => import('./pages/CoachingProfile'));
-const TeacherRegistration = lazy(() => import('./pages/TeacherRegistration'));
 const MarketplaceSettings = lazy(() => import('./pages/MarketplaceSettings'));
 const AIQuizGenerator = lazy(() => import('./pages/AIQuizGenerator'));
 
@@ -126,6 +126,7 @@ function App() {
             <Route path="/tests" element={<PrivateRoute><TestList /></PrivateRoute>} />
             <Route path="/quizzes" element={<PrivateRoute><QuizList /></PrivateRoute>} />
             <Route path="/tests/:id" element={<PrivateRoute><TestDetails /></PrivateRoute>} />
+            <Route path="/scan/bulk" element={<PrivateRoute><BulkScanMarks /></PrivateRoute>} />
             <Route path="/scan" element={<PrivateRoute><ScanMarks /></PrivateRoute>} />
             <Route path="/students/:id" element={<PrivateRoute><StudentProfile /></PrivateRoute>} />
             <Route path="/fees" element={<PrivateRoute><Fees /></PrivateRoute>} />

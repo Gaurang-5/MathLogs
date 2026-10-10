@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GraduationCap, User, Phone, MapPin, Lock, Loader2, CheckCircle2, Sparkles, ArrowRight, ArrowLeft, Building2, Plus, MessageCircle, AlertCircle } from 'lucide-react';
+import { User, Phone, MapPin, Lock, Loader2, CheckCircle2, Sparkles, ArrowRight, ArrowLeft, Building2, Plus, MessageCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { MARKETPLACE_CITY, MARKETPLACE_CITY_OPTIONS } from '../features/marketplace/location';
 

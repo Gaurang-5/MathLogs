@@ -780,40 +780,19 @@ export const updateBatch = async (req: Request, res: Response) => {
 };
 
 export const deleteBatch = async (req: Request, res: Response) => {
-    const { id } = req.params;
-
     try {
-        const batch = await prisma.batch.findUnique({
-            where: { id: String(id) },
-            include: {
-                _count: {
-                    select: { feeInstallments: true }
-                }
-            }
+        const result = await prisma.$transaction(async tx => {
+            const id = String(req.params.id);
+            await tx.$queryRaw`SELECT id FROM "Batch" WHERE id=${id} FOR UPDATE`;
+            const batch = await tx.batch.findUnique({ where: { id }, include: { _count: { select: { students: true, enrollments: true, tests: true, sharedTests: true, onlineQuizzes: true, sharedOnlineQuizzes: true, feeInstallments: true, monthCoverageProfiles: true, monthCoveragePayments: true, monthCoverageAllocations: true, studentLeads: true, studentIdentityReviews: true } } } });
+            if (!batch) return { status: 404, body: { error: 'Batch not found' } };
+            if (batch.instituteId !== req.user.instituteId || batch.teacherId !== req.user.id) return { status: 403, body: { error: 'Unauthorized' } };
+            if (Object.values(batch._count).some(count => count > 0)) return { status: 409, body: { error: 'This batch has student, assessment or fee history and cannot be permanently deleted. End registration to retain its records.' } };
+            await tx.batch.delete({ where: { id } });
+            return { status: 200, body: { success: true } };
         });
-        if (!batch) return res.status(404).json({ error: 'Batch not found' });
-
-        const user = req.user;
-        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
-
-        // FINANCIAL SAFETY GUARD (P1-A): Prevent destruction of payment history.
-        // Hard-deleting a batch with payments cascades and wipes the entire financial ledger.
-        // Admins must archive/soft-delete instead if payment records exist.
-        const paymentCount = await prisma.feePayment.count({
-            where: { installment: { batchId: String(id) } }
-        });
-        if (paymentCount > 0) {
-            return res.status(409).json({
-                error: `Cannot delete batch with ${paymentCount} existing payment record(s). This would permanently destroy financial history. Please contact support to archive this batch instead.`
-            });
-        }
-
-        await prisma.batch.delete({ where: { id: String(id) } });
-        res.json({ success: true });
-    } catch (e) {
-        console.error('Error deleting batch:', e);
-        res.status(500).json({ error: 'Failed to delete batch' });
-    }
+        return res.status(result.status).json(result.body);
+    } catch { return res.status(409).json({ error: 'Batch changed or still has linked records. Refresh before trying again.' }); }
 };
 
 // --- WhatsApp Invitation Feature ---

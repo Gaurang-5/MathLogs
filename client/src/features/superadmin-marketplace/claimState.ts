@@ -3,7 +3,7 @@ import type { ClaimStatus } from './types';
 export type ClaimDecision = 'approve' | 'reject';
 export interface ClaimDecisionInput { verificationNote: string; rejectionReason: string; }
 
-export const claimActionsForStatus = (status: ClaimStatus) => {
+export const claimActionsForStatus = (status: ClaimStatus): readonly (ClaimDecision | 'contact')[] => {
   if (status === 'NEW') return ['contact', 'approve', 'reject'] as const;
   if (status === 'CONTACTED') return ['approve', 'reject'] as const;
   return [] as const;

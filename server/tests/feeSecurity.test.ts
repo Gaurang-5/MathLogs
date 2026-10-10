@@ -56,36 +56,18 @@ afterEach(() => {
 
 // Mock helpers for payInstallment
 function setupPayInstallmentMock(installmentOverrides: any, existingPaymentsCount: number = 0, batchIds = ['batch-1']) {
+    const installment = { id: 'installment-1', name:'Test', amount:500, ...installmentOverrides };
     replaceMethod(prisma.student, 'findUnique', (async () => ({
-        id: 'student-1',
-        name: 'Target Student',
-        createdAt: new Date('2026-03-01T00:00:00Z'), // Joined March 1st
-        instituteId: 'inst-1',
-        enrollments: batchIds.map(batchId => ({
-            batchId,
-            startedAt: new Date('2026-03-01T00:00:00Z'),
-            batch: { teacherId: 'teacher-1', institute: { name: 'Institute' } },
-        })),
-        feeAssignments: [],
-    }) as never) as typeof prisma.student.findUnique);
-
-    replaceMethod(prisma.feePayment, 'findMany', (async () => {
-        if (existingPaymentsCount > 0) {
-            return [{ amountPaid: 100 }] as never; // prior payment
-        }
-        return [] as never;
-    }) as typeof prisma.feePayment.findMany);
-
-    replaceMethod(prisma.feeInstallment, 'findUnique', (async () => ({
-        id: 'installment-1',
-        name: 'Test Installment',
-        amount: 500,
-        ...installmentOverrides,
-    }) as never) as typeof prisma.feeInstallment.findUnique);
-
-    replaceMethod(prisma.feePayment, 'create', (async () => ({ id: 'payment-1' }) as never) as typeof prisma.feePayment.create);
-    replaceMethod(prisma.systemLog, 'create', (async () => ({})) as never as typeof prisma.systemLog.create);
-    replaceMethod(prisma, '$transaction', (async (callback: any) => callback(prisma)) as typeof prisma.$transaction);
+        id:'student-1',name:'Target',instituteId:'inst-1',fees:[],feeAssignments:[],
+        feePayments:existingPaymentsCount ? [{installmentId:'installment-1',amountPaid:100}] : [],
+        enrollments:batchIds.map(batchId=>({batchId,feeDecision:'LEGACY',startedAt:new Date('2026-03-01'),batch:{teacherId:'teacher-1',name:'Batch',feeInstallments:installment.batchId===batchId?[installment]:[]}}))
+    })) as never);
+    replaceMethod(prisma.feePayment,'create',(async()=>({id:'payment-1'})) as never);
+    replaceMethod(prisma.systemLog,'create',(async()=>({})) as never);
+    replaceMethod(prisma.enrollmentAction,'findUnique',(async()=>null) as never);
+    replaceMethod(prisma.enrollmentAction,'create',(async()=>({})) as never);
+    replaceMethod(prisma,'$queryRaw',(async()=>[]) as never);
+    replaceMethod(prisma,'$transaction',(async(callback:any)=>callback(prisma)) as never);
 }
 
 test('payInstallment security: CANNOT pay towards another student\'s custom installment', async () => {
@@ -96,14 +78,14 @@ test('payInstallment security: CANNOT pay towards another student\'s custom inst
     });
 
     const req = {
-        body: { studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
+        body: { idempotencyKey:'fixture-payment-key', studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
         user: { id: 'teacher-1', instituteId: 'inst-1' }
     } as MockRequest;
     const res = createMockResponse();
 
     await payInstallment(req as never, res as never);
-    assert.equal(res.statusCode, 403);
-    assert.deepEqual(res.body, { error: 'Forbidden: Installment is not valid for this student' });
+    assert.equal(res.statusCode, 400);
+    assert.deepEqual(res.body, { error: 'An installment is not applicable to this student. Refresh and select again.' });
 });
 
 test('payInstallment security: CANNOT pay towards global installment from a different batch', async () => {
@@ -114,14 +96,14 @@ test('payInstallment security: CANNOT pay towards global installment from a diff
     });
 
     const req = {
-        body: { studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
+        body: { idempotencyKey:'fixture-payment-key', studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
         user: { id: 'teacher-1', instituteId: 'inst-1' }
     } as MockRequest;
     const res = createMockResponse();
 
     await payInstallment(req as never, res as never);
-    assert.equal(res.statusCode, 403);
-    assert.deepEqual(res.body, { error: 'Forbidden: Installment is not valid for this student' });
+    assert.equal(res.statusCode, 400);
+    assert.deepEqual(res.body, { error: 'An installment is not applicable to this student. Refresh and select again.' });
 });
 
 test('payInstallment security: CAN pay towards their own custom installment', async () => {
@@ -132,7 +114,7 @@ test('payInstallment security: CAN pay towards their own custom installment', as
     });
 
     const req = {
-        body: { studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
+        body: { idempotencyKey:'fixture-payment-key', studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
         user: { id: 'teacher-1', instituteId: 'inst-1' }
     } as MockRequest;
     const res = createMockResponse();
@@ -149,7 +131,7 @@ test('payInstallment security: CAN pay towards valid global installment in own b
     });
 
     const req = {
-        body: { studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
+        body: { idempotencyKey:'fixture-payment-key', studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
         user: { id: 'teacher-1', instituteId: 'inst-1' }
     } as MockRequest;
     const res = createMockResponse();
@@ -166,7 +148,7 @@ test('payInstallment security: CAN pay towards global installment before join da
     }, 1); // 1 prior payment
 
     const req = {
-        body: { studentId: 'student-1', installmentId: 'installment-1', amount: 400 },
+        body: { idempotencyKey:'fixture-payment-key', studentId: 'student-1', installmentId: 'installment-1', amount: 400 },
         user: { id: 'teacher-1', instituteId: 'inst-1' }
     } as MockRequest;
     const res = createMockResponse();
@@ -183,7 +165,7 @@ test('payInstallment accepts an installment from either active enrollment', asyn
     }, 0, ['batch-1', 'batch-2']);
 
     const req = {
-        body: { studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
+        body: { idempotencyKey:'fixture-payment-key', studentId: 'student-1', installmentId: 'installment-1', amount: 500 },
         user: { id: 'teacher-1', instituteId: 'inst-1' }
     } as MockRequest;
     const res = createMockResponse();

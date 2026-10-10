@@ -1,13 +1,12 @@
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CalendarDays, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Monitor, Copy, Share2, Sparkles, ChevronRight } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, Eye, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Share2, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
-import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
 import { getInstallmentPaidMap, isFeeInstallmentApplicable, type LegacyFee } from '../utils/fees';
 import StudentProfileDrawer from '../components/StudentProfileDrawer';
@@ -16,7 +15,7 @@ import { StudentFeeStartDialog } from '../features/month-coverage/StudentFeeStar
 import { confirmStudentFeeProfile, loadMonthCoverageSummary } from '../features/month-coverage/api';
 import type { MonthCoverageProfile, MonthCoverageStudentSummary, MonthCoverageSummary } from '../features/month-coverage/types';
 import { MonthCoveragePaymentDialog } from '../features/month-coverage/MonthCoveragePaymentDialog';
-import { formatCoverageRange, monthStatusCopy } from '../features/month-coverage/monthCoverageViewModel';
+import { monthStatusCopy } from '../features/month-coverage/monthCoverageViewModel';
 import { BatchExportDialog, type BatchExportColumn } from '../features/batch-export/BatchExportDialog';
 import { AddStudentFlow } from '../features/enrollments/AddStudentFlow';
 import { EndEnrollmentDialog } from '../features/enrollments/EndEnrollmentDialog';
@@ -117,7 +116,7 @@ export default function BatchDetails() {
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [showAddStudent, setShowAddStudent] = useState(false);
-    const [showRegMenu, setShowRegMenu] = useState(false);
+    const [] = useState(false);
     const [showRegModal, setShowRegModal] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -210,6 +209,7 @@ export default function BatchDetails() {
     const [customInvoice, setCustomInvoice] = useState({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
 
     // Payment Modal State
+    const paymentRequestRef = useRef<{ fingerprint: string; key: string } | null>(null);
     const [paymentModal, setPaymentModal] = useState<{ student: Student, installment: FeeInstallment, date: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -708,6 +708,8 @@ export default function BatchDetails() {
 
         // Capture values to avoid closure issues or mutations
         const { student, installment, date } = paymentModal;
+        const fingerprint = JSON.stringify([student.id, installment.id, installment.amount, date]);
+        if (paymentRequestRef.current?.fingerprint !== fingerprint) paymentRequestRef.current = { fingerprint, key: crypto.randomUUID() };
 
         // Optimistic Update
         const newPayment = {
@@ -740,8 +742,10 @@ export default function BatchDetails() {
                 studentId: student.id,
                 installmentId: installment.id,
                 amount: Number(installment.amount), // Ensure amount is number
-                date: date
+                date: date,
+                idempotencyKey: paymentRequestRef.current.key
             });
+            paymentRequestRef.current = null;
             toast.success('Payment recorded', { id: toastId });
             setPaymentModal(null);
             setTimeout(() => fetchDetails(), 300); // Small delay to ensure backend processed
@@ -750,7 +754,7 @@ export default function BatchDetails() {
             const errorMessage = getErrorMessage(error, 'Failed to record payment');
 
             // If payment already exists, treat as success/info and keep the UI state
-            if (errorMessage.includes('already exists') || errorMessage.includes('409')) {
+            if (errorMessage.includes('PAYMENT_ALREADY_RECORDED')) {
                 toast.success('Payment already recorded', { id: toastId, icon: 'info' });
                 setPaymentModal(null);
                 setTimeout(() => fetchDetails(), 300);
@@ -1831,7 +1835,7 @@ export default function BatchDetails() {
                                                     {rows.length === 0 && (
                                                         <tr><td colSpan={5} className="px-6 py-12 text-center text-app-text-tertiary">No test records found.</td></tr>
                                                     )}
-                                                    {rows.map((row, i) => {
+                                                    {rows.map((row) => {
                                                         if (row.type === 'absent') {
                                                             const parsedDate = row.test.date ? new Date(row.test.date) : null;
                                                             const dateStr = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate.toLocaleDateString() : '-';
@@ -2228,7 +2232,7 @@ export default function BatchDetails() {
                                                                     <button onClick={() => { setEditingInstallment(inst); setFeeView('edit'); }} className="p-2 hover:bg-blue-50 text-app-text-tertiary hover:text-blue-600 rounded-xl transition-colors" title="Edit">
                                                                         <Edit2 className="w-4 h-4" />
                                                                     </button>
-                                                                    <button onClick={() => { setInstallmentToDelete(inst); setFeeView('delete-confirm'); }} className="p-2 hover:bg-red-50 text-app-text-tertiary hover:text-red-500 rounded-xl transition-colors" title="Remove from batch" aria-label={`Remove ${student.name} from batch`}>
+                                                                    <button onClick={() => { setInstallmentToDelete(inst); setFeeView('delete-confirm'); }} className="p-2 hover:bg-red-50 text-app-text-tertiary hover:text-red-500 rounded-xl transition-colors" title="Remove from batch" aria-label={`Remove installment ${inst.name}`}>
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </button>
                                                                 </div>

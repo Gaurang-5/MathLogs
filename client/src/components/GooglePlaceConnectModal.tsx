@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MapPin, Star, CheckCircle, RefreshCw, X, ExternalLink, Globe } from 'lucide-react';
+import { Search, MapPin, Star, CheckCircle, RefreshCw, X, Globe } from 'lucide-react';
 
 interface GooglePlaceSearchResult {
     placeId: string;
@@ -28,7 +28,6 @@ export const GooglePlaceConnectModal: React.FC<GooglePlaceConnectModalProps> = (
     currentPlaceId,
     currentRating,
     currentReviewCount,
-    currentMapsUrl,
     onSyncSuccess
 }) => {
     const [searchQuery, setSearchQuery] = useState('');

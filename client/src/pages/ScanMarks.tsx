@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
@@ -29,9 +29,11 @@ interface StudentMark {
 }
 
 interface StudentLookupResponse {
+    humanId?: string;
     id: string;
     name: string;
     batch?: {
+        name?: string;
         className?: string | null;
     };
     marks?: StudentMark[];
@@ -92,9 +94,7 @@ export default function ScanMarks() {
                     scannerRef.current.stop().catch(err => console.error("Failed to stop scanner", err));
                 }
                 // clear() returns Promise<void> usually, but let's be safe
-                scannerRef.current.clear().catch((error: unknown) => {
-                    console.debug("Failed to clear scanner on unmount", error);
-                });
+                void Promise.resolve().then(() => scannerRef.current?.clear()).catch(() => {});
             }
         };
     }, []);
@@ -179,18 +179,18 @@ export default function ScanMarks() {
                                     await new Promise(r => setTimeout(r, 100));
 
                                     // NOW pause (video still had live frames during the wait)
-                                    html5QrCode.pause();
+                                    // Keep live frames until the best sticker capture is selected.
 
                                     const videoElement = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement;
                                     if (!videoElement) return { score: "", confidence: 0, debugImage: null };
 
                                     // CV detection: 3 attempts × 100ms = max 300ms
                                     let smartImage = null;
-                                    if (window.cv) {
+                                    {
                                         try {
                                             const cvCanvas = document.createElement('canvas');
                                             for (let i = 0; i < 3; i++) {
-                                                smartImage = await detectAndWarpSticker(videoElement, cvCanvas);
+                                                smartImage = await detectAndWarpSticker(videoElement, cvCanvas, decodedText);
                                                 if (smartImage) {
                                                     console.log(`✅ CV warp succeeded on attempt ${i + 1}`);
                                                     break;
@@ -202,15 +202,16 @@ export default function ScanMarks() {
                                         }
                                     }
 
-                                    if (!smartImage) console.warn("⚠️ CV warp failed — using raw video fallback");
+                                    html5QrCode.pause();
+                                    if (!smartImage) showToast("Keep the whole sticker visible and move closer, then scan again.", "warning");
 
                                     // Get maxMarks from the selected test for OCR range validation
                                     const currentTest = testsRef.current.find(t => t.id === selectedTestId);
                                     const testMaxMarks = currentTest?.maxMarks;
 
                                     return smartImage
-                                        ? await extractMarksFromSticker(videoElement, smartImage, testMaxMarks)
-                                        : await extractMarksFromSticker(videoElement, undefined, testMaxMarks);
+                                        ? await extractMarksFromSticker(videoElement, smartImage, testMaxMarks, selectedTestId)
+                                        : await extractMarksFromSticker(videoElement, undefined, testMaxMarks, selectedTestId);
                                 } catch (ocrErr) {
                                     console.error("❌ OCR Error:", ocrErr);
                                     return { score: "", confidence: 0, debugImage: null };
@@ -339,7 +340,8 @@ export default function ScanMarks() {
             await apiRequest('/marks', 'POST', {
                 testId: selectedTestId,
                 studentId: student.id,
-                score
+                score,
+                expectedScore: existingMark
             });
 
             // Single success toast
@@ -404,6 +406,7 @@ export default function ScanMarks() {
 
     return (
         <Layout title="Scan Marks">
+            <Link className="inline-flex min-h-11 items-center underline mb-4" to="/scan/bulk">Scan a stack of papers →</Link>
             {/* Hide top and bottom navigation bars when in immersive scanning mode or showing modals */}
             {(scanning || student || pendingStudent) && (
                 <style>{`

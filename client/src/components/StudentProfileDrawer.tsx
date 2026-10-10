@@ -8,8 +8,7 @@ import {
     X, Phone, Book, GraduationCap, CheckCircle2,
     CreditCard, Activity, CalendarDays, TrendingUp,
     MessageCircle, IndianRupee, School, Mail, User, AlertCircle,
-    Award, Check, Clock
-} from 'lucide-react';
+    } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { TeacherButton } from './teacher-ui/TeacherButton';
 import { ConfiguredStudentFields } from '../features/student-profile/ConfiguredStudentFields';

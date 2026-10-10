@@ -17,7 +17,7 @@ describe('StudentPaymentPortal month coverage', () => {
     vi.clearAllMocks();
     axiosMock.get.mockImplementation(async (url: string) => {
       if (url.includes('student-fees')) throw { response: { status: 403, data: { error: 'PARENT_PAYMENTS_DISABLED_FOR_MONTH_COVERAGE' } } };
-      return { data: { name: 'Apex Academy', logoUrl: null } };
+      return { data: { name: 'Apex Academy', logoUrl: null, coachingFeeMode: 'MONTH_COVERAGE' } };
     });
     container = document.createElement('div');
     document.body.appendChild(container);

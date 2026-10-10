@@ -59,6 +59,8 @@ interface QuizQuestion {
 }
 
 interface OnlineQuiz {
+    isPublic?: boolean;
+    batches?: {id:string;name:string;className?:string|null}[];
     id: string;
     title: string;
     topic?: string | null;
@@ -136,7 +138,7 @@ export default function QuizList() {
         e.stopPropagation();
         const cloned = {
             ...quiz,
-            id: undefined,
+            id: '',
             title: `${quiz.title} (Copy)`,
             isFinalized: false,
             submissions: [],
@@ -1002,7 +1004,6 @@ export default function QuizList() {
                                                     let statusLabel = 'Not Started';
                                                     let statusBadge = 'bg-neutral-100 text-neutral-700 border-neutral-250';
                                                     let scoreText = '-';
-                                                    let isMissed = false;
 
                                                     if (sub) {
                                                         if (sub.submittedAt) {
@@ -1014,7 +1015,6 @@ export default function QuizList() {
                                                                 statusLabel = 'Quiz Missed (Locked)';
                                                                 statusBadge = 'bg-rose-50 text-rose-700 border-rose-100';
                                                                 scoreText = '0.0 / ' + activeQuiz.totalMarks;
-                                                                isMissed = true;
                                                             } else {
                                                                 statusLabel = 'Attending';
                                                                 statusBadge = 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse';
@@ -1026,7 +1026,6 @@ export default function QuizList() {
                                                             statusLabel = 'Quiz Missed';
                                                             statusBadge = 'bg-rose-50 text-rose-700 border-rose-100';
                                                             scoreText = '0.0 / ' + activeQuiz.totalMarks;
-                                                            isMissed = true;
                                                         }
                                                     }
 

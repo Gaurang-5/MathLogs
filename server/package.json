@@ -6,7 +6,7 @@
   "scripts": {
     "test": "JWT_SECRET=test-secret NODE_ENV=test tsx --test tests/*.test.ts",
     "dev": "tsx watch --ignore \"*.pdf\" --ignore \"*.log\" --ignore \"*.csv\" --ignore \"tmp/**\" src/index.ts",
-    "start:dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx src/index.ts",
+    "start:dev": "tsx src/index.ts",
     "seed:month-coverage-demo": "tsx scripts/seedMonthCoverageDemo.ts",
     "build": "tsc",
     "start": "node dist/index.js"
@@ -31,7 +31,7 @@
     "@types/nodemailer": "^7.0.5",
     "@types/pdfkit": "^0.17.4",
     "aws4fetch": "^1.0.20",
-    "axios": "1.13.5",
+    "axios": "^1.20.0",
     "bcryptjs": "^3.0.3",
     "bwip-js": "^4.8.0",
     "compression": "^1.8.1",
@@ -43,7 +43,7 @@
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
-    "nodemailer": "^7.0.12",
+    "nodemailer": "^10.1.0",
     "pdfkit": "^0.17.2",
     "pg": "^8.21.0",
     "prisma": "5.22.0",

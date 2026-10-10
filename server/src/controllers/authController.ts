@@ -442,7 +442,7 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'OTP has already been used' });
         }
 
-        const isDevBypass = process.env.NODE_ENV !== 'production' && otp === "000000";
+        const isDevBypass = process.env.NODE_ENV === 'test' && process.env.ALLOW_TEST_OTP === 'true' && otp === "000000";
         if (storedOtp.otp !== otp && !isDevBypass) { 
             return res.status(400).json({ error: 'Invalid OTP code' });
         }
@@ -782,7 +782,7 @@ export const verifySignupOtp = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
         }
 
-        const isDevBypass = process.env.NODE_ENV !== 'production' && otp === '000000';
+        const isDevBypass = process.env.NODE_ENV === 'test' && process.env.ALLOW_TEST_OTP === 'true' && otp === '000000';
         if (storedOtp.otp !== otp && !isDevBypass) {
             return res.status(400).json({ error: 'Invalid OTP code' });
         }

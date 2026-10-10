@@ -32,7 +32,7 @@ test('OTP verification returns a selector instead of choosing the first shared-p
   replaceMethod(prisma.otpToken, 'findUnique', (async () => ({
     otp: '123456', expiresAt: new Date(Date.now() + 60_000), verified: false,
   }) as never) as typeof prisma.otpToken.findUnique);
-  replaceMethod(prisma.otpToken, 'delete', (async () => ({}) as never) as typeof prisma.otpToken.delete);
+  replaceMethod(prisma.otpToken, 'deleteMany', (async () => ({count:1}) as never) as typeof prisma.otpToken.deleteMany);
   replaceMethod(prisma.student, 'findMany', (async () => ([
     { id: 's1', humanId: 'ML-001', name: 'Riya', enrollments: [{ batch: { name: 'Class 10 Boys' } }] },
     { id: 's2', humanId: 'ML-002', name: 'Siya', enrollments: [{ batch: { name: 'Class 8 Girls' } }] },

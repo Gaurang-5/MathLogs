@@ -33,6 +33,8 @@ import {
 
 /* ─── Types ─── */
 interface QuizQuestion {
+    imageUrl?: string;
+    figureUrl?: string;
     id: string;
     questionText: string;
     options: string[];
@@ -236,7 +238,7 @@ export default function TakeQuiz() {
     };
 
     const maskTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const answersRef = useRef<Record<string, string>>({});
+    const answersRef = useRef<Record<string, AnswerValue>>({});
     const lastSavedRef = useRef('{}');
     const autosaveFlying = useRef(false);
     const submittedRef = useRef(false);
@@ -657,7 +659,7 @@ export default function TakeQuiz() {
     /* ── Accidental refresh protection (beforeunload) ── */
     useEffect(() => {
         if (phase !== 'quiz') return;
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        const handleBeforeUnload = () => {
             isUnloadingRef.current = true;
             // No longer prompting, just preventing the false positive flag
         };

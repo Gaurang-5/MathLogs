@@ -55,11 +55,13 @@ export function validateFeeAllocations(amount: unknown, allocations: FeeAllocati
   return selected;
 }
 
-export async function collectExplicitPayment(input: {studentId: string; amount: unknown; allocations: FeeAllocation[]; idempotencyKey: string; verificationId?: string}, actor: Actor) {
+export async function collectExplicitPayment(input: {studentId: string; amount: unknown; allocations: FeeAllocation[]; idempotencyKey: string; verificationId?: string; date?: string}, actor: Actor) {
   if (typeof input.idempotencyKey !== 'string' || input.idempotencyKey.length < 8 || input.idempotencyKey.length > 150) throw new FeeAllocationError('Payment reference is required. Refresh the payment form.');
   if (!Array.isArray(input.allocations) || !input.allocations.length || input.allocations.length > 100 || input.allocations.some(a => !a || typeof a.installmentId !== 'string')) throw new FeeAllocationError('Select the installment this payment belongs to.');
+  const paymentDate = input.date ? new Date(input.date) : undefined;
+  if (paymentDate && !Number.isFinite(paymentDate.getTime())) throw new FeeAllocationError('Invalid payment date.');
   const received = amountPaise(input.amount);
-  const fingerprint = JSON.stringify({studentId:input.studentId, amount:received, allocations:(input.allocations || []).map(a=>({id:a.installmentId,paise:amountPaise(a.amount)})).sort((a,b)=>a.id.localeCompare(b.id)), verificationId:input.verificationId || null});
+  const fingerprint = JSON.stringify({studentId:input.studentId, amount:received, allocations:(input.allocations || []).map(a=>({id:a.installmentId,paise:amountPaise(a.amount)})).sort((a,b)=>a.id.localeCompare(b.id)), verificationId:input.verificationId || null,date:paymentDate?.toISOString() || null});
   for (let attempt=0; attempt<3; attempt++) {
     try { return await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM "Student" WHERE id=${input.studentId} AND "instituteId"=${actor.instituteId} FOR UPDATE`;
@@ -80,7 +82,7 @@ export async function collectExplicitPayment(input: {studentId: string; amount: 
         if (claimed.count!==1) throw new FeeAllocationError('This receipt was already processed.',409);
       }
       const payments=[];
-      for (const allocation of selected) payments.push(await tx.feePayment.create({data:{studentId:student.id,installmentId:allocation.installmentId,amountPaid:allocation.paise/100}}));
+      for (const allocation of selected) payments.push(await tx.feePayment.create({data:{studentId:student.id,installmentId:allocation.installmentId,amountPaid:allocation.paise/100,date:paymentDate}}));
       const response={success:true,studentId:student.id,amount:received/100,paymentIds:payments.map(p=>p.id),allocations:selected.map(a=>({installmentId:a.installmentId,name:installments.find(i=>i.id===a.installmentId)!.name,amount:a.paise/100})),replayed:false};
       await tx.systemLog.create({data:{instituteId:actor.instituteId,action:'FEE_COLLECTED',entityId:student.id,entityName:student.name,details:{type:'Teacher-selected installments',...response,verificationId:input.verificationId || null}}});
       await tx.enrollmentAction.create({data:{instituteId:actor.instituteId,idempotencyKey:key,action:'EXPLICIT_FEE_PAYMENT',result:{fingerprint,response}}});

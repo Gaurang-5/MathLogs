@@ -263,89 +263,35 @@ test('POST /api/auth/refresh rotates tokens for a valid refresh token', async ()
     });
 });
 
-test('POST /api/fees/pay-installment records a payment for an authenticated teacher', async () => {
-    replaceMethod(prisma.institute, 'findUnique', (async () => ({ coachingFeeMode: 'CURRENT_DUE_BASED' }) as never) as typeof prisma.institute.findUnique);
-    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: (error: unknown, decoded?: unknown) => void) => {
-        callback(null, {
-            id: 'teacher-1',
-            username: 'owner',
-            passwordVersion: 1,
-            instituteId: 'inst-1',
-            role: 'ADMIN',
-        });
-    }) as unknown) as typeof jwt.verify);
-    replaceMethod(prisma.admin, 'findUnique', (async () => ({
-        id: 'teacher-1',
-        username: 'owner',
-        passwordVersion: 1,
-        instituteId: 'inst-1',
-        role: 'ADMIN',
-        institute: {
-            planExpiryDate: null,
-            plan: 'ENTERPRISE',
-        },
-    }) as never) as typeof prisma.admin.findUnique);
-    replaceMethod(prisma.student, 'findUnique', (async () => ({
-        id: 'student-1',
-        name: 'Aarav Sharma',
-        batchId: 'batch-1',
-        parentWhatsapp: '',
-        instituteId: 'inst-1',
-        createdAt: new Date('2026-01-01T00:00:00Z'),
-        enrollments: [{
-            batchId: 'batch-1',
-            startedAt: new Date('2026-01-01T00:00:00Z'),
-            batch: {
-                id: 'batch-1',
-                teacherId: 'teacher-1',
-                institute: { name: 'MathLogs Institute' },
-            },
-        }],
-        feeAssignments: [],
-    }) as never) as typeof prisma.student.findUnique);
-    replaceMethod(prisma.feePayment, 'findMany', (async () => [] as never) as typeof prisma.feePayment.findMany);
-    replaceMethod(prisma.feeInstallment, 'findUnique', (async () => ({
-        id: 'installment-1',
-        name: 'April Fee',
-        amount: 500,
-        studentId: null,
-        batchId: 'batch-1',
-        createdAt: new Date('2026-04-01T00:00:00Z')
-    }) as never) as typeof prisma.feeInstallment.findUnique);
-    replaceMethod(prisma.feePayment, 'create', (async ({ data }: { data: Record<string, unknown> }) => ({
-        id: 'payment-route-1',
-        studentId: data.studentId,
-        installmentId: data.installmentId,
-        amountPaid: data.amountPaid,
-        date: data.date,
-    }) as never) as typeof prisma.feePayment.create);
-    replaceMethod(prisma.systemLog, 'create', (async () => ({ id: 'system-log-route-1' }) as never) as typeof prisma.systemLog.create);
-    replaceMethod(prisma, '$transaction', (async (cb: any) => cb(prisma)) as typeof prisma.$transaction);
 
-    const response = await postJson('/api/fees/pay-installment', {
-        studentId: '123e4567-e89b-12d3-a456-426614174000',
-        installmentId: '123e4567-e89b-12d3-a456-426614174001',
-        amount: 500,
-        date: '2026-04-03',
-    }, {
-        Authorization: 'Bearer valid-token',
-    });
-
-    assert.equal(response.status, 200);
-
-    const json = await response.json() as {
-        id: string;
-        studentId: string;
-        installmentId: string;
-        amountPaid: number;
-        date: string;
-    };
-
-    assert.equal(json.id, 'payment-route-1');
-    assert.equal(json.studentId, '123e4567-e89b-12d3-a456-426614174000');
-    assert.equal(json.installmentId, '123e4567-e89b-12d3-a456-426614174001');
-    assert.equal(json.amountPaid, 500);
-    assert.equal(json.date, new Date('2026-04-03').toISOString());
+function mockExplicitCollection(studentId: string, installmentId: string) {
+    const payments: any[] = [];
+    const actions = new Map<string, any>();
+    let queue = Promise.resolve();
+    replaceMethod(prisma, '$transaction', (async (callback: any) => {
+        const previous=queue; let release!:()=>void;
+        queue=new Promise<void>(resolve=>{release=resolve;});await previous;
+        try { return await callback(prisma); } finally { release(); }
+    }) as never);
+    replaceMethod(prisma, '$queryRaw', (async()=>[]) as never);
+    replaceMethod(prisma.student,'findUnique',(async()=>({id:studentId,name:'Fixture',instituteId:'inst-1',fees:[],feeAssignments:[],feePayments:payments,
+        enrollments:[{feeDecision:'LEGACY',startedAt:new Date('2026-01-01'),batch:{teacherId:'teacher-1',name:'Batch',feeInstallments:[{id:installmentId,name:'October',amount:500,studentId:null,createdAt:new Date('2026-04-01')}]}}]})) as never);
+    replaceMethod(prisma.feePayment,'create',(async({data}:any)=>{const payment={id:`payment-${payments.length+1}`,...data};payments.push(payment);return payment;}) as never);
+    replaceMethod(prisma.systemLog,'create',(async()=>({})) as never);
+    replaceMethod(prisma.enrollmentAction,'findUnique',(async({where}:any)=>actions.get(where.instituteId_idempotencyKey.idempotencyKey)||null) as never);
+    replaceMethod(prisma.enrollmentAction,'create',(async({data}:any)=>{actions.set(data.idempotencyKey,data);return data;}) as never);
+    return payments;
+}
+test('POST /api/fees/pay-installment uses explicit allocations and preserves receipt date', async()=>{
+    replaceMethod(prisma.institute,'findUnique',(async()=>({coachingFeeMode:'CURRENT_DUE_BASED'})) as never);
+    replaceMethod(jwt,'verify',((token: string, secret: string, callback:any)=>callback(null,{id:'teacher-1',instituteId:'inst-1',role:'ADMIN'})) as never);
+    replaceMethod(prisma.admin,'findUnique',(async()=>({id:'teacher-1',instituteId:'inst-1',role:'ADMIN',institute:{plan:'ENTERPRISE'}})) as never);
+    const studentId='123e4567-e89b-12d3-a456-426614174000', installmentId='123e4567-e89b-12d3-a456-426614174001';
+    const payments=mockExplicitCollection(studentId,installmentId);
+    const response=await postJson('/api/fees/pay-installment',{studentId,installmentId,amount:500,date:'2026-04-03',idempotencyKey:'route-payment-date'},{Authorization:'Bearer token'});
+    assert.equal(response.status,200);const body=await response.json() as any;
+    assert.equal(body.amount,500);assert.equal(body.paymentIds.length,1);
+    assert.equal(payments[0].date.toISOString(),'2026-04-03T00:00:00.000Z');
 });
 
 test('POST /api/tests/online saves generated quiz questions for a teacher batch', async () => {
@@ -505,117 +451,30 @@ test('PUT /api/tests/online charges one credit when publishing a draft and never
     assert.equal(includedCredits, 4);
 });
 
-test('POST /api/fees/pay is idempotent and prevents double-payment', async () => {
-    replaceMethod(prisma.institute, 'findUnique', (async () => ({ coachingFeeMode: 'CURRENT_DUE_BASED' }) as never) as typeof prisma.institute.findUnique);
-    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: any) => {
-        callback(null, { id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN' });
-    }) as unknown) as typeof jwt.verify);
-    replaceMethod(prisma.admin, 'findUnique', (async () => ({
-        id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN', institute: { plan: 'ENTERPRISE' },
-    }) as never) as typeof prisma.admin.findUnique);
-
-    let txLock = Promise.resolve();
-    replaceMethod(prisma, '$transaction', (async (cb: any) => {
-        const previous = txLock;
-        let release!: () => void;
-        txLock = new Promise(r => { release = r; });
-        await previous;
-        try {
-            return await cb(prisma);
-        } finally {
-            release();
-        }
-    }) as typeof prisma.$transaction);
-
-    let createdRecords: any[] = [];
-    replaceMethod(prisma.student, 'findUnique', (async () => ({
-        id: '123e4567-e89b-12d3-a456-426614174002',
-        name: 'Idempotency Test',
-        instituteId: 'inst-1',
-        createdAt: new Date(),
-        enrollments: [{
-            startedAt: new Date(),
-            batch: { teacherId: 'teacher-1', feeAmount: 1000, feeInstallments: [] },
-        }],
-        fees: [...createdRecords],
-        feePayments: []
-    }) as never) as typeof prisma.student.findUnique);
-
-    replaceMethod(prisma.feeRecord, 'create', (async ({ data }: any) => {
-        createdRecords.push(data);
-        return { id: 'fr-1', ...data };
-    }) as typeof prisma.feeRecord.create);
-    replaceMethod(prisma.systemLog, 'create', (async () => ({})) as typeof prisma.systemLog.create);
-
-    const [res1, res2] = await Promise.all([
-        postJson('/api/fees/pay', { studentId: '123e4567-e89b-12d3-a456-426614174002', amount: 1000 }, { Authorization: 'Bearer token' }),
-        postJson('/api/fees/pay', { studentId: '123e4567-e89b-12d3-a456-426614174002', amount: 1000 }, { Authorization: 'Bearer token' })
-    ]);
-
-    assert.ok(res1.status === 200 || res2.status === 200, 'At least one request should succeed');
-    assert.ok(res1.status === 400 || res2.status === 400, 'One request should fail due to overpayment');
-    assert.equal(createdRecords.length, 1, 'Only one fee record should be created');
+test('POST /api/fees/pay is idempotent and prevents double-payment',async()=>{
+    replaceMethod(prisma.institute,'findUnique',(async()=>({coachingFeeMode:'CURRENT_DUE_BASED'})) as never);
+    replaceMethod(jwt,'verify',((token: string, secret: string, callback:any)=>callback(null,{id:'teacher-1',instituteId:'inst-1',role:'ADMIN'})) as never);
+    replaceMethod(prisma.admin,'findUnique',(async()=>({id:'teacher-1',instituteId:'inst-1',role:'ADMIN',institute:{plan:'ENTERPRISE'}})) as never);
+    const studentId='123e4567-e89b-12d3-a456-426614174000', installmentId='123e4567-e89b-12d3-a456-426614174001';
+    const payments=mockExplicitCollection(studentId,installmentId);
+    const input={studentId,allocations:[{installmentId,amount:500}],amount:500,idempotencyKey:'same-payment-reference'};
+    const results=await Promise.all([postJson('/api/fees/pay',input,{Authorization:'Bearer token'}),postJson('/api/fees/pay',input,{Authorization:'Bearer token'})]);
+    assert.deepEqual(results.map(r=>r.status),[200,200]);
+    assert.equal(payments.length,1);
+    const responses=await Promise.all(results.map(r=>r.json())) as any[];
+    assert.equal(responses.filter(r=>r.replayed).length,1);
 });
 
-test('POST /api/fees/pay-installment is idempotent and prevents double-payment', async () => {
-    replaceMethod(prisma.institute, 'findUnique', (async () => ({ coachingFeeMode: 'CURRENT_DUE_BASED' }) as never) as typeof prisma.institute.findUnique);
-    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: any) => {
-        callback(null, { id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN' });
-    }) as unknown) as typeof jwt.verify);
-    replaceMethod(prisma.admin, 'findUnique', (async () => ({
-        id: 'teacher-1', instituteId: 'inst-1', role: 'ADMIN', institute: { plan: 'ENTERPRISE' },
-    }) as never) as typeof prisma.admin.findUnique);
-
-    let txLock = Promise.resolve();
-    replaceMethod(prisma, '$transaction', (async (cb: any) => {
-        const previous = txLock;
-        let release!: () => void;
-        txLock = new Promise(r => { release = r; });
-        await previous;
-        try {
-            return await cb(prisma);
-        } finally {
-            release();
-        }
-    }) as typeof prisma.$transaction);
-
-    replaceMethod(prisma.student, 'findUnique', (async () => ({
-        id: '123e4567-e89b-12d3-a456-426614174003',
-        name: 'Installment Test',
-        instituteId: 'inst-1',
-        batchId: 'batch-1',
-        createdAt: new Date('2026-01-01T00:00:00Z'),
-        enrollments: [{
-            batchId: 'batch-1',
-            startedAt: new Date('2026-01-01T00:00:00Z'),
-            batch: { id: 'batch-1', teacherId: 'teacher-1', institute: { name: 'Inst' } },
-        }],
-        feeAssignments: [],
-    }) as never) as typeof prisma.student.findUnique);
-
-    replaceMethod(prisma.feeInstallment, 'findUnique', (async () => ({
-        id: '123e4567-e89b-12d3-a456-426614174004',
-        name: 'May Fee',
-        amount: 500,
-        studentId: null,
-        batchId: 'batch-1',
-        createdAt: new Date('2026-04-01T00:00:00Z')
-    }) as never) as typeof prisma.feeInstallment.findUnique);
-
-    let createdInstallmentPayments: any[] = [];
-    replaceMethod(prisma.feePayment, 'findMany', (async () => [...createdInstallmentPayments]) as typeof prisma.feePayment.findMany);
-    replaceMethod(prisma.feePayment, 'create', (async ({ data }: any) => {
-        createdInstallmentPayments.push(data);
-        return { id: 'fp-1', ...data };
-    }) as typeof prisma.feePayment.create);
-    replaceMethod(prisma.systemLog, 'create', (async () => ({})) as typeof prisma.systemLog.create);
-
-    const [res1, res2] = await Promise.all([
-        postJson('/api/fees/pay-installment', { studentId: '123e4567-e89b-12d3-a456-426614174003', installmentId: '123e4567-e89b-12d3-a456-426614174004', amount: 500 }, { Authorization: 'Bearer token' }),
-        postJson('/api/fees/pay-installment', { studentId: '123e4567-e89b-12d3-a456-426614174003', installmentId: '123e4567-e89b-12d3-a456-426614174004', amount: 500 }, { Authorization: 'Bearer token' })
-    ]);
-
-    assert.ok(res1.status === 200 || res2.status === 200, 'At least one request should succeed');
-    assert.ok(res1.status === 400 || res2.status === 400, 'One request should fail due to overpayment');
-    assert.equal(createdInstallmentPayments.length, 1, 'Only one fee payment should be created');
+test('POST /api/fees/pay-installment is idempotent and prevents double-payment',async()=>{
+    replaceMethod(prisma.institute,'findUnique',(async()=>({coachingFeeMode:'CURRENT_DUE_BASED'})) as never);
+    replaceMethod(jwt,'verify',((token: string, secret: string, callback:any)=>callback(null,{id:'teacher-1',instituteId:'inst-1',role:'ADMIN'})) as never);
+    replaceMethod(prisma.admin,'findUnique',(async()=>({id:'teacher-1',instituteId:'inst-1',role:'ADMIN',institute:{plan:'ENTERPRISE'}})) as never);
+    const studentId='123e4567-e89b-12d3-a456-426614174000', installmentId='123e4567-e89b-12d3-a456-426614174001';
+    const payments=mockExplicitCollection(studentId,installmentId);
+    const input={studentId,installmentId,amount:500,idempotencyKey:'same-payment-reference'};
+    const results=await Promise.all([postJson('/api/fees/pay-installment',input,{Authorization:'Bearer token'}),postJson('/api/fees/pay-installment',input,{Authorization:'Bearer token'})]);
+    assert.deepEqual(results.map(r=>r.status),[200,200]);
+    assert.equal(payments.length,1);
+    const responses=await Promise.all(results.map(r=>r.json())) as any[];
+    assert.equal(responses.filter(r=>r.replayed).length,1);
 });

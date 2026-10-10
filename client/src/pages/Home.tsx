@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ChevronRight, MessageSquare, Shield,
-    CheckCircle, CheckCircle2, ArrowRight, Database, LineChart,
+    CheckCircle, CheckCircle2, ArrowRight, Database,
     Camera, X, Maximize2, Settings,
     Download, FileText, Printer, Wallet, Plus, Minus,
     Sparkles

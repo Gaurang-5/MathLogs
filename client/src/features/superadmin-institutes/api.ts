@@ -10,7 +10,8 @@ async function request<T>(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELE
 }
 
 export class InstituteConflictError extends Error {
-  constructor(public latest: InstituteWorkspaceData['overview']) { super('This institute was changed by another operation.'); }
+  latest: InstituteWorkspaceData['overview'];
+  constructor(latest: InstituteWorkspaceData['overview']) { super('This institute was changed by another operation.'); this.latest = latest; }
 }
 
 const query = (values: Record<string, string | number | undefined>) => {

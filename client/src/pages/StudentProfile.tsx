@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
-import { ArrowLeft, User, Phone, Book, GraduationCap, CheckCircle2, CreditCard, Activity, CalendarDays, TrendingUp, MessageCircle, Mail, School, AlertCircle } from 'lucide-react';
+import { ArrowLeft, User, Phone, Book, GraduationCap, CheckCircle2, CreditCard, Activity, CalendarDays, TrendingUp, MessageCircle, School } from 'lucide-react';
 import { TeacherButton } from '../components/teacher-ui/TeacherButton';
 import { cn } from '../utils/cn';
 import { ConfiguredStudentFields } from '../features/student-profile/ConfiguredStudentFields';
@@ -99,13 +99,6 @@ export default function StudentProfile() {
         return student.marks.reduce((acc, mark) => acc + scorePercent(mark.score, mark.test.maxMarks), 0) / student.marks.length;
     }, [student?.marks]);
 
-    const feeCollectionPercent = useMemo(() => {
-        if (student?.coachingFeeMode === 'MONTH_COVERAGE') return student.monthCoverageStats?.progressPercent ?? 0;
-        const total = student?.balance?.totalFee || 0;
-        const paid = student?.balance?.totalPaid || 0;
-        if (total <= 0) return 100;
-        return Math.min(100, Math.round((paid / total) * 100));
-    }, [student?.balance, student?.coachingFeeMode, student?.monthCoverageStats?.progressPercent]);
 
     if (loading) {
         return (

@@ -1,7 +1,7 @@
 import { InstallmentAllocationPicker, type PaymentAllocation } from '../features/fee-payment/InstallmentAllocationPicker';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Search, Loader, IndianRupee, User, Wallet, Sparkles } from 'lucide-react';
+import { X, Search, Loader, IndianRupee, User, Wallet } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 import type { MonthCoverageStudentSummary } from '../features/month-coverage/types';
@@ -35,9 +35,8 @@ export default function QuickFeeModal({ isOpen, onClose, instituteFeeMode }: Qui
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const legacyStudentsLoadedRef = useRef(false);
-    const [scanningImage, setScanningImage] = useState(false);
+    const [] = useState(false);
     const [feeMode, setFeeMode] = useState<'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' | null>(null);
     const [monthStudents, setMonthStudents] = useState<MonthCoverageStudentSummary[]>([]);
 
@@ -103,36 +102,6 @@ export default function QuickFeeModal({ isOpen, onClose, instituteFeeMode }: Qui
         ).slice(0, 5)
         : [];
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setScanningImage(true);
-        const formData = new FormData();
-        formData.append('image', file);
-
-        try {
-            const data: any = await api.post('/fees/scan-receipt', formData, {
-                // api.ts automatically handles multipart headers if FormData is passed in axios, 
-                // but since it's fetch wrapper we just pass body: formData and omit Content-Type.
-            });
-            
-            if (data.amountPaid) {
-                setAmount(data.amountPaid.toString());
-                toast.success(`Scanned ₹${data.amountPaid} from receipt!`);
-                if (data.senderName) {
-                    setSearch(data.senderName);
-                }
-            } else {
-                toast.error("Could not detect amount from image.");
-            }
-        } catch (error) {
-            toast.error("Receipt scanning failed.");
-        } finally {
-            setScanningImage(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

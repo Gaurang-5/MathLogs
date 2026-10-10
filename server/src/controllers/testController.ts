@@ -1,3 +1,4 @@
+import { ownsTest, eligibleEnrollment } from '../services/testAccess';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { quizCache } from '../utils/redis';
@@ -42,6 +43,11 @@ export const createTest = async (req: Request, res: Response) => {
     if (!user.instituteId) return res.status(401).json({ error: 'No institute assigned' });
 
     try {
+        const selectedBatchIds = [...new Set<string>([...(Array.isArray(batchIds) ? batchIds : []), ...(batchId ? [batchId] : [])])];
+        if (selectedBatchIds.length) {
+            const allowed = await prisma.batch.count({ where: { id: { in: selectedBatchIds }, instituteId: user.instituteId, teacherId } });
+            if (allowed !== selectedBatchIds.length) return res.status(403).json({ error: 'Select only batches you teach in this institute.' });
+        }
         const test = await prisma.test.create({
             data: {
                 name,
@@ -94,59 +100,28 @@ export const getTests = async (req: Request, res: Response) => {
 }
 
 export const submitMark = async (req: Request, res: Response) => {
-    const { testId, studentId, score } = req.body;
-    const teacherId = req.user?.id;
-
+    const { testId, studentId, score, expectedScore } = req.body;
     try {
-        // Verify test ownership
-        const test = await prisma.test.findUnique({ where: { id: testId } });
-        if (!test) return res.status(404).json({ error: 'Test not found' });
-        if (test.teacherId && test.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
-
-        // Validate score doesn't exceed maxMarks
-        const numericScore = parseFloat(score);
-        if (numericScore > test.maxMarks) {
-            return res.status(400).json({
-                error: `Score (${numericScore}) cannot exceed maximum marks (${test.maxMarks})`
-            });
-        }
-        if (numericScore < 0) {
-            return res.status(400).json({ error: 'Score cannot be negative' });
-        }
-
-        // Verify Student Eligibility (Security Check)
-        const student = await prisma.student.findUnique({
-            where: { id: studentId },
-            select: { instituteId: true }
+        const result = await prisma.$transaction(async tx => {
+            await tx.$queryRaw`SELECT id FROM "Test" WHERE id=${testId} FOR UPDATE`;
+            const test = await tx.test.findUnique({ where: { id: testId }, include: { batches: { select: { id: true } } } });
+            if (!test || !ownsTest(test, req.user)) return { status: 403, body: { error: 'Test is not available for this account' } };
+            const numericScore = Number(score);
+            if (!Number.isFinite(numericScore) || numericScore < 0 || numericScore > test.maxMarks) return { status: 400, body: { error: `Score must be between 0 and ${test.maxMarks}` } };
+            const student = await tx.student.findUnique({ where: { id: studentId }, include: { enrollments: { where: { status: 'ACTIVE' }, include: { batch: true } } } });
+            if (!student || student.instituteId !== req.user.instituteId || !eligibleEnrollment(test, student.enrollments, req.user.id)) return { status: 403, body: { error: 'Student is not actively enrolled for this test' } };
+            const previous = await tx.mark.findUnique({ where: { studentId_testId: { studentId, testId } } });
+            if (previous && previous.score !== numericScore && previous.score !== expectedScore) return { status: 409, body: { error: 'A result already exists or changed. Review the current score before replacing it.' } };
+            if (!previous && expectedScore != null) return { status: 409, body: { error: 'The previous result changed. Refresh before saving.' } };
+            if (previous?.score === numericScore) return { status: 200, body: previous };
+            const mark = await tx.mark.upsert({ where: { studentId_testId: { studentId, testId } }, update: { score: numericScore }, create: { testId, studentId, score: numericScore }, include: { student: true, test: true } });
+            await tx.systemLog.create({ data: { instituteId: req.user.instituteId, action: previous ? 'MARK_CORRECTED' : 'MARK_RECORDED', entityId: studentId, entityName: student.name, details: { testId, actorId: req.user.id, previousScore: previous?.score ?? null, score: numericScore } } });
+            return { status: 200, body: mark };
         });
-
-        if (!student) return res.status(404).json({ error: 'Student not found' });
-
-        // Ensure student belongs to same institute (redundant but safe)
-        if (student.instituteId && test.instituteId && student.instituteId !== test.instituteId) {
-            return res.status(403).json({ error: 'Student belongs to a different institute' });
-        }
-
-        // Upsert allows updating if already exists
-        const mark = await prisma.mark.upsert({
-            where: {
-                studentId_testId: {
-                    studentId,
-                    testId
-                }
-            },
-            update: { score: numericScore },
-            create: {
-                studentId,
-                testId,
-                score: numericScore
-            },
-            include: { student: true, test: true }
-        });
-        res.json(mark);
+        return res.status(result.status).json(result.body);
     } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: 'Failed to save mark' });
+        secureLogger.error('Failed to save mark', e);
+        return res.status(500).json({ error: 'Failed to save mark' });
     }
 };
 
@@ -177,7 +152,14 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
             res.status(403).json({ error: 'Unauthorized' });
             return;
         }
-        res.json({ ...student, batch: student.enrollments[0]?.batch || null });
+        let enrollment = student.enrollments.find(e => e.batch.teacherId === teacherId);
+        if (testId) {
+            const test = await prisma.test.findUnique({ where: { id: String(testId) }, include: { batches: { select: { id: true } } } });
+            if (!test || !ownsTest(test, user)) return res.status(403).json({ error: 'Unauthorized test' });
+            enrollment = eligibleEnrollment(test, student.enrollments, teacherId);
+            if (!enrollment) return res.status(403).json({ error: 'Student is not actively enrolled for this test' });
+        }
+        res.json({ id: student.id, name: student.name, humanId: student.humanId, marks: student.marks, batch: enrollment?.batch || null });
     } catch (e) {
         console.error('Student lookup error:', e);
         res.status(500).json({ error: 'Lookup failed' });
@@ -203,7 +185,7 @@ export const getTestDetails = async (req: Request, res: Response) => {
             }
         });
         if (!test) return res.status(404).json({ error: 'Test not found' });
-        if (test.teacherId && test.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+        if ((!test.instituteId || test.instituteId !== req.user.instituteId || test.teacherId !== teacherId)) return res.status(403).json({ error: 'Unauthorized' });
         res.json(test);
     } catch (e) {
         res.status(500).json({ error: 'Failed to fetch test details' });
@@ -218,7 +200,7 @@ export const updateTest = async (req: Request, res: Response) => {
     try {
         const test = await prisma.test.findUnique({ where: { id: String(id) } });
         if (!test) return res.status(404).json({ error: 'Test not found' });
-        if (test.teacherId && test.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+        if ((!test.instituteId || test.instituteId !== req.user.instituteId || test.teacherId !== teacherId)) return res.status(403).json({ error: 'Unauthorized' });
 
         const updated = await prisma.test.update({
             where: { id: String(id) },
@@ -242,7 +224,7 @@ export const deleteTest = async (req: Request, res: Response) => {
     try {
         const test = await prisma.test.findUnique({ where: { id: String(id) } });
         if (!test) return res.status(404).json({ error: 'Test not found' });
-        if (test.teacherId && test.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+        if ((!test.instituteId || test.instituteId !== req.user.instituteId || test.teacherId !== teacherId)) return res.status(403).json({ error: 'Unauthorized' });
 
         await prisma.test.delete({
             where: { id: String(id) }
@@ -267,7 +249,7 @@ export const downloadTestReport = async (req: Request, res: Response) => {
             }
         });
 
-        if (test?.teacherId && test?.teacherId !== teacherId) {
+        if (test && (!test.instituteId || test.instituteId !== req.user.instituteId || test.teacherId !== teacherId)) {
             res.status(403).send('Unauthorized');
             return;
         }
@@ -342,12 +324,12 @@ export const getTestEligibleStudents = async (req: Request, res: Response) => {
         // Fetch test details (lightweight query)
         const test = await prisma.test.findUnique({
             where: { id: String(id) },
-            select: { teacherId: true, batchId: true, className: true, batches: { select: { id: true } } } // Fetch batchId and batches
+            select: { instituteId: true, teacherId: true, batchId: true, className: true, batches: { select: { id: true } } } // Fetch batchId and batches
         });
 
         if (!test) return res.status(404).json({ error: 'Test not found' });
         // Basic permission check
-        if (test.teacherId && test.teacherId !== teacherId) {
+        if ((!test.instituteId || test.instituteId !== req.user.instituteId || test.teacherId !== teacherId)) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
@@ -433,7 +415,7 @@ export const sendTestResultsEmail = async (req: Request, res: Response) => {
         });
 
         if (!test) return res.status(404).json({ error: 'Test not found' });
-        if (test.teacherId && test.teacherId !== teacherId) {
+        if ((!test.instituteId || test.instituteId !== req.user.instituteId || test.teacherId !== teacherId)) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 

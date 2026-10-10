@@ -10,21 +10,15 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
     const role = user?.role;
     const PDFDocument = require('pdfkit');
 
+    if (!instituteId || !teacherId) return res.status(403).json({ error: 'An institute account is required' });
     const whereClause: any = {
-        status: 'APPROVED'
+        instituteId,
+        enrollments: { some: {
+            status: 'ACTIVE',
+            ...(batchId ? { batchId: String(batchId) } : {}),
+            batch: { instituteId, ...(role === 'SUPER_ADMIN' ? {} : { teacherId }) }
+        } }
     };
-
-    if (instituteId) {
-        whereClause.instituteId = instituteId;
-    }
-
-    if (role !== 'SUPER_ADMIN') {
-        whereClause.batch = { teacherId };
-    }
-
-    if (batchId) {
-        whereClause.batchId = String(batchId);
-    }
 
     try {
         const students = await prisma.student.findMany({
@@ -33,7 +27,7 @@ export const generateStickerSheet = async (req: Request, res: Response) => {
         });
 
         if (students.length === 0) {
-            res.status(400).send('No approved students found');
+            res.status(400).send('No actively enrolled students found');
             return;
         }
 

@@ -132,7 +132,6 @@ export default function StudentPortalDashboard() {
 
     const initials = data.student.name.charAt(0).toUpperCase();
     const quizzesArray = Array.isArray(quizzes) ? quizzes : [];
-    const scheduledQuizzes = quizzesArray.filter(quiz => quiz.availabilityStatus === 'SCHEDULED');
     const pendingQuizzes = quizzesArray.filter(quiz => !quiz.submission?.submittedAt && quiz.availabilityStatus !== 'LOCKED' && quiz.availabilityStatus !== 'SCHEDULED');
     const submittedQuizzes = quizzesArray.filter(quiz => quiz.submission?.submittedAt);
 
@@ -210,7 +209,7 @@ export default function StudentPortalDashboard() {
                                                 <ReferenceLine y={75} stroke="#22c55e" strokeDasharray="4 4" strokeWidth={1} />
                                                 <Tooltip
                                                     contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
-                                                    formatter={(v: number) => [`${Number(v).toFixed(1)}%`, 'Score']}
+                                                    formatter={(v) => [`${Number(v).toFixed(1)}%`, 'Score']}
                                                 />
                                                 <Line type="monotone" dataKey="percentage" stroke="#000" strokeWidth={2.5}
                                                     dot={{ fill: '#000', r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />

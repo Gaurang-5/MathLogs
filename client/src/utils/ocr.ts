@@ -5,47 +5,6 @@ export interface OCRResult {
     debugImage?: string;
 }
 
-// Helper for preprocessing (still used)
-async function preprocessImage(imageBase64: string): Promise<string> {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-            // Double the resolution limit so the handwriting remains crisp
-            const MAX_DIMENSION = 1200;
-            let width = img.width;
-            let height = img.height;
-
-            if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-                if (width > height) {
-                    height = MAX_DIMENSION * (height / width);
-                    width = MAX_DIMENSION;
-                } else {
-                    width = MAX_DIMENSION * (width / height);
-                    height = MAX_DIMENSION;
-                }
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-
-            if (!ctx) {
-                resolve(imageBase64);
-                return;
-            }
-
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(0, 0, width, height);
-            ctx.drawImage(img, 0, 0, width, height);
-            // High quality JPEG to avoid compression artifacts around handwritten lines
-            resolve(canvas.toDataURL('image/jpeg', 0.95));
-        };
-        img.onerror = () => resolve(imageBase64);
-        img.src = imageBase64;
-    });
-}
-
 /**
  * Crops ONLY the 3 digit-box area from the CV-warped sticker image.
  *
@@ -91,7 +50,7 @@ async function cropMarksRegion(warpedBase64: string): Promise<string> {
                 cropWidth, cropHeight            // dest w, h
             );
 
-            resolve(canvas.toDataURL('image/jpeg', 0.92));
+            resolve(canvas.toDataURL('image/png'));
         };
         img.onerror = () => resolve(warpedBase64);
         img.src = warpedBase64;
@@ -104,9 +63,10 @@ async function cropMarksRegion(warpedBase64: string): Promise<string> {
  * Captures the current video frame and sends to Gemini for OCR.
  */
 export async function extractMarksFromSticker(
-    videoElement: HTMLVideoElement,
+    _videoElement: HTMLVideoElement,
     imageOverride?: string | null,
-    maxMarks?: number
+    maxMarks?: number,
+    testId?: string
 ): Promise<OCRResult> {
 
 
@@ -120,41 +80,8 @@ export async function extractMarksFromSticker(
         processedImage = await cropMarksRegion(imageBase64);
         console.log("📸 Using CV-warped → marks-region crop for OCR");
     } else {
-        // Fallback: capture raw video frame cropped to sticker area
-        const canvas = document.createElement('canvas');
-        const sourceWidth = videoElement.videoWidth;
-        const sourceHeight = videoElement.videoHeight;
-        console.log(`Video Dimensions: ${sourceWidth}x${sourceHeight}`);
-
-        // Crop center of frame to sticker aspect ratio (3.9cm × 2.1cm = 39/21)
-        const cropWidth = sourceWidth * 0.9;
-        const cropHeight = cropWidth / (39 / 21);
-
-        const startX = (sourceWidth - cropWidth) / 2;
-        const startY = (sourceHeight - cropHeight) / 2;
-
-        canvas.width = cropWidth;
-        canvas.height = cropHeight;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error("Failed to create canvas context");
-
-        ctx.drawImage(videoElement, startX, startY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-
-        imageBase64 = canvas.toDataURL('image/jpeg', 0.95);
-        console.log(`Captured Raw Snippet Length: ${imageBase64.length}`);
-
-        // Preprocess raw capture, THEN crop marks region so it behaves identically to warped version
-        try {
-            const prepped = await preprocessImage(imageBase64);
-            processedImage = await cropMarksRegion(prepped);
-            console.log("📸 Using raw fallback → preprocessed → marks-region crop for OCR");
-        } catch (e) {
-            console.warn("Preprocessing failed, using raw fallback image", e);
-            processedImage = await cropMarksRegion(imageBase64);
-        }
+        return { score: '', confidence: 0 }; // Recapture a located sticker; never guess a center crop.
     }
-
 
     // 🚀 SECURITY: Use Backend Proxy with Multipart Upload
     try {
@@ -163,7 +90,8 @@ export async function extractMarksFromSticker(
         // Convert Base64 to Blob
         const fetchRes = await fetch(processedImage);
         const blob = await fetchRes.blob();
-        formData.append('image', blob, 'scan.jpg');
+        formData.append('image', blob, 'scan.png');
+        if (testId) formData.append('testId', testId);
         if (maxMarks) formData.append('maxMarks', String(maxMarks));
 
         const token = localStorage.getItem('token');
@@ -177,6 +105,7 @@ export async function extractMarksFromSticker(
 
         const response = await fetch('/api/scan-ocr', {
             method: 'POST',
+            signal: AbortSignal.timeout(45000),
             body: formData, // No Content-Type header needed, browser sets boundary
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -193,7 +122,7 @@ export async function extractMarksFromSticker(
         const data = await response.json();
         console.log("✅ Backend OCR Result:", data);
 
-        if (data.score && data.score !== "ERROR_UNCERTAIN" && data.score !== "0") {
+        if (data.score && data.score !== "ERROR_UNCERTAIN") {
             return { score: data.score, confidence: data.confidence, debugImage: processedImage };
         } else {
             console.warn("⚠️ Backend returned uncertain result.");

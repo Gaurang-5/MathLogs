@@ -13,33 +13,18 @@ const genAI = new GoogleGenerativeAI(geminiKey || "");
 /**
  * Standardizes the AI output by extracting the first valid number or fraction.
  */
-function cleanExtractedScore(text: string): string {
-    if (!text) return "";
-
-    // Normalize text
-    const clean = text.replace(/```(?:json|text)?/g, '').replace(/```/g, '').trim();
-
-    // Aggressive merge of spaced digits: "7 0" -> "70", "0 5" -> "05"
-    const fractionMatch = clean.match(/(\d+)\s*\/\s*(\d+)/);
-    if (fractionMatch) {
-        return `${fractionMatch[1]}/${fractionMatch[2]}`;
-    }
-
-    const digitOnly = clean.replace(/[^0-9.]/g, ' ').trim();
-    const parts = digitOnly.split(/\s+/);
-
-    if (parts.length > 1) {
-        return parts.join('');
-    }
-
-    const scorePattern = /(\d+(?:\.\d+)?)/;
-    const match = clean.match(scorePattern);
-
-    return match ? match[0] : "";
+export function cleanExtractedScore(text: unknown, maxMarks?: number): string {
+    if (typeof text !== 'string') return '';
+    const value = text.trim();
+    const match = /^(\d+(?:\.\d{1,2})?)(?:\s*\/\s*(\d+(?:\.\d{1,2})?))?$/.exec(value);
+    if (!match) return '';
+    const score = Number(match[1]);
+    if (!Number.isFinite(score) || (maxMarks !== undefined && score > maxMarks)) return '';
+    if (match[2] && (maxMarks === undefined || Number(match[2]) !== maxMarks || score > Number(match[2]))) return '';
+    return String(score);
 }
 
-
-export async function processOCR(input: Buffer | string): Promise<{ score: string; confidence: number; raw: string }> {
+export async function processOCR(input: Buffer | string, maxMarks?: number, mimeType = 'image/jpeg'): Promise<{ score: string; confidence: number; raw: string }> {
     if (!geminiKey) {
         throw new Error("Server missing Gemini API Key");
     }
@@ -78,7 +63,8 @@ export async function processOCR(input: Buffer | string): Promise<{ score: strin
                 }
             });
 
-            const prompt = `You are an AI reading handwritten exam marks from a student sticker.
+            const prompt = `${maxMarks === undefined ? '' : `The selected test has a maximum score of ${maxMarks}. Never infer a missing digit from this maximum.`}
+You are an AI reading handwritten exam marks from a student sticker.
 The image shows the MARKS section: a label "MARKS:" and below it, 3 small boxes in a row.
 Each box may contain ONE handwritten digit.
 The boxes have a horizontal underline at the bottom for writing guidance — ignore these underlines, they are not digits.
@@ -92,11 +78,11 @@ Rules:
 4. If you clearly see a score format like "45/50", return "45/50".
 
 LIMIT TO NUMBERS ONLY. Assign the exact numerical score to the "score" field in the JSON response.
-If the image is completely unreadable or has no numbers, return "ERROR_UNCERTAIN".`.trim();
+If marks are crossed out, ambiguous, multiple alternative totals appear, the image is unreadable, or no numbers appear, return "ERROR_UNCERTAIN".`.trim();
 
             const result = await model.generateContent([
                 prompt,
-                { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } }
+                { inlineData: { data: cleanBase64, mimeType } }
             ]);
 
             // Safely get text, handling cases where it was blocked or returned empty
@@ -125,10 +111,10 @@ If the image is completely unreadable or has no numbers, return "ERROR_UNCERTAIN
                 // fall back to raw responseText if JSON parse fails
             }
 
-            const cleanScore = cleanExtractedScore(extractedScore);
+            const cleanScore = cleanExtractedScore(extractedScore, maxMarks);
 
             if (cleanScore && cleanScore !== "ERROR_UNCERTAIN") {
-                return { score: cleanScore, confidence: 0.95, raw: responseText };
+                return { score: cleanScore, confidence: 0, raw: responseText };
             }
         } catch (error: any) {
             console.error(`❌ ${modelName} Failed:`, error.message || error);

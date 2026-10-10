@@ -5,6 +5,8 @@ import { ImagePlus, Loader2, Plus, X, Trash2, ArrowUp, ArrowDown, GripVertical, 
 import toast from 'react-hot-toast';
 import { OperationalCommunicationPreferences } from '../features/superadmin-communications/OperationalCommunicationPreferences';
 
+function getErrorMessage(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
+
 interface Profile {
     username: string;
     email?: string;

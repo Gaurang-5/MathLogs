@@ -195,7 +195,9 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
 
         // Compute SHA-256 of raw image bytes for deduplication
         const rawBuffer = (req as any).file ? (req as any).file.buffer : Buffer.from(imageBuffer.toString(), 'base64');
-        const hash = crypto.createHash('sha256').update(rawBuffer).digest('hex');
+        const test = typeof req.body.testId === 'string' ? await prisma.test.findFirst({ where: { id: req.body.testId, instituteId: req.user.instituteId, teacherId: req.user.id } }) : null;
+        if (!test) return res.status(403).json({ error: 'Select an authorized test before scanning.' });
+        const hash = crypto.createHash('sha256').update(`ocr-v2:${req.user.instituteId}:${test.id}:${test.maxMarks}:`).update(rawBuffer).digest('hex');
 
         // Check DB-backed cache first (works across all server instances)
         const cached = await checkOcrCache(hash);
@@ -203,7 +205,7 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
             return res.json(cached);
         }
 
-        const gemini = await processOCR(imageBuffer).catch((error: any) => ({
+        const gemini = await processOCR(imageBuffer, test.maxMarks, req.file?.mimetype || 'image/jpeg').catch((error: any) => ({
             score: 'GEMINI_ERROR',
             confidence: 0,
             raw: error?.message || 'Unknown error',

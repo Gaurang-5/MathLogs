@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Search, MapPin, Sparkles, SlidersHorizontal, GraduationCap, Star,
-  ArrowRight, Loader2, BookOpen, ChevronRight, X, Filter, Phone, MessageCircle
-} from 'lucide-react';
+  ArrowRight, Loader2, BookOpen, ChevronRight, X, Filter, } from 'lucide-react';
 import CoachingCard, { type CoachingItem } from '../components/CoachingCard';
 import MarketplaceBreadcrumbs from '../components/MarketplaceBreadcrumbs';
 import { MARKETPLACE_CITY, parseMarketplaceLandingParams } from '../features/marketplace/location';

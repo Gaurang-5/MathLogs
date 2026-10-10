@@ -181,7 +181,8 @@ export const payInstallmentSchema = z.object({
         studentId: z.string().uuid("Invalid Student ID"),
         installmentId: z.string().uuid("Invalid Installment ID"),
         amount: z.number().positive("Amount must be positive"),
-        date: z.string().optional() // Accept any date string format (datetime or YYYY-MM-DD)
+        idempotencyKey: z.string().min(8).max(150),
+        date: z.string().optional() // Validated by the shared payment service
     })
 });
 
@@ -189,6 +190,7 @@ export const submitMarkSchema = z.object({
     body: z.object({
         testId: z.string().uuid("Invalid Test ID"),
         studentId: z.string().uuid("Invalid Student ID"),
+        expectedScore: z.number().min(0).nullable().optional(),
         score: z.number().min(0, "Score cannot be negative")
             .or(z.string().regex(/^\d+(\.\d+)?$/).transform(Number))
     })

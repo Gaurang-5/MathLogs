@@ -54,6 +54,8 @@ test('paymentSchema allows numeric strings for backward compatibility', () => {
     const result = paymentSchema.safeParse({
         body: {
             studentId: validUuid,
+            idempotencyKey: 'schema-payment-key',
+            allocations: [{ installmentId: validUuid, amount: '1500.50' }],
             amount: '450.50',
         },
     });

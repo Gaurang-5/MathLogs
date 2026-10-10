@@ -427,7 +427,7 @@ export default function AdminLogin() {
                                     {otp.map((digit, idx) => (
                                         <input
                                             key={idx}
-                                            ref={el => (otpInputsRef.current[idx] = el)}
+                                            ref={el => { otpInputsRef.current[idx] = el; }}
                                             type="text"
                                             inputMode="numeric"
                                             maxLength={1}
@@ -505,7 +505,7 @@ export default function AdminLogin() {
                                 Multiple accounts found for this mobile number. Please select the one you want to log into.
                             </p>
                             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                                {accounts.map((acc, idx) => (
+                                {(accounts ?? []).map((acc, idx) => (
                                     <motion.div
                                         key={acc.adminId}
                                         initial={{ opacity: 0, y: 10 }}

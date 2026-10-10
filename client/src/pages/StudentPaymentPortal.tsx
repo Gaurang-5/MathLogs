@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, CheckCircle, AlertCircle, Loader, Phone, ChevronRight, IndianRupee, ArrowLeft, Clock, GraduationCap, PartyPopper, ArrowRight } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Loader, Phone, ChevronRight, IndianRupee, ArrowLeft, Clock, GraduationCap, ArrowRight } from 'lucide-react';
 import { API_URL } from '../utils/api';
 
 interface FeeInstallment { id: string; name: string; amount: number; dueDate?: string; }
@@ -23,8 +23,11 @@ export default function StudentPaymentPortal() {
     const { slug } = useParams<{ slug: string }>();
     const [searchParams] = useSearchParams();
     const phoneFromUrl = searchParams.get('phone');
-    const [step, setStep] = useState<Step>(phoneFromUrl ? 'loading' : 'phone');
+    const [step, setStep] = useState<Step>('phone');
     const [phone, setPhone] = useState(phoneFromUrl || '');
+    const [otp, setOtp] = useState('');
+    const [otpSent, setOtpSent] = useState(false);
+    const [feeToken, setFeeToken] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [institute, setInstitute] = useState<InstituteInfo | null>(null);
@@ -57,6 +60,7 @@ export default function StudentPaymentPortal() {
         setLoadingInstitute(true);
         axios.get(`${API_URL}/public/i/${slug}`)
             .then(res => {
+                if (res.data.coachingFeeMode === 'MONTH_COVERAGE') setParentPaymentsDisabled(true);
                 setInstitute(prev => prev || {
                     name: res.data.name,
                     logoUrl: res.data.logoUrl
@@ -68,29 +72,6 @@ export default function StudentPaymentPortal() {
             })
             .finally(() => setLoadingInstitute(false));
 
-        if (phoneFromUrl) {
-            const autoFetch = async () => {
-                try {
-                    const cleanPhone = phoneFromUrl.replace(/\D/g, '').slice(-10);
-                    const res = await axios.get(`${API_URL}/public/i/${slug}/student-fees?phone=${cleanPhone}`);
-                    setInstitute({ name: res.data.institute.name, logoUrl: res.data.institute.logoUrl });
-                    setStudents(res.data.students);
-                    if (res.data.students.length === 1) {
-                        setSelectedStudent(res.data.students[0]);
-                        setStep('upload');
-                    } else if (res.data.students.length > 1) {
-                        setStep('select-student');
-                    } else {
-                        setStep('phone');
-                    }
-                } catch (reason) {
-                    if (isParentPaymentDisabled(reason)) setParentPaymentsDisabled(true);
-                    else setStep('phone'); // fallback to manual entry
-                }
-            };
-            autoFetch();
-        }
-     
     }, [slug, phoneFromUrl]);
 
     const lookupStudent = useCallback(async () => {
@@ -98,7 +79,17 @@ export default function StudentPaymentPortal() {
         setLoading(true);
         setError('');
         try {
-            const res = await axios.get(`${API_URL}/public/i/${slug}/student-fees?phone=${phone.replace(/\D/g, '').slice(-10)}`);
+            const mobileNumber = phone.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
+            if (!/^\d{10}$/.test(mobileNumber)) { setError('Enter a valid 10-digit phone number.'); return; }
+            if (!otpSent) {
+                await axios.post(`${API_URL}/student-portal/login`, { instituteSlug: slug, mobileNumber });
+                setOtpSent(true);
+                return;
+            }
+            const verified = await axios.post(`${API_URL}/student-portal/verify-login-otp`, { instituteSlug: slug, mobileNumber, otp });
+            const token = verified.data.selectionToken || verified.data.token;
+            setFeeToken(token);
+            const res = await axios.get(`${API_URL}/public/i/${slug}/student-fees?phone=${mobileNumber}`, { headers: { Authorization: `Bearer ${token}` } });
             setInstitute(res.data.institute);
             setStudents(res.data.students);
             if (res.data.students.length === 1) {
@@ -113,7 +104,7 @@ export default function StudentPaymentPortal() {
         } finally {
             setLoading(false);
         }
-    }, [slug, phone]);
+    }, [slug, phone, otp, otpSent]);
 
     const getBalance = (student: StudentData | null) => {
         if (!student) return 0;
@@ -139,7 +130,7 @@ export default function StudentPaymentPortal() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedStudent || !amount || !file) { setError('Please fill all fields and upload a screenshot.'); return; }
-        
+
         const totalDue = getBalance(selectedStudent);
         if (Number(amount) > totalDue) {
             setError(`Amount cannot exceed the total due (₹${totalDue.toLocaleString()}).`);
@@ -148,7 +139,7 @@ export default function StudentPaymentPortal() {
 
         setSubmitting(true);
         setError('');
-        
+
         try {
             // Client-side Image Compression (massive speed up for network upload)
             const compressedFile = await new Promise<File>((resolve) => {
@@ -159,7 +150,7 @@ export default function StudentPaymentPortal() {
                     const canvas = document.createElement('canvas');
                     const MAX_SIZE = 1200;
                     let { width, height } = img;
-                    
+
                     if (width > height && width > MAX_SIZE) {
                         height = Math.round(height * (MAX_SIZE / width));
                         width = MAX_SIZE;
@@ -167,12 +158,12 @@ export default function StudentPaymentPortal() {
                         width = Math.round(width * (MAX_SIZE / height));
                         height = MAX_SIZE;
                     }
-                    
+
                     canvas.width = width;
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     if (ctx) ctx.drawImage(img, 0, 0, width, height);
-                    
+
                     canvas.toBlob(
                         (blob) => {
                             if (blob) resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' }));
@@ -195,8 +186,8 @@ export default function StudentPaymentPortal() {
             formData.append('screenshot', compressedFile);
             if (paidByName.trim()) formData.append('paidByName', paidByName.trim());
 
-            await axios.post(`${API_URL}/public/i/${slug}/submit-upi`, formData, { 
-                headers: { 'Content-Type': 'multipart/form-data' },
+            await axios.post(`${API_URL}/public/i/${slug}/submit-upi`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${feeToken}` },
                 onUploadProgress: (progressEvent) => {
                     const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1000000));
                     setUploadProgress(Math.min(99, percentCompleted)); // Keep at 99% until server fully resolves
@@ -205,6 +196,7 @@ export default function StudentPaymentPortal() {
             setStep('success');
         } catch (err: any) {
             if (isParentPaymentDisabled(err)) setParentPaymentsDisabled(true);
+            else if (err.response?.status === 401) { setStep('phone'); setOtpSent(false); setFeeToken(''); setError('Verification expired. Request a new code before submitting.'); }
             else setError(err.response?.data?.error || 'Submission failed. Please try again.');
         } finally {
             setSubmitting(false);
@@ -316,25 +308,29 @@ export default function StudentPaymentPortal() {
                                 {step === 'phone' && (
                                     <motion.div key="phone" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                                         <h2 className="text-xl font-bold text-app-text mb-1">Find Your Fees</h2>
-                                        <p className="text-app-text-secondary text-sm mb-6">Enter your registered phone number to look up pending fees.</p>
+                                        <p className="text-app-text-secondary text-sm mb-6">Verify your registered phone number with a WhatsApp code to view fees.</p>
 
                                         <form onSubmit={(e) => { e.preventDefault(); lookupStudent(); }}>
                                             <div>
                                                 <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Registered Phone Number</label>
                                                 <div className="relative group mb-4">
                                                     <Phone className={iconClass} />
-                                                    <input 
-                                                        type="tel" 
-                                                        value={phone} 
-                                                        onChange={(e) => setPhone(e.target.value)} 
-                                                        placeholder="Enter 10-digit number" 
+                                                    <input
+                                                        type="tel"
+                                                        value={phone}
+                                                        onChange={(e) => { setPhone(e.target.value); setOtpSent(false); setOtp(''); setFeeToken(''); }}
+                                                        placeholder="Enter 10-digit number"
                                                         className={inputClass}
-                                                        maxLength={13} 
-                                                        required 
+                                                        maxLength={13}
+                                                        required
                                                     />
                                                 </div>
                                             </div>
 
+                                            {otpSent && <label className="block text-sm mb-4">WhatsApp verification code
+                                                <input aria-label="WhatsApp verification code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))} className={inputClass} required />
+                                                <button type="button" className="min-h-11 underline" onClick={() => { setOtpSent(false); setOtp(''); }}>Request another code</button>
+                                            </label>}
                                             {error && (
                                                 <div className="bg-danger/10 border border-danger/20 text-danger rounded-xl px-4 py-3 text-sm flex items-start gap-2 mb-4">
                                                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /><span>{error}</span>
@@ -342,7 +338,7 @@ export default function StudentPaymentPortal() {
                                             )}
 
                                             <button type="submit" disabled={loading || phone.length < 10} className="w-full py-3.5 bg-neutral-900 text-white font-bold rounded-xl shadow-md shadow-neutral-900/20 disabled:opacity-40 disabled:shadow-none hover:shadow-lg focus:ring-2 focus:ring-offset-2 focus:ring-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group">
-                                                {loading ? <Loader className="w-5 h-5 animate-spin" /> : <>Find My Fees <ChevronRight className="w-[18px] h-[18px] group-hover:translate-x-0.5 transition-transform" /></>}
+                                                {loading ? <Loader className="w-5 h-5 animate-spin" /> : <>{otpSent ? 'Verify and View Fees' : 'Send Verification Code'} <ChevronRight className="w-[18px] h-[18px] group-hover:translate-x-0.5 transition-transform" /></>}
                                             </button>
                                         </form>
                                     </motion.div>
@@ -460,7 +456,7 @@ export default function StudentPaymentPortal() {
                                                                             </div>
                                                                         );
                                                                     })}
-                                                                    
+
                                                                     {/* Offset Adhoc Payments to Match Total Balance */}
                                                                     {(selectedStudent.feeRecords?.reduce((s, r) => s + Number(r.amount || 0), 0) || 0) > 0 && (
                                                                         <div className="flex items-center justify-between text-[13px] text-emerald-600 font-medium pt-1 mt-1 border-t border-neutral-200/50">
@@ -484,9 +480,9 @@ export default function StudentPaymentPortal() {
                                                         <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Amount Paid</label>
                                                         <div className="relative group">
                                                             <IndianRupee className={iconClass} />
-                                                            <input 
-                                                                type="number" 
-                                                                value={amount} 
+                                                            <input
+                                                                type="number"
+                                                                value={amount}
                                                                 onChange={(e) => {
                                                                     const val = e.target.value;
                                                                     const totalDue = getBalance(selectedStudent!);
@@ -495,13 +491,13 @@ export default function StudentPaymentPortal() {
                                                                     } else {
                                                                         setAmount(val);
                                                                     }
-                                                                }} 
+                                                                }}
                                                                 readOnly={paymentType === 'full'}
-                                                                placeholder="Enter amount" 
-                                                                className={inputClass + (paymentType === 'full' ? ' bg-neutral-50 text-neutral-500 cursor-not-allowed' : '')} 
-                                                                min="1" 
+                                                                placeholder="Enter amount"
+                                                                className={inputClass + (paymentType === 'full' ? ' bg-neutral-50 text-neutral-500 cursor-not-allowed' : '')}
+                                                                min="1"
                                                                 max={getBalance(selectedStudent!)}
-                                                                required 
+                                                                required
                                                             />
                                                         </div>
                                                         {paymentType === 'custom' && (
@@ -512,13 +508,13 @@ export default function StudentPaymentPortal() {
                                                     <div>
                                                         <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Paid By (Name)</label>
                                                         <div className="relative group">
-                                                            <input 
-                                                                type="text" 
-                                                                value={paidByName} 
-                                                                onChange={(e) => setPaidByName(e.target.value)} 
-                                                                placeholder="e.g., Rajiv Kumar" 
+                                                            <input
+                                                                type="text"
+                                                                value={paidByName}
+                                                                onChange={(e) => setPaidByName(e.target.value)}
+                                                                placeholder="e.g., Rajiv Kumar"
                                                                 className={inputClass}
-                                                                required 
+                                                                required
                                                             />
                                                         </div>
                                                     </div>
@@ -529,9 +525,9 @@ export default function StudentPaymentPortal() {
                                                             <input type="file" accept="image/jpeg,image/png,image/jpg" onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])} hidden />
                                                             {file ? (
                                                                 <div className="flex flex-col items-center gap-2 w-full">
-                                                                    <img 
-                                                                        src={filePreviewUrl || ''} 
-                                                                        alt="Payment preview" 
+                                                                    <img
+                                                                        src={filePreviewUrl || ''}
+                                                                        alt="Payment preview"
                                                                         className="w-full max-h-48 object-contain rounded-lg border border-neutral-200"
                                                                     />
                                                                     <span className="text-xs text-app-text-secondary mt-1">Tap to change</span>

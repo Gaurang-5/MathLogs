@@ -1,3 +1,4 @@
+import { parentFeeScope } from '../services/parentFeeAccess';
 import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
@@ -93,7 +94,8 @@ function createStudentToken(studentId: string, instituteId: string): string {
         {
             studentId,
             instituteId,
-            role: 'STUDENT'
+            role: 'STUDENT',
+            authenticationMethod: 'WHATSAPP_OTP'
         },
         JWT_SECRET,
         { expiresIn: '30d' }
@@ -228,7 +230,7 @@ export const loginStudent = async (req: Request, res: Response): Promise<void> =
 
         // Normalize mobile number: Keep only digits
         const cleanMobile = normalizeMobile(rawMobile);
-        if (cleanMobile.length < 10) {
+        if (!/^\d{10}$/.test(cleanMobile)) {
             res.status(400).json({ error: 'Please enter a valid 10-digit mobile number' });
             return;
         }
@@ -293,7 +295,7 @@ export const loginStudent = async (req: Request, res: Response): Promise<void> =
         await sendOtpWhatsApp(whatsappNumber, otpCode);
 
         if (process.env.NODE_ENV !== 'production') {
-            secureLogger.info(`[STUDENT_OTP] Sent OTP for ${otpIdentifier}: ${otpCode}`);
+            secureLogger.info('[STUDENT_OTP] Verification code queued');
         } else {
             secureLogger.info(`[STUDENT_OTP] Dispatched WhatsApp OTP for student login: ${otpIdentifier}`);
         }
@@ -301,13 +303,7 @@ export const loginStudent = async (req: Request, res: Response): Promise<void> =
         res.json({
             success: true,
             requiresOtp: true,
-            message: 'OTP sent on WhatsApp.',
-            student: {
-                id: student.id,
-                name: student.name,
-                batchName: student.batch?.name || 'N/A',
-                instituteName: institute.name
-            }
+            message: 'OTP sent on WhatsApp.'
         });
     } catch (error) {
         console.error('[STUDENT_LOGIN_ERROR]', error);
@@ -336,7 +332,7 @@ export const verifyStudentLoginOtp = async (req: Request, res: Response): Promis
         }
 
         const cleanMobile = normalizeMobile(rawMobile);
-        if (cleanMobile.length < 10) {
+        if (!/^\d{10}$/.test(cleanMobile)) {
             res.status(400).json({ error: 'Please enter a valid 10-digit mobile number' });
             return;
         }
@@ -362,7 +358,7 @@ export const verifyStudentLoginOtp = async (req: Request, res: Response): Promis
             return;
         }
 
-        const isDevBypass = process.env.NODE_ENV !== 'production' && otp === '000000';
+        const isDevBypass = process.env.NODE_ENV === 'test' && process.env.ALLOW_TEST_OTP === 'true' && otp === '000000';
         if (storedOtp.otp !== otp && !isDevBypass) {
             res.status(400).json({ error: 'Invalid OTP code' });
             return;
@@ -392,7 +388,8 @@ export const verifyStudentLoginOtp = async (req: Request, res: Response): Promis
             return;
         }
 
-        await prisma.otpToken.delete({ where: { identifier: otpIdentifier } });
+        const consumed = await prisma.otpToken.deleteMany({ where: { identifier: otpIdentifier, otp: storedOtp.otp, expiresAt: { gt: new Date() }, verified: false } });
+        if (consumed.count !== 1) { res.status(400).json({ error: 'OTP expired or already used' }); return; }
         if (students.length > 1) {
             res.json({
                 success: true,
@@ -551,6 +548,10 @@ export const registerPublicQuiz = async (req: Request, res: Response): Promise<v
 
         // If studentId is provided, reuse the existing student (phone lookup confirmed)
         if (studentId) {
+            const access = parentFeeScope(req);
+            if (!access || access.instituteId !== quiz.instituteId || !access.studentIds.includes(studentId)) {
+                res.status(401).json({ error: 'Sign in with a verification code to use an existing profile.' }); return;
+            }
             student = await prisma.student.findUnique({ where: { id: studentId } });
             if (!student || student.instituteId !== quiz.instituteId) {
                 res.status(404).json({ error: 'Student not found' });
