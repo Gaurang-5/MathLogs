@@ -283,8 +283,8 @@ export default function UpiVerificationList() {
                                     Cancel
                                 </button>
                                 <button
-                                    disabled={confirmAction.action==='approve' && !allocationReady} onClick={executeAction}
-                                    disabled={confirmAction.action === 'reject' && !rejectReason.trim()}
+                                    onClick={executeAction}
+                                    disabled={confirmAction.action === 'approve' ? !allocationReady : !rejectReason.trim()}
                                     className={`flex-1 py-3.5 text-white font-semibold text-[15px] rounded-xl transition-all ${confirmAction.action === 'approve'
                                             ? 'bg-[#059669] hover:bg-[#047857]'
                                             : !rejectReason.trim()

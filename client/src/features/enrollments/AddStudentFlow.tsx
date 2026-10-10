@@ -40,9 +40,12 @@ export function AddStudentFlow({ batch, onClose, onComplete }: {
   const candidates = useQuery({
     queryKey: ['enrollment-candidates', batch.id, deferredQuery],
     queryFn: () => searchEnrollmentCandidates(batch.id, deferredQuery),
-    enabled: deferredQuery.length >= 2 && !candidate && !createNew,
+    enabled: /^\d{10}$/.test(deferredQuery) && !candidate && !createNew,
     staleTime: 15_000,
   });
+
+  const phoneReady = /^\d{10}$/.test(query);
+  const lookupComplete = phoneReady && query === deferredQuery && candidates.isSuccess && !candidates.isFetching;
 
   const confirm = async () => {
     if (!isEnrollmentFeeChoiceReady(fee)) return;
@@ -68,7 +71,7 @@ export function AddStudentFlow({ batch, onClose, onComplete }: {
   return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
     <section ref={dialogRef} tabIndex={-1} aria-modal="true" role="dialog" aria-label="Add student" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl">
       <header className="mb-5 flex items-start justify-between">
-        <div><h2 className="text-xl font-bold">Add student to {batch.name}</h2><p className="text-sm text-app-text-tertiary">Find an old profile first, or send a link for a new student.</p></div>
+        <div><h2 className="text-xl font-bold">Add student to {batch.name}</h2><p className="text-sm text-app-text-tertiary">Enter the student’s WhatsApp number to check for an existing profile.</p></div>
         <TeacherButton variant="quiet" iconOnlyLabel="Close" disabled={submitting} onClick={onClose} icon={<X className="h-5 w-5" />} />
       </header>
 
@@ -85,17 +88,22 @@ export function AddStudentFlow({ batch, onClose, onComplete }: {
       </div> : <div className="space-y-5">
         {!candidate && !createNew ? <>
           <label className="relative block"><Search className="absolute left-3 top-3.5 h-4 w-4 text-app-text-tertiary" />
-            <input role="searchbox" value={query} onChange={event => setQuery(event.target.value)} placeholder="Student ID, name, parent or phone"
+            <input role="searchbox" aria-label="Student WhatsApp number" type="tel" inputMode="numeric" value={query} onChange={event => setQuery(event.target.value.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').slice(0, 10))} placeholder="10-digit WhatsApp number"
               className="w-full rounded-xl border border-black/10 py-3 pl-10 pr-4" autoFocus />
           </label>
-          <div className="space-y-2">
-            {candidates.data?.map(item => <CandidateCard key={item.studentId} candidate={item} onUse={() => { setCandidate(item); setWhatsapp(item.parentWhatsapp); }} />)}
-            {deferredQuery.length >= 2 && !candidates.isFetching && candidates.data?.length === 0 ? <p className="text-sm text-app-text-tertiary">No matching old profile found.</p> : null}
-          </div>
-          <button className="w-full rounded-xl border border-black/10 px-4 py-3 font-semibold" onClick={() => setCreateNew(true)}>Create a separate student</button>
+          {!phoneReady ? <p className="text-sm text-app-text-secondary">Enter a 10-digit number to continue.</p> : null}
+          {phoneReady && (query !== deferredQuery || candidates.isFetching) ? <p role="status" className="text-sm text-app-text-secondary">Checking existing profiles…</p> : null}
+          {phoneReady && query === deferredQuery && candidates.isError ? <div role="alert" className="space-y-2"><p>Could not check existing profiles. Please retry before creating a student.</p><TeacherButton variant="secondary" onClick={() => void candidates.refetch()}>Retry lookup</TeacherButton></div> : null}
+          {lookupComplete ? <>
+            <div className="space-y-2">
+              {candidates.data.map(item => <CandidateCard key={item.studentId} candidate={item} onUse={() => { setCandidate(item); setWhatsapp(item.parentWhatsapp); }} />)}
+              {candidates.data.length === 0 ? <p role="status" className="text-sm text-app-text-secondary">No existing profile found for this number.</p> : <p className="text-sm text-app-text-secondary">Use an existing profile to keep its history. Create a separate student only if this number belongs to another student too.</p>}
+            </div>
+            <TeacherButton variant="secondary" className="w-full" onClick={() => { setWhatsapp(query); setCreateNew(true); }}>{candidates.data.length ? 'Create a separate student' : 'Create new student'}</TeacherButton>
+          </> : null}
         </> : <>
           <div className="rounded-xl bg-neutral-50 p-4">
-            {candidate ? <><strong>{candidate.name}</strong><p className="text-sm">{candidate.humanId || 'No ID'} · {candidate.parentWhatsapp}</p></> : <label className="block"><span className="text-xs font-bold uppercase">Student WhatsApp</span><input aria-label="Student WhatsApp" type="tel" inputMode="numeric" value={whatsapp} onChange={event => setWhatsapp(event.target.value.replace(/\D/g, '').slice(-10))} className="mt-2 w-full rounded-xl border px-4 py-3" placeholder="10-digit number" /></label>}
+            {candidate ? <><strong>{candidate.name}</strong><p className="text-sm">{candidate.humanId || 'No ID'} · {candidate.parentWhatsapp}</p></> : <label className="block"><span className="text-xs font-bold uppercase">Student WhatsApp</span><input aria-label="Student WhatsApp" type="tel" inputMode="numeric" value={whatsapp} readOnly className="mt-2 w-full rounded-xl border px-4 py-3" placeholder="10-digit number" /></label>}
           </div>
           <FeeApplicabilityStep batch={batch} value={fee} onChange={setFee} />
           <p className="rounded-xl border border-app-border bg-app-surface-opaque p-3 text-xs text-app-text-secondary">Review the confirmed fee total before continuing. Existing payments and previously assigned fees remain unchanged.</p>

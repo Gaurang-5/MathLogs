@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BatchDetails from './BatchDetails';
+import { searchEnrollmentCandidates } from '../features/enrollments/api';
 
 const { apiRequest, loadSummary, sendRegistrationInvite } = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -58,6 +59,7 @@ describe('BatchDetails month coverage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(searchEnrollmentCandidates).mockResolvedValue([]);
     apiRequest.mockResolvedValue(batch);
     loadSummary.mockResolvedValue(summary);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(['pdf']) }));
@@ -115,9 +117,17 @@ describe('BatchDetails month coverage', () => {
 
     const addStudent = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.trim() === 'Add Student') as HTMLButtonElement;
     await act(async () => addStudent.click());
-    expect(document.body.textContent).toContain('Create a separate student');
+    expect(document.body.textContent).not.toContain('Create a separate student');
+    const lookupInput = document.body.querySelector('input[role="searchbox"]') as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(lookupInput, '9876543210');
+      lookupInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    for (let i = 0; i < 30 && !document.body.textContent?.includes('Create new student'); i++) {
+      await act(async () => new Promise(resolve => setTimeout(resolve, 10)));
+    }
 
-    const createSeparate = Array.from(document.body.querySelectorAll('button')).find(button => button.textContent?.includes('Create a separate student')) as HTMLButtonElement;
+    const createSeparate = Array.from(document.body.querySelectorAll('button')).find(button => button.textContent?.includes('Create new student')) as HTMLButtonElement;
     await act(async () => createSeparate.click());
 
     const phoneInput = document.body.querySelector('input[placeholder="10-digit number"]') as HTMLInputElement;
@@ -129,8 +139,7 @@ describe('BatchDetails month coverage', () => {
 
     await act(async () => {
       const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-      setValue?.call(phoneInput, '9876543210');
-      phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+      expect(phoneInput.value).toBe('9876543210');
       setValue?.call(feeStartInput, '2026-08');
       feeStartInput.dispatchEvent(new Event('input', { bubbles: true }));
     });

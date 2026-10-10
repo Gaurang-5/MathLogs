@@ -34,6 +34,7 @@ describe('AddStudentFlow', () => {
     await act(async () => root.render(<QueryClientProvider client={new QueryClient()}><AddStudentFlow
       batch={{ id: 'b1', name: 'Class 10', coachingFeeMode: 'CURRENT_DUE_BASED', feeInstallments: [] }}
       onClose={vi.fn()} onComplete={vi.fn()} /></QueryClientProvider>));
+    expect(container.textContent).not.toContain('Create a separate student');
     const search = container.querySelector('[role="searchbox"]') as HTMLInputElement;
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -43,6 +44,10 @@ describe('AddStudentFlow', () => {
     expect(apiMocks.searchEnrollmentCandidates).toHaveBeenCalledWith('b1', '9876543210');
     expect(container.textContent).toContain('MB-MTH26-049');
     expect(apiMocks.enrollExisting).not.toHaveBeenCalled();
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Create a separate student'))?.click());
+    expect((container.querySelector('[aria-label="Student WhatsApp"]') as HTMLInputElement).value).toBe('9876543210');
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Back')?.click());
+    await waitForText(container, 'MB-MTH26-049');
     await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Use existing profile'))?.click());
     expect(container.textContent).toContain('Apply installments');
     expect(apiMocks.enrollExisting).not.toHaveBeenCalled();
