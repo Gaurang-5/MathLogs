@@ -172,7 +172,7 @@ export default function Onboarding() {
     const [otpVerifying, setOtpVerifying] = useState(false);
     const [otpError, setOtpError] = useState('');
     const [otpResendTimer, setOtpResendTimer] = useState(0);
-    const otpResendRef = useRef<NodeJS.Timeout | null>(null);
+    const otpResendRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Resend Setup Link Drawer State
     const [showResend, setShowResend] = useState(false);

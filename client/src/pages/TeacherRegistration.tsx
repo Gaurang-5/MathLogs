@@ -45,7 +45,7 @@ export default function TeacherRegistration() {
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [otpResendTimer, setOtpResendTimer] = useState(0);
-  const otpTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const otpTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cleanPhone = phoneNumber.trim().replace(/\D/g, '').slice(0, 10);
 

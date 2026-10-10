@@ -63,7 +63,7 @@ export default function StudentPortalLogin() {
     const otpBoxRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setTimeout>;
         if (resendTimer > 0) {
             interval = setInterval(() => {
                 setResendTimer(prev => prev - 1);

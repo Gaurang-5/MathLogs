@@ -1,6 +1,6 @@
 import { calculateStudentFeeSnapshot } from '../utils/feeCalculations';
 import { amountPaise } from '../services/explicitFeePaymentService';
-import { parentFeeScope, normalizeParentPhone } from '../services/parentFeeAccess';
+import { normalizeParentPhone } from '../services/parentFeeAccess';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { z } from 'zod';
@@ -136,8 +136,6 @@ export const studentFeesCache = new Map<string, FeeCacheEntry>();
 export const getPublicStudentFees = async (req: Request, res: Response) => {
     try {
         const slug = req.params.slug as string;
-        const access = parentFeeScope(req);
-        if (!access) return res.status(401).json({ error: 'Verify your phone number before viewing fees.' });
         const phone = normalizeParentPhone(req.query.phone);
         if (!phone) return res.status(400).json({ error: 'Enter a valid 10-digit phone number.' });
         res.setHeader('Cache-Control', 'no-store');
@@ -156,13 +154,11 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
 
         const logoUrl = (institute.config as any)?.logo || null;
 
-        if (access.instituteId !== institute.id || (access.phone && access.phone !== phone)) return res.status(403).json({ error: 'Unauthorized' });
 
         // Find standard active students by phone
         const students = await prisma.student.findMany({
             where: {
                 instituteId: institute.id,
-                id: { in: access.studentIds },
                 parentWhatsapp: { in: [phone, `91${phone}`, `+91${phone}`] },
                 enrollments: { some: { status: 'ACTIVE' } }
             },
@@ -213,8 +209,6 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
 
 export const submitUpiPayment = async (req: Request, res: Response) => {
     try {
-        const access = parentFeeScope(req);
-        if (!access) return res.status(401).json({ error: 'Verify your phone number before submitting payment.' });
         const slug = req.params.slug as string;
         const institute = await prisma.institute.findUnique({
             where: { slug: slug.toLowerCase() }
@@ -242,7 +236,6 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Institute not found.' });
         }
 
-        if (access.instituteId !== institute.id || !access.studentIds.includes(studentId)) return res.status(403).json({ error: 'Unauthorized' });
 
         const student = await prisma.student.findFirst({
             where: {

@@ -108,9 +108,10 @@ export const submitMark = async (req: Request, res: Response) => {
             if (!test || !ownsTest(test, req.user)) return { status: 403, body: { error: 'Test is not available for this account' } };
             const numericScore = Number(score);
             if (!Number.isFinite(numericScore) || numericScore < 0 || numericScore > test.maxMarks) return { status: 400, body: { error: `Score must be between 0 and ${test.maxMarks}` } };
-            const student = await tx.student.findUnique({ where: { id: studentId }, include: { enrollments: { where: { status: 'ACTIVE' }, include: { batch: true } } } });
-            if (!student || student.instituteId !== req.user.instituteId || !eligibleEnrollment(test, student.enrollments, req.user.id)) return { status: 403, body: { error: 'Student is not actively enrolled for this test' } };
+            const student = await tx.student.findUnique({ where: { id: studentId }, include: { enrollments: { include: { batch: true } } } });
             const previous = await tx.mark.findUnique({ where: { studentId_testId: { studentId, testId } } });
+            const eligible = student?.enrollments.filter(e => e.status === 'ACTIVE' || (previous && e.startedAt <= test.date && (!e.endedAt || e.endedAt >= test.date)));
+            if (!student || student.instituteId !== req.user.instituteId || !eligibleEnrollment(test, eligible || [], req.user.id)) return { status: 403, body: { error: 'Student is not enrolled for this test' } };
             if (previous && previous.score !== numericScore && previous.score !== expectedScore) return { status: 409, body: { error: 'A result already exists or changed. Review the current score before replacing it.' } };
             if (!previous && expectedScore != null) return { status: 409, body: { error: 'The previous result changed. Refresh before saving.' } };
             if (previous?.score === numericScore) return { status: 200, body: previous };

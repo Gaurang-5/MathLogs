@@ -98,7 +98,7 @@ export default function AdminLogin() {
 
     // Countdown for OTP resend
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setTimeout>;
         if (step === 'otp' && resendTimer > 0) {
             interval = setInterval(() => {
                 setResendTimer(prev => {

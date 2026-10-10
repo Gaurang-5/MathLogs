@@ -25,9 +25,6 @@ export default function StudentPaymentPortal() {
     const phoneFromUrl = searchParams.get('phone');
     const [step, setStep] = useState<Step>('phone');
     const [phone, setPhone] = useState(phoneFromUrl || '');
-    const [otp, setOtp] = useState('');
-    const [otpSent, setOtpSent] = useState(false);
-    const [feeToken, setFeeToken] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [institute, setInstitute] = useState<InstituteInfo | null>(null);
@@ -74,22 +71,15 @@ export default function StudentPaymentPortal() {
 
     }, [slug, phoneFromUrl]);
 
-    const lookupStudent = useCallback(async () => {
-        if (!slug || phone.length < 10) return;
+    const lookupStudent = useCallback(async (phoneNumber: string) => {
+        if (!slug) return;
         setLoading(true);
         setError('');
         try {
-            const mobileNumber = phone.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
+            if (!/^[+\d\s()-]+$/.test(phoneNumber)) { setError('Enter a valid 10-digit phone number.'); return; }
+            const mobileNumber = phoneNumber.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
             if (!/^\d{10}$/.test(mobileNumber)) { setError('Enter a valid 10-digit phone number.'); return; }
-            if (!otpSent) {
-                await axios.post(`${API_URL}/student-portal/login`, { instituteSlug: slug, mobileNumber });
-                setOtpSent(true);
-                return;
-            }
-            const verified = await axios.post(`${API_URL}/student-portal/verify-login-otp`, { instituteSlug: slug, mobileNumber, otp });
-            const token = verified.data.selectionToken || verified.data.token;
-            setFeeToken(token);
-            const res = await axios.get(`${API_URL}/public/i/${slug}/student-fees?phone=${mobileNumber}`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await axios.get(`${API_URL}/public/i/${slug}/student-fees?phone=${mobileNumber}`);
             setInstitute(res.data.institute);
             setStudents(res.data.students);
             if (res.data.students.length === 1) {
@@ -104,7 +94,11 @@ export default function StudentPaymentPortal() {
         } finally {
             setLoading(false);
         }
-    }, [slug, phone, otp, otpSent]);
+    }, [slug]);
+
+    useEffect(() => {
+        if (phoneFromUrl) void lookupStudent(phoneFromUrl);
+    }, [phoneFromUrl, lookupStudent]);
 
     const getBalance = (student: StudentData | null) => {
         if (!student) return 0;
@@ -187,7 +181,7 @@ export default function StudentPaymentPortal() {
             if (paidByName.trim()) formData.append('paidByName', paidByName.trim());
 
             await axios.post(`${API_URL}/public/i/${slug}/submit-upi`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${feeToken}` },
+                headers: { 'Content-Type': 'multipart/form-data' },
                 onUploadProgress: (progressEvent) => {
                     const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1000000));
                     setUploadProgress(Math.min(99, percentCompleted)); // Keep at 99% until server fully resolves
@@ -196,7 +190,6 @@ export default function StudentPaymentPortal() {
             setStep('success');
         } catch (err: any) {
             if (isParentPaymentDisabled(err)) setParentPaymentsDisabled(true);
-            else if (err.response?.status === 401) { setStep('phone'); setOtpSent(false); setFeeToken(''); setError('Verification expired. Request a new code before submitting.'); }
             else setError(err.response?.data?.error || 'Submission failed. Please try again.');
         } finally {
             setSubmitting(false);
@@ -308,9 +301,9 @@ export default function StudentPaymentPortal() {
                                 {step === 'phone' && (
                                     <motion.div key="phone" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                                         <h2 className="text-xl font-bold text-app-text mb-1">Find Your Fees</h2>
-                                        <p className="text-app-text-secondary text-sm mb-6">Verify your registered phone number with a WhatsApp code to view fees.</p>
+                                        <p className="text-app-text-secondary text-sm mb-6">Enter your registered phone number to view fees.</p>
 
-                                        <form onSubmit={(e) => { e.preventDefault(); lookupStudent(); }}>
+                                        <form onSubmit={(e) => { e.preventDefault(); lookupStudent(phone); }}>
                                             <div>
                                                 <label className="block text-sm font-medium text-app-text-secondary mb-1.5 ml-0.5">Registered Phone Number</label>
                                                 <div className="relative group mb-4">
@@ -318,7 +311,7 @@ export default function StudentPaymentPortal() {
                                                     <input
                                                         type="tel"
                                                         value={phone}
-                                                        onChange={(e) => { setPhone(e.target.value); setOtpSent(false); setOtp(''); setFeeToken(''); }}
+                                                        onChange={(e) => setPhone(e.target.value)}
                                                         placeholder="Enter 10-digit number"
                                                         className={inputClass}
                                                         maxLength={13}
@@ -327,10 +320,7 @@ export default function StudentPaymentPortal() {
                                                 </div>
                                             </div>
 
-                                            {otpSent && <label className="block text-sm mb-4">WhatsApp verification code
-                                                <input aria-label="WhatsApp verification code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))} className={inputClass} required />
-                                                <button type="button" className="min-h-11 underline" onClick={() => { setOtpSent(false); setOtp(''); }}>Request another code</button>
-                                            </label>}
+
                                             {error && (
                                                 <div className="bg-danger/10 border border-danger/20 text-danger rounded-xl px-4 py-3 text-sm flex items-start gap-2 mb-4">
                                                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /><span>{error}</span>
@@ -338,7 +328,7 @@ export default function StudentPaymentPortal() {
                                             )}
 
                                             <button type="submit" disabled={loading || phone.length < 10} className="w-full py-3.5 bg-neutral-900 text-white font-bold rounded-xl shadow-md shadow-neutral-900/20 disabled:opacity-40 disabled:shadow-none hover:shadow-lg focus:ring-2 focus:ring-offset-2 focus:ring-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group">
-                                                {loading ? <Loader className="w-5 h-5 animate-spin" /> : <>{otpSent ? 'Verify and View Fees' : 'Send Verification Code'} <ChevronRight className="w-[18px] h-[18px] group-hover:translate-x-0.5 transition-transform" /></>}
+                                                {loading ? <Loader className="w-5 h-5 animate-spin" /> : <>View Fees <ChevronRight className="w-[18px] h-[18px] group-hover:translate-x-0.5 transition-transform" /></>}
                                             </button>
                                         </form>
                                     </motion.div>

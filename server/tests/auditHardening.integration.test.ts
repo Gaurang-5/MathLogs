@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 import { PrismaClient } from '@prisma/client';
 import express from 'express';
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
 const url=process.env.FEE_TEST_DATABASE_URL;
-test('real database: concurrent installment payments, parent scopes, marks revisions and protected batch history',{skip:!url},async()=>{
+test('real database: concurrent installment payments, exact parent phone lookup, marks revisions and protected batch history',{skip:!url},async()=>{
     assert.match(url!,/^postgresql:\/\/[^/]*127\.0\.0\.1:55439\/mathlogs_fee_test(?:\?|$)/);
     const db=new PrismaClient({datasources:{db:{url}}});(global as any).prisma=db;
     const {payInstallment}=await import('../src/controllers/feeController');
@@ -29,10 +28,14 @@ test('real database: concurrent installment payments, parent scopes, marks revis
         assert.equal((await db.feePayment.aggregate({where:{studentId:student.id},_sum:{amountPaid:true}}))._sum.amountPaid,700);
         const successful=results[0].status===200?input:{...input,idempotencyKey:'concurrent-second'};
         assert.equal((await request(app).post('/pay').send(successful)).body.replayed,true);
-        assert.equal((await request(app).get(`/fees/${institute.slug}?phone=hello`)).status,401);
-        const token=jwt.sign({role:'STUDENT',authenticationMethod:'WHATSAPP_OTP',studentId:student.id,instituteId:institute.id},'test-secret');
-        assert.equal((await request(app).get(`/fees/${institute.slug}?phone=hello`).auth(token,{type:'bearer'})).status,400);
-        const fees=await request(app).get(`/fees/${institute.slug}?phone=9000000000`).auth(token,{type:'bearer'});
+        for (const phone of ['hello', '0000', '', '9000000000abc', '9000000000000']) {
+            assert.equal((await request(app).get(`/fees/${institute.slug}`).query({phone})).status,400);
+        }
+        assert.equal((await request(app).get(`/fees/${institute.slug}?phone=9000000001`)).status,404);
+        const fees=await request(app).get(`/fees/${institute.slug}?phone=9000000000`);
+        assert.equal(fees.headers['cache-control'],'no-store');
+        assert.equal((await request(app).get(`/fees/${institute.slug}`).query({phone:'+919000000000'})).status,200);
+        assert.equal((await request(app).post(`/receipt/${institute.slug}`).send({})).status,400);
         assert.equal(fees.status,200,JSON.stringify(fees.body));assert.equal(fees.body.students.length,1);assert.equal(fees.body.students[0].feeInstallments[0].id,installment.id);
         const stickers=await request(app).get(`/stickers?batchId=${batch.id}`);assert.equal(stickers.status,200);assert.match(stickers.headers['content-type'],/application\/pdf/);
         assert.equal((await request(app).get(`/lookup/AUDIT-001?testId=${exam.id}`)).status,200);

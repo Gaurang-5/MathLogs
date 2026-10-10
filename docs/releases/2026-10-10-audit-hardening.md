@@ -4,7 +4,7 @@ Both coaching fee modes remain supported. This release changes installment payme
 
 Native Expo sources were extracted from commit 8cbb031 into the independent local repository `/Users/gaurangbhatia/Projects/MathLogs-mobile` (initial commit 9ef1a2c). The live repository and root setup no longer include `mobile/`. The website and its mobile-browser/PWA support remain. A remote repository for the native app has not been created.
 
-Parent web fees now require WhatsApp OTP verification, including when opened through an old phone-prefilled link. A public quiz guest token cannot authorize fee access. WhatsApp receipt ingestion is deferred at the user's request. Teachers continue reviewing uploaded receipts.
+Parent web fees retain the existing phone-number lookup and receipt upload without OTP, as requested. Personalized phone links work directly. Strict phone validation, exact matching, institute scoping and no-store responses remain. Phone ownership is not verified in this flow. WhatsApp receipt ingestion is deferred at the user's request. Teachers continue reviewing uploaded receipts.
 
 The scanner's stack mode captures QR-located stickers, reads at most two concurrently, preserves local drafts and shows a review list. It never automatically credits a score. Existing marks require explicit replacement; the server checks the previous score and records revisions. Camera/OCR accuracy must still be measured on real handwriting and phones; synthetic geometry and UI tests do not establish recognition accuracy. Local drafts contain student paper images; clear saved rows when finished, especially on shared devices.
 
