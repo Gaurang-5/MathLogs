@@ -4,7 +4,7 @@ import { previewInstituteOnboarding } from '../src/services/superAdminInstituteS
 
 const base = {
   owner: { name: 'Gita Sharma', phone: '+91 9876543210', email: 'gita@example.com' },
-  institute: { name: 'Guided Academy', city: 'Jaipur' },
+  institute: { name: 'Guided Academy', city: 'Muaffarnagar' },
   marketplace: { isPubliclyListed: true, isVerified: false }
 };
 
@@ -16,6 +16,7 @@ test('Superadmin onboarding accepts canonical unlimited plans and derives trial 
   assert.equal(result.valid, true);
   assert.equal((result.summary as any).subscription.plan, 'ENTERPRISE');
   assert.equal((result.summary as any).unlimitedStudents, true);
+  assert.equal((result.summary as any).institute.city, 'Muzaffarnagar');
   assert.equal('limits' in (result.normalized as any), false);
 });
 

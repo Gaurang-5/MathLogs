@@ -21,6 +21,12 @@ import { runLifecycleSweep } from './services/subscriptionLifecycleService';
 import { handleRazorpayBillingWebhook } from './controllers/billingWebhookController';
 import { dispatchDuePlanNotifications } from './services/planNotificationService';
 import { planSubscriptionReconciliationService } from './services/planSubscriptionReconciliationService';
+import {
+    enumerateMarketplaceLandingPathsFromListings,
+    getMarketplaceProfileSeo,
+    parseMarketplaceLandingPath,
+    resolveMarketplaceLanding,
+} from './services/marketplaceSeoService';
 
 
 
@@ -181,7 +187,10 @@ export function createApp() {
 
             const institutes = await prisma.institute.findMany({
                 where: { isPubliclyListed: true, status: 'ACTIVE', slug: { not: null } },
-                select: { slug: true, updatedAt: true },
+                select: {
+                    id: true, name: true, slug: true, updatedAt: true, area: true,
+                    classesOffered: true, subjectsOffered: true,
+                },
                 orderBy: { updatedAt: 'desc' }
             });
             const staticUrls = [
@@ -199,6 +208,21 @@ export function createApp() {
             institutes.forEach(item => {
                 if (!item.slug) return;
                 urlEntries.push(`  <url><loc>${PUBLIC_SITE_URL}/coaching/${escapeXml(item.slug)}</loc><lastmod>${item.updatedAt.toISOString()}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`);
+            });
+            const facetPaths = enumerateMarketplaceLandingPathsFromListings(institutes.map(item => ({
+                id: item.id,
+                name: item.name,
+                slug: item.slug || item.id,
+                area: item.area,
+                classesOffered: Array.isArray(item.classesOffered)
+                    ? item.classesOffered.filter((value): value is string => typeof value === 'string')
+                    : [],
+                subjectsOffered: Array.isArray(item.subjectsOffered)
+                    ? item.subjectsOffered.filter((value): value is string => typeof value === 'string')
+                    : [],
+            })));
+            facetPaths.forEach(facetPath => {
+                urlEntries.push(`  <url><loc>${PUBLIC_SITE_URL}${escapeXml(facetPath)}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>`);
             });
 
             const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries.join('\n')}\n</urlset>`;
@@ -218,6 +242,7 @@ export function createApp() {
     // The marketplace currently serves Muzaffarnagar only. Keep one canonical
     // search page and permanently consolidate the former location URL into it.
     app.get('/coaching-in/:citySlug', (_req, res) => res.redirect(301, '/coaching'));
+    app.get('/coaching/muzaffarnagar', (_req, res) => res.redirect(301, '/coaching'));
 
     app.use(express.static(path.join(__dirname, '../../client/dist')));
     app.use('/api', apiRoutes);
@@ -314,6 +339,42 @@ export function createApp() {
                 url: canonicalUrl,
                 description
             };
+        } else if (parseMarketplaceLandingPath(req.path)) {
+            const landingRequest = parseMarketplaceLandingPath(req.path)!;
+            try {
+                const page = await resolveMarketplaceLanding(landingRequest);
+                title = page.title;
+                description = page.description;
+                ogTitle = title;
+                ogDesc = description;
+                canonicalUrl = `${PUBLIC_SITE_URL}${page.canonicalPath}`;
+                robots = page.indexable ? 'index, follow, max-image-preview:large' : 'noindex, follow';
+                if (page.indexable) {
+                    structuredData = [
+                        {
+                            '@context': 'https://schema.org', '@type': 'CollectionPage', name: page.heading,
+                            url: canonicalUrl, description: page.description,
+                        },
+                        {
+                            '@context': 'https://schema.org', '@type': 'ItemList',
+                            itemListElement: page.items.map((item, index) => ({
+                                '@type': 'ListItem', position: index + 1, name: item.name,
+                                url: `${PUBLIC_SITE_URL}/coaching/${item.slug}`,
+                            })),
+                        },
+                        {
+                            '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+                            itemListElement: page.breadcrumbs.map((item, index) => ({
+                                '@type': 'ListItem', position: index + 1, name: item.name,
+                                item: `${PUBLIC_SITE_URL}${item.path}`,
+                            })),
+                        },
+                    ];
+                }
+            } catch (error) {
+                robots = 'noindex, follow';
+                secureLogger.warn('[SEO] Marketplace landing metadata lookup failed', { path: req.path, error });
+            }
         } else if (pathUrl.startsWith('/coaching/')) {
             const rawSlug = req.path.slice('/coaching/'.length);
             let slug = rawSlug;
@@ -322,18 +383,39 @@ export function createApp() {
                 const institute = await prisma.institute.findFirst({
                     where: { OR: [{ slug }, { id: slug }], isPubliclyListed: true, status: 'ACTIVE' },
                     select: {
-                        name: true, slug: true, city: true, area: true, address: true, tagline: true,
+                        name: true, slug: true, teacherName: true, city: true, area: true, address: true, tagline: true,
                         aboutUs: true, logoUrl: true, publicPhone: true, phoneNumber: true,
-                        subjectsOffered: true, googleMapsUrl: true, googleRating: true, googleReviewCount: true
+                        subjectsOffered: true, classesOffered: true, googleMapsUrl: true, googleRating: true, googleReviewCount: true
                     }
                 });
                 if (institute) {
                     const city = institute.city || 'India';
-                    title = `${institute.name} in ${city} | Reviews, Courses & Contact`;
-                    description = `${institute.name}${institute.area ? ` in ${institute.area}` : ''}, ${city}. View subjects, classes, ratings, student reviews, batch details and direct contact information.`;
+                    const duplicateCount = await prisma.institute.count({
+                        where: {
+                            name: { equals: institute.name, mode: 'insensitive' },
+                            isPubliclyListed: true,
+                            status: 'ACTIVE',
+                        },
+                    });
+                    const profileSeo = getMarketplaceProfileSeo({
+                        name: institute.name,
+                        slug: institute.slug || slug,
+                        teacherName: institute.teacherName || 'Faculty',
+                        city,
+                        area: institute.area,
+                        classesOffered: Array.isArray(institute.classesOffered)
+                            ? institute.classesOffered.filter((value): value is string => typeof value === 'string')
+                            : [],
+                        subjectsOffered: Array.isArray(institute.subjectsOffered)
+                            ? institute.subjectsOffered.filter((value): value is string => typeof value === 'string')
+                            : [],
+                        duplicateName: duplicateCount > 1,
+                    });
+                    title = profileSeo.title;
+                    description = profileSeo.description;
                     ogTitle = title;
                     ogDesc = description;
-                    canonicalUrl = `${PUBLIC_SITE_URL}/coaching/${institute.slug || slug}`;
+                    canonicalUrl = `${PUBLIC_SITE_URL}${profileSeo.canonicalPath}`;
                     structuredData = {
                         '@context': 'https://schema.org',
                         '@type': 'EducationalOrganization',

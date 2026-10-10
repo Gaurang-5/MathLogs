@@ -39,7 +39,7 @@ function payload(phone: string, name = 'Guided Academy') {
   const emailPhone = phone.replace(/\D/g, '').slice(-10);
   return {
     owner: { name: 'Gita Sharma', phone, email: `gita-${emailPhone}@example.com` },
-    institute: { name, city: 'Jaipur', area: 'Malviya Nagar' },
+    institute: { name, city: 'Muaffarnagar', area: 'Gandhi Colony' },
     subscription: { plan: 'ENTERPRISE', billingCycle: 'MONTHLY', startTrial: true },
     marketplace: { isPubliclyListed: true, isVerified: false }
   };
@@ -56,6 +56,7 @@ test('onboarding preview normalizes owner login and derives a safe summary witho
   assert.equal(body.data.summary.owner.loginPhone, phone);
   assert.equal(body.data.summary.subscription.plan, 'ENTERPRISE');
   assert.equal(body.data.summary.unlimitedStudents, true);
+  assert.equal(body.data.summary.institute.city, 'Muzaffarnagar');
   assert.equal(await prisma.institute.count({ where: { phoneNumber: phone } }), 0);
 });
 
@@ -81,12 +82,25 @@ test('onboarding commit is idempotent, creates a setup invite, and never returns
   assert.equal(institute.phoneNumber, phone);
   assert.equal(institute.plan, 'ENTERPRISE');
   assert.equal(institute.includedQuizCredits, 5);
+  assert.equal(institute.city, 'Muzaffarnagar');
   assert.ok(institute.trialEndsAt);
 
   const reused = await fetch(`${baseUrl}/api/super-admin/institutes/onboarding/commit`, {
     method: 'POST', headers: headers(key), body: JSON.stringify(payload(phone, 'Different Request'))
   });
   assert.equal(reused.status, 409);
+});
+
+test('onboarding preview rejects a public listing outside Muzaffarnagar', async () => {
+  const request = payload(`95${String(Date.now()).slice(-8)}`, 'Outside City Academy');
+  request.institute.city = 'Jaipur';
+  const response = await fetch(`${baseUrl}/api/super-admin/institutes/onboarding/preview`, {
+    method: 'POST', headers: headers(), body: JSON.stringify(request)
+  });
+  assert.equal(response.status, 400);
+  const body = await response.json() as any;
+  assert.equal(body.data.valid, false);
+  assert.ok(body.data.errors.some((error: any) => error.field === 'institute.city' && /Muzaffarnagar/.test(error.message)));
 });
 
 test('import preview reports row-level errors and commit creates only valid rows', async () => {

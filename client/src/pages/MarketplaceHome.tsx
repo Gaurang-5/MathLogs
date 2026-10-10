@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   Search, MapPin, Sparkles, SlidersHorizontal, GraduationCap, Star,
   ArrowRight, Loader2, BookOpen, ChevronRight, X, Filter, Phone, MessageCircle
 } from 'lucide-react';
 import CoachingCard, { type CoachingItem } from '../components/CoachingCard';
+import MarketplaceBreadcrumbs from '../components/MarketplaceBreadcrumbs';
+import { MARKETPLACE_CITY, parseMarketplaceLandingParams } from '../features/marketplace/location';
+import type { MarketplaceLandingPage } from '../features/marketplace/types';
 import { useMetaTags } from '../hooks/useMetaTags';
 
 const FEATURED_SUBJECTS = [
@@ -23,15 +26,18 @@ const SORT_OPTIONS = [
 ];
 
 export default function MarketplaceHome() {
-  const canonicalPath = '/coaching';
+  const rawParams = useParams();
+  const landingParams = parseMarketplaceLandingParams(rawParams);
+  const isLandingRoute = Boolean(landingParams.areaSlug || landingParams.classSlug || landingParams.subjectSlug);
+  const [landingPage, setLandingPage] = useState<MarketplaceLandingPage | null>(null);
+  const canonicalPath = landingPage?.canonicalPath || '/coaching';
   const [coachings, setCoachings] = useState<CoachingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
-  const [selectedCity, setSelectedCity] = useState('Muzaffarnagar');
+  const [selectedCity, setSelectedCity] = useState<string>(MARKETPLACE_CITY);
   const [sortBy, setSortBy] = useState('rating');
-  const [availableCities, setAvailableCities] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -54,15 +60,34 @@ export default function MarketplaceHome() {
   }), [canonicalPath, coachings]);
 
   useMetaTags({
-    title: 'Best Coaching Institutes in Muzaffarnagar | Reviews & Contact',
-    description: 'Find and compare coaching institutes in Muzaffarnagar. Explore subjects, classes, verified profiles, student reviews, ratings, locations and direct contact details.',
+    title: landingPage?.title || 'Best Coaching Institutes in Muzaffarnagar | Reviews & Contact',
+    description: landingPage?.description || 'Find and compare coaching institutes in Muzaffarnagar. Explore subjects, classes, verified profiles, student reviews, ratings, locations and direct contact details.',
     canonicalPath,
+    robots: isLandingRoute && landingPage && !landingPage.indexable ? 'noindex, follow' : undefined,
     structuredData
   });
 
   const fetchMarketplaceData = useCallback(async () => {
     setLoading(true);
     try {
+      if (isLandingRoute) {
+        const landingQuery = new URLSearchParams();
+        if (landingParams.areaSlug) landingQuery.set('areaSlug', landingParams.areaSlug);
+        if (landingParams.classSlug) landingQuery.set('classSlug', landingParams.classSlug);
+        if (landingParams.subjectSlug) landingQuery.set('subjectSlug', landingParams.subjectSlug);
+        const res = await fetch(`/api/marketplace/landing?${landingQuery.toString()}`);
+        const payload = await res.json();
+        if (payload.success) {
+          const page = payload.data as MarketplaceLandingPage;
+          setLandingPage(page);
+          setCoachings(page.items || []);
+          setSelectedCity(MARKETPLACE_CITY);
+          setSelectedClass(page.filters.className || '');
+          setSelectedSubject(page.filters.subject || '');
+        }
+        return;
+      }
+
       const queryParams = new URLSearchParams();
       if (searchTerm) queryParams.append('q', searchTerm);
       if (selectedSubject) queryParams.append('subject', selectedSubject);
@@ -75,16 +100,13 @@ export default function MarketplaceHome() {
 
       if (data.success) {
         setCoachings(data.data || []);
-        if (data.availableFilters?.cities) {
-          setAvailableCities(data.availableFilters.cities);
-        }
       }
     } catch (err) {
       console.error('Failed to fetch marketplace coachings:', err);
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, selectedSubject, selectedClass, selectedCity, sortBy]);
+  }, [isLandingRoute, landingParams.areaSlug, landingParams.classSlug, landingParams.subjectSlug, searchTerm, selectedSubject, selectedClass, selectedCity, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -114,25 +136,17 @@ export default function MarketplaceHome() {
     setFilterOpen(false);
   };
 
-  const hasActiveFilters = selectedSubject || selectedClass || selectedCity;
+  const hasActiveFilters = Boolean(selectedSubject || selectedClass || searchTerm);
 
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedSubject('');
     setSelectedClass('');
-    setSelectedCity('');
+    setSelectedCity(MARKETPLACE_CITY);
     setSortBy('rating');
   };
 
-  const displayCities = Array.from(
-    new Set(
-      (availableCities.length > 0 ? availableCities : ['Muzaffarnagar']).map(c => {
-        const l = c.trim().toLowerCase();
-        if (l.includes('muzaffarnagar') || l.includes('muaffarnagar')) return 'Muzaffarnagar';
-        return c.trim();
-      })
-    )
-  );
+  const displayCities = [MARKETPLACE_CITY];
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col font-sans text-neutral-900 selection:bg-neutral-900 selection:text-white relative overflow-x-hidden">
@@ -178,16 +192,17 @@ export default function MarketplaceHome() {
       {/* ── Hero / Search Bar Section ──────────────────────────────────────── */}
       <section className="bg-white border-b border-neutral-200/60 py-8 sm:py-12 px-4 sm:px-6 relative overflow-hidden">
         <div className="max-w-4xl mx-auto text-center relative z-10">
+          {landingPage ? <MarketplaceBreadcrumbs items={landingPage.breadcrumbs} /> : null}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-50 text-amber-800 border border-amber-200/80 text-xs font-bold rounded-full mb-4 shadow-2xs">
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
             <span>Compare Coaching in Muzaffarnagar</span>
           </div>
 
           <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-neutral-900 tracking-tight leading-tight mb-3">
-            Best Coaching Institutes in Muzaffarnagar
+            {landingPage?.heading || 'Best Coaching Institutes in Muzaffarnagar'}
           </h1>
           <p className="text-sm sm:text-base text-neutral-500 font-medium max-w-xl mx-auto mb-8">
-            Compare coaching centers in Muzaffarnagar by subjects, classes, student reviews, ratings and location, then contact teachers directly.
+            {landingPage?.introduction || 'Compare coaching centers in Muzaffarnagar by subjects, classes, student reviews, ratings and location, then contact teachers directly.'}
           </p>
 
           {/* Desktop Search Box */}
@@ -209,7 +224,6 @@ export default function MarketplaceHome() {
                 onChange={(e) => setSelectedCity(e.target.value)}
                 className="w-full bg-transparent text-sm font-semibold text-neutral-800 outline-none cursor-pointer"
               >
-                <option value="">All Cities</option>
                 {displayCities.map((city) => (
                   <option key={city} value={city}>{city}</option>
                 ))}
@@ -294,7 +308,6 @@ export default function MarketplaceHome() {
                 {selectedCity && (
                   <span className="text-[11px] bg-neutral-900 text-white font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                     {selectedCity}
-                    <button onClick={() => setSelectedCity('')}><X className="w-3 h-3" /></button>
                   </span>
                 )}
                 <button onClick={clearFilters} className="text-[11px] text-neutral-400 hover:text-neutral-700 font-semibold">Clear all</button>
@@ -329,12 +342,17 @@ export default function MarketplaceHome() {
             <p className="text-sm text-neutral-500 mt-1 max-w-md mx-auto">
               Try resetting your filters or search keywords to explore more teachers.
             </p>
-            <button
+            {isLandingRoute ? (
+              <Link
+                to="/coaching"
+                className="mt-5 inline-flex px-6 py-2.5 bg-neutral-900 text-white font-bold text-xs rounded-full hover:bg-neutral-800 transition-colors"
+              >Browse all coaching in Muzaffarnagar</Link>
+            ) : <button
               onClick={clearFilters}
               className="mt-5 px-6 py-2.5 bg-neutral-900 text-white font-bold text-xs rounded-full hover:bg-neutral-800 transition-colors"
             >
               Reset All Filters
-            </button>
+            </button>}
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
@@ -385,12 +403,6 @@ export default function MarketplaceHome() {
                   <MapPin className="w-3.5 h-3.5" /> City
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setSelectedCity('')}
-                    className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${!selectedCity ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200/80'}`}
-                  >
-                    All Cities
-                  </button>
                   {displayCities.map(city => (
                     <button
                       key={city}
@@ -460,6 +472,19 @@ export default function MarketplaceHome() {
           </div>
         </div>
       )}
+
+      {landingPage?.relatedLinks.length ? (
+        <aside className="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 sm:pb-12" aria-label="Related coaching searches">
+          <h2 className="mb-3 text-sm font-extrabold text-neutral-900">Related coaching searches</h2>
+          <div className="flex flex-wrap gap-2">
+            {landingPage.relatedLinks.map(link => (
+              <Link key={link.path} to={link.path} className="rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-bold text-neutral-700 hover:border-neutral-400">
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </aside>
+      ) : null}
 
       {/* ── Footer ─────────────────────────────────────────────────────────── */}
       <footer className="hidden sm:block bg-white border-t border-neutral-200/60 py-10 px-6">

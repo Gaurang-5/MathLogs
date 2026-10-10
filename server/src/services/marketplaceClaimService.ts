@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { Prisma, type Institute, type MarketplaceClaim } from '@prisma/client';
 import { prisma } from '../prisma';
 import { writeMarketplaceAudit } from './marketplaceAuditService';
+import { requireMarketplaceCity } from '../domain/marketplace/location';
 
 const OPEN_CLAIM_STATUSES = ['NEW', 'CONTACTED'];
 
@@ -189,6 +190,7 @@ export async function approveMarketplaceClaim(
       config = isJsonObject(institute.config) ? institute.config : {};
     }
 
+    const canonicalCity = requireMarketplaceCity(institute.city);
     const updatedInstitute = await tx.institute.update({
       where: { id: institute.id },
       data: {
@@ -197,6 +199,7 @@ export async function approveMarketplaceClaim(
         claimedAt: decidedAt,
         isVerified: true,
         isPubliclyListed: true,
+        city: canonicalCity,
         plan: 'MARKETPLACE',
         billingCycle: 'ONE_TIME',
         marketplaceAccessGrantedAt: institute.marketplaceAccessGrantedAt ?? decidedAt,

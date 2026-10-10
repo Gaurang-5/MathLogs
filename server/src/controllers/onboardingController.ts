@@ -13,6 +13,10 @@ import { OnboardingPaymentError, persistOnboardingOrder, provisionClaimedOnboard
 import { planSubscriptionCheckoutService } from '../services/planSubscriptionCheckoutService';
 import { planSubscriptionLifecycleService } from '../services/planSubscriptionLifecycleService';
 import { type ProvisioningInput } from '../services/accountProvisioningService';
+import {
+    MarketplaceCityValidationError,
+    requireMarketplaceCity,
+} from '../domain/marketplace/location';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -88,6 +92,7 @@ export const createOrder = async (req: Request, res: Response) => {
         }
 
         if (cycle === 'MONTHLY') {
+            const canonicalCity = req.body.city ? requireMarketplaceCity(req.body.city) : undefined;
             const provisioning: ProvisioningInput = {
                 kind: 'PUBLIC',
                 instituteName: tuitionName,
@@ -96,7 +101,7 @@ export const createOrder = async (req: Request, res: Response) => {
                 email,
                 marketplace: {
                     listed: req.body.listOnMarketplace ?? true,
-                    city: req.body.city ? String(req.body.city).trim() : undefined,
+                    city: canonicalCity,
                     area: req.body.area ? String(req.body.area).trim() : undefined,
                     subjects: Array.isArray(req.body.subjectsOffered) ? req.body.subjectsOffered : undefined,
                     googleMapsUrl: req.body.googleMapsUrl ? String(req.body.googleMapsUrl).trim() : undefined
@@ -145,7 +150,17 @@ export const createOrder = async (req: Request, res: Response) => {
 
         await persistOnboardingOrder({
             providerOrderId: String(order.id), amountPaise: amountInPaise, plan: plan as 'QUIZ' | 'ENTERPRISE', billingCycle: cycle,
-            provisioningData: { tuitionName, ownerName, phone, email, listOnMarketplace: req.body.listOnMarketplace, city: req.body.city, area: req.body.area, subjectsOffered: req.body.subjectsOffered, googleMapsUrl: req.body.googleMapsUrl }
+            provisioningData: {
+                tuitionName,
+                ownerName,
+                phone,
+                email,
+                listOnMarketplace: req.body.listOnMarketplace,
+                city: req.body.city ? requireMarketplaceCity(req.body.city) : undefined,
+                area: req.body.area,
+                subjectsOffered: req.body.subjectsOffered,
+                googleMapsUrl: req.body.googleMapsUrl,
+            }
         });
 
         return res.json({
@@ -158,6 +173,9 @@ export const createOrder = async (req: Request, res: Response) => {
         });
 
     } catch (error) {
+        if (error instanceof MarketplaceCityValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
         console.error('Create Order Error:', error);
         res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error during order creation.' });
     }
@@ -284,6 +302,7 @@ export const startTrial = async (req: Request, res: Response) => {
 
         const uniqueSlug = await createUniqueSlug(tuitionName);
 
+        const canonicalCity = city ? requireMarketplaceCity(city) : null;
         const newInstitute = await prisma.institute.create({
             data: {
                 name: tuitionName,
@@ -296,10 +315,10 @@ export const startTrial = async (req: Request, res: Response) => {
                 billingCycle: 'ONE_TIME',
                 marketplaceAccessGrantedAt: new Date(),
                 quizCredits: 0,
-                isPubliclyListed: listOnMarketplace ?? true,
+                isPubliclyListed: false,
                 isExclusive: false,
                 slug: uniqueSlug,
-                city: city ? city.trim() : null,
+                city: canonicalCity,
                 area: area ? area.trim() : null,
                 subjectsOffered: Array.isArray(subjectsOffered) ? subjectsOffered : [],
                 googleMapsUrl: googleMapsUrl ? googleMapsUrl.trim() : null,
@@ -344,6 +363,9 @@ export const startTrial = async (req: Request, res: Response) => {
         });
 
     } catch (error) {
+        if (error instanceof MarketplaceCityValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
         if (error instanceof SubscriptionLifecycleError && error.message === 'TRIAL_ALREADY_USED') {
             return res.status(409).json({ error: 'A free trial has already been used for this account.' });
         }

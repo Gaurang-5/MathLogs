@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { API_URL } from '../utils/api';
 import type { CoachingFeeMode } from '../features/month-coverage/types';
+import { MARKETPLACE_CITY, MARKETPLACE_CITY_OPTIONS } from '../features/marketplace/location';
 
 const DEFAULT_SUBJECTS = [
     'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Science',
@@ -95,7 +96,7 @@ export default function SetupAccount() {
 
     // Directory Listing Configuration (Independent & Optional)
     const [isPubliclyListed, setIsPubliclyListed] = useState(true);
-    const [city, setCity] = useState('Muzaffarnagar');
+    const [city, setCity] = useState<string>(MARKETPLACE_CITY);
     const [area, setArea] = useState('');
     const [googleMapsUrl, setGoogleMapsUrl] = useState('');
     const [description, setDescription] = useState('');
@@ -122,7 +123,7 @@ export default function SetupAccount() {
                 setPhoneNumber(data.phoneNumber || '');
                 setPlan(data.plan || '');
 
-                if (data.city) setCity(data.city);
+                if (data.city) setCity(MARKETPLACE_CITY);
                 if (data.area) setArea(data.area);
                 if (data.googleMapsUrl) setGoogleMapsUrl(data.googleMapsUrl);
                 if (data.isPubliclyListed !== undefined) setIsPubliclyListed(data.isPubliclyListed);
@@ -597,16 +598,14 @@ export default function SetupAccount() {
                                             City *
                                         </label>
                                         <select
+                                            name="marketplace-city"
                                             value={city}
-                                            onChange={e => setCity(e.target.value)}
+                                            onChange={() => setCity(MARKETPLACE_CITY)}
                                             className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-bold outline-none focus:border-black cursor-pointer"
                                         >
-                                            <option value="Muzaffarnagar">Muzaffarnagar</option>
-                                            <option value="Meerut">Meerut</option>
-                                            <option value="Saharanpur">Saharanpur</option>
-                                            <option value="Delhi NCR">Delhi NCR</option>
-                                            <option value="Pune">Pune</option>
-                                            <option value="Other">Other City</option>
+                                            {MARKETPLACE_CITY_OPTIONS.map(option => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
                                         </select>
                                     </div>
 
