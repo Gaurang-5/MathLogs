@@ -4,7 +4,6 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { motion } from 'framer-motion';
 import { User, Users, Smartphone, Mail, ArrowRight, CheckCircle, School, GraduationCap, BookOpen, AlertCircle, Hash, Type } from 'lucide-react';
-import ToastProvider from '../components/ToastProvider';
 import toast from 'react-hot-toast';
 import { getCachedRegistration, type RegisteredStudent } from '../utils/registration';
 
@@ -446,7 +445,6 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
 
     return (
         <div className="min-h-screen bg-app-bg font-sans">
-            <ToastProvider />
 
             {/* ─── Branded Hero ─── */}
             <div className="relative overflow-hidden">

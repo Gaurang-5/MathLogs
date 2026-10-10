@@ -6,7 +6,6 @@ import { LayoutDashboard, Users, FileText, Sparkles, Scan, ReceiptIndianRupee, L
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../utils/cn';
 import { api } from '../utils/api';
-import ToastProvider from './ToastProvider';
 import QuickFeeModal from './QuickFeeModal';
 import PWAInstallPrompt from './PWAInstallPrompt';
 import { SupportSessionBanner } from '../features/superadmin-shell/SupportSessionBanner';
@@ -129,7 +128,6 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
     return (
         <div data-teacher-shell className="teacher-shell flex min-h-screen font-sans selection:bg-accent-subtle selection:text-accent">
             {supportFeatureEnabled ? <SupportSessionBanner /> : null}
-            <ToastProvider />
             <QuickFeeModal isOpen={showQuickFeeModal} instituteFeeMode={instituteFeeMode} onClose={() => setShowQuickFeeModal(false)} />
 
             {/* Sidebar (Desktop) - Premium Glass Style */}
