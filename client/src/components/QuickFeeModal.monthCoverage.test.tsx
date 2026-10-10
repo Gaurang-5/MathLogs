@@ -47,4 +47,56 @@ describe('QuickFeeModal month coverage dispatch', () => {
     expect(apiMock.get).not.toHaveBeenCalledWith('/fees');
     expect(container.textContent).toContain('Quick payment for Aarav');
   });
+
+  it('does not show the legacy payment form while the month-only fee mode is loading', async () => {
+    let resolveInstitute!: (value: { coachingFeeMode: 'MONTH_COVERAGE' }) => void;
+    apiMock.get.mockReturnValueOnce(new Promise(resolve => { resolveInstitute = resolve; }));
+
+    await act(async () => root.render(<QuickFeeModal isOpen onClose={vi.fn()} />));
+
+    expect(container.textContent).not.toContain('Log Fee Payment');
+    expect(container.querySelector('.animate-spin')).not.toBeNull();
+
+    await act(async () => {
+      resolveInstitute({ coachingFeeMode: 'MONTH_COVERAGE' });
+      await settle();
+    });
+    expect(container.textContent).toContain('Quick payment for Aarav');
+  });
+
+  it('uses a prefetched month-only fee mode without requesting the institute again', async () => {
+    apiMock.get.mockRejectedValue(new Error('duplicate institute request'));
+
+    await act(async () => root.render(
+      <QuickFeeModal isOpen instituteFeeMode="MONTH_COVERAGE" onClose={vi.fn()} />
+    ));
+    await act(async () => { await settle(); });
+
+    expect(apiMock.get).not.toHaveBeenCalledWith('/institute/me');
+    expect(container.textContent).toContain('Quick payment for Aarav');
+  });
+
+  it('shows the month-only payment form immediately while students refresh in the background', async () => {
+    let resolveSummary!: (value: Awaited<ReturnType<typeof loadSummary>>) => void;
+    loadSummary.mockReturnValueOnce(new Promise(resolve => { resolveSummary = resolve; }));
+
+    await act(async () => root.render(
+      <QuickFeeModal isOpen instituteFeeMode="MONTH_COVERAGE" onClose={vi.fn()} />
+    ));
+
+    expect(container.querySelector('[data-testid="quick-month-payment"]')).not.toBeNull();
+    expect(container.querySelector('.animate-spin')).toBeNull();
+
+    await act(async () => {
+      resolveSummary({
+        students: [{
+          studentId: 'student-1', name: 'Aarav', batchId: 'batch-1', batchName: 'Target 2027', setupRequired: false,
+          feeStartMonth: '2026-06', feeEndMonth: '2027-05', applicableMonths: 12, receivedMonths: 2,
+          pendingMonths: 10, overdueMonths: 1, nextPendingMonth: '2026-08', oldestOverdueMonth: '2026-08', progressPercent: 17,
+        }],
+      });
+      await settle();
+    });
+    expect(container.textContent).toContain('Quick payment for Aarav');
+  });
 });

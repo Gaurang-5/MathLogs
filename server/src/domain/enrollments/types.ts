@@ -6,6 +6,9 @@ export type MonthCoverageFeeChoice = {
 export type CurrentDueFeeChoice = {
   mode: 'CURRENT_DUE_BASED';
   installmentIds: string[];
+  decision?: 'SELECTED' | 'NO_FEE' | 'LATER';
+  applyFutureInstallments?: boolean;
+  amounts?: Record<string, number>;
 };
 
 export type EnrollmentFeeChoice = MonthCoverageFeeChoice | CurrentDueFeeChoice;

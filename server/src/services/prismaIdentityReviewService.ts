@@ -4,14 +4,16 @@ import { normalizeIdentityPhone } from '../domain/enrollments/identity';
 import type { EnrollmentResult } from '../domain/enrollments/types';
 import { getCourseCode, getInstituteCode } from '../utils/studentIds';
 import { applyEnrollmentFees } from './enrollmentFeeService';
+import { createEnrollmentService } from './enrollmentService';
 import { createIdentityReviewService } from './identityReviewService';
-import { enrollmentFeeDepsFor, prismaEnrollmentService } from './prismaEnrollmentService';
+import { enrollmentFeeDepsFor, transactionAdapter } from './prismaEnrollmentService';
 
 function resultFromJson(value: Prisma.JsonValue): EnrollmentResult {
   return value as unknown as EnrollmentResult;
 }
 
-export const prismaIdentityReviewService = createIdentityReviewService({
+export function identityReviewServiceFor(prisma: Prisma.TransactionClient | typeof import('../prisma').prisma) {
+return createIdentityReviewService({
   async findCandidates({ instituteId, submittedData }) {
     const phone = normalizeIdentityPhone(submittedData.parentWhatsapp);
     return prisma.student.findMany({
@@ -39,7 +41,8 @@ export const prismaIdentityReviewService = createIdentityReviewService({
     const phone = normalizeIdentityPhone(submittedData.parentWhatsapp);
     return candidates.find(row => {
       const saved = row.submittedData as Record<string, unknown>;
-      return normalizeIdentityPhone(String(saved.parentWhatsapp || '')) === phone
+      return (saved.enrollmentIntent as any)?.nonce === submittedData.enrollmentIntent?.nonce
+        && normalizeIdentityPhone(String(saved.parentWhatsapp || '')) === phone
         && String(saved.name || '').trim().toLocaleLowerCase() === submittedData.name.trim().toLocaleLowerCase();
     }) || null;
   },
@@ -70,9 +73,9 @@ export const prismaIdentityReviewService = createIdentityReviewService({
       },
     });
   },
-  enrollExisting: input => prismaEnrollmentService.enrollExistingStudent(input),
+  enrollExisting: input => createEnrollmentService({ runTransaction: operation => '$transaction' in prisma ? prisma.$transaction(tx => operation(transactionAdapter(tx))) : operation(transactionAdapter(prisma)) }).enrollExistingStudent(input),
   async createNewAndEnroll(input) {
-    return prisma.$transaction(async tx => {
+    const run = async (tx: Prisma.TransactionClient) => {
       const replay = await tx.enrollmentAction.findUnique({
         where: { instituteId_idempotencyKey: { instituteId: input.instituteId, idempotencyKey: input.idempotencyKey } },
       });
@@ -138,6 +141,10 @@ export const prismaIdentityReviewService = createIdentityReviewService({
         },
       });
       return result;
-    });
+    };
+    return '$transaction' in prisma ? prisma.$transaction(run) : run(prisma);
   },
 });
+}
+
+export const prismaIdentityReviewService = identityReviewServiceFor(prisma);

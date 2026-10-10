@@ -11,8 +11,9 @@ import {
     Award, Check, Clock
 } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { TeacherButton } from './teacher-ui/TeacherButton';
 import { ConfiguredStudentFields } from '../features/student-profile/ConfiguredStudentFields';
-import type { RegistrationFieldDefinition } from '../features/student-profile/registrationFields';
+import { additionalRegistrationFields, type RegistrationFieldDefinition } from '../features/student-profile/registrationFields';
 import { StudentFeeStartDialog } from '../features/month-coverage/StudentFeeStartDialog';
 import { confirmStudentFeeProfile } from '../features/month-coverage/api';
 
@@ -107,7 +108,7 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const [editingFeeStart, setEditingFeeStart] = useState(false);
 
-    const { data: student, isLoading, isFetching, isError, refetch } = useQuery({
+    const { data: student, isLoading, isFetching, isError, error, refetch } = useQuery({
         queryKey: ['studentProfile', studentId],
         queryFn: () => api.get<StudentProfileData>(`/students/${studentId}/profile`),
         enabled: !!studentId,
@@ -172,6 +173,7 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
     const sanitizedWhatsapp = student?.parentWhatsapp?.replace(/\D/g, '') || '';
     const whatsappHref = sanitizedWhatsapp ? `https://wa.me/${sanitizedWhatsapp.length === 10 ? `91${sanitizedWhatsapp}` : sanitizedWhatsapp}` : '';
     const phoneHref = student?.parentWhatsapp ? `tel:${student.parentWhatsapp}` : '';
+    const onboardingFields = additionalRegistrationFields(student?.registrationFields || []);
 
     const getInitials = (name: string) => (name || 'Unknown').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 
@@ -203,14 +205,17 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50"
+                        className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[110]"
                         onClick={onClose}
                     />
 
                     {/* Modal container */}
-                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-none">
+                    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-none">
                         <motion.div
                             key="modal"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Student profile"
                             initial={{ y: '100%', opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
                             exit={{ y: '100%', opacity: 0 }}
@@ -218,7 +223,8 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                             className="w-full sm:w-[92vw] max-w-[720px] max-h-[90vh] sm:max-h-[85vh] h-[90vh] sm:h-auto bg-white rounded-t-[28px] sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden pointer-events-auto border border-black/10"
                         >
                             {isLoading && (
-                                <div className="p-6 space-y-4 animate-pulse">
+                                <div className="p-6 space-y-4">
+                                    <div className="flex items-center justify-between"><span role="status" className="text-sm text-app-text-secondary">Loading profile…</span><TeacherButton variant="quiet" iconOnlyLabel="Close profile" icon={<X className="size-5" />} onClick={onClose} /></div>
                                     <div className="w-12 h-1.5 bg-neutral-200 rounded-full mx-auto sm:hidden" />
                                     <div className="flex items-center gap-3">
                                         <div className="w-14 h-14 rounded-2xl bg-neutral-200 shrink-0" />
@@ -242,7 +248,7 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                                         <AlertCircle className="w-7 h-7" />
                                     </div>
                                     <h2 className="text-lg font-black text-black">Could not load profile</h2>
-                                    <p className="text-xs text-neutral-500 mt-1 max-w-xs">The profile request failed. Please check your connection and try again.</p>
+                                    <p className="text-xs text-neutral-500 mt-1 max-w-xs">{error instanceof Error ? error.message : 'The profile request failed. Please try again.'}</p>
                                     <div className="flex gap-2 mt-5">
                                         <button
                                             onClick={() => refetch()}
@@ -393,14 +399,12 @@ export default function StudentProfileDrawer({ studentId, onClose }: Props) {
                                                         )}
                                                         <ProfileInfoRow icon={CalendarDays} label="Enrollment Date" value={formatDate(student.createdAt)} />
                                                     </div>
+                                                    {onboardingFields.length > 0 && (
+                                                        <div className="mt-2 border-t border-black/[0.04] pt-3">
+                                                            <ConfiguredStudentFields student={student} fields={onboardingFields} />
+                                                        </div>
+                                                    )}
                                                 </div>
-
-                                                {(student.registrationFields?.length || 0) > 0 && (
-                                                    <div className="bg-neutral-50/60 border border-black/[0.06] rounded-2xl p-3.5 sm:p-4">
-                                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3 px-1">Onboarding details</h3>
-                                                        <ConfiguredStudentFields student={student} fields={student.registrationFields || []} />
-                                                    </div>
-                                                )}
 
                                                 {/* Fee Status Card */}
                                                 <div className="bg-neutral-50/60 border border-black/[0.06] rounded-2xl p-4">

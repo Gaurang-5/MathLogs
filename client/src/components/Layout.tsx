@@ -30,14 +30,19 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
     const [quizCredits, setQuizCredits] = useState<number>(() => {
         return parseInt(localStorage.getItem('quizCredits') || '0', 10);
     });
+    const [instituteFeeMode, setInstituteFeeMode] = useState<'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' | null | undefined>(null);
 
     useEffect(() => {
-        api.get<{ quizCredits?: number }>('/institute/me').then((res) => {
+        api.get<{ quizCredits?: number; coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' }>('/institute/me').then((res) => {
             if (res && res.quizCredits !== undefined) {
                 setQuizCredits(res.quizCredits);
                 localStorage.setItem('quizCredits', res.quizCredits.toString());
             }
-        }).catch(() => {});
+            setInstituteFeeMode(res.coachingFeeMode ?? 'CURRENT_DUE_BASED');
+        }).catch(() => {
+            // undefined lets QuickFeeModal retry the lookup if this preload failed.
+            setInstituteFeeMode(undefined);
+        });
     }, []);
 
     useEffect(() => { reconcileSupportSession(supportFeatureEnabled); }, []);
@@ -125,7 +130,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
         <div data-teacher-shell className="teacher-shell flex min-h-screen font-sans selection:bg-accent-subtle selection:text-accent">
             {supportFeatureEnabled ? <SupportSessionBanner /> : null}
             <ToastProvider />
-            <QuickFeeModal isOpen={showQuickFeeModal} onClose={() => setShowQuickFeeModal(false)} />
+            <QuickFeeModal isOpen={showQuickFeeModal} instituteFeeMode={instituteFeeMode} onClose={() => setShowQuickFeeModal(false)} />
 
             {/* Sidebar (Desktop) - Premium Glass Style */}
             <aside

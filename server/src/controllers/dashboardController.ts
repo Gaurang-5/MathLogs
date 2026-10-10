@@ -23,11 +23,11 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
         if (!user.instituteId) return res.status(400).json({ error: 'Missing institute context' });
         const dashboardInstitute = await prisma.institute.findUnique({
             where: { id: user.instituteId },
-            select: { coachingFeeMode: true, teacherName: true },
+            select: { id: true, coachingFeeMode: true, timezone: true, teacherName: true },
         });
         if (!dashboardInstitute) return res.status(404).json({ error: 'Institute not found' });
         if (dashboardInstitute.coachingFeeMode === 'MONTH_COVERAGE') {
-            const dashboard = await getMonthCoverageDashboard(user.instituteId, teacherId, new Date());
+            const dashboard = await getMonthCoverageDashboard(user.instituteId, teacherId, new Date(), undefined, dashboardInstitute);
             return res.json({
                 ...dashboard,
                 userName: dashboard.userName || user.username,
@@ -222,7 +222,7 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
                 AND s."instituteId" = ${instituteId}
                 ${ayFilter}
                 AND (
-                    (fi."studentId" IS NULL AND (fi."createdAt" >= e."startedAt" OR EXISTS (SELECT 1 FROM "FeePayment" fp WHERE fp."installmentId" = fi.id AND fp."studentId" = s.id)))
+                    (fi."studentId" IS NULL AND ((e."feeDecision" = 'LEGACY' AND fi."createdAt" >= e."startedAt") OR EXISTS (SELECT 1 FROM "FeeInstallmentAssignment" fa WHERE fa."installmentId" = fi.id AND fa."studentId" = s.id) OR EXISTS (SELECT 1 FROM "FeePayment" fp WHERE fp."installmentId" = fi.id AND fp."studentId" = s.id)))
                     OR (fi."studentId" = s.id)
                 )
             GROUP BY yr, mo
@@ -239,7 +239,7 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
             WHERE e.status = 'ACTIVE'
                 AND s."instituteId" = ${instituteId}
                 ${ayFilter}
-                AND b."feeAmount" > 0
+                AND e."feeDecision" = 'LEGACY' AND b."feeAmount" > 0
                 AND NOT EXISTS (
                     SELECT 1 FROM "FeeInstallment" fi2 WHERE fi2."batchId" = b.id AND fi2."studentId" IS NULL
                 )
@@ -301,18 +301,9 @@ export const getFinancialGrowthStats = async (req: Request, res: Response) => {
         let totalOverpaid = 0;
         try {
             const overpaidQuery = await prisma.$queryRaw<Array<{ amt: number }>>`
-                SELECT COALESCE(SUM(amount_overpaid), 0)::float as amt FROM (
-                    SELECT GREATEST(0, (COALESCE(SUM(fp."amountPaid"), 0) + COALESCE(SUM(fr.amount), 0)) - (
-                        -- total generated for this student
-                        COALESCE((SELECT SUM(fi.amount) FROM "FeeInstallment" fi WHERE fi."studentId" = s.id OR (fi."studentId" IS NULL AND EXISTS (SELECT 1 FROM "Enrollment" e WHERE e."studentId" = s.id AND e."batchId" = fi."batchId" AND e.status = 'ACTIVE'))), 0) +
-                        COALESCE((SELECT SUM(b."feeAmount") FROM "Enrollment" e JOIN "Batch" b ON b.id = e."batchId" WHERE e."studentId" = s.id AND e.status = 'ACTIVE' AND NOT EXISTS(SELECT 1 FROM "FeeInstallment" fi2 WHERE fi2."batchId" = b.id AND fi2."studentId" IS NULL)), 0)
-                    )) as amount_overpaid
-                    FROM "Student" s
-                    LEFT JOIN "FeePayment" fp ON fp."studentId" = s.id
-                    LEFT JOIN "FeeRecord" fr ON fr."studentId" = s.id AND fr.status = 'PAID'
-                    WHERE s."instituteId" = ${instituteId}
-                    GROUP BY s.id
-                ) sub
+                SELECT COALESCE(SUM(GREATEST(0, -sb.balance)), 0)::float AS amt
+                FROM "StudentBalance" sb JOIN "Student" s ON s.id = sb."studentId"
+                WHERE s."instituteId" = ${instituteId}
             `;
             totalOverpaid = overpaidQuery[0]?.amt || 0;
         } catch (e) {
@@ -374,7 +365,7 @@ export const getInstallmentGrowthStats = async (req: Request, res: Response) => 
                 enrollments: {
                     where: { status: 'ACTIVE' },
                     select: {
-                        startedAt: true,
+                        startedAt: true, feeDecision: true,
                         batch: { select: { feeInstallments: {
                             select: {
                                 id: true,
@@ -411,7 +402,7 @@ export const getInstallmentGrowthStats = async (req: Request, res: Response) => 
 
         students.forEach((student: any) => {
             const allBatchInstallments = student.enrollments.flatMap((enrollment: any) =>
-                enrollment.batch.feeInstallments.map((installment: any) => ({ ...installment, enrollmentStartedAt: enrollment.startedAt })));
+                enrollment.batch.feeInstallments.map((installment: any) => ({ ...installment, enrollmentStartedAt: enrollment.startedAt, feeDecision: enrollment.feeDecision })));
 
             const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
             const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
@@ -420,7 +411,7 @@ export const getInstallmentGrowthStats = async (req: Request, res: Response) => 
                 if (inst.studentId) {
                     return inst.studentId === student.id;
                 }
-                const isAfterJoin = new Date(inst.createdAt) >= new Date(inst.enrollmentStartedAt);
+                const isAfterJoin = (!inst.feeDecision || inst.feeDecision === 'LEGACY') && new Date(inst.createdAt) >= new Date(inst.enrollmentStartedAt);
                 const hasPayment = paidInstallmentIds.has(inst.id);
                 const isAssigned = assignedIds.has(inst.id);
                 return isAfterJoin || hasPayment || isAssigned;

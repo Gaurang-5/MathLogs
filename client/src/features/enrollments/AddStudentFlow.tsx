@@ -1,9 +1,10 @@
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { TeacherButton } from '../../components/teacher-ui/TeacherButton';
 import { Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { enrollExisting, previewEnrollment, resendEnrollmentNotification, searchEnrollmentCandidates, sendRegistrationInvite } from './api';
-import { defaultEnrollmentFeeChoice, FeeApplicabilityStep } from './FeeApplicabilityStep';
+import { defaultEnrollmentFeeChoice, FeeApplicabilityStep, isEnrollmentFeeChoiceReady } from './FeeApplicabilityStep';
 import type { EnrollmentBatch, EnrollmentCandidate, EnrollmentFeeChoice, EnrollmentResult } from './types';
 
 export function AddStudentFlow({ batch, onClose, onComplete }: {
@@ -19,7 +20,23 @@ export function AddStudentFlow({ batch, onClose, onComplete }: {
   const [fee, setFee] = useState<EnrollmentFeeChoice>(() => defaultEnrollmentFeeChoice(batch));
   const [result, setResult] = useState<EnrollmentResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const startedAt = new Date().toISOString();
+  const [startedAt] = useState(() => new Date().toISOString());
+  const dialogRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !submitting) onClose();
+      if (event.key === 'Tab') {
+        const items = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]') || []);
+        const first = items[0], last = items[items.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('keydown', key); previous?.focus(); };
+  }, [onClose, submitting]);
   const candidates = useQuery({
     queryKey: ['enrollment-candidates', batch.id, deferredQuery],
     queryFn: () => searchEnrollmentCandidates(batch.id, deferredQuery),
@@ -28,6 +45,7 @@ export function AddStudentFlow({ batch, onClose, onComplete }: {
   });
 
   const confirm = async () => {
+    if (!isEnrollmentFeeChoiceReady(fee)) return;
     setSubmitting(true);
     try {
       if (candidate) {
@@ -37,7 +55,7 @@ export function AddStudentFlow({ batch, onClose, onComplete }: {
         if (saved.outcome !== 'ALREADY_ENROLLED') await onComplete();
       } else {
         await sendRegistrationInvite(batch.id, whatsapp, fee);
-        toast.success('Registration link sent with the selected fee settings.');
+        toast.success('Registration link queued with the confirmed fee plan.');
         onClose();
       }
     } catch (error) {
@@ -48,10 +66,10 @@ export function AddStudentFlow({ batch, onClose, onComplete }: {
   };
 
   return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-    <section role="dialog" aria-label="Add student" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl">
+    <section ref={dialogRef} tabIndex={-1} aria-modal="true" role="dialog" aria-label="Add student" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl">
       <header className="mb-5 flex items-start justify-between">
         <div><h2 className="text-xl font-bold">Add student to {batch.name}</h2><p className="text-sm text-app-text-tertiary">Find an old profile first, or send a link for a new student.</p></div>
-        <button aria-label="Close" onClick={onClose}><X className="h-5 w-5" /></button>
+        <TeacherButton variant="quiet" iconOnlyLabel="Close" disabled={submitting} onClick={onClose} icon={<X className="h-5 w-5" />} />
       </header>
 
       {result ? <div className="space-y-4">
@@ -77,12 +95,12 @@ export function AddStudentFlow({ batch, onClose, onComplete }: {
           <button className="w-full rounded-xl border border-black/10 px-4 py-3 font-semibold" onClick={() => setCreateNew(true)}>Create a separate student</button>
         </> : <>
           <div className="rounded-xl bg-neutral-50 p-4">
-            {candidate ? <><strong>{candidate.name}</strong><p className="text-sm">{candidate.humanId || 'No ID'} · {candidate.parentWhatsapp}</p></> : <label className="block"><span className="text-xs font-bold uppercase">Student WhatsApp</span><input value={whatsapp} onChange={event => setWhatsapp(event.target.value.replace(/\D/g, '').slice(-10))} className="mt-2 w-full rounded-xl border px-4 py-3" placeholder="10-digit number" /></label>}
+            {candidate ? <><strong>{candidate.name}</strong><p className="text-sm">{candidate.humanId || 'No ID'} · {candidate.parentWhatsapp}</p></> : <label className="block"><span className="text-xs font-bold uppercase">Student WhatsApp</span><input aria-label="Student WhatsApp" type="tel" inputMode="numeric" value={whatsapp} onChange={event => setWhatsapp(event.target.value.replace(/\D/g, '').slice(-10))} className="mt-2 w-full rounded-xl border px-4 py-3" placeholder="10-digit number" /></label>}
           </div>
           <FeeApplicabilityStep batch={batch} value={fee} onChange={setFee} />
-          <p className="rounded-xl bg-blue-50 p-3 text-xs text-blue-900">Existing fees and payments will not be recreated. Only the choices above apply to this enrollment.</p>
-          <div className="flex gap-3"><button className="flex-1 rounded-xl border px-4 py-3" onClick={() => { setCandidate(null); setCreateNew(false); }}>Back</button>
-            <button disabled={submitting || (!candidate && whatsapp.length < 10)} className="flex-1 rounded-xl bg-black px-4 py-3 font-semibold text-white disabled:opacity-50" onClick={confirm}>{submitting ? 'Saving…' : candidate ? 'Use existing profile' : 'Send registration link'}</button></div>
+          <p className="rounded-xl border border-app-border bg-app-surface-opaque p-3 text-xs text-app-text-secondary">Review the confirmed fee total before continuing. Existing payments and previously assigned fees remain unchanged.</p>
+          <div className="flex gap-3"><TeacherButton variant="secondary" className="flex-1" onClick={() => { setCandidate(null); setCreateNew(false); }}>Back</TeacherButton>
+            <TeacherButton disabled={submitting || !isEnrollmentFeeChoiceReady(fee) || (!candidate && whatsapp.length < 10)} className="flex-1" onClick={confirm}>{submitting ? 'Saving…' : candidate ? 'Use existing profile' : 'Confirm fees and send link'}</TeacherButton></div>
         </>}
       </div>}
     </section>

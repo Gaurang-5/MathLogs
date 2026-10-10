@@ -98,6 +98,7 @@ export default function Dashboard() {
         queryKey: ['classAverage'],
         queryFn: () => api.get<ClassAveragePoint[]>('/stats/class-average'),
         staleTime: 30000,
+        enabled: Boolean(summary),
     });
 
     const { data: installmentStatsData = [], isLoading: installmentStatsLoading } = useQuery({

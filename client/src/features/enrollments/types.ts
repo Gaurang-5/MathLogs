@@ -1,6 +1,6 @@
 export type EnrollmentFeeChoice =
   | { mode: 'MONTH_COVERAGE'; feeStartMonth: string }
-  | { mode: 'CURRENT_DUE_BASED'; installmentIds: string[] };
+  | { mode: 'CURRENT_DUE_BASED'; installmentIds: string[]; decision?: 'SELECTED' | 'NO_FEE' | 'LATER'; applyFutureInstallments?: boolean; amounts?: Record<string, number> };
 
 export type EnrollmentCandidate = {
   studentId: string;

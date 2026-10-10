@@ -472,6 +472,8 @@ model Enrollment {
   batchId                  String
   status                   EnrollmentStatus             @default(ACTIVE)
   startedAt                DateTime
+  feeDecision              String                       @default("LEGACY")
+  applyFutureInstallments  Boolean                      @default(true)
   endedAt                  DateTime?
   endReason                String?
   createdById              String?
@@ -614,6 +616,7 @@ model Mark {
 }
 
 model FeeInstallment {
+  lockedAt                DateTime?
   id                      String                     @id @default(uuid())
   name                    String
   amount                  Float

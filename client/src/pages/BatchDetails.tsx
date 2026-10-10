@@ -9,7 +9,7 @@ import { ArrowLeft, CalendarDays, Clock, Download, Mail, Phone, Edit2, Trash2, X
 import toast from 'react-hot-toast';
 import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
-import { getInstallmentPaidMap, getStudentJoinDate, type LegacyFee } from '../utils/fees';
+import { getInstallmentPaidMap, isFeeInstallmentApplicable, type LegacyFee } from '../utils/fees';
 import StudentProfileDrawer from '../components/StudentProfileDrawer';
 import { BatchRegistrationQrModal } from '../components/batch/BatchRegistrationQrModal';
 import { StudentFeeStartDialog } from '../features/month-coverage/StudentFeeStartDialog';
@@ -25,6 +25,7 @@ interface Student {
     id: string;
     enrollmentId: string;
     enrollmentStartedAt?: string;
+    feeDecision?: string;
     humanId: string | null;
     name: string;
     parentName: string;
@@ -1160,10 +1161,7 @@ export default function BatchDetails() {
                                             const isFullyPaid = paidAmount >= inst.amount;
                                             const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
 
-                                            const studentJoinDate = getStudentJoinDate(student.createdAt);
-                                            const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
-                                            const isAssigned = student.feeAssignments?.some(a => a.installmentId === inst.id);
-                                            const isNotApplicable = instDate < studentJoinDate && payments.length === 0 && !isAssigned;
+                                            const isNotApplicable = !isFeeInstallmentApplicable(student, inst);
 
                                             if (isNotApplicable) {
                                                 return (
@@ -1309,7 +1307,7 @@ export default function BatchDetails() {
                                                 <button
                                                     onClick={() => handleDelete(student)}
                                                     className="p-2 bg-neutral-50 hover:bg-red-50 text-red-600 rounded-xl border border-black/5 transition-colors"
-                                                    title="Delete"
+                                                    title="Remove from batch" aria-label={`Remove ${student.name} from batch`}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -1420,11 +1418,7 @@ export default function BatchDetails() {
                                             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 mb-1">
                                                 {batch.feeInstallments.filter((inst) => {
                                                     if (inst.studentId) return false;
-                                                    const studentJoinDate = getStudentJoinDate(student.createdAt);
-                                                    const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
-                                                    const hasPayment = student.feePayments?.some(p => p.installmentId === inst.id);
-                                                    const isAssigned = student.feeAssignments?.some(a => a.installmentId === inst.id);
-                                                    return instDate >= studentJoinDate || hasPayment || isAssigned;
+                                                    return isFeeInstallmentApplicable(student, inst);
                                                 }).map((inst) => {
                                                     const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
                                                     const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);
@@ -1566,7 +1560,7 @@ export default function BatchDetails() {
                                             className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-red-400 hover:bg-red-50 active:bg-red-100 transition-colors"
                                         >
                                             <Trash2 className="w-4 h-4" />
-                                            <span className="text-[9px] font-bold uppercase tracking-wide">Delete</span>
+                                            <span className="text-[9px] font-bold uppercase tracking-wide">Remove</span>
                                         </button>
                                     </div>
                                 </div>
@@ -2234,7 +2228,7 @@ export default function BatchDetails() {
                                                                     <button onClick={() => { setEditingInstallment(inst); setFeeView('edit'); }} className="p-2 hover:bg-blue-50 text-app-text-tertiary hover:text-blue-600 rounded-xl transition-colors" title="Edit">
                                                                         <Edit2 className="w-4 h-4" />
                                                                     </button>
-                                                                    <button onClick={() => { setInstallmentToDelete(inst); setFeeView('delete-confirm'); }} className="p-2 hover:bg-red-50 text-app-text-tertiary hover:text-red-500 rounded-xl transition-colors" title="Delete">
+                                                                    <button onClick={() => { setInstallmentToDelete(inst); setFeeView('delete-confirm'); }} className="p-2 hover:bg-red-50 text-app-text-tertiary hover:text-red-500 rounded-xl transition-colors" title="Remove from batch" aria-label={`Remove ${student.name} from batch`}>
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </button>
                                                                 </div>

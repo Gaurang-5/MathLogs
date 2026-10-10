@@ -706,7 +706,7 @@ export const getStudentDashboard = async (req: Request, res: Response): Promise<
             if (inst.studentId && inst.studentId !== studentId) return false;
             if (inst.studentId === studentId) return true;
             const enrollment = student.enrollments.find((item: any) => item.batchId === inst.batchId);
-            return Boolean(enrollment) && (new Date(inst.createdAt) >= new Date(enrollment.startedAt) || inst.payments.length > 0 || assignedIds.has(inst.id));
+            return Boolean(enrollment) && ((enrollment.feeDecision === 'LEGACY' && new Date(inst.createdAt) >= new Date(enrollment.startedAt)) || inst.payments.length > 0 || assignedIds.has(inst.id));
         });
 
         // Build a map of testId -> mark for fast lookup

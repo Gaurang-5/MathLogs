@@ -1,3 +1,4 @@
+import { collectExplicitPayment, loadPaymentOptions } from '../services/explicitFeePaymentService';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 // const PDFDocument = require('pdfkit');
@@ -160,7 +161,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 enrollments: {
                     where: { status: 'ACTIVE' },
                     select: {
-                        startedAt: true,
+                        startedAt: true, feeDecision: true,
                         batch: { select: { name: true, feeAmount: true, feeInstallments: {
                             select: {
                                 id: true,
@@ -206,7 +207,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
 
         const summary = students.map((student: any) => {
             const allBatchInstallments = student.enrollments.flatMap((enrollment: any) =>
-                enrollment.batch.feeInstallments.map((installment: any) => ({ ...installment, enrollmentStartedAt: enrollment.startedAt })));
+                enrollment.batch.feeInstallments.map((installment: any) => ({ ...installment, enrollmentStartedAt: enrollment.startedAt, feeDecision: enrollment.feeDecision })));
 
             // Build a set of installment IDs that have existing payments for this student
             const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
@@ -220,7 +221,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 if (inst.studentId) {
                     return inst.studentId === student.id;
                 }
-                const isAfterJoin = new Date(inst.createdAt) >= new Date(inst.enrollmentStartedAt);
+                const isAfterJoin = (!inst.feeDecision || inst.feeDecision === 'LEGACY') && new Date(inst.createdAt) >= new Date(inst.enrollmentStartedAt);
                 const hasPayment = paidInstallmentIds.has(inst.id);
                 const isAssigned = assignedIds.has(inst.id);
                 return isAfterJoin || hasPayment || isAssigned;
@@ -284,7 +285,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
             } else {
                 const fallbackBatchFees = student.enrollments.reduce((sum: number, enrollment: any) => {
                     const hasGlobals = enrollment.batch.feeInstallments.some((installment: any) => !installment.studentId);
-                    return sum + (hasGlobals ? 0 : Number(enrollment.batch.feeAmount || 0));
+                    return sum + (hasGlobals || (enrollment.feeDecision && enrollment.feeDecision !== 'LEGACY') ? 0 : Number(enrollment.batch.feeAmount || 0));
                 }, 0);
                 totalFee = globalInstallmentsTotal + fallbackBatchFees + customInstallmentsTotal;
             }
@@ -327,160 +328,18 @@ export const getFeeSummary = async (req: Request, res: Response) => {
     }
 };
 
-export const recordPayment = async (req: Request, res: Response) => {
-    const { studentId, amount } = req.body;
-    const parsedAmount = parseFloat(amount);
-
-    if (!studentId || !amount || isNaN(parsedAmount)) {
-        res.status(400).json({ error: 'Invalid Payment Data' });
-        return;
-    }
-
+export const getStudentPaymentOptions = async (req: Request, res: Response) => {
     try {
-        const teacherId = (req as any).user?.id;
+        const result = await loadPaymentOptions(prisma, String(req.params.id), req.user as any);
+        return res.json({ studentId: result.student.id, installments: result.installments });
+    } catch (error: any) { return res.status(error.statusCode || 500).json({error: error.statusCode ? error.message : 'Could not load applicable installments.'}); }
+};
 
-        // CONCURRENCY FIX: Wrap entire read-validate-write in a serializable transaction.
-        // Previously, two concurrent payments could both pass the balance check
-        // (both see balance = Rs. 5000) and create duplicate payments (total Rs. 10000).
-        // With serializable isolation, the second request will see the updated balance
-        // after the first transaction commits.
-        const result = await prisma.$transaction(async (tx) => {
-            // 1. Fetch Student & Installments (inside transaction for consistency)
-            const student = await tx.student.findUnique({
-                where: { id: studentId },
-                include: {
-                    enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { feeInstallments: { orderBy: { createdAt: 'asc' } }, institute: true } } } },
-                    feePayments: true,
-                    fees: true
-                }
-            });
-
-            if (!student) {
-                throw { statusCode: 404, message: 'Student not found' };
-            }
-            if (!student.enrollments.some(enrollment => !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId)) {
-                throw { statusCode: 403, message: 'Unauthorized' };
-            }
-
-            const allBatchInstallments = student.enrollments.flatMap(enrollment =>
-                enrollment.batch.feeInstallments.map(installment => ({ ...installment, enrollmentStartedAt: enrollment.startedAt })));
-            const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
-            const installments = allBatchInstallments.filter((inst: any) => {
-                if (inst.studentId) {
-                    return inst.studentId === studentId;
-                }
-                const isAfterJoin = new Date(inst.createdAt) >= new Date(inst.enrollmentStartedAt);
-                const hasPayment = paidInstallmentIds.has(inst.id);
-                return isAfterJoin || hasPayment;
-            });
-            const validInstallmentIds = new Set(installments.map(i => i.id));
-
-            // Validation: Prevent Overpayment
-            const installmentSum = installments.reduce((sum, i) => sum + i.amount, 0);
-            const fallbackFees = student.enrollments.reduce((sum, enrollment) =>
-                sum + (enrollment.batch.feeInstallments.length > 0 ? 0 : enrollment.batch.feeAmount), 0);
-            const totalFee = installmentSum + fallbackFees;
-
-            const paidGeneric = student.fees
-                .filter((f: any) => f.status === 'PAID')
-                .reduce((sum: number, f: any) => sum + f.amount, 0);
-            // Only count payments for valid installments
-            const paidLinked = student.feePayments
-                .filter((p: any) => validInstallmentIds.has(p.installmentId))
-                .reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-
-            const currentBalance = Math.max(0, totalFee - (paidGeneric + paidLinked));
-
-            if (parsedAmount > currentBalance) {
-                throw { statusCode: 400, message: `Amount (Rs. ${parsedAmount}) exceeds outstanding balance (Rs. ${currentBalance})` };
-            }
-
-            let remainingAmount = parsedAmount;
-
-            // 2. Auto-Allocate to Installments
-            for (const inst of installments) {
-                if (remainingAmount <= 0) break;
-
-                const paymentsForThisInstallment = student.feePayments.filter(p => p.installmentId === inst.id);
-                const paidSoFar = paymentsForThisInstallment.reduce((sum, p) => sum + p.amountPaid, 0);
-                const pendingForThis = inst.amount - paidSoFar;
-
-                if (pendingForThis > 0) {
-                    const allocate = Math.min(pendingForThis, remainingAmount);
-
-                    await tx.feePayment.create({
-                        data: {
-                            studentId,
-                            installmentId: inst.id,
-                            amountPaid: allocate,
-                            date: new Date()
-                        }
-                    });
-
-                    remainingAmount -= allocate;
-                }
-            }
-
-            // 3. Stash Surplus (if any)
-            if (remainingAmount > 0) {
-                await tx.feeRecord.create({
-                    data: {
-                        studentId,
-                        amount: remainingAmount,
-                        status: 'PAID',
-                        date: new Date()
-                    }
-                });
-            }
-
-            await tx.systemLog.create({
-                data: {
-                    instituteId: student.instituteId!,
-                    action: 'FEE_COLLECTED',
-                    entityId: student.id,
-                    entityName: student.name,
-                    details: { amount: parsedAmount, type: 'Automated Allocation' }
-                }
-            });
-
-            return student; // Return for WhatsApp notification
-        }, {
-            isolationLevel: 'Serializable', // Prevents phantom reads / double-payment
-            timeout: 15000 // 15s timeout for the transaction
-        });
-
-        // Send WhatsApp receipt OUTSIDE transaction (fire-and-forget)
-        if (result.parentWhatsapp) {
-            const installments = result.enrollments.flatMap(enrollment => enrollment.batch.feeInstallments
-                .filter(inst => new Date(inst.createdAt) >= new Date(enrollment.startedAt)));
-            const allocatedInstallments = installments
-                .filter(inst => {
-                    const paidBefore = result.feePayments.filter(p => p.installmentId === inst.id).reduce((s, p) => s + p.amountPaid, 0);
-                    return inst.amount - paidBefore > 0;
-                })
-                .map(inst => inst.name)
-                .join(', ') || 'Fee Payment';
-
-            import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
-                void sendStudentAlertForStudent(result.id, phone => sendPaymentReceiptWhatsApp(phone, {
-                    studentName: result.name,
-                    amountPaid: `Rs. ${parsedAmount.toLocaleString()}`,
-                    installmentName: allocatedInstallments,
-                    instituteName: result.enrollments[0]?.batch.institute?.name || 'our institute',
-                    instituteId: result.instituteId || undefined
-                })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
-            });
-        }
-
-        res.json({ success: true, message: 'Payment recorded and allocated' });
-    } catch (error: any) {
-        // Handle structured errors from within the transaction
-        if (error.statusCode) {
-            return res.status(error.statusCode).json({ error: error.message });
-        }
-        console.error("Error recording payment:", error);
-        res.status(500).json({ error: 'Failed to record payment' });
-    }
+export const recordPayment = async (req: Request, res: Response) => {
+    try {
+        const result = await collectExplicitPayment(req.body, req.user as any);
+        return res.json(result);
+    } catch (error: any) { return res.status(error.statusCode || (error.code === 'P2034' ? 409 : 500)).json({error: error.statusCode ? error.message : 'Could not save payment. Retry with the same payment details.'}); }
 };
 
 export const payInstallment = async (req: Request, res: Response) => {
@@ -542,7 +401,7 @@ export const payInstallment = async (req: Request, res: Response) => {
         const isExistingPayment = existingPayments.length > 0;
         const matchingEnrollment = student.enrollments.find(enrollment => enrollment.batchId === installment.batchId);
         const isAfterJoin = Boolean(matchingEnrollment)
-            && new Date(installment.createdAt).getTime() >= new Date(matchingEnrollment!.startedAt).getTime();
+            && matchingEnrollment!.feeDecision === 'LEGACY' && new Date(installment.createdAt).getTime() >= new Date(matchingEnrollment!.startedAt).getTime();
         const isValidCustomInstallment = Boolean(installment.studentId) && installment.studentId === student.id && isSameBatch;
         const isValidBatchInstallment = !installment.studentId && isSameBatch && (isAfterJoin || isExistingPayment || isAssigned);
 
@@ -941,163 +800,11 @@ class PaymentValidationError extends Error {
 
 export const approveUpiVerification = async (req: Request, res: Response) => {
     try {
-        const id = req.params.id as string;
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
-
-        const rawVerification = await prisma.upiPaymentVerification.findUnique({
-            where: { id },
-            include: {
-                student: { include: { batch: { include: { institute: true } } } },
-                installment: true
-            }
-        });
-        const verification = rawVerification as any;
-
-        if (!verification || verification.instituteId !== instituteId) {
-            return res.status(404).json({ error: 'Verification not found' });
-        }
-        if (verification.student.batch?.teacherId && verification.student.batch.teacherId !== teacherId) {
-            return res.status(403).json({ error: 'Unauthorized' });
-        }
-        if (verification.status !== 'PENDING') {
-            return res.status(400).json({ error: `This payment has already been ${verification.status.toLowerCase()}.`, alreadyProcessed: true });
-        }
-
-        // Inside a transaction to approve and pay
-        await prisma.$transaction(async (tx) => {
-            // VERIFICATION: Check the materialized balance to absolutely prevent double-logging
-            const studentBalance = await tx.studentBalance.findUnique({
-                where: { studentId: verification.studentId }
-            });
-            const pendingAmount = studentBalance?.balance || 0;
-
-            if (pendingAmount <= 0) {
-                throw new PaymentValidationError("Cannot approve! This student has no pending fee. The payment was likely logged directly by another method.");
-            }
-            if (verification.amount > pendingAmount) {
-                throw new PaymentValidationError(`Cannot approve! The receipt amount (₹${verification.amount}) is greater than the student's current due balance (₹${pendingAmount}).`);
-            }
-
-            // Atomically claim this verification row so concurrent approvers cannot double-collect.
-            const claimed = await tx.upiPaymentVerification.updateMany({
-                where: {
-                    id,
-                    status: 'PENDING'
-                },
-                data: { status: 'APPROVED' }
-            });
-            if (claimed.count !== 1) {
-                throw new AlreadyProcessedError('This payment has already been processed.');
-            }
-
-            // Create fee payment
-            if (verification.installmentId) {
-                await tx.feePayment.create({
-                    data: {
-                        studentId: verification.studentId,
-                        installmentId: verification.installmentId,
-                        amountPaid: verification.amount,
-                        date: new Date()
-                    }
-                });
-            } else {
-                // If it was custom amount without installment, intelligently waterfall allocate
-                const studentData = await tx.student.findUnique({
-                    where: { id: verification.studentId },
-                    include: { feePayments: true, batch: { include: { feeInstallments: true } } }
-                });
-
-                if (!studentData || !studentData.batch) {
-                    throw new Error("Student data missing during allocation.");
-                }
-
-                let remainingAmount = verification.amount;
-                const studentJoinDate = studentData.createdAt ? new Date(studentData.createdAt) : new Date(0);
-                const installments = studentData.batch.feeInstallments
-                    .filter(inst => new Date(inst.createdAt) >= studentJoinDate)
-                    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-                for (const inst of installments) {
-                    if (remainingAmount <= 0) break;
-
-                    const paidSoFar = studentData.feePayments.filter(p => p.installmentId === inst.id).reduce((sum, p) => sum + p.amountPaid, 0);
-                    const pendingForThis = inst.amount - paidSoFar;
-
-                    if (pendingForThis > 0) {
-                        const allocate = Math.min(pendingForThis, remainingAmount);
-
-                        await tx.feePayment.create({
-                            data: {
-                                studentId: verification.studentId,
-                                installmentId: inst.id,
-                                amountPaid: allocate,
-                                date: new Date()
-                            }
-                        });
-
-                        remainingAmount -= allocate;
-                    }
-                }
-
-                if (remainingAmount > 0) {
-                    await tx.feeRecord.create({
-                        data: {
-                            studentId: verification.studentId,
-                            amount: remainingAmount,
-                            status: 'PAID',
-                            date: new Date()
-                        }
-                    });
-                }
-            }
-
-            // System log
-            await tx.systemLog.create({
-                data: {
-                    instituteId,
-                    action: 'FEE_COLLECTED',
-                    entityId: verification.studentId,
-                    entityName: verification.student.name,
-                    details: { amount: verification.amount, type: 'UPI Verification' }
-                }
-            });
-        });
-
-        // Send success response FIRST — transaction is committed, don't let side-effects cause 500
-        res.json({ success: true, message: 'Payment approved successfully!' });
-
-        // Fire-and-forget side effects (won't affect response)
-        try {
-            // 1. Delete the physical screenshot (Space saving)
-            deletePaymentScreenshot(verification.storageKey).catch(e => console.error('Failed to delete screenshot after approval:', e));
-
-            // 2. WhatsApp Notification
-            const phoneRaw = verification.student.parentWhatsapp;
-            if (phoneRaw) {
-                import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
-                    void sendStudentAlertForStudent(verification.student.id, phone => sendPaymentReceiptWhatsApp(phone, {
-                        studentName: verification.student.name,
-                        amountPaid: `Rs. ${verification.amount.toLocaleString()}`,
-                        installmentName: verification.installment?.name || 'Fee Payment',
-                        instituteName: verification.student.batch?.institute?.name || 'our institute',
-                        instituteId: instituteId || undefined
-                    })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
-                }).catch(err => console.error('WhatsApp import error:', err));
-            }
-        } catch (sideEffectErr) {
-            console.error('Post-approval side-effect error (non-critical):', sideEffectErr);
-        }
-    } catch (e: any) {
-        if (e instanceof AlreadyProcessedError) {
-            return res.status(400).json({ error: e.message, alreadyProcessed: true });
-        }
-        if (e instanceof PaymentValidationError) {
-            return res.status(400).json({ error: e.message });
-        }
-        console.error('Approve UPI Payment Error:', e?.message, e?.stack);
-        res.status(500).json({ error: 'Failed to approve payment', detail: e?.message });
-    }
+        const verification = await prisma.upiPaymentVerification.findUnique({where:{id:String(req.params.id)}});
+        if (!verification || verification.instituteId !== req.user.instituteId) return res.status(404).json({error:'Verification not found.'});
+        const result = await collectExplicitPayment({studentId:verification.studentId,amount:verification.amount,allocations:req.body.allocations,idempotencyKey:`upi:${verification.id}`,verificationId:verification.id},req.user as any);
+        return res.json(result);
+    } catch(error:any) { return res.status(error.statusCode || 500).json({error:error.statusCode ? error.message : 'Could not approve payment. Retry with the same allocation.'}); }
 };
 
 export const rejectUpiVerification = async (req: Request, res: Response) => {

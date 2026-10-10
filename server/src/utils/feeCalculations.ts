@@ -27,6 +27,7 @@ export interface StudentFeeSnapshotInput {
     } | null;
     enrollments?: Array<{
         startedAt: string | Date;
+        feeDecision?: string;
         batch: {
             feeAmount?: number | null;
             feeInstallments?: FeeInstallmentSnapshot[] | null;
@@ -49,20 +50,20 @@ export function calculateStudentFeeSnapshot(student: StudentFeeSnapshotInput): S
     const paidInstallmentIds = new Set(student.feePayments.map((p) => p.installmentId));
     const enrollmentSources = student.enrollments?.length
         ? student.enrollments
-        : student.batch ? [{ startedAt: student.createdAt || new Date(0), batch: student.batch }] : [];
+        : student.batch ? [{ startedAt: student.createdAt || new Date(0), batch: student.batch, feeDecision: undefined as string | undefined }] : [];
     const installmentRows = enrollmentSources.flatMap(enrollment =>
-        (enrollment.batch.feeInstallments || []).map(installment => ({ installment, startedAt: enrollment.startedAt })));
+        (enrollment.batch.feeInstallments || []).map(installment => ({ installment, startedAt: enrollment.startedAt, feeDecision: enrollment.feeDecision })));
     
     const assignedIds = new Set((student.feeAssignments || []).map((a) => a.installmentId));
     const sortedInstallments = installmentRows
-        .filter(({ installment, startedAt }) => {
+        .filter(({ installment, startedAt, feeDecision }) => {
             // Custom invoice: only applies to the specific student it was created for
             if (installment.studentId) return installment.studentId === (student.id ?? null);
             // Global installment: applicable when created on/after join date, or if there
             // is already a payment/explicit assignment for it (backwards compat)
             const instTime = new Date(installment.createdAt).getTime();
             const joinTime = new Date(startedAt).getTime();
-            return instTime >= joinTime || paidInstallmentIds.has(installment.id) || assignedIds.has(installment.id);
+            return ((!feeDecision || feeDecision === 'LEGACY') && instTime >= joinTime) || paidInstallmentIds.has(installment.id) || assignedIds.has(installment.id);
         })
         .map(row => row.installment)
         .filter((installment, index, rows) => rows.findIndex(row => row.id === installment.id) === index)
@@ -78,7 +79,7 @@ export function calculateStudentFeeSnapshot(student: StudentFeeSnapshotInput): S
 
     const fallbackBatchFees = enrollmentSources.reduce((sum, enrollment) => {
         const hasGlobalInstallments = (enrollment.batch.feeInstallments || []).some(installment => !installment.studentId);
-        return sum + (hasGlobalInstallments ? 0 : Number(enrollment.batch.feeAmount || 0));
+        return sum + (hasGlobalInstallments || (enrollment.feeDecision && enrollment.feeDecision !== 'LEGACY') ? 0 : Number(enrollment.batch.feeAmount || 0));
     }, 0);
     const totalFee = globalInstallmentsTotal + fallbackBatchFees + customInstallmentsTotal;
 

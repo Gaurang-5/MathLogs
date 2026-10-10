@@ -26,9 +26,9 @@ export async function sendRegistrationInvite(batchId: string, whatsappNumber: st
   return api.post(`/batches/${batchId}/invite`, { whatsappNumber, fee });
 }
 
-export async function endEnrollment(batchId: string, enrollmentId: string, reason: string) {
+export async function endEnrollment(batchId: string, enrollmentId: string, reason: string, idempotencyKey = crypto.randomUUID()) {
   const response = await api.delete<ApiResult<EnrollmentResult>>(`/batches/${batchId}/enrollments/${enrollmentId}`, {
-    reason, idempotencyKey: crypto.randomUUID(),
+    reason, idempotencyKey,
   });
   return response.data;
 }

@@ -11,7 +11,7 @@ import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
 import { getOnlineQuizAnalytics, getLiveQuizStatus, unlockQuizSubmission } from '../controllers/analyticsController';
-import { assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt, getFeeInstallmentsList, getPaymentHistory } from '../controllers/feeController';
+import { getStudentPaymentOptions, assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt, getFeeInstallmentsList, getPaymentHistory } from '../controllers/feeController';
 import { getDashboardSummary, getFinancialGrowthStats, getInstallmentGrowthStats } from '../controllers/dashboardController';
 import { validateInvite, setupAccount } from '../controllers/inviteController';
 import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } from '../controllers/onboardingController';
@@ -331,6 +331,7 @@ router.get('/fees/summary', authenticateToken as any, requireCurrentDueFeeMode a
 router.get('/fees/installments-list', authenticateToken as any, requireCurrentDueFeeMode as any, getFeeInstallmentsList as any);
 router.get('/fees/download-pending', authenticateToken as any, requireCurrentDueFeeMode as any, downloadPendingFeesReport as any);
 // ✅ HIGH-2 FIX: Rate limiting on payment endpoints
+router.get('/fees/students/:id/payment-options', authenticateToken as any, requireCurrentDueFeeMode as any, getStudentPaymentOptions as any);
 router.post('/fees/pay', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, validateRequest(paymentSchema), recordPayment as any);
 router.post('/fees/pay-installment', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, validateRequest(payInstallmentSchema), payInstallment as any);
 router.get('/fees/recent', authenticateToken as any, requireCurrentDueFeeMode as any, getRecentTransactions as any);

@@ -60,3 +60,17 @@ test('preview rejects installments outside the destination batch', async () => {
     /INVALID_INSTALLMENT_SELECTION/,
   );
 });
+
+test('rejects a fee amount changed since the teacher reviewed it', async () => {
+  const harness = createDeps('CURRENT_DUE_BASED');
+  await assert.rejects(previewEnrollmentFees({ instituteId: 'i1', studentId: 's1', batchId: 'b1' }, { mode: 'CURRENT_DUE_BASED', decision: 'SELECTED', installmentIds: ['old'], amounts: { old: 900 } }, harness.deps), /FEE_AMOUNT_CHANGED/);
+});
+
+test('rejects selected-without-installments and contradictory no-fee choices', async () => {
+  const harness = createDeps('CURRENT_DUE_BASED');
+  for (const choice of [
+    { mode: 'CURRENT_DUE_BASED' as const, decision: 'SELECTED' as const, installmentIds: [] },
+    { mode: 'CURRENT_DUE_BASED' as const, decision: 'NO_FEE' as const, installmentIds: ['old'] },
+    { mode: 'CURRENT_DUE_BASED' as const, decision: 'LATER' as const, installmentIds: [], applyFutureInstallments: true },
+  ]) await assert.rejects(previewEnrollmentFees({ instituteId: 'i1', studentId: 's1', batchId: 'b1' }, choice, harness.deps));
+});

@@ -1,11 +1,11 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
-import { currentMonthInTimezone } from '../domain/monthCoverage/calendar';
+import { compareMonths, currentMonthInTimezone } from '../domain/monthCoverage/calendar';
 import type { EnrollmentFeeChoice, EnrollmentResult } from '../domain/enrollments/types';
 import { createEnrollmentService, type EnrollmentServiceTx } from './enrollmentService';
 import { applyEnrollmentFees, type EnrollmentFeeDeps } from './enrollmentFeeService';
 
-type EnrollmentFeeClient = Pick<Prisma.TransactionClient, 'student' | 'batch' | 'studentMonthCoverageProfile' | 'feeInstallmentAssignment'>;
+type EnrollmentFeeClient = Pick<Prisma.TransactionClient, 'enrollment' | 'student' | 'batch' | 'studentMonthCoverageProfile' | 'feeInstallmentAssignment'>;
 
 export function enrollmentFeeDepsFor(tx: EnrollmentFeeClient): EnrollmentFeeDeps {
   return {
@@ -18,7 +18,7 @@ export function enrollmentFeeDepsFor(tx: EnrollmentFeeClient): EnrollmentFeeDeps
             startDate: true,
             endDate: true,
             institute: { select: { coachingFeeMode: true, timezone: true } },
-            feeInstallments: { select: { id: true, amount: true } },
+            feeInstallments: { where: { studentId: null }, select: { id: true, amount: true } },
           },
         }),
       ]);
@@ -49,6 +49,9 @@ export function enrollmentFeeDepsFor(tx: EnrollmentFeeClient): EnrollmentFeeDeps
         },
       });
     },
+    async saveFeeDecision(enrollmentId, feeDecision, applyFutureInstallments) {
+      await tx.enrollment.update({ where: { id: enrollmentId }, data: { feeDecision, applyFutureInstallments } });
+    },
     async assignInstallments(studentId, installmentIds) {
       if (installmentIds.length === 0) return [];
       await tx.feeInstallmentAssignment.createMany({
@@ -60,7 +63,7 @@ export function enrollmentFeeDepsFor(tx: EnrollmentFeeClient): EnrollmentFeeDeps
   };
 }
 
-function transactionAdapter(tx: Prisma.TransactionClient): EnrollmentServiceTx {
+export function transactionAdapter(tx: Prisma.TransactionClient): EnrollmentServiceTx {
   return {
     async findAction(instituteId, idempotencyKey) {
       const row = await tx.enrollmentAction.findUnique({
@@ -107,14 +110,16 @@ function transactionAdapter(tx: Prisma.TransactionClient): EnrollmentServiceTx {
     async closeMonthCoverageProfile(enrollmentId, endedAt) {
       const profile = await tx.studentMonthCoverageProfile.findUnique({
         where: { enrollmentId },
-        select: { institute: { select: { timezone: true } } },
+        select: { feeEndMonth: true, institute: { select: { timezone: true } } },
       });
       if (!profile) return;
+      const endedMonth = currentMonthInTimezone(endedAt, profile.institute.timezone);
+      const feeEndMonth = profile.feeEndMonth && compareMonths(profile.feeEndMonth, endedMonth) < 0 ? profile.feeEndMonth : endedMonth;
       await tx.studentMonthCoverageProfile.update({
         where: { enrollmentId },
         data: {
           status: 'CLOSED',
-          feeEndMonth: currentMonthInTimezone(endedAt, profile.institute.timezone),
+          feeEndMonth,
         },
       });
     },

@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import logger from '../utils/logger';
@@ -13,10 +14,10 @@ import {
     studentMonthCoverageDepsFor,
 } from '../services/studentMonthCoverageService';
 import { MonthCoverageError } from '../domain/monthCoverage/types';
-import { currentMonthInTimezone } from '../domain/monthCoverage/calendar';
+import { compareMonths, currentMonthInTimezone } from '../domain/monthCoverage/calendar';
 import { summarizeStudent } from '../services/monthCoverageSummaryService';
 import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
-import { prismaIdentityReviewService } from '../services/prismaIdentityReviewService';
+import { identityReviewServiceFor } from '../services/prismaIdentityReviewService';
 import type { EnrollmentFeeChoice } from '../domain/enrollments/types';
 import { applyEnrollmentFees } from '../services/enrollmentFeeService';
 import { enrollmentFeeDepsFor } from '../services/prismaEnrollmentService';
@@ -188,9 +189,12 @@ export const registerStudent = async (req: Request, res: Response) => {
             }
             const storedIntent = await prisma.inviteToken.findUnique({ where: { token: signedEnrollmentIntent.nonce } });
             const persisted = storedIntent?.enrollmentIntent as Record<string, any> | null;
+            if (storedIntent?.isUsed && persisted?.reviewId && persisted?.batchId === batch.id) {
+                return res.status(202).json({ code: 'IDENTITY_REVIEW_REQUIRED', reviewId: persisted.reviewId });
+            }
             if (!storedIntent || storedIntent.isUsed || storedIntent.expiresAt.getTime() < Date.now()
                 || persisted?.batchId !== batch.id
-                || JSON.stringify(persisted?.fee) !== JSON.stringify(signedEnrollmentIntent.fee)
+                || !isDeepStrictEqual(persisted?.fee, signedEnrollmentIntent.fee)
                 || persisted?.issuedById !== signedEnrollmentIntent.issuedById) {
                 return res.status(403).json({ error: 'Registration link is expired, used, or invalid.' });
             }
@@ -211,10 +215,21 @@ export const registerStudent = async (req: Request, res: Response) => {
         // Multi-Tenant: Ensure Student inherits instituteId from Batch
         if (!batch.instituteId) return res.status(500).json({ error: 'Batch has no institute assigned' });
 
-        const reviewResult = await prismaIdentityReviewService.reviewPublicRegistration({
-            instituteId: batch.instituteId,
-            batchId,
-            submittedData: { name, parentName, parentWhatsapp, parentEmail, schoolName, additionalData },
+        const reviewResult = await prisma.$transaction(async tx => {
+            const result = await identityReviewServiceFor(tx).reviewPublicRegistration({
+                instituteId: batch.instituteId!, batchId,
+                submittedData: { name, parentName, parentWhatsapp, parentEmail, schoolName, additionalData,
+                    ...(signedEnrollmentIntent ? { enrollmentIntent: { fee: signedEnrollmentIntent.fee, nonce: signedEnrollmentIntent.nonce } } : {}),
+                },
+            });
+            if (result.code === 'IDENTITY_REVIEW_REQUIRED' && signedEnrollmentIntent) {
+                const consumed = await tx.inviteToken.updateMany({
+                    where: { token: signedEnrollmentIntent.nonce, isUsed: false, expiresAt: { gt: new Date() } },
+                    data: { isUsed: true, enrollmentIntent: { batchId, fee: signedEnrollmentIntent.fee, issuedById: signedEnrollmentIntent.issuedById, reviewId: result.reviewId } as any },
+                });
+                if (consumed.count !== 1) throw new Error('INVITE_ALREADY_USED');
+            }
+            return result;
         });
         if (reviewResult.code === 'IDENTITY_REVIEW_REQUIRED') {
             return res.status(202).json(reviewResult);
@@ -794,12 +809,12 @@ export const getStudentProfile = async (req: Request, res: Response) => {
                     select: {
                         id: true, status: true, startedAt: true, endedAt: true, endReason: true,
                         batch: { select: { id: true, name: true, className: true, subject: true, startDate: true, endDate: true } },
-                        monthCoverageProfile: { select: { id: true, batchId: true, feeStartMonth: true, feeEndMonth: true, status: true } }
+                        monthCoverageProfile: { select: { id: true, enrollmentId: true, batchId: true, feeStartMonth: true, feeEndMonth: true, status: true } }
                     },
                     orderBy: { startedAt: 'desc' }
                 },
                 monthCoverageAllocations: {
-                    select: { coverageMonth: true, payment: { select: { status: true } } }
+                    select: { enrollmentId: true, coverageMonth: true, payment: { select: { status: true } } }
                 },
                 marks: {
                     select: {
@@ -836,12 +851,12 @@ export const getStudentProfile = async (req: Request, res: Response) => {
         if (student.institute?.coachingFeeMode === 'MONTH_COVERAGE') {
             const profile = student.enrollments.find(enrollment => enrollment.status === 'ACTIVE')?.monthCoverageProfile
                 || student.enrollments.find(enrollment => enrollment.monthCoverageProfile)?.monthCoverageProfile;
-            const monthCoverageStats = profile?.feeStartMonth && profile.feeEndMonth
+            const monthCoverageStats = profile?.feeStartMonth && profile.feeEndMonth && compareMonths(profile.feeStartMonth, profile.feeEndMonth) <= 0
                 ? summarizeStudent({
                     feeStartMonth: profile.feeStartMonth,
                     feeEndMonth: profile.feeEndMonth,
                     coveredMonths: student.monthCoverageAllocations
-                        .filter(allocation => allocation.payment.status === 'ACTIVE')
+                        .filter(allocation => allocation.payment.status === 'ACTIVE' && allocation.enrollmentId === profile.enrollmentId)
                         .map(allocation => allocation.coverageMonth),
                     currentMonth: currentMonthInTimezone(new Date(), student.institute.timezone),
                 })
@@ -850,6 +865,7 @@ export const getStudentProfile = async (req: Request, res: Response) => {
                 ...common,
                 feePayments: [],
                 balance: null,
+                monthCoverageProfile: profile || null,
                 monthCoverageStats,
                 feeView: {
                     mode: 'MONTH_COVERAGE',

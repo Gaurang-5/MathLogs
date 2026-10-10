@@ -11,6 +11,7 @@ type EnrollmentRow = {
   studentId: string;
   batchId: string;
   status: 'ACTIVE' | 'ENDED';
+  startedAt?: Date;
 };
 
 type HistoryCounts = {
@@ -105,6 +106,7 @@ export function createEnrollmentService(deps: EnrollmentServiceDeps) {
 
         const enrollment = await tx.findEnrollment(command.enrollmentId);
         if (!enrollment || enrollment.instituteId !== command.instituteId) throw new Error('ENROLLMENT_NOT_FOUND');
+        if (enrollment.startedAt && command.endedAt < enrollment.startedAt) throw new Error('END_BEFORE_START');
         if (enrollment.status === 'ENDED') {
           const result: EnrollmentResult = { outcome: 'ALREADY_ENDED', enrollmentId: enrollment.id };
           await tx.saveAction(command.instituteId, command.idempotencyKey, 'END', result, enrollment.id);
