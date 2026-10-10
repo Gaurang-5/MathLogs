@@ -305,6 +305,8 @@ export const registerStudent = async (req: Request, res: Response) => {
                                 batchId: batch.id,
                                 startedAt: createdStudent.createdAt,
                                 createdById: batch.teacherId,
+                                feeDecision: batch.institute?.coachingFeeMode === 'MONTH_COVERAGE' ? 'LEGACY' : 'LATER',
+                                applyFutureInstallments: false,
                             },
                         });
                         return { student: createdStudent, enrollmentId: enrollment.id };
@@ -362,7 +364,7 @@ export const registerStudent = async (req: Request, res: Response) => {
                 });
             }
         } else if (student && batch) {
-            await autoAssignGlobalInstallments(student.id, batch.id, student.createdAt);
+            // Generic links have no teacher-confirmed plan. Keep fees pending explicit assignment.
         }
 
         res.json(student);
@@ -378,29 +380,6 @@ export const addStudentManually = async (_req: Request, res: Response) => {
         error: 'USE_ENROLLMENT_CREATE_ENDPOINT',
         message: 'Use the batch enrollment flow to select a profile and fee start point.',
     });
-};
-
-const autoAssignGlobalInstallments = async (studentId: string, batchId: string, studentCreatedAt: Date) => {
-    try {
-        const globalInstallments = await prisma.feeInstallment.findMany({
-            where: {
-                batchId,
-                studentId: null,
-                createdAt: { lte: studentCreatedAt }
-            }
-        });
-        if (globalInstallments.length > 0) {
-            await prisma.feeInstallmentAssignment.createMany({
-                data: globalInstallments.map(inst => ({
-                    studentId,
-                    installmentId: inst.id
-                })),
-                skipDuplicates: true
-            });
-        }
-    } catch (err) {
-        secureLogger.error('[FeeAssignment] Auto-assign global installments failed:', err);
-    }
 };
 
 export const updateStudent = async (req: Request, res: Response) => {
@@ -545,9 +524,7 @@ export const approveStudent = async (req: Request, res: Response) => {
 
         // Auto-send welcome invite if enabled
         await autoSendWelcomeInvite(student!, studentToApprove.batch);
-        if (student && studentToApprove.batch.institute?.coachingFeeMode !== 'MONTH_COVERAGE') {
-            await autoAssignGlobalInstallments(student.id, studentToApprove.batch.id, student.createdAt);
-        }
+        // Approval must not allocate historical installments without a teacher fee decision.
 
         res.json(student);
     } catch (e: any) {

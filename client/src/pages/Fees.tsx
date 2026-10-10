@@ -863,7 +863,7 @@ const LegacyFees: React.FC = () => {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-8 relative z-10"
+                            className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-8 relative z-10 max-h-[80dvh] overflow-y-auto"
                         >
                             <button
                                 onClick={() => setSelectedStudent(null)}

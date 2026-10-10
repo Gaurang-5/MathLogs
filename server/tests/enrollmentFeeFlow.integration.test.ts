@@ -54,6 +54,12 @@ test('phone invitation preserves fees through registration, review, and balance 
     assert.equal(missing.status, 400);
     const stale = await request(app).post(`/batches/${batch.id}/invite`).send({ whatsappNumber: '9000000000', fee: { ...fee, amounts: { [old.id]: 1 } } });
     assert.equal(stale.status, 409);
+    const generic = await request(app).post('/register').send({batchId:batch.id,name:'Generic join',parentName:'Parent',parentWhatsapp:'9000000099'});
+    assert.equal(generic.status,200,JSON.stringify(generic.body));
+    const genericStudent = await db.student.findUniqueOrThrow({where:{id:generic.body.id},include:{enrollments:true,feeAssignments:true,balance:true}});
+    assert.equal(genericStudent.enrollments[0].feeDecision,'LATER');
+    assert.equal(genericStudent.feeAssignments.length,0);
+    assert.equal(genericStudent.balance?.balance,0);
     const token = await invite('9000000001', fee);
     await assert.rejects(db.feeInstallment.update({ where: { id: old.id }, data: { amount: 1300 } }), /INVITED_INSTALLMENT_LOCKED/);
     await assert.rejects(db.feeInstallment.delete({ where: { id: old.id } }), /INVITED_INSTALLMENT_LOCKED/);

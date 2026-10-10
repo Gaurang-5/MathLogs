@@ -335,9 +335,25 @@ export const getStudentPaymentOptions = async (req: Request, res: Response) => {
     } catch (error: any) { return res.status(error.statusCode || 500).json({error: error.statusCode ? error.message : 'Could not load applicable installments.'}); }
 };
 
+// Notify only after a newly committed payment; retries must not send a second receipt.
+async function notifyExplicitPayment(result: any) {
+    if (result.replayed || process.env.NODE_ENV === 'test') return;
+    const student = await prisma.student.findUnique({where:{id:result.studentId},include:{institute:true}});
+    if (!student) return;
+    const { sendPaymentReceiptWhatsApp } = await import('../utils/whatsapp');
+    await sendStudentAlertForStudent(student.id, phone => sendPaymentReceiptWhatsApp(phone, {
+        studentName: student.name,
+        amountPaid: `Rs. ${Number(result.amount).toLocaleString('en-IN')}`,
+        installmentName: result.allocations.map((a: any) => a.name).join(', '),
+        instituteName: student.institute?.name || 'our institute',
+        instituteId: student.instituteId || undefined
+    }));
+}
+
 export const recordPayment = async (req: Request, res: Response) => {
     try {
         const result = await collectExplicitPayment(req.body, req.user as any);
+        void notifyExplicitPayment(result).catch(() => secureLogger.warn('Payment saved; receipt notification failed.'));
         return res.json(result);
     } catch (error: any) { return res.status(error.statusCode || (error.code === 'P2034' ? 409 : 500)).json({error: error.statusCode ? error.message : 'Could not save payment. Retry with the same payment details.'}); }
 };
@@ -803,6 +819,7 @@ export const approveUpiVerification = async (req: Request, res: Response) => {
         const verification = await prisma.upiPaymentVerification.findUnique({where:{id:String(req.params.id)}});
         if (!verification || verification.instituteId !== req.user.instituteId) return res.status(404).json({error:'Verification not found.'});
         const result = await collectExplicitPayment({studentId:verification.studentId,amount:verification.amount,allocations:req.body.allocations,idempotencyKey:`upi:${verification.id}`,verificationId:verification.id},req.user as any);
+        void notifyExplicitPayment(result).catch(() => secureLogger.warn('Payment saved; receipt notification failed.'));
         return res.json(result);
     } catch(error:any) { return res.status(error.statusCode || 500).json({error:error.statusCode ? error.message : 'Could not approve payment. Retry with the same allocation.'}); }
 };

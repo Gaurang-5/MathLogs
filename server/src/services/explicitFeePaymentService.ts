@@ -57,6 +57,7 @@ export function validateFeeAllocations(amount: unknown, allocations: FeeAllocati
 
 export async function collectExplicitPayment(input: {studentId: string; amount: unknown; allocations: FeeAllocation[]; idempotencyKey: string; verificationId?: string}, actor: Actor) {
   if (typeof input.idempotencyKey !== 'string' || input.idempotencyKey.length < 8 || input.idempotencyKey.length > 150) throw new FeeAllocationError('Payment reference is required. Refresh the payment form.');
+  if (!Array.isArray(input.allocations) || !input.allocations.length || input.allocations.length > 100 || input.allocations.some(a => !a || typeof a.installmentId !== 'string')) throw new FeeAllocationError('Select the installment this payment belongs to.');
   const received = amountPaise(input.amount);
   const fingerprint = JSON.stringify({studentId:input.studentId, amount:received, allocations:(input.allocations || []).map(a=>({id:a.installmentId,paise:amountPaise(a.amount)})).sort((a,b)=>a.id.localeCompare(b.id)), verificationId:input.verificationId || null});
   for (let attempt=0; attempt<3; attempt++) {
