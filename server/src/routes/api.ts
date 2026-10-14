@@ -4,14 +4,14 @@ import { authenticateToken } from '../middleware/auth';
 import { requireCoachingFeeMode } from '../middleware/requireCoachingFeeMode';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, loginSchema, payInstallmentSchema, paymentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resendEnrollmentNotificationSchema, resolveIdentityReviewSchema, retryEnrollmentNotificationSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
 import { addStudentManually, approveStudent, archiveStudent, confirmMonthCoverageProfileController, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
 import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
 import { getOnlineQuizAnalytics, getLiveQuizStatus, unlockQuizSubmission } from '../controllers/analyticsController';
-import { assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt, getFeeInstallmentsList, getPaymentHistory } from '../controllers/feeController';
+import { getStudentPaymentOptions, assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt, getFeeInstallmentsList, getPaymentHistory } from '../controllers/feeController';
 import { getDashboardSummary, getFinancialGrowthStats, getInstallmentGrowthStats } from '../controllers/dashboardController';
 import { validateInvite, setupAccount } from '../controllers/inviteController';
 import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } from '../controllers/onboardingController';
@@ -29,6 +29,8 @@ import { parseSupportAttachments } from '../middleware/supportUpload';
 import { requireSupportFeature } from '../middleware/supportFeatureGate';
 import { getPublicPlanCatalogue } from '../controllers/planCatalogController';
 import { monthCoverageHandlers } from '../controllers/monthCoverageController';
+import { deleteEmptyStudentController, endEnrollmentController, enrollExistingStudentController, getDeletionEligibilityController, previewEnrollmentFeesController, resendEnrollmentNotificationController, retryEnrollmentNotificationController, searchEnrollmentCandidatesController } from '../controllers/enrollmentController';
+import { listIdentityReviews, resolveIdentityReview } from '../controllers/identityReviewController';
 
 const router = Router();
 const requireCurrentDueFeeMode = requireCoachingFeeMode('CURRENT_DUE_BASED');
@@ -213,7 +215,9 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) 
 
         // Compute SHA-256 of raw image bytes for deduplication
         const rawBuffer = (req as any).file ? (req as any).file.buffer : Buffer.from(imageBuffer.toString().replace(/^data:image\/[^;]+;base64,/, ''), 'base64');
-        const hash = crypto.createHash('sha256').update('sticker-single-box-v5-gemini35-38:').update(rawBuffer).digest('hex');
+        const test = typeof req.body.testId === 'string' ? await prisma.test.findFirst({ where: { id: req.body.testId, instituteId: req.user.instituteId, teacherId: req.user.id } }) : null;
+        if (!test) return res.status(403).json({ error: 'Select an authorized test before scanning.' });
+        const hash = crypto.createHash('sha256').update(`sticker-single-box-v5-gemini35-38:${req.user.instituteId}:${test.id}:${test.maxMarks}:`).update(rawBuffer).digest('hex');
 
         // Check DB-backed cache first (works across all server instances)
         const started = Date.now();
@@ -226,7 +230,7 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) 
         const controller = new AbortController();
         const disconnected = () => { if (!res.writableEnded) controller.abort(); };
         res.once('close', disconnected);
-        const gemini = await processOCR(imageBuffer, req.file?.mimetype, { signal: controller.signal }).catch((error: any) => ({
+        const gemini = await processOCR(imageBuffer, req.file?.mimetype, { signal: controller.signal, maxMarks: test.maxMarks }).catch((error: any) => ({
             score: 'GEMINI_ERROR',
             raw: '',
             reason: 'provider_error' as const,
@@ -269,6 +273,12 @@ router.post('/auth/send-signup-otp', authLimiter, sendSignupOtp as any);
 router.post('/auth/verify-signup-otp', authLimiter, verifySignupOtp as any);
 
 // Batches
+router.get('/batches/:batchId/enrollment-candidates', authenticateToken as any, searchEnrollmentCandidatesController as any);
+router.post('/batches/:batchId/enrollments/preview', authenticateToken as any, validateRequest(previewEnrollmentSchema), previewEnrollmentFeesController as any);
+router.post('/batches/:batchId/enrollments', authenticateToken as any, validateRequest(createEnrollmentSchema), enrollExistingStudentController as any);
+router.delete('/batches/:batchId/enrollments/:enrollmentId', authenticateToken as any, validateRequest(endEnrollmentSchema), endEnrollmentController as any);
+router.post('/enrollments/:enrollmentId/notification/retry', authenticateToken as any, validateRequest(retryEnrollmentNotificationSchema), retryEnrollmentNotificationController as any);
+router.post('/enrollments/:enrollmentId/notification/resend', authenticateToken as any, validateRequest(resendEnrollmentNotificationSchema), resendEnrollmentNotificationController as any);
 router.get('/batches', authenticateToken as any, getBatches as any);
 router.post('/batches', authenticateToken as any, validateRequest(createBatchSchema), createBatch as any);
 router.get('/batches/:id', authenticateToken as any, getBatchDetails as any);
@@ -282,10 +292,12 @@ router.post('/batches/:id/installments', authenticateToken as any, requireCurren
 router.put('/installments/:id', authenticateToken as any, requireCurrentDueFeeMode as any, updateFeeInstallment as any);
 router.delete('/installments/:id', authenticateToken as any, requireCurrentDueFeeMode as any, deleteFeeInstallment as any);
 router.post('/batches/:id/whatsapp-invite', authenticateToken as any, bulkNotifyLimiter, sendBatchWhatsappInvite as any);
-router.post('/batches/:id/invite', authenticateToken as any, inviteStudentToBatch as any);
+router.post('/batches/:id/invite', authenticateToken as any, validateRequest(inviteStudentEnrollmentSchema), inviteStudentToBatch as any);
 router.post('/students/:id/whatsapp-invite', authenticateToken as any, sendStudentWhatsappInvite as any);
 
 // Students
+router.get('/students/:studentId/deletion-eligibility', authenticateToken as any, getDeletionEligibilityController as any);
+router.delete('/students/:studentId/permanent', authenticateToken as any, validateRequest(deleteEmptyStudentSchema), deleteEmptyStudentController as any);
 router.get('/public/batch/:id', publicLimiter, getBatchPublicStatus as any); // Public Status
 router.post('/public/register', publicLimiter, validateRequest(registerStudentSchema), registerStudent as any); // Public
 router.get('/public/check-status', publicLimiter, checkRegistrationStatus as any); // Public - Check if registered
@@ -296,6 +308,8 @@ router.post('/students/:id/approve', authenticateToken as any, approveStudent as
 router.post('/students/:id/reject', authenticateToken as any, rejectStudent as any);
 router.delete('/students/:id/archive', authenticateToken as any, archiveStudent as any);
 router.put('/students/:id', authenticateToken as any, validateRequest(updateStudentSchema), updateStudent as any);
+router.get('/identity-reviews', authenticateToken as any, listIdentityReviews as any);
+router.post('/identity-reviews/:id/resolve', authenticateToken as any, validateRequest(resolveIdentityReviewSchema), resolveIdentityReview as any);
 router.get('/students/lookup/:humanId', authenticateToken as any, getStudentByHumanId as any);
 router.get('/students/:id/profile', authenticateToken as any, getStudentProfile as any);
 router.put('/month-coverage/students/:studentId/profile', authenticateToken as any, requireMonthCoverageFeeMode as any, validateRequest(confirmMonthCoverageProfileSchema), confirmMonthCoverageProfileController as any);
@@ -346,6 +360,7 @@ router.get('/fees/summary', authenticateToken as any, requireCurrentDueFeeMode a
 router.get('/fees/installments-list', authenticateToken as any, requireCurrentDueFeeMode as any, getFeeInstallmentsList as any);
 router.get('/fees/download-pending', authenticateToken as any, requireCurrentDueFeeMode as any, downloadPendingFeesReport as any);
 // ✅ HIGH-2 FIX: Rate limiting on payment endpoints
+router.get('/fees/students/:id/payment-options', authenticateToken as any, requireCurrentDueFeeMode as any, getStudentPaymentOptions as any);
 router.post('/fees/pay', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, validateRequest(paymentSchema), recordPayment as any);
 router.post('/fees/pay-installment', authenticateToken as any, requireCurrentDueFeeMode as any, paymentLimiter, validateRequest(payInstallmentSchema), payInstallment as any);
 router.get('/fees/recent', authenticateToken as any, requireCurrentDueFeeMode as any, getRecentTransactions as any);

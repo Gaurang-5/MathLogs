@@ -1,3 +1,4 @@
+import { InstallmentAllocationPicker, type PaymentAllocation } from '../features/fee-payment/InstallmentAllocationPicker';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
@@ -32,6 +33,9 @@ export default function UpiVerificationList() {
     const [error, setError] = useState<string | null>(null);
     const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
     const [confirmAction, setConfirmAction] = useState<{ id: string, action: 'approve' | 'reject' } | null>(null);
+    const [allocations,setAllocations]=useState<PaymentAllocation[]>([]);
+    const [allocationReady,setAllocationReady]=useState(false);
+    useEffect(()=>setAllocationReady(false),[confirmAction?.id]);
     const [rejectReason, setRejectReason] = useState<string>('');
 
     const fetchVerifications = async () => {
@@ -57,7 +61,7 @@ export default function UpiVerificationList() {
     }, []);
 
     const executeAction = async () => {
-        if (!confirmAction) return;
+        if (!confirmAction || (confirmAction.action==='approve' && !allocationReady)) return;
         const { id, action } = confirmAction;
         const reason = rejectReason;
 
@@ -69,7 +73,7 @@ export default function UpiVerificationList() {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`${API_URL}/fees/upi-verifications/${id}/${action}`, action === 'reject' ? { reason } : {}, {
+            await axios.post(`${API_URL}/fees/upi-verifications/${id}/${action}`, action === 'reject' ? { reason } : { allocations }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             // Remove card after brief visual feedback
@@ -247,7 +251,7 @@ export default function UpiVerificationList() {
                                 animate={{ scale: 1, opacity: 1, y: 0 }}
                                 exit={{ scale: 0.95, opacity: 0, y: 10 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="bg-white rounded-[24px] p-6 max-w-[320px] w-full shadow-2xl flex flex-col items-center text-center border border-neutral-100 relative z-[10000]"
+                                className="bg-white rounded-[24px] p-6 max-w-lg max-h-[85vh] overflow-y-auto w-full shadow-2xl flex flex-col items-center text-center border border-neutral-100 relative z-[10000]"
                             >
                                 <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${confirmAction.action === 'approve' ? 'bg-[#059669]/10 text-[#059669]' : 'bg-red-100 text-red-600'}`}>
                                     {confirmAction.action === 'approve' ? <Check className="w-7 h-7 stroke-[2.5px]" /> : <X className="w-7 h-7 stroke-[2.5px]" />}
@@ -270,7 +274,8 @@ export default function UpiVerificationList() {
                                 />
                             )}
 
-                            <div className="flex gap-3 w-full mt-2">
+                            {confirmAction.action==='approve' && (()=>{const item=verifications.find(v=>v.id===confirmAction.id)!;return <InstallmentAllocationPicker key={item.id} studentId={item.studentId} amount={item.amount} onChange={(rows,ready)=>{setAllocations(rows);setAllocationReady(ready);}} />;})()}
+                                <div className="flex gap-3 w-full mt-2">
                                 <button
                                     onClick={() => setConfirmAction(null)}
                                     className="flex-[0.8] py-3.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-semibold text-[15px] rounded-xl transition-colors"
@@ -279,7 +284,7 @@ export default function UpiVerificationList() {
                                 </button>
                                 <button
                                     onClick={executeAction}
-                                    disabled={confirmAction.action === 'reject' && !rejectReason.trim()}
+                                    disabled={confirmAction.action === 'approve' ? !allocationReady : !rejectReason.trim()}
                                     className={`flex-1 py-3.5 text-white font-semibold text-[15px] rounded-xl transition-all ${confirmAction.action === 'approve'
                                             ? 'bg-[#059669] hover:bg-[#047857]'
                                             : !rejectReason.trim()

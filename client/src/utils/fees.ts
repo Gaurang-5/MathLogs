@@ -5,6 +5,7 @@ export interface LegacyFee {
 
 export interface FeeInstallment {
     id: string;
+    studentId?: string | null;
     amount: number;
     createdAt: string;
 }
@@ -15,13 +16,17 @@ export interface FeePayment {
 }
 
 export interface FeeAllocationStudent {
+    id?: string;
+    feeDecision?: string;
+    enrollmentStartedAt?: string;
+    feeAssignments?: { installmentId: string }[];
     createdAt?: string;
     fees: LegacyFee[];
     feePayments: FeePayment[];
 }
 
 export function getStudentJoinDate(createdAt?: string): number {
-    return createdAt ? new Date(createdAt).setHours(0, 0, 0, 0) : 0;
+    return createdAt ? new Date(createdAt).getTime() : 0;
 }
 
 export function getInstallmentPaidMap(student: FeeAllocationStudent, installments: FeeInstallment[]): Record<string, number> {
@@ -30,13 +35,8 @@ export function getInstallmentPaidMap(student: FeeAllocationStudent, installment
         .reduce((sum, fee) => sum + fee.amount, 0) || 0;
 
     let currentBuffer = genericPaid;
-    const studentJoinDate = getStudentJoinDate(student.createdAt);
     const sortedInstallments = [...installments]
-        .filter((installment) => {
-            const isAfterJoin = new Date(installment.createdAt).setHours(0, 0, 0, 0) >= studentJoinDate;
-            const hasPayment = student.feePayments?.some(p => p.installmentId === installment.id);
-            return isAfterJoin || hasPayment;
-        })
+        .filter(installment => isFeeInstallmentApplicable(student, installment))
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     const installmentPaidMap: Record<string, number> = {};
@@ -56,4 +56,11 @@ export function getInstallmentPaidMap(student: FeeAllocationStudent, installment
     });
 
     return installmentPaidMap;
+}
+
+export function isFeeInstallmentApplicable(student: FeeAllocationStudent, installment: FeeInstallment): boolean {
+    if (installment.studentId) return installment.studentId === student.id;
+    if (student.feeAssignments?.some(a => a.installmentId === installment.id) || student.feePayments?.some(p => p.installmentId === installment.id)) return true;
+    if (student.feeDecision && student.feeDecision !== 'LEGACY') return false;
+    return new Date(installment.createdAt).getTime() >= getStudentJoinDate(student.enrollmentStartedAt || student.createdAt);
 }

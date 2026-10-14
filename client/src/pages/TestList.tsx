@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { useState, useEffect } from 'react';
-import { API_URL, apiRequest } from '../utils/api';
+import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Calendar, FileText, CheckCircle, X } from 'lucide-react';

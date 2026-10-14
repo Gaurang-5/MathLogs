@@ -428,7 +428,7 @@ await sendStudentAlert(
 );
 ```
 
-Do not fan out authentication OTPs, teacher onboarding links, or generic one-off invite numbers that are not bound to an existing student. Attendance template helpers currently have no active caller; document their future student caller requirement beside the resolver rather than inventing a new attendance workflow.
+Do not fan out authentication OTPs, teacher onboarding links, or generic one-off invite numbers that are not bound to an existing student.
 
 - [ ] **Step 4: Run focused tests and verify GREEN**
 

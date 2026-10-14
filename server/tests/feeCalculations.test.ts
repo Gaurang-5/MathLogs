@@ -52,3 +52,19 @@ test('calculateStudentFeeSnapshot ignores installments from before the student j
     assert.equal(result.balance, 200);
     assert.equal(result.oldestDue.toISOString(), '2026-03-01T00:00:00.000Z');
 });
+
+test('explicit selection excludes same-day and future unassigned installments', () => {
+    const batch = { feeAmount: 5000, feeInstallments: [
+        { id: 'selected', amount: 1000, createdAt: '2026-10-10T08:00:00Z' },
+        { id: 'same-day', amount: 500, createdAt: '2026-10-10T09:00:00Z' },
+        { id: 'future', amount: 900, createdAt: '2026-10-11T09:00:00Z' },
+    ] };
+    const result = calculateStudentFeeSnapshot({ id: 's', fees: [], feePayments: [], feeAssignments: [{ installmentId: 'selected' }], enrollments: [{ startedAt: '2026-10-10T10:00:00Z', feeDecision: 'SELECTED', batch }] });
+    assert.equal(result.balance, 1000);
+});
+
+test('no fee and deferred choices never fall back to a flat batch fee', () => {
+    for (const feeDecision of ['NO_FEE', 'LATER']) {
+        assert.equal(calculateStudentFeeSnapshot({ fees: [], feePayments: [], enrollments: [{ startedAt: new Date(), feeDecision, batch: { feeAmount: 5000, feeInstallments: [] } }] }).balance, 0);
+    }
+});

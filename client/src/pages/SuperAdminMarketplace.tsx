@@ -60,7 +60,7 @@ export default function SuperAdminMarketplace() {
   };
   const refreshAll = () => { void loadOverview(); setRefreshKey(value => value + 1); };
   const changed = () => { void loadOverview(true); setRefreshKey(value => value + 1); };
-  const counts = useMemo(() => overview ? attentionCounts(overview.metrics) : {}, [overview]);
+  const counts = useMemo(() => overview ? attentionCounts(overview.metrics) : {claims:0,reviews:0,leads:0}, [overview]);
   const content = section === 'overview'
     ? <OverviewPanel overview={overview} onSelect={selectSection} />
     : section === 'listings'

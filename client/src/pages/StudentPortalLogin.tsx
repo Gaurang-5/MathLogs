@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, GraduationCap, ChevronRight, Loader, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { useMetaTags } from '../hooks/useMetaTags';
+import { StudentAccountSelector, type StudentPortalAccount } from '../features/student-portal/StudentAccountSelector';
 
 interface Branding {
     name: string;
@@ -18,8 +19,10 @@ export default function StudentPortalLogin() {
 
     const [mobileNumber, setMobileNumber] = useState('');
     const [otp, setOtp] = useState('');
-    const [step, setStep] = useState<'mobile' | 'otp'>('mobile');
+    const [step, setStep] = useState<'mobile' | 'otp' | 'select'>('mobile');
     const [pendingStudent, setPendingStudent] = useState<{ name: string; batchName: string; instituteName: string } | null>(null);
+    const [accountSelection, setAccountSelection] = useState<{ selectionToken: string; students: StudentPortalAccount[] } | null>(null);
+    const [selectingStudentId, setSelectingStudentId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [resending, setResending] = useState(false);
     
@@ -60,7 +63,7 @@ export default function StudentPortalLogin() {
     const otpBoxRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setTimeout>;
         if (resendTimer > 0) {
             interval = setInterval(() => {
                 setResendTimer(prev => prev - 1);
@@ -161,6 +164,7 @@ export default function StudentPortalLogin() {
             await verifyOtp(e);
             return;
         }
+        if (step === 'select') return;
         await requestOtp(false);
     };
 
@@ -175,15 +179,24 @@ export default function StudentPortalLogin() {
 
         setLoading(true);
         try {
-            const data = await apiRequest<{ token: string; student: any }>(
+            const data = await apiRequest<{
+                token?: string;
+                student?: any;
+                selectionToken?: string;
+                students?: StudentPortalAccount[];
+            }>(
                 '/student-portal/verify-login-otp',
                 'POST',
                 { instituteSlug, mobileNumber: cleanMobile, otp: code }
             );
 
-            localStorage.setItem(`student_token_${instituteSlug}`, data.token);
-            toast.success(`Welcome, ${data.student.name}!`);
-            navigate(`/${instituteSlug}/student/dashboard`);
+            if (data.selectionToken && data.students?.length) {
+                setAccountSelection({ selectionToken: data.selectionToken, students: data.students });
+                setStep('select');
+                return;
+            }
+            if (!data.token || !data.student) throw new Error('Invalid login response');
+            completeLogin(data.token, data.student.name);
         } catch (error: any) {
             toast.error(error.message || 'OTP verification failed. Please try again.', {
                 duration: 5000,
@@ -193,6 +206,37 @@ export default function StudentPortalLogin() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const completeLogin = (token: string, studentName: string) => {
+        localStorage.setItem(`student_token_${instituteSlug}`, token);
+        toast.success(`Welcome, ${studentName}!`);
+        navigate(`/${instituteSlug}/student/dashboard`);
+    };
+
+    const selectAccount = async (student: StudentPortalAccount) => {
+        if (!accountSelection) return;
+        setSelectingStudentId(student.id);
+        try {
+            const data = await apiRequest<{ token: string; student: { name: string } }>(
+                '/student-portal/select-account',
+                'POST',
+                { selectionToken: accountSelection.selectionToken, studentId: student.id },
+            );
+            completeLogin(data.token, data.student.name);
+        } catch (error: any) {
+            toast.error(error.message || 'Could not open this student account. Please request a new OTP.');
+        } finally {
+            setSelectingStudentId(null);
+        }
+    };
+
+    const resetLogin = () => {
+        setStep('mobile');
+        setOtp('');
+        setPendingStudent(null);
+        setAccountSelection(null);
+        setSelectingStudentId(null);
     };
 
     const inputClass = "w-full bg-neutral-50/80 border border-neutral-200/80 text-app-text pl-11 pr-4 py-3.5 rounded-xl focus:bg-white focus:ring-2 focus:ring-accent/20 focus:border-accent/40 outline-none transition-all placeholder:text-neutral-400 text-[15px]";
@@ -277,11 +321,13 @@ export default function StudentPortalLogin() {
                             className="w-full bg-white/80 backdrop-blur-2xl rounded-3xl shadow-xl border border-white/60 p-6 sm:p-8"
                         >
                             <div className="text-center mb-6">
-                                <h2 className="text-xl font-black text-app-text mb-2">{step === 'otp' ? 'Verify WhatsApp OTP' : 'Welcome Back!'}</h2>
+                                <h2 className="text-xl font-black text-app-text mb-2">{step === 'otp' ? 'Verify WhatsApp OTP' : step === 'select' ? 'Choose student' : 'Welcome Back!'}</h2>
                                 <p className="text-app-text-secondary text-sm">
                                     {step === 'otp'
                                         ? `Enter the 6-digit verification code sent to WhatsApp ${cleanMobile ? `ending in ${cleanMobile.slice(-4)}` : ''}.`
-                                        : 'Enter your registered mobile number to view your progress, attendance, fees, and quizzes.'}
+                                        : step === 'select'
+                                            ? 'This mobile number is linked to more than one student. Choose the account you want to open.'
+                                        : 'Enter your registered mobile number to view your progress, fees, tests, and quizzes.'}
                                 </p>
                             </div>
 
@@ -304,7 +350,7 @@ export default function StudentPortalLogin() {
                                             />
                                         </div>
                                     </div>
-                                ) : (
+                                ) : step === 'otp' ? (
                                     <div className="space-y-5">
                                         {pendingStudent && (
                                             <div className="bg-neutral-50 border border-neutral-200/80 rounded-2xl px-4 py-3 flex items-center gap-3">
@@ -358,8 +404,7 @@ export default function StudentPortalLogin() {
                                             <button
                                                 type="button"
                                                 onClick={() => {
-                                                    setStep('mobile');
-                                                    setOtp('');
+                                                    resetLogin();
                                                 }}
                                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-app-text-secondary hover:text-app-text transition-colors"
                                             >
@@ -383,9 +428,16 @@ export default function StudentPortalLogin() {
                                             )}
                                         </div>
                                     </div>
-                                )}
+                                ) : accountSelection ? (
+                                    <StudentAccountSelector
+                                        students={accountSelection.students}
+                                        selectingId={selectingStudentId}
+                                        onSelect={selectAccount}
+                                        onBack={resetLogin}
+                                    />
+                                ) : null}
 
-                                <button 
+                                {step !== 'select' ? <button
                                     type="submit" 
                                     disabled={loading || (step === 'mobile' ? cleanMobile.length < 10 : otp.length !== 6)}
                                     className="w-full py-4 text-white font-bold rounded-2xl shadow-lg transition-all duration-200 disabled:opacity-50 disabled:shadow-none hover:shadow-xl hover:-translate-y-0.5 focus:ring-2 focus:ring-offset-2 flex items-center justify-center gap-2 group active:scale-[0.98]"
@@ -400,7 +452,7 @@ export default function StudentPortalLogin() {
                                     ) : (
                                         <>Send WhatsApp OTP <ChevronRight className="w-[18px] h-[18px] group-hover:translate-x-1 transition-transform" /></>
                                     )}
-                                </button>
+                                </button> : null}
                             </form>
                         </motion.div>
                         

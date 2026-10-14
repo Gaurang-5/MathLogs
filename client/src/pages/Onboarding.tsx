@@ -96,7 +96,7 @@ const pricingPlans = [
         yearlyPrice: 4999,
         tagline: 'Complete Coaching ERP',
         period: '/ month',
-        description: 'Full coaching ERP — student records, attendance, fee collection, tests & directory listing.',
+        description: 'Full coaching ERP — student records, fee collection, tests & directory listing.',
         trialInfo: '14-Day Free Trial Included',
         features: [
             'Full Student Management & Batches',
@@ -172,7 +172,7 @@ export default function Onboarding() {
     const [otpVerifying, setOtpVerifying] = useState(false);
     const [otpError, setOtpError] = useState('');
     const [otpResendTimer, setOtpResendTimer] = useState(0);
-    const otpResendRef = useRef<NodeJS.Timeout | null>(null);
+    const otpResendRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Resend Setup Link Drawer State
     const [showResend, setShowResend] = useState(false);

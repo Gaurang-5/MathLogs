@@ -135,7 +135,7 @@ export function createApp() {
         }
     });
 
-    app.get('/health/detailed', async (req, res) => {
+    app.get('/health/detailed', authenticateToken as any, async (req, res) => {
         try {
             const health = await getHealthStatus();
             const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
@@ -298,7 +298,7 @@ export function createApp() {
         }
 
         let title = 'MathLogs | Coaching Marketplace & AI Quiz Generator';
-        let description = 'Find coaching institutes, generate AI-powered online quizzes, and manage attendance, fees, tests and parent communication with MathLogs.';
+        let description = 'Find coaching institutes, generate AI-powered online quizzes, and manage students, fees, tests and parent communication with MathLogs.';
         let ogTitle = title;
         let ogDesc = description;
         let canonicalUrl = `${PUBLIC_SITE_URL}${req.path === '/' ? '/' : req.path.replace(/\/$/, '')}`;
@@ -491,10 +491,13 @@ function startServer() {
 
     app.listen(PORT, () => {
         // Initialize background workers
-        emailWorker.start();
-        startSuperAdminSessionWorker();
-        startSuperAdminBillingWorker();
-        if (process.env.NODE_ENV !== 'test') {
+        const workersEnabled = process.env.ENABLE_BACKGROUND_WORKERS === 'true' || (process.env.NODE_ENV === 'production' && process.env.ENABLE_BACKGROUND_WORKERS !== 'false');
+        if (workersEnabled) {
+            emailWorker.start();
+            startSuperAdminSessionWorker();
+            startSuperAdminBillingWorker();
+        }
+        if (workersEnabled) {
             void runLifecycleSweep().catch(error => secureLogger.error('[Lifecycle] Initial sweep failed', error));
             void planSubscriptionReconciliationService.reconcileDueSubscriptions().catch(error => secureLogger.error('[AutoPay] Initial reconciliation failed', error));
             void dispatchDuePlanNotifications().catch(error => secureLogger.error('[Lifecycle] Initial notification dispatch failed', error));
@@ -506,7 +509,7 @@ function startServer() {
             lifecycleTimer.unref();
         }
 
-        if (process.env.NODE_ENV === 'production' || process.env.WHATSAPP_ACCESS_TOKEN) {
+        if (workersEnabled) {
             import('./utils/whatsappWorker').then(({ processWhatsappQueue }) => {
                 secureLogger.info('✅ WhatsApp Worker Initialized');
 

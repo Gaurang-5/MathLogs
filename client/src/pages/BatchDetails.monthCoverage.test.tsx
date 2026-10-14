@@ -1,10 +1,16 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BatchDetails from './BatchDetails';
+import { searchEnrollmentCandidates } from '../features/enrollments/api';
 
-const { apiRequest, loadSummary } = vi.hoisted(() => ({ apiRequest: vi.fn(), loadSummary: vi.fn() }));
+const { apiRequest, loadSummary, sendRegistrationInvite } = vi.hoisted(() => ({
+  apiRequest: vi.fn(),
+  loadSummary: vi.fn(),
+  sendRegistrationInvite: vi.fn(),
+}));
 vi.mock('../utils/api', () => ({ apiRequest, API_URL: '/api' }));
 vi.mock('../components/Layout', () => ({ default: ({ children }: { children: React.ReactNode }) => <main>{children}</main> }));
 vi.mock('../components/StudentProfileDrawer', () => ({ default: () => null }));
@@ -16,6 +22,13 @@ vi.mock('../features/month-coverage/api', () => ({
 }));
 vi.mock('../features/month-coverage/MonthCoveragePaymentDialog', () => ({
   MonthCoveragePaymentDialog: () => <div data-testid="month-payment-dialog" />,
+}));
+vi.mock('../features/enrollments/api', () => ({
+  searchEnrollmentCandidates: vi.fn().mockResolvedValue([]),
+  previewEnrollment: vi.fn(),
+  enrollExisting: vi.fn(),
+  resendEnrollmentNotification: vi.fn(),
+  sendRegistrationInvite,
 }));
 
 const batch = {
@@ -42,9 +55,11 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 30));
 describe('BatchDetails month coverage', () => {
   let container: HTMLDivElement;
   let root: Root;
+  let queryClient: QueryClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(searchEnrollmentCandidates).mockResolvedValue([]);
     apiRequest.mockResolvedValue(batch);
     loadSummary.mockResolvedValue(summary);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(['pdf']) }));
@@ -53,17 +68,19 @@ describe('BatchDetails month coverage', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   });
 
   afterEach(() => {
     act(() => root.unmount());
+    queryClient.clear();
     container.remove();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
   it('shows per-student month progress without duplicating Fees dashboard history or legacy controls', async () => {
-    await act(async () => root.render(<MemoryRouter initialEntries={['/batches/batch-1']}><Routes><Route path="/batches/:id" element={<BatchDetails />} /></Routes></MemoryRouter>));
+    await act(async () => root.render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={['/batches/batch-1']}><Routes><Route path="/batches/:id" element={<BatchDetails />} /></Routes></MemoryRouter></QueryClientProvider>));
     await act(async () => { await settle(); });
     expect(container.textContent).toContain('2 / 12 months received');
     expect(container.textContent).toContain('August 2026 fee pending · overdue');
@@ -73,7 +90,7 @@ describe('BatchDetails month coverage', () => {
   });
 
   it('lets the teacher choose configured student columns before downloading', async () => {
-    await act(async () => root.render(<MemoryRouter initialEntries={['/batches/batch-1']}><Routes><Route path="/batches/:id" element={<BatchDetails />} /></Routes></MemoryRouter>));
+    await act(async () => root.render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={['/batches/batch-1']}><Routes><Route path="/batches/:id" element={<BatchDetails />} /></Routes></MemoryRouter></QueryClientProvider>));
     await act(async () => { await settle(); });
 
     const downloadButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.trim() === 'Download') as HTMLButtonElement;
@@ -92,5 +109,47 @@ describe('BatchDetails month coverage', () => {
     await act(async () => { await settle(); });
 
     expect(fetch).toHaveBeenCalledWith('/api/batches/batch-1/download?columns=studentName%2CparentWhatsapp%2Ccustom%3AstudentPhone', expect.any(Object));
+  });
+
+  it('lets the teacher choose a fee start month before inviting a new student', async () => {
+    await act(async () => root.render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={['/batches/batch-1']}><Routes><Route path="/batches/:id" element={<BatchDetails />} /></Routes></MemoryRouter></QueryClientProvider>));
+    await act(async () => { await settle(); });
+
+    const addStudent = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.trim() === 'Add Student') as HTMLButtonElement;
+    await act(async () => addStudent.click());
+    expect(document.body.textContent).not.toContain('Create a separate student');
+    const lookupInput = document.body.querySelector('input[role="searchbox"]') as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(lookupInput, '9876543210');
+      lookupInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    for (let i = 0; i < 30 && !document.body.textContent?.includes('Create new student'); i++) {
+      await act(async () => new Promise(resolve => setTimeout(resolve, 10)));
+    }
+
+    const createSeparate = Array.from(document.body.querySelectorAll('button')).find(button => button.textContent?.includes('Create new student')) as HTMLButtonElement;
+    await act(async () => createSeparate.click());
+
+    const phoneInput = document.body.querySelector('input[placeholder="10-digit number"]') as HTMLInputElement;
+    const feeStartInput = document.body.querySelector('input[type="month"]') as HTMLInputElement;
+    expect(feeStartInput).not.toBeNull();
+    expect(feeStartInput.required).toBe(true);
+    expect(feeStartInput.min).toBe('2026-06');
+    expect(feeStartInput.max).toBe('2027-05');
+
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      expect(phoneInput.value).toBe('9876543210');
+      setValue?.call(feeStartInput, '2026-08');
+      feeStartInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const submit = Array.from(document.body.querySelectorAll('button')).find(button => button.textContent?.includes('Confirm fees and send link')) as HTMLButtonElement;
+    await act(async () => submit.click());
+    await act(async () => { await settle(); });
+
+    expect(sendRegistrationInvite).toHaveBeenCalledWith('batch-1', '9876543210', {
+      mode: 'MONTH_COVERAGE',
+      feeStartMonth: '2026-08',
+    });
   });
 });

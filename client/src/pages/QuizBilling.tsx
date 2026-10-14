@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { CreditCard, Sparkles, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { CreditCard, Sparkles } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 

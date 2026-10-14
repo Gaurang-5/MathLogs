@@ -235,7 +235,7 @@ export default function MarketplaceSettings() {
               </div>
               <h2 className="text-2xl font-extrabold tracking-tight">Upgrade to MathLogs ERP</h2>
               <p className="text-xs text-neutral-300 font-medium leading-relaxed">
-                Unlock complete coaching management: student tracking, digital attendance, online quizzes, fee collection & automated WhatsApp parent notifications.
+                Unlock complete coaching management: student records, online quizzes, fee collection & automated WhatsApp parent notifications.
               </p>
             </div>
 

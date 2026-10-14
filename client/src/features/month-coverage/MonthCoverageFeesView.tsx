@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, CalendarDays, Download, History, IndianRupee, Loader2, Mail, Plus, Search, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, Download, History, Loader2, Mail, Plus, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   loadMonthCoverageSummary,

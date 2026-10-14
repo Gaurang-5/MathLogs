@@ -1,14 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../utils/api';
 import Layout from '../components/Layout';
 import { useNavigate } from 'react-router-dom';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart, BarChart, Bar } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Users, Wallet, TrendingUp, Eye, EyeOff, BookOpen, IndianRupee, Sparkles } from 'lucide-react';
 import CountUp from 'react-countup';
 import StudentSearch from '../components/StudentSearch';
-import { cn } from '../utils/cn';
 import { monthLabel } from '../features/month-coverage/monthCoverageViewModel';
 
 interface ClassAveragePoint {
@@ -98,6 +97,7 @@ export default function Dashboard() {
         queryKey: ['classAverage'],
         queryFn: () => api.get<ClassAveragePoint[]>('/stats/class-average'),
         staleTime: 30000,
+        enabled: Boolean(summary),
     });
 
     const { data: installmentStatsData = [], isLoading: installmentStatsLoading } = useQuery({
@@ -120,13 +120,6 @@ export default function Dashboard() {
         financeGrowth: installmentStatsLoading
     };
 
-    const toggleFeePrivacy = () => {
-        setShowFeeData((prev) => {
-            const next = !prev;
-            localStorage.setItem('mathlogs_hide_fees', next ? 'false' : 'true');
-            return next;
-        });
-    };
 
     // Collection rate based on total collected (all-time), not monthly
     const collectionRate = monthCoverage ? monthCoverage.progressPercent : finances.totalCollected + finances.pending > 0
@@ -354,7 +347,7 @@ export default function Dashboard() {
                                             fontWeight: 600,
                                             fontSize: '13px'
                                         }}
-                                        formatter={(value: number) => [`${value}%`, 'Average Marks']}
+                                        formatter={(value) => [`${value}%`, 'Average Marks']}
                                     />
                                     <Bar
                                         dataKey="average"
@@ -437,7 +430,7 @@ export default function Dashboard() {
                                                 fontWeight: 600,
                                                 fontSize: '13px'
                                             }}
-                                            formatter={(value: number | string, name: string) => [
+                                            formatter={(value, name) => [
                                                 showFeeData ? `₹${new Intl.NumberFormat('en-IN').format(Number(value) || 0)}` : '₹••••••',
                                                 name === 'Collected' ? 'Collected' : 'Remaining'
                                             ]}

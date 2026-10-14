@@ -1,10 +1,11 @@
+import { InstallmentAllocationPicker, type PaymentAllocation } from '../features/fee-payment/InstallmentAllocationPicker';
 /* eslint-disable */
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Loader, X, TrendingUp, TrendingDown, IndianRupee, Mail, History, CheckCircle, Download, ArrowUpRight, FileText, ArrowUpDown, ChevronDown, Check, Receipt, MessageSquare, Send, ChevronRight, AlertCircle, Phone, Calendar, User, Square, CheckSquare } from 'lucide-react';
+import { Search, Loader, X, TrendingDown, IndianRupee, Mail, History, CheckCircle, Download, FileText, ArrowUpDown, ChevronDown, Check, Receipt, Send, ChevronRight, User, Square, CheckSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../utils/cn';
 import UpiVerificationList from '../components/UpiVerificationList';
@@ -70,6 +71,10 @@ const LegacyFees: React.FC = () => {
 
     const [selectedStudent, setSelectedStudent] = useState<FeeSummary | null>(null);
     const [paymentAmount, setPaymentAmount] = useState('');
+    const [allocations,setAllocations]=useState<PaymentAllocation[]>([]);
+    const [allocationReady,setAllocationReady]=useState(false);
+    const [paymentKey,setPaymentKey]=useState(()=>crypto.randomUUID());
+    useEffect(()=>{setPaymentKey(crypto.randomUUID());setAllocationReady(false);},[selectedStudent?.id,paymentAmount]);
     const [processing, setProcessing] = useState(false);
     const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
     const [reportYear, setReportYear] = useState(new Date().getFullYear());
@@ -122,7 +127,7 @@ const LegacyFees: React.FC = () => {
 
     const handlePayment = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedStudent || !paymentAmount) return;
+        if (!selectedStudent || !paymentAmount || !allocationReady) return;
 
         setProcessing(true);
         const toastId = toast.loading('Processing payment...');
@@ -130,15 +135,15 @@ const LegacyFees: React.FC = () => {
         try {
             await api.post('/fees/pay', {
                 studentId: selectedStudent.id,
-                amount: paymentAmount
+                amount: paymentAmount, allocations, idempotencyKey:paymentKey
             });
             await queryClient.invalidateQueries({ queryKey: ['fees'] });
             await queryClient.invalidateQueries({ queryKey: ['transactions'] });
             toast.success(`Payment of ₹${paymentAmount} recorded!`, { id: toastId });
             setSelectedStudent(null);
             setPaymentAmount('');
-        } catch {
-            toast.error('Payment failed. Please try again.', { id: toastId });
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Payment failed. Please try again.', { id: toastId });
         } finally {
             setProcessing(false);
         }
@@ -858,7 +863,7 @@ const LegacyFees: React.FC = () => {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-8 relative z-10"
+                            className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-8 relative z-10 max-h-[80dvh] overflow-y-auto"
                         >
                             <button
                                 onClick={() => setSelectedStudent(null)}
@@ -912,9 +917,10 @@ const LegacyFees: React.FC = () => {
                                         autoFocus
                                     />
                                     <p className="text-xs text-gray-400 mt-2">
-                                        This payment will correct the oldest pending installments first.
+                                        Select the installment below. No month is selected automatically.
                                     </p>
                                 </div>
+                                <InstallmentAllocationPicker key={selectedStudent.id} studentId={selectedStudent.id} amount={paymentAmount} onChange={(rows,ready)=>{setAllocations(rows);setAllocationReady(ready);}} />
                                 <div className="flex justify-end gap-3">
                                     <button
                                         type="button"
@@ -925,7 +931,7 @@ const LegacyFees: React.FC = () => {
                                     </button>
                                     <button
                                         type="submit"
-                                        disabled={processing}
+                                        disabled={processing || !allocationReady}
                                         className="px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black disabled:opacity-50 shadow-xl shadow-gray-200 transition-all active:scale-[0.98]"
                                     >
                                         {processing ? 'Processing...' : 'Confirm Payment'}

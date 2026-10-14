@@ -4,7 +4,7 @@ import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, Clock, Users, Plus, X, GraduationCap, Hash, BookOpen, Type, ChevronRight } from 'lucide-react';
+import { CalendarDays, Clock, Users, Plus, X, GraduationCap, BookOpen, Type, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { buildCreateBatchPayload } from '../features/month-coverage/batchForm';
 

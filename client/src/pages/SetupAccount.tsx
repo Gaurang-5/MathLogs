@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-    Loader2, CheckCircle2, AlertTriangle, Building2,
-    BookOpen, Users, ArrowRight, Plus, X, Phone, RotateCcw, MapPin, ShieldCheck, Sparkles, Store, EyeOff
+    Loader2, CheckCircle2, AlertTriangle,
+    BookOpen, ArrowRight, Plus, X, Phone, RotateCcw, ShieldCheck, Sparkles, Store, EyeOff
 } from 'lucide-react';
 import { API_URL } from '../utils/api';
 import type { CoachingFeeMode } from '../features/month-coverage/types';
@@ -81,9 +81,9 @@ export default function SetupAccount() {
 
     // Institute details from backend
     const [instituteName, setInstituteName] = useState('');
-    const [teacherName, setTeacherName] = useState('');
+    const [, setTeacherName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
-    const [plan, setPlan] = useState('');
+    const [, setPlan] = useState('');
     const [coachingFeeMode, setCoachingFeeMode] = useState<CoachingFeeMode>('CURRENT_DUE_BASED');
 
     // Academic / Teaching Configuration (Always Active)

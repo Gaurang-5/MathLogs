@@ -22,8 +22,9 @@ describe('original sticker photo', () => {
     const image = new Blob(['original-image-bytes'], { type: 'image/png' });
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ score, status: 'read' }) });
     vi.stubGlobal('fetch', fetchMock);
-    const result = await extractMarksFromSticker(image);
+    const result = await extractMarksFromSticker(image, undefined, 'authorized-test');
     const form = fetchMock.mock.calls[0][1].body as FormData;
+    expect(form.get('testId')).toBe('authorized-test');
     const uploaded = form.get('image') as File;
     const read = (blob: Blob) => new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsText(blob); });
     expect(await read(uploaded)).toBe(await read(image));

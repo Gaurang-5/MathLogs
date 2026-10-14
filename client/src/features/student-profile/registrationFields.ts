@@ -25,6 +25,10 @@ const systemFieldKeys: Record<string, keyof ConfiguredStudent> = {
   schoolName: 'schoolName',
 };
 
+export function additionalRegistrationFields(fields: RegistrationFieldDefinition[]): RegistrationFieldDefinition[] {
+  return fields.filter(field => !field.system && !systemFieldKeys[field.id]);
+}
+
 export function studentFieldValue(student: ConfiguredStudent, field: RegistrationFieldDefinition): string {
   const systemKey = systemFieldKeys[field.id];
   const value = systemKey ? student[systemKey] : student.additionalData?.[field.id];

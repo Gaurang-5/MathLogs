@@ -4,7 +4,6 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { motion } from 'framer-motion';
 import { User, Users, Smartphone, Mail, ArrowRight, CheckCircle, School, GraduationCap, BookOpen, AlertCircle, Hash, Type } from 'lucide-react';
-import ToastProvider from '../components/ToastProvider';
 import toast from 'react-hot-toast';
 import { getCachedRegistration, type RegisteredStudent } from '../utils/registration';
 
@@ -46,6 +45,7 @@ interface BatchStatus {
     isRegistrationOpen?: boolean;
     autoSendWelcome?: boolean;
     whatsappGroupLink?: string;
+    identityReviewRequired?: boolean;
     alreadyRegistered?: boolean;
     registeredStudent?: any;
     institute?: {
@@ -62,6 +62,7 @@ interface BatchStatus {
 export default function Register({ mode = 'standard' }: RegisterProps) {
     const { batchId } = useParams();
     const cachedRegistration = getCachedRegistration(batchId, mode);
+    const [reviewPending, setReviewPending] = useState(false);
     const [submitted, setSubmitted] = useState(() => cachedRegistration !== null);
 
     const [formData, setFormData] = useState<Record<string, string>>({});
@@ -106,6 +107,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
             apiRequest<BatchStatus & { alreadyRegistered?: boolean, registeredStudent?: any }>(url, 'GET')
                 .then(data => {
                     setBatchStatus(data);
+                    setReviewPending(data.identityReviewRequired === true);
                     
                     // Priority 1: If backend says token is already registered, force success state
                     if (data.alreadyRegistered && data.registeredStudent) {
@@ -163,7 +165,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                 }
             });
 
-            const student = await apiRequest<RegisteredStudent>('/public/register', 'POST', {
+            const student = await apiRequest<RegisteredStudent | { code: 'IDENTITY_REVIEW_REQUIRED'; reviewId: string }>('/public/register', 'POST', {
                 batchId,
                 name: formData['studentName'] || '',
                 parentName: formData['parentName'] || '',
@@ -190,8 +192,14 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                 });
             }
 
+            if ('code' in student && student.code === 'IDENTITY_REVIEW_REQUIRED') {
+                setReviewPending(true);
+                setSubmitted(false);
+                toast.success('Details received. Your teacher will review your profile.', { id: toastId });
+                return;
+            }
             toast.success('✅ ✅ Registration successful!', { id: toastId });
-            const finalData = { ...student, batchId };
+            const finalData = { ...(student as RegisteredStudent), batchId };
             setSubmittedData(finalData);
             setSubmitted(true);
             
@@ -322,6 +330,9 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
     }
 
     // ─── Success Screen ───
+    if (reviewPending) {
+        return <main className="min-h-screen flex items-center justify-center p-6"><div role="status" className="max-w-md rounded-2xl border p-8 text-center"><h1 className="text-2xl font-bold">Awaiting teacher review</h1><p className="mt-4">Your details have been received. Your teacher needs to check a possible existing profile before completing enrollment. Your invitation fee plan is saved.</p><p className="mt-3 text-sm">You do not need to register again.</p>{mode === 'kiosk' ? <button className="mt-4 min-h-11 rounded-xl border px-4" onClick={() => { setReviewPending(false); setFormData({}); }}>Next student</button> : null}</div></main>;
+    }
     if (submitted) {
         return (
             <div className="min-h-screen bg-app-bg flex items-center justify-center px-4 font-sans">
@@ -362,12 +373,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                                 <p className="text-app-text text-sm">{submittedData.schoolName}</p>
                             </div>
                             <div className="pt-2 border-t border-app-border">
-                                {mode === 'kiosk' ? (
-                                    <div className="space-y-1 mt-1 bg-blue-50 p-3 rounded-lg border border-blue-100">
-                                        <p className="text-sm text-blue-800 font-medium">WhatsApp Invitation</p>
-                                        <p className="text-xs text-blue-600">A WhatsApp message will be sent to your registered number shortly.</p>
-                                    </div>
-                                ) : batchStatus?.autoSendWelcome && batchStatus?.whatsappGroupLink ? (
+                                {batchStatus?.autoSendWelcome && batchStatus?.whatsappGroupLink ? (
                                     <div className="space-y-2 mt-1">
                                         <p className="text-sm text-app-text font-medium">Join the WhatsApp Group</p>
                                         <p className="text-xs text-app-text-secondary">Join for updates and announcements.</p>
@@ -409,11 +415,7 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
                         <button
                             onClick={() => {
                                 setSubmitted(false);
-                                setStudentName('');
-                                setParentName('');
-                                setWhatsapp('');
-                                setEmail('');
-                                setSchoolName('');
+                                setFormData({});
                                 setSubmittedData(null);
                             }}
                             className="mt-6 bg-neutral-900 hover:bg-black text-white font-semibold py-3 px-6 rounded-xl w-full transition-colors flex items-center justify-center"
@@ -434,7 +436,6 @@ export default function Register({ mode = 'standard' }: RegisterProps) {
 
     return (
         <div className="min-h-screen bg-app-bg font-sans">
-            <ToastProvider />
 
             {/* ─── Branded Hero ─── */}
             <div className="relative overflow-hidden">

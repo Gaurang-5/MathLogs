@@ -54,10 +54,10 @@ it('never scans automatically, captures once on click, accepts zero and saves on
   await click('Capture');
   expect(mocks.capture).toHaveBeenCalledTimes(1);
   expect(mocks.ocr).toHaveBeenCalledTimes(1);
-  expect(document.body.querySelector('input:not([type="file"])')?.value).toBe('0');
+  expect(document.body.querySelector<HTMLInputElement>('input:not([type="file"])')?.value).toBe('0');
   expect(mocks.api).not.toHaveBeenCalledWith('/marks', expect.anything(), expect.anything());
   await click('Save');
-  expect(mocks.api).toHaveBeenCalledWith('/marks', 'POST', { testId: 'test', studentId: 'student', score: '0' });
+  expect(mocks.api).toHaveBeenCalledWith('/marks', 'POST', { testId: 'test', studentId: 'student', score: '0', expectedScore: null });
   expect(mocks.capture).toHaveBeenCalledTimes(1);
   expect(document.body.querySelector('video')).not.toBeNull();
   expect(getUserMedia).toHaveBeenCalledTimes(1);
@@ -73,7 +73,7 @@ it('locks repeated capture clicks and discards OCR results after cancellation', 
   expect(mocks.capture).toHaveBeenCalledTimes(1);
   await click('Retake');
   await act(async () => finish({ score: '42', status: 'read' }));
-  expect(document.body.querySelector('input:not([type="file"])')).toBeNull();
+  expect(document.body.querySelector<HTMLInputElement>('input:not([type="file"])')).toBeNull();
   expect(stop).not.toHaveBeenCalled();
 });
 
@@ -88,7 +88,7 @@ it('starts QR decoding and marks OCR concurrently before either one finishes', a
   expect(mocks.api.mock.calls.some(([path]) => path.startsWith('/students/lookup'))).toBe(false);
   await act(async () => finishOCR({ score: '72', status: 'read' }));
   await act(async () => finishQR('IS-MTH26-001'));
-  expect(document.body.querySelector('input[aria-label="Obtained marks"]')?.value).toBe('72');
+  expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('72');
 });
 
 it('allows retaking a photo when the QR cannot be read', async () => {
@@ -99,13 +99,13 @@ it('allows retaking a photo when the QR cannot be read', async () => {
   expect(document.body.querySelector('img[alt="Photo kept for marks review"]')).not.toBeNull();
   await click('Retake photo');
   await click('Capture');
-  expect(document.body.querySelector('input:not([type="file"])')?.value).toBe('0');
+  expect(document.body.querySelector<HTMLInputElement>('input:not([type="file"])')?.value).toBe('0');
 });
 
 it('shows a blank field for uncertain OCR rather than retaining a previous score', async () => {
   mocks.ocr.mockResolvedValue({ score: '', status: 'needs_review' });
   await click('Capture');
-  expect(document.body.querySelector('input:not([type="file"])')?.value).toBe('');
+  expect(document.body.querySelector<HTMLInputElement>('input:not([type="file"])')?.value).toBe('');
 });
 
 
@@ -146,20 +146,20 @@ it('restarts a stuck camera only when requested', async () => {
 
 it('sends the original phone-camera file to OCR and reads QR from that same file', async () => {
   const file = new File(['unaltered original camera photo'], 'photo.jpg', { type: 'image/jpeg' });
-  const input = document.body.querySelector('input[type="file"]')!;
+  const input = document.body.querySelector<HTMLInputElement>('input[type="file"]')!;
   Object.defineProperty(input, 'files', { value: [file] });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(mocks.ocr).toHaveBeenCalledWith(file, expect.any(AbortSignal));
+  expect(mocks.ocr).toHaveBeenCalledWith(file, expect.any(AbortSignal), 'test');
   expect(mocks.photoQR).toHaveBeenCalledWith(file, expect.any(AbortSignal));
   expect(mocks.capture).not.toHaveBeenCalled();
-  expect(document.body.querySelector('input:not([type="file"])')?.value).toBe('0');
+  expect(document.body.querySelector<HTMLInputElement>('input:not([type="file"])')?.value).toBe('0');
 });
 
 it('captures a real ready frame without needing the loadeddata event', async () => {
   await click('Restart camera');
   await click('Capture');
   expect(mocks.capture).toHaveBeenCalledTimes(1);
-  expect(document.body.querySelector('input[aria-label="Obtained marks"]')?.value).toBe('0');
+  expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('0');
 });
 
 it('explains an unready capture instead of silently disabling the button', async () => {
@@ -176,7 +176,7 @@ it('keeps the photo and marks when QR fails and requires choosing a student befo
     ? [{ id: 'student', humanId: 'AB123', name: 'Aarav', batch: { name: '10 A' } }]
     : { id: 'student', humanId: 'AB123', name: 'Aarav', batch: { className: '10' }, marks: [] });
   await click('Capture');
-  expect(document.body.querySelector('input[aria-label="Obtained marks"]')).toBeNull();
+  expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')).toBeNull();
   const input = document.getElementById('sticker-student-search') as HTMLInputElement;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Aarav');
@@ -184,7 +184,7 @@ it('keeps the photo and marks when QR fails and requires choosing a student befo
   });
   await click('Search students');
   await click('Aarav · AB123 · 10 A');
-  expect(document.body.querySelector('input[aria-label="Obtained marks"]')?.value).toBe('0');
+  expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('0');
   expect(mocks.api).toHaveBeenCalledWith('/students/lookup/AB123?testId=test', 'GET', undefined, { timeoutMs: 15000 });
   expect(mocks.api.mock.calls.some(([path]) => path === '/marks')).toBe(false);
 });
@@ -196,9 +196,9 @@ it('exits a stalled OCR operation into manual entry and ignores its late result'
   await click('Capture');
   await act(async () => { await vi.advanceTimersByTimeAsync(20001); });
   expect(document.body.textContent).toContain('Reading marks timed out');
-  expect(document.body.querySelector('input[aria-label="Obtained marks"]')?.value).toBe('');
+  expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('');
   await act(async () => finish({ score: '91', status: 'read' }));
-  expect(document.body.querySelector('input[aria-label="Obtained marks"]')?.value).toBe('');
+  expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('');
 });
 
 it('stops a camera whose permission request finishes after the scanner is closed', async () => {
@@ -218,7 +218,7 @@ it('keeps scanning available when a browser rejects optional focus constraints',
   await click('Restart camera');
   await act(async () => document.body.querySelector('video')!.dispatchEvent(new Event('loadeddata')));
   await click('Capture');
-  expect(document.body.querySelector('input:not([type="file"])')?.value).toBe('0');
+  expect(document.body.querySelector<HTMLInputElement>('input:not([type="file"])')?.value).toBe('0');
 });
 
 
@@ -239,7 +239,7 @@ it('shows the identified student before OCR finishes and preserves a manual mark
   await act(async () => finish({ score: '9', status: 'read' }));
   expect(input.value).toBe('4');
   await click('Save');
-  expect(mocks.api).toHaveBeenCalledWith('/marks', 'POST', { testId: 'test', studentId: 'student', score: '4' });
+  expect(mocks.api).toHaveBeenCalledWith('/marks', 'POST', { testId: 'test', studentId: 'student', score: '4', expectedScore: null });
 });
 
 it('explains an out-of-range reading instead of calling it unreadable', async () => {
@@ -252,6 +252,21 @@ it('explains an out-of-range reading instead of calling it unreadable', async ()
 it('uses server eligibility for a shared test spanning different classes', async () => {
   mocks.api.mockResolvedValueOnce({ id: 'student', name: 'Aarav', batch: { className: '9' }, testEligible: true, marks: [] });
   await click('Capture');
-  expect(document.body.querySelector('input[aria-label="Obtained marks"]')?.value).toBe('0');
+  expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('0');
   expect(document.getElementById('sticker-student-search')).toBeNull();
+});
+
+it('preserves the reviewed previous score when explicitly overwriting an existing mark', async () => {
+  mocks.api.mockResolvedValueOnce({ id: 'student', name: 'Aarav', batch: { className: '10' }, marks: [{ testId: 'test', score: 12 }] });
+  await click('Capture');
+  await click('Overwrite');
+  await click('Save');
+  expect(mocks.api).toHaveBeenCalledWith('/marks', 'POST', { testId: 'test', studentId: 'student', score: '0', expectedScore: 12 });
+});
+
+it('resumes the web camera when the native photo picker is cancelled', async () => {
+  await click('Use phone camera');
+  expect(stop).toHaveBeenCalled();
+  await act(async () => document.querySelector('input[type="file"]')!.dispatchEvent(new Event('cancel')));
+  expect(getUserMedia).toHaveBeenCalledTimes(2);
 });

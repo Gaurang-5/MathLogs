@@ -20,7 +20,7 @@
     --color-warning: var(--warning);
     --color-danger: var(--danger);
 
-    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
     --shadow-sm: var(--shadow-sm);
     --shadow-md: var(--shadow-md);
@@ -75,6 +75,19 @@
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+
+    /* Authenticated teacher interface */
+    --teacher-content-max: 96rem;
+    --teacher-gutter: clamp(1rem, 2.4vw, 2rem);
+    --teacher-control-height: 2.75rem;
+    --teacher-radius-control: 0.875rem;
+    --teacher-radius-card: 1.25rem;
+    --teacher-radius-sheet: 1.75rem;
+    --teacher-material: rgba(255, 255, 255, 0.72);
+    --teacher-material-strong: rgba(255, 255, 255, 0.9);
+    --teacher-press-scale: 0.97;
+    --teacher-focus: 0 0 0 3px rgba(17, 24, 39, 0.2);
+    --teacher-bottom-nav-space: calc(6rem + env(safe-area-inset-bottom));
 }
 
 /* Dark mode removed */
@@ -82,11 +95,94 @@
 body {
     background-color: var(--bg-app);
     color: var(--text-main);
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     transition: background-color 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.4s ease;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.teacher-shell {
+    min-height: 100dvh;
+    background: var(--bg-app);
+    color: var(--text-main);
+}
+
+.teacher-page {
+    width: min(100%, var(--teacher-content-max));
+    margin-inline: auto;
+}
+
+.teacher-material {
+    background: var(--teacher-material);
+    border: 1px solid var(--border-subtle);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+}
+
+.teacher-interactive {
+    min-height: var(--teacher-control-height);
+    touch-action: manipulation;
+    transition:
+        transform 120ms ease-out,
+        background-color 160ms ease-out,
+        border-color 160ms ease-out,
+        color 160ms ease-out,
+        box-shadow 160ms ease-out;
+}
+
+.teacher-interactive:active:not(:disabled) {
+    transform: scale(var(--teacher-press-scale));
+}
+
+.teacher-interactive:focus-visible {
+    outline: none;
+    box-shadow: var(--teacher-focus);
+}
+
+.teacher-interactive:disabled,
+.teacher-interactive[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Shared treatment for legacy teacher pages while they migrate to primitives. */
+.teacher-shell :where(button, a[href]) {
+    touch-action: manipulation;
+}
+
+.teacher-shell :where(button, a[href]):focus-visible,
+.teacher-shell :where(input, select, textarea):focus-visible {
+    outline: none;
+    box-shadow: var(--teacher-focus);
+}
+
+.teacher-shell :where(input, select, textarea) {
+    min-height: var(--teacher-control-height);
+    font: inherit;
+}
+
+.teacher-shell :where(button):not(:disabled):active,
+.teacher-shell :where(a[href]):active {
+    transform: scale(var(--teacher-press-scale));
+}
+
+.teacher-shell :where(button, a[href]) {
+    transition-property: transform, background-color, border-color, color, box-shadow, opacity;
+    transition-duration: 140ms;
+    transition-timing-function: ease-out;
+}
+
+.teacher-shell :where([role="dialog"], [data-modal-open]) {
+    border-radius: var(--teacher-radius-sheet);
 }
 
 /* Respect user's motion preferences */
@@ -99,6 +195,23 @@ body {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .glass,
+    .teacher-material {
+        background: var(--bg-surface-opaque);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+@media (prefers-contrast: more) {
+    :root {
+        --border-subtle: rgba(0, 0, 0, 0.45);
+        --teacher-material: var(--bg-surface-opaque);
+        --teacher-focus: 0 0 0 3px currentColor;
     }
 }
 
@@ -234,41 +347,4 @@ html {
         scroll-margin-bottom: 25vh;
         scroll-margin-top: 15vh;
     }
-}
-/* Shared teacher controls used by the marks scanner. */
-:root {
-    --teacher-control-height: 2.75rem;
-    --teacher-radius-control: 0.875rem;
-    --teacher-press-scale: 0.97;
-    --teacher-focus: 0 0 0 3px rgba(17, 24, 39, 0.2);
-}
-.teacher-interactive {
-    min-height: var(--teacher-control-height);
-    touch-action: manipulation;
-    transition:
-        transform 120ms ease-out,
-        background-color 160ms ease-out,
-        border-color 160ms ease-out,
-        color 160ms ease-out,
-        box-shadow 160ms ease-out;
-}
-
-.teacher-interactive:active:not(:disabled) {
-    transform: scale(var(--teacher-press-scale));
-}
-
-.teacher-interactive:focus-visible {
-    outline: none;
-    box-shadow: var(--teacher-focus);
-}
-
-.teacher-interactive:disabled,
-.teacher-interactive[aria-disabled="true"] {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-
-@media (prefers-reduced-motion: reduce) {
-    .teacher-interactive:active:not(:disabled) { transform: none; }
 }

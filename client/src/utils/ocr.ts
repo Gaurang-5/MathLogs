@@ -34,10 +34,11 @@ export function stickerFrameBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 /** Upload the original captured bytes, without crops, filters, warping, or recompression. */
-export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal): Promise<OCRResult> {
+export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal, testId?: string): Promise<OCRResult> {
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Authentication required for scanning');
     const formData = new FormData();
+    if (testId) formData.append('testId', testId);
     formData.append('image', image, image.type === 'image/jpeg' ? 'sticker.jpg' : image.type === 'image/webp' ? 'sticker.webp' : 'sticker.png');
     const controller = new AbortController();
     const abort = () => controller.abort();

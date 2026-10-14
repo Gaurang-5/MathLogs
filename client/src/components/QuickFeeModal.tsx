@@ -1,6 +1,7 @@
+import { InstallmentAllocationPicker, type PaymentAllocation } from '../features/fee-payment/InstallmentAllocationPicker';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Search, Loader, IndianRupee, User, Wallet, Sparkles } from 'lucide-react';
+import { X, Search, Loader, IndianRupee, User, Wallet } from 'lucide-react';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 import type { MonthCoverageStudentSummary } from '../features/month-coverage/types';
@@ -9,6 +10,7 @@ import { QuickMonthCoverageFeeForm } from '../features/month-coverage/QuickMonth
 interface QuickFeeModalProps {
     isOpen: boolean;
     onClose: () => void;
+    instituteFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' | null;
 }
 
 interface Student {
@@ -20,48 +22,77 @@ interface Student {
     balance: number;
 }
 
-export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
+export default function QuickFeeModal({ isOpen, onClose, instituteFeeMode }: QuickFeeModalProps) {
     const [students, setStudents] = useState<Student[]>([]);
     const [search, setSearch] = useState('');
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [amount, setAmount] = useState('');
+    const [allocations,setAllocations]=useState<PaymentAllocation[]>([]);
+    const [allocationReady,setAllocationReady]=useState(false);
+    const paymentKey=useRef(crypto.randomUUID());
+    useEffect(()=>{paymentKey.current=crypto.randomUUID();setAllocationReady(false);},[selectedStudent?.id,amount]);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [scanningImage, setScanningImage] = useState(false);
+    const legacyStudentsLoadedRef = useRef(false);
+    const [] = useState(false);
     const [feeMode, setFeeMode] = useState<'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' | null>(null);
     const [monthStudents, setMonthStudents] = useState<MonthCoverageStudentSummary[]>([]);
 
     useEffect(() => {
-        if (isOpen) {
-            // Reset state
-            setSearch('');
-            setSelectedStudent(null);
-            setAmount('');
+        if (!isOpen) return;
 
-            // Focus search
-            setTimeout(() => inputRef.current?.focus(), 100);
+        setSearch('');
+        setSelectedStudent(null);
+        setAmount('');
+        setLoading(true);
 
-            setLoading(true);
-            api.get<{ coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' }>('/institute/me').then(async institute => {
-                const mode = institute.coachingFeeMode ?? 'CURRENT_DUE_BASED';
+        const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 100);
+        let cancelled = false;
+
+        const loadFeeFlow = async () => {
+            try {
+                // null means Layout is already fetching the institute; wait for that
+                // request instead of issuing a duplicate one from the modal.
+                if (instituteFeeMode === null) {
+                    setFeeMode(null);
+                    return;
+                }
+
+                const mode = instituteFeeMode ?? (
+                    await api.get<{ coachingFeeMode?: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE' }>('/institute/me')
+                ).coachingFeeMode ?? 'CURRENT_DUE_BASED';
+                if (cancelled) return;
+
                 setFeeMode(mode);
                 if (mode === 'MONTH_COVERAGE') {
                     const { loadMonthCoverageSummary } = await import('../features/month-coverage/api');
                     const summary = await loadMonthCoverageSummary();
-                    setMonthStudents(summary.students.filter(student => !student.setupRequired && student.pendingMonths > 0));
-                } else if (students.length === 0) {
-                    setStudents(await api.get<Student[]>('/fees'));
+                    if (!cancelled) {
+                        setMonthStudents(summary.students.filter(student => !student.setupRequired && student.pendingMonths > 0));
+                    }
+                } else if (!legacyStudentsLoadedRef.current) {
+                    const legacyStudents = await api.get<Student[]>('/fees');
+                    if (!cancelled) {
+                        legacyStudentsLoadedRef.current = true;
+                        setStudents(legacyStudents);
+                    }
                 }
-                setLoading(false);
-            }).catch(() => {
+            } catch {
+                if (cancelled) return;
                 toast.error('Failed to load students');
-                setLoading(false);
-            });
-        }
-    }, [isOpen, students.length]);
+            } finally {
+                if (!cancelled && instituteFeeMode !== null) setLoading(false);
+            }
+        };
+
+        void loadFeeFlow();
+        return () => {
+            cancelled = true;
+            window.clearTimeout(focusTimer);
+        };
+    }, [instituteFeeMode, isOpen]);
 
     const filteredStudents = search.trim()
         ? students.filter(s =>
@@ -71,46 +102,16 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
         ).slice(0, 5)
         : [];
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setScanningImage(true);
-        const formData = new FormData();
-        formData.append('image', file);
-
-        try {
-            const data: any = await api.post('/fees/scan-receipt', formData, {
-                // api.ts automatically handles multipart headers if FormData is passed in axios, 
-                // but since it's fetch wrapper we just pass body: formData and omit Content-Type.
-            });
-            
-            if (data.amountPaid) {
-                setAmount(data.amountPaid.toString());
-                toast.success(`Scanned ₹${data.amountPaid} from receipt!`);
-                if (data.senderName) {
-                    setSearch(data.senderName);
-                }
-            } else {
-                toast.error("Could not detect amount from image.");
-            }
-        } catch (error) {
-            toast.error("Receipt scanning failed.");
-        } finally {
-            setScanningImage(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedStudent || !amount) return;
+        if (!selectedStudent || !amount || !allocationReady) return;
 
         setSubmitting(true);
         try {
             await api.post('/fees/pay', {
                 studentId: selectedStudent.id,
-                amount: amount
+                amount: amount, allocations, idempotencyKey:paymentKey.current
             });
             toast.success(`Collected ₹${amount} from ${selectedStudent.name}`);
 
@@ -118,15 +119,18 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
             window.dispatchEvent(new Event('fee-updated'));
 
             onClose();
-        } catch {
-            toast.error('Failed to log fee');
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to log fee');
         } finally {
             setSubmitting(false);
         }
     };
 
+    if (isOpen && feeMode === null) {
+        return <div className="fixed inset-0 z-[110] grid place-items-center bg-black/40"><Loader className="h-7 w-7 animate-spin text-white" /></div>;
+    }
+
     if (isOpen && feeMode === 'MONTH_COVERAGE') {
-        if (loading) return <div className="fixed inset-0 z-[110] grid place-items-center bg-black/40"><Loader className="h-7 w-7 animate-spin text-white" /></div>;
         return <QuickMonthCoverageFeeForm students={monthStudents} onClose={onClose} onSaved={() => { window.dispatchEvent(new Event('fee-updated')); onClose(); }} />;
     }
 
@@ -147,7 +151,7 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] w-full max-w-md p-4"
                     >
-                        <div className="bg-white rounded-[24px] shadow-2xl">
+                        <div className="bg-white rounded-[24px] shadow-2xl max-h-[85dvh] overflow-y-auto">
                             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-[24px]">
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-900">Log Fee Payment</h2>
@@ -267,9 +271,10 @@ export default function QuickFeeModal({ isOpen, onClose }: QuickFeeModalProps) {
                                 </div>
 
                                 {/* Submit */}
+                                {selectedStudent && Number(amount)>0 && <InstallmentAllocationPicker key={selectedStudent.id} studentId={selectedStudent.id} amount={amount} onChange={(rows,ready)=>{setAllocations(rows);setAllocationReady(ready);}} />}
                                 <button
                                     type="submit"
-                                    disabled={!selectedStudent || !amount || submitting || !!error}
+                                    disabled={!selectedStudent || !amount || submitting || !!error || !allocationReady}
                                     className="w-full bg-gray-900 text-white font-bold py-4 rounded-xl hover:bg-black disabled:bg-gray-900 disabled:text-white/50 disabled:cursor-not-allowed disabled:shadow-none shadow-xl shadow-gray-200 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                                 >
                                     {submitting ? (

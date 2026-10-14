@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { PrismaClient } from '@prisma/client';
+import express from 'express';
+import request from 'supertest';
+const url=process.env.FEE_TEST_DATABASE_URL;
+test('real database: concurrent installment payments, exact parent phone lookup, marks revisions and protected batch history',{skip:!url},async()=>{
+    assert.match(url!,/^postgresql:\/\/[^/]*127\.0\.0\.1:55439\/mathlogs_fee_test(?:\?|$)/);
+    const db=new PrismaClient({datasources:{db:{url}}});(global as any).prisma=db;
+    const {payInstallment}=await import('../src/controllers/feeController');
+    const {getPublicStudentFees,submitUpiPayment}=await import('../src/controllers/publicController');
+    const {submitMark,getStudentByHumanId}=await import('../src/controllers/testController');
+    const {generateStickerSheet}=await import('../src/controllers/stickerController');
+    const {deleteBatch}=await import('../src/controllers/batchController');
+    const institute=await db.institute.create({data:{name:'Audit fixture',slug:`audit-${Date.now()}`}});
+    const teacher=await db.admin.create({data:{username:`audit-${Date.now()}`,password:'unused',instituteId:institute.id}});
+    const batch=await db.batch.create({data:{name:'Audit',teacherId:teacher.id,instituteId:institute.id}});
+    const student=await db.student.create({data:{name:'Fixture',parentName:'Parent',parentWhatsapp:'9000000000',batchId:batch.id,instituteId:institute.id,humanId:'AUDIT-001',status:'LEFT'}});
+    await db.enrollment.create({data:{studentId:student.id,batchId:batch.id,instituteId:institute.id,status:'ACTIVE',startedAt:new Date(),feeDecision:'SELECTED'}});
+    const installment=await db.feeInstallment.create({data:{name:'October',batchId:batch.id,studentId:student.id,amount:1000}});
+    const exam=await db.test.create({data:{name:'Exam',subject:'Maths',date:new Date(),maxMarks:50,batchId:batch.id,instituteId:institute.id,teacherId:teacher.id}});
+    const app=express();app.use(express.json());app.use((req,_res,next)=>{(req as any).user={id:teacher.id,instituteId:institute.id};next();});
+    app.get('/stickers',generateStickerSheet as any);app.post('/pay',payInstallment as any);app.get('/fees/:slug',getPublicStudentFees as any);app.post('/receipt/:slug',submitUpiPayment as any);app.post('/marks',submitMark as any);app.delete('/batch/:id',deleteBatch as any);app.get('/lookup/:humanId',getStudentByHumanId as any);
+    try{
+        const input={studentId:student.id,installmentId:installment.id,amount:700,idempotencyKey:'concurrent-first'};
+        const results=await Promise.all([request(app).post('/pay').send(input),request(app).post('/pay').send({...input,idempotencyKey:'concurrent-second'})]);
+        assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
+        assert.equal((await db.feePayment.aggregate({where:{studentId:student.id},_sum:{amountPaid:true}}))._sum.amountPaid,700);
+        const successful=results[0].status===200?input:{...input,idempotencyKey:'concurrent-second'};
+        assert.equal((await request(app).post('/pay').send(successful)).body.replayed,true);
+        for (const phone of ['hello', '0000', '', '9000000000abc', '9000000000000']) {
+            assert.equal((await request(app).get(`/fees/${institute.slug}`).query({phone})).status,400);
+        }
+        assert.equal((await request(app).get(`/fees/${institute.slug}?phone=9000000001`)).status,404);
+        const fees=await request(app).get(`/fees/${institute.slug}?phone=9000000000`);
+        assert.equal(fees.headers['cache-control'],'no-store');
+        assert.equal((await request(app).get(`/fees/${institute.slug}`).query({phone:'+919000000000'})).status,200);
+        assert.equal((await request(app).post(`/receipt/${institute.slug}`).send({})).status,400);
+        assert.equal(fees.status,200,JSON.stringify(fees.body));assert.equal(fees.body.students.length,1);assert.equal(fees.body.students[0].feeInstallments[0].id,installment.id);
+        const stickers=await request(app).get(`/stickers?batchId=${batch.id}`);assert.equal(stickers.status,200);assert.match(stickers.headers['content-type'],/application\/pdf/);
+        assert.equal((await request(app).get(`/lookup/AUDIT-001?testId=${exam.id}`)).status,200);
+        const mark={studentId:student.id,testId:exam.id,score:0};
+        assert.equal((await request(app).post('/marks').send(mark)).status,200);
+        assert.equal((await request(app).post('/marks').send({...mark,score:9})).status,409);
+        assert.equal((await request(app).post('/marks').send({...mark,score:9,expectedScore:0})).status,200);
+        assert.equal(await db.systemLog.count({where:{instituteId:institute.id,action:'MARK_CORRECTED'}}),1);
+        assert.equal((await request(app).delete(`/batch/${batch.id}`)).status,409);
+        await db.test.update({where:{id:exam.id},data:{teacherId:null}});
+        assert.equal((await request(app).post('/marks').send(mark)).status,403);
+    }finally{
+        await db.systemLog.deleteMany({where:{instituteId:institute.id}});await db.enrollmentAction.deleteMany({where:{instituteId:institute.id}});
+        await db.mark.deleteMany({where:{testId:exam.id}});await db.test.delete({where:{id:exam.id}});await db.feePayment.deleteMany({where:{studentId:student.id}});await db.feeInstallment.delete({where:{id:installment.id}});await db.enrollment.deleteMany({where:{studentId:student.id}});await db.student.delete({where:{id:student.id}});await db.batch.delete({where:{id:batch.id}});await db.admin.delete({where:{id:teacher.id}});await db.institute.delete({where:{id:institute.id}});await db.$disconnect();
+    }
+});

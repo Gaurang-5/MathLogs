@@ -74,6 +74,13 @@ export default function ScanMarks() {
     const [elapsed, setElapsed] = useState(0);
 
     useEffect(() => {
+        const input = photoInput.current;
+        const restoreCamera = () => setUsingPhoneCamera(false);
+        input?.addEventListener('cancel', restoreCamera);
+        return () => input?.removeEventListener('cancel', restoreCamera);
+    }, [cameraSessionOpen]);
+
+    useEffect(() => {
         if (!isProcessingOCR) return;
         const started = Date.now();
         setElapsed(0);
@@ -172,7 +179,7 @@ export default function ScanMarks() {
             // Start OCR immediately. QR and identity lookup use the very same captured frame.
             setCaptureStage('Reading student QR…');
             const current = () => mountedRef.current && !request.signal.aborted && captureRequest.current === request;
-            const ocrPromise = scanDeadline(extractMarksFromSticker(image, request.signal), 20000, 'Reading marks timed out. Enter them manually.', request.signal)
+            const ocrPromise = scanDeadline(extractMarksFromSticker(image, request.signal, selectedTestId), 20000, 'Reading marks timed out. Enter them manually.', request.signal)
                 .catch((error: Error) => ({ score: '', status: 'needs_review' as const, error: error.message }))
                 .then(ocr => {
                     if (!current()) return;
@@ -253,7 +260,8 @@ export default function ScanMarks() {
             await apiRequest('/marks', 'POST', {
                 testId: selectedTestId,
                 studentId: student.id,
-                score
+                score,
+                expectedScore: existingMark
             });
 
             // Single success toast
@@ -376,7 +384,6 @@ export default function ScanMarks() {
                     aria-label="Capture marks sticker" onKeyDown={event => { if (event.key === 'Escape') cancelCapture(); }}
                     className={`fixed inset-0 bg-black overflow-hidden ${scanning ? 'z-[200]' : 'invisible pointer-events-none -z-10'}`}>
                     <input ref={photoInput} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden
-                        onCancel={() => setUsingPhoneCamera(false)}
                         onChange={event => {
                             const photo = event.target.files?.[0];
                             event.target.value = '';
@@ -472,7 +479,6 @@ export default function ScanMarks() {
                                     onClick={() => {
                                         setStudent(pendingStudent);
                                         setPendingStudent(null);
-                                        setExistingMark(null);
                                     }}
                                     className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition"
                                 >

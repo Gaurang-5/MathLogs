@@ -52,6 +52,10 @@ export const processWhatsappQueue = async () => {
     }
 
     try {
+        await prisma.whatsappJob.updateMany({
+            where: { status: 'PROCESSING', updatedAt: { lt: new Date(Date.now() - 15 * 60 * 1000) } },
+            data: { status: 'FAILED', error: 'DELIVERY_UNKNOWN: worker lease expired. Check provider delivery before retrying.' }
+        });
         // ── Step 1: Claim jobs with a short, tight transaction ────────────────
         // We intentionally keep this transaction as short as possible (two queries)
         // so it doesn't hold a pool connection while we fetch full job rows.

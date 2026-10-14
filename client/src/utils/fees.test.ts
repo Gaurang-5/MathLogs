@@ -8,8 +8,8 @@ const installments: FeeInstallment[] = [
 ];
 
 describe('fees helpers', () => {
-    it('normalizes join date to midnight timestamp', () => {
-        expect(getStudentJoinDate('2026-02-11T18:45:00.000Z')).toBe(new Date('2026-02-11T18:45:00.000Z').setHours(0, 0, 0, 0));
+    it('preserves exact join time to avoid assigning earlier same-day fees', () => {
+        expect(getStudentJoinDate('2026-02-11T18:45:00.000Z')).toBe(new Date('2026-02-11T18:45:00.000Z').getTime());
         expect(getStudentJoinDate()).toBe(0);
     });
 
@@ -37,4 +37,12 @@ describe('fees helpers', () => {
             'inst-3': 500,
         });
     });
+});
+
+it('allocates generic payment to explicitly selected older installments only', () => {
+    expect(getInstallmentPaidMap({ id: 'student', feeDecision: 'SELECTED', createdAt: '2026-02-01T15:00:00Z', fees: [{ status: 'PAID', amount: 300 }], feePayments: [], feeAssignments: [{ installmentId: 'inst-1' }] }, installments)).toEqual({ 'inst-1': 300 });
+});
+
+it('does not charge an unselected earlier installment on the joining day', () => {
+    expect(getInstallmentPaidMap({ createdAt: '2026-02-01T15:00:00Z', fees: [], feePayments: [] }, [installments[1]])).toEqual({});
 });

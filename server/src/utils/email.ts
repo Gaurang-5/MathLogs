@@ -77,7 +77,7 @@ const getEmailConfig = (type: SenderType): EmailConfig | null => {
 };
 
 // Cache transporters to avoid recreating them constantly
-const transporters: Record<string, nodemailer.Transporter> = {};
+const transporters: Record<string, ReturnType<typeof nodemailer.createTransport>> = {};
 
 const getTransporter = (config: EmailConfig) => {
     if (!transporters[config.user]) {
@@ -92,8 +92,8 @@ const getTransporter = (config: EmailConfig) => {
                 user: config.user,
                 pass: config.pass
             },
-            debug: process.env.NODE_ENV === 'development',
-            logger: process.env.NODE_ENV === 'development'
+            debug: false,
+            logger: false
         });
     }
     return transporters[config.user];

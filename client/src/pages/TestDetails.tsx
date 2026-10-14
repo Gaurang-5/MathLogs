@@ -7,7 +7,6 @@ import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Users, ScanLine, ArrowLeft, Trash2, Pencil, X, AlertTriangle, Download, Plus, Save, Mail, Send, Search, User } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Dropdown from '../components/Dropdown';
 
 interface StudentSummary {
     id: string;
@@ -214,7 +213,8 @@ export default function TestDetails() {
             await apiRequest('/marks', 'POST', {
                 testId: id,
                 studentId,
-                score: editScore
+                score: editScore,
+                expectedScore: test?.marks.find(mark => mark.studentId === studentId)?.score
             });
             toast.success('Mark updated');
             setEditingMarkId(null);

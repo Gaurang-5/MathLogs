@@ -1,3 +1,6 @@
+import { calculateStudentFeeSnapshot } from '../utils/feeCalculations';
+import { amountPaise } from '../services/explicitFeePaymentService';
+import { normalizeParentPhone } from '../services/parentFeeAccess';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { z } from 'zod';
@@ -22,6 +25,7 @@ export const getPublicInstituteProfile = async (req: Request, res: Response) => 
                 id: true,
                 name: true,
                 aboutUs: true,
+                coachingFeeMode: true,
                 config: true,
                 websiteConfig: true,
                 batches: {
@@ -59,6 +63,7 @@ export const getPublicInstituteProfile = async (req: Request, res: Response) => 
             name: institute.name,
             aboutUs: institute.aboutUs || `Welcome to ${institute.name}! Reach out to us to learn more.`,
             showFees,
+            coachingFeeMode: institute.coachingFeeMode,
             logoUrl: config?.logo || null,
             batches: sanitizedBatches,
             websiteConfig: institute.websiteConfig
@@ -111,6 +116,17 @@ export const submitPublicLead = async (req: Request, res: Response) => {
     }
 };
 
+function parentApplicableInstallments(student: any): Array<{ id:string; name:string; amount:number }> {
+    const assigned = new Set(student.feeAssignments.map((a:any) => a.installmentId));
+    const paid = new Set(student.feePayments.map((p:any) => p.installmentId));
+    const seen = new Set<string>();
+    return student.enrollments.flatMap((e:any) => e.batch.feeInstallments.filter((i:any) => {
+        const applicable = i.studentId ? i.studentId === student.id : assigned.has(i.id) || paid.has(i.id) || (e.feeDecision === 'LEGACY' && i.createdAt >= e.startedAt);
+        if (!applicable || seen.has(i.id)) return false;
+        seen.add(i.id); return true;
+    }));
+}
+
 interface FeeCacheEntry {
     data: any;
     timestamp: number;
@@ -120,17 +136,9 @@ export const studentFeesCache = new Map<string, FeeCacheEntry>();
 export const getPublicStudentFees = async (req: Request, res: Response) => {
     try {
         const slug = req.params.slug as string;
-        const phone = req.query.phone as string;
-
-        if (!phone) {
-            return res.status(400).json({ error: 'Phone number is required' });
-        }
-
-        const cacheKey = `${slug.toLowerCase()}:${phone}`;
-        const cached = studentFeesCache.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp < 60000)) {
-            return res.json(cached.data);
-        }
+        const phone = normalizeParentPhone(req.query.phone);
+        if (!phone) return res.status(400).json({ error: 'Enter a valid 10-digit phone number.' });
+        res.setHeader('Cache-Control', 'no-store');
 
         const institute = await prisma.institute.findUnique({
             where: { slug: slug.toLowerCase() },
@@ -146,24 +154,16 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
 
         const logoUrl = (institute.config as any)?.logo || null;
 
-        const digits = phone.replace(/\D/g, '');
-        const last10 = digits.slice(-10);
 
         // Find standard active students by phone
         const students = await prisma.student.findMany({
             where: {
                 instituteId: institute.id,
-                parentWhatsapp: { contains: last10 },
-                status: 'APPROVED'
+                parentWhatsapp: { in: [phone, `91${phone}`, `+91${phone}`] },
+                enrollments: { some: { status: 'ACTIVE' } }
             },
             include: {
-                batch: {
-                    include: {
-                        feeInstallments: {
-                            orderBy: { createdAt: 'asc' }
-                        }
-                    }
-                },
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { feeInstallments: { orderBy: { createdAt: 'asc' } } } } } },
                 feeAssignments: { select: { installmentId: true } },
                 feePayments: true,
                 fees: { where: { status: 'PAID' } },
@@ -179,15 +179,15 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
         }
 
         const studentData = students.map(student => {
-            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
+            const installments = parentApplicableInstallments(student);
 
             return {
                 studentId: student.id,
                 studentName: student.name,
-                batchName: student.batch?.name || 'N/A',
-                feeInstallments: (student.batch?.feeInstallments || []).filter(inst => assignedIds.has(inst.id)),
-                feePayments: student.feePayments || [],
-                feeRecords: student.fees || [],
+                batchName: student.enrollments.map(enrollment => enrollment.batch.name).join(', ') || 'N/A',
+                feeInstallments: installments.map(i => ({ id:i.id, name:i.name, amount:i.amount })),
+                feePayments: student.feePayments.map(p => ({ id:p.id, installmentId:p.installmentId, amountPaid:p.amountPaid, date:p.date })),
+                feeRecords: student.fees.map(p => ({ id:p.id, amount:p.amount, date:p.date })),
                 pendingVerifications: student.upiPaymentVerifications || []
             };
         });
@@ -199,18 +199,6 @@ export const getPublicStudentFees = async (req: Request, res: Response) => {
                 logoUrl
             }
         };
-
-        // Cache cleanup strategy (OOM safety)
-        if (studentFeesCache.size > 1000) {
-            const now = Date.now();
-            for (const [k, v] of studentFeesCache.entries()) {
-                if (now - v.timestamp > 60000) {
-                    studentFeesCache.delete(k);
-                }
-            }
-        }
-
-        studentFeesCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
 
         res.json(responseData);
     } catch (error) {
@@ -238,7 +226,8 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Missing required fields or screenshot.' });
         }
 
-        const numericAmount = Number(Number.parseFloat(String(amount)).toFixed(2));
+        let numericAmount: number;
+        try { numericAmount = amountPaise(amount) / 100; } catch { return res.status(400).json({ error: 'Enter a positive amount with at most two decimal places.' }); }
         if (isNaN(numericAmount) || numericAmount <= 0) {
             return res.status(400).json({ error: 'Invalid amount.' });
         }
@@ -247,19 +236,16 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Institute not found.' });
         }
 
+
         const student = await prisma.student.findFirst({
             where: {
                 id: studentId,
                 instituteId: institute.id,
-                status: 'APPROVED'
+                enrollments: { some: { status: 'ACTIVE' } }
             },
             include: {
-                batch: {
-                    include: {
-                        feeInstallments: true
-                    }
-                },
-                feeAssignments: { select: { installmentId: true } },
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { feeInstallments: true } } } },
+                feeAssignments: { select: { installmentId: true, installment: true } },
                 feePayments: true,
                 fees: { where: { status: 'PAID' } }
             }
@@ -269,16 +255,7 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
         }
 
         if (installmentId) {
-            if (!student.batchId) {
-                return res.status(400).json({ error: 'Student batch is missing; installment payment is not possible.' });
-            }
-            const installment = await prisma.feeInstallment.findFirst({
-                where: {
-                    id: installmentId,
-                    batchId: student.batchId
-                },
-                select: { id: true, amount: true }
-            });
+            const installment = parentApplicableInstallments(student).find(i => i.id === installmentId);
             if (!installment) {
                 return res.status(400).json({ error: 'Invalid installment for this student.' });
             }
@@ -295,16 +272,7 @@ export const submitUpiPayment = async (req: Request, res: Response) => {
                 return res.status(400).json({ error: `Amount exceeds pending installment balance (₹${pendingForInstallment.toLocaleString()}).` });
             }
         } else {
-            const assignedIds = new Set((student.feeAssignments || []).map((a: any) => a.installmentId));
-            const installments = (student.batch?.feeInstallments || []).filter(inst => assignedIds.has(inst.id));
-            const totalFee = installments.reduce((sum, inst) => sum + Number(inst.amount || 0), 0);
-
-            const validInstallmentIds = new Set(installments.map(inst => inst.id));
-            const totalPaidInstallments = student.feePayments
-                .filter(p => validInstallmentIds.has(p.installmentId))
-                .reduce((sum, p) => sum + Number(p.amountPaid || 0), 0);
-            const totalPaidAdhoc = (student.fees || []).reduce((sum, fr) => sum + Number(fr.amount || 0), 0);
-            const remaining = Math.max(0, totalFee - (totalPaidInstallments + totalPaidAdhoc));
+            const remaining = calculateStudentFeeSnapshot(student).balance;
 
             if (remaining <= 0) {
                 return res.status(400).json({ error: 'No pending fee due for this student.' });
