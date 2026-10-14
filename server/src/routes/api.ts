@@ -18,6 +18,7 @@ import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } fr
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
 import { buildGeminiOcrResult } from '../utils/ocrResult';
+import { readOcrCacheFast } from '../utils/ocrTiming';
 import { secureLogger } from '../utils/secureLogger';
 
 import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
@@ -81,6 +82,17 @@ const upload = multer({
             cb(new Error('Invalid file type. Only JPEG, PNG and WebP are allowed.'));
         }
     }
+});
+
+// Original camera photos can exceed the general 5 MB upload limit.
+// Keep base64 inline requests below Gemini's 20 MB request budget (14 MB raw).
+const ocrUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 14 * 1024 * 1024, files: 1 },
+    fileFilter: (_req, file, callback) => {
+        if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) callback(null, true);
+        else callback(new Error('Only JPEG, PNG and WebP photos are supported.'));
+    },
 });
 
 const testDocUpload = multer({
@@ -175,7 +187,15 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // OCR Scan Endpoint
-router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('image'), async (req, res) => {
+router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) => {
+    ocrUpload.single('image')(req, res, error => {
+        if (error) {
+            res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Photo exceeds the 14 MB upload limit.' : error.message });
+            return;
+        }
+        next();
+    });
+}, async (req, res) => {
     try {
         let imageBuffer: Buffer | string | undefined;
 
@@ -192,25 +212,32 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, upload.single('im
         }
 
         // Compute SHA-256 of raw image bytes for deduplication
-        const rawBuffer = (req as any).file ? (req as any).file.buffer : Buffer.from(imageBuffer.toString(), 'base64');
-        const hash = crypto.createHash('sha256').update(rawBuffer).digest('hex');
+        const rawBuffer = (req as any).file ? (req as any).file.buffer : Buffer.from(imageBuffer.toString().replace(/^data:image\/[^;]+;base64,/, ''), 'base64');
+        const hash = crypto.createHash('sha256').update('sticker-single-box-v5-gemini35-38:').update(rawBuffer).digest('hex');
 
         // Check DB-backed cache first (works across all server instances)
-        const cached = await checkOcrCache(hash);
+        const started = Date.now();
+        secureLogger.info('Sticker OCR received', { bytes: rawBuffer.length, mime: req.file?.mimetype });
+        const cached = await readOcrCacheFast(() => checkOcrCache(hash));
         if (cached) {
             return res.json(cached);
         }
 
-        const gemini = await processOCR(imageBuffer).catch((error: any) => ({
+        const controller = new AbortController();
+        const disconnected = () => { if (!res.writableEnded) controller.abort(); };
+        res.once('close', disconnected);
+        const gemini = await processOCR(imageBuffer, req.file?.mimetype, { signal: controller.signal }).catch((error: any) => ({
             score: 'GEMINI_ERROR',
-            confidence: 0,
-            raw: error?.message || 'Unknown error',
+            raw: '',
+            reason: 'provider_error' as const,
         }));
+        res.off('close', disconnected);
+        if (controller.signal.aborted) return;
         const primary = buildGeminiOcrResult(gemini);
-        secureLogger.debug('OCR completed', { source: primary.source });
+        secureLogger.info('Sticker OCR completed', { status: primary.status, reason: primary.reason, elapsedMs: Date.now() - started });
 
-        await setOcrCache(hash, primary);
-        res.json({ score: primary.score, confidence: primary.confidence, raw: primary.raw, source: primary.source });
+        if (primary.status === 'read') void setOcrCache(hash, primary);
+        res.json(primary);
 
 
 

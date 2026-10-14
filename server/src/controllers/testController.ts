@@ -156,18 +156,26 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
     const teacherId = req.user?.id;
     const user = req.user;
 
+    if (!teacherId || !user?.instituteId) return res.status(401).json({ error: 'Unauthorized' });
+
     try {
-        // FIX: Use findFirst scoped to instituteId since composite constraint is now humanId_instituteId
-        const student = await prisma.student.findFirst({
+        const selectedTestId = typeof testId === 'string' ? testId : undefined;
+        const [student, selectedTest] = await Promise.all([prisma.student.findFirst({
             where: {
-                humanId: String(humanId),
+                humanId: String(humanId).trim(),
                 instituteId: user.instituteId
             },
             include: {
                 batch: true,
-                marks: testId ? { where: { testId: String(testId) } } : true
+                marks: selectedTestId ? { where: { testId: selectedTestId } } : true
             }
-        });
+        }), selectedTestId ? prisma.test.findFirst({
+            where: { id: selectedTestId, instituteId: user.instituteId,
+                OR: [{ teacherId }, { teacherId: null }] },
+            select: { batchId: true, className: true, batches: { select: { id: true } } }
+        }) : null]);
+
+        if (selectedTestId && !selectedTest) return res.status(404).json({ error: 'Test not found' });
 
         if (!student) {
             res.status(404).json({ error: 'Student not found' });
@@ -177,7 +185,15 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
             res.status(403).json({ error: 'Unauthorized' });
             return;
         }
-        res.json(student);
+        // A shared test can include batches from several classes. Its explicit batch
+        // links take precedence over the legacy className field.
+        const batchIds = selectedTest
+            ? [...selectedTest.batches.map(batch => batch.id), ...(selectedTest.batchId ? [selectedTest.batchId] : [])] : [];
+        const eligible = !selectedTest || (batchIds.length > 0
+            ? !!student.batchId && batchIds.includes(student.batchId)
+            : !selectedTest.className || student.batch?.className === selectedTest.className);
+        if (!eligible) return res.status(409).json({ error: 'Student is not enrolled in a batch for this test. Select the correct test or student.' });
+        res.json({ ...student, testEligible: !!selectedTest });
     } catch (e) {
         console.error('Student lookup error:', e);
         res.status(500).json({ error: 'Lookup failed' });

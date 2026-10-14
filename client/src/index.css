@@ -235,3 +235,40 @@ html {
         scroll-margin-top: 15vh;
     }
 }
+/* Shared teacher controls used by the marks scanner. */
+:root {
+    --teacher-control-height: 2.75rem;
+    --teacher-radius-control: 0.875rem;
+    --teacher-press-scale: 0.97;
+    --teacher-focus: 0 0 0 3px rgba(17, 24, 39, 0.2);
+}
+.teacher-interactive {
+    min-height: var(--teacher-control-height);
+    touch-action: manipulation;
+    transition:
+        transform 120ms ease-out,
+        background-color 160ms ease-out,
+        border-color 160ms ease-out,
+        color 160ms ease-out,
+        box-shadow 160ms ease-out;
+}
+
+.teacher-interactive:active:not(:disabled) {
+    transform: scale(var(--teacher-press-scale));
+}
+
+.teacher-interactive:focus-visible {
+    outline: none;
+    box-shadow: var(--teacher-focus);
+}
+
+.teacher-interactive:disabled,
+.teacher-interactive[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+    .teacher-interactive:active:not(:disabled) { transform: none; }
+}

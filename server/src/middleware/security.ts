@@ -21,6 +21,7 @@ export const configureSecurityHeaders = (app: Express) => {
                     "https://fonts.googleapis.com"
                 ],
                 scriptSrc: [
+                    "'wasm-unsafe-eval'", // Local QR decoder; does not permit JavaScript eval
                     "'self'",
                     "'unsafe-inline'",                // Required: Razorpay injects inline scripts
                     "https://checkout.razorpay.com",
