@@ -92,21 +92,12 @@ export interface PaymentRejectionWAData {
     instituteId?: string;
 }
 
-export interface AttendanceCheckInWAData {
-    studentName: string;
-    batchName: string;
-    instituteName: string;
-    checkInTime: string;
-    photoUrl: string;
-    instituteId?: string;
-}
+export type EnrollmentLifecycleTemplate = 'ADDED' | 'READDED' | 'REMOVED';
 
-export interface AttendanceAbsentWAData {
-    studentName: string;
-    batchName: string;
-    instituteName: string;
-    scheduledTime: string;
-    instituteId?: string;
+export function enrollmentLifecycleTemplate(type: EnrollmentLifecycleTemplate) {
+    if (type === 'REMOVED') return process.env.WHATSAPP_TEMPLATE_BATCH_REMOVED || 'student_batch_removed';
+    if (type === 'READDED') return process.env.WHATSAPP_TEMPLATE_BATCH_READDED || 'student_batch_readded';
+    return process.env.WHATSAPP_TEMPLATE_BATCH_ADDED || 'student_batch_added';
 }
 
 /**
@@ -315,31 +306,4 @@ export const sendStudentInviteWhatsApp = async (mobileNumber: string, data: { in
     ];
 
     return await enqueueWhatsApp(mobileNumber, INVITE_TEMPLATE_NAME, componentValues, data.instituteId);
-};
-
-export const sendAttendanceCheckInWhatsApp = async (mobileNumber: string, data: AttendanceCheckInWAData) => {
-    const ATTENDANCE_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_ATTENDANCE_PRESENT || 'attendance_checkin_alert';
-
-    const componentValues = [
-        data.studentName || 'Student',
-        data.batchName || 'the batch',
-        data.instituteName || 'our institute',
-        data.checkInTime || 'just now',
-        data.photoUrl
-    ];
-
-    return await enqueueWhatsApp(mobileNumber, ATTENDANCE_TEMPLATE_NAME, componentValues, data.instituteId);
-};
-
-export const sendAttendanceAbsentWhatsApp = async (mobileNumber: string, data: AttendanceAbsentWAData) => {
-    const ATTENDANCE_ABSENT_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_ATTENDANCE_ABSENT || 'attendance_absent_alert';
-
-    const componentValues = [
-        data.studentName || 'Student',
-        data.batchName || 'the batch',
-        data.instituteName || 'our institute',
-        data.scheduledTime || 'today'
-    ];
-
-    return await enqueueWhatsApp(mobileNumber, ATTENDANCE_ABSENT_TEMPLATE_NAME, componentValues, data.instituteId);
 };

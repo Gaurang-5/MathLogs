@@ -21,6 +21,7 @@ export const configureSecurityHeaders = (app: Express) => {
                     "https://fonts.googleapis.com"
                 ],
                 scriptSrc: [
+                    "'wasm-unsafe-eval'", // Local QR decoder; does not permit JavaScript eval
                     "'self'",
                     "'unsafe-inline'",                // Required: Razorpay injects inline scripts
                     "https://checkout.razorpay.com",
@@ -199,7 +200,7 @@ export const upiPaymentLimiter = rateLimit({
 export const ocrLimiter = rateLimit({
     store: rateLimitStore('rl:ocr:'),
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 15, // Limit each user to 15 scans per minute
+    max: 90, // Authenticated batch scanning; client caps concurrent recognition at two
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Scanning too fast. Please wait a moment.' },
@@ -321,4 +322,15 @@ export const quizActivityLimiter = rateLimit({
         });
         res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
     }
+});
+
+// Bound guesses per destination as well as per IP (shared classroom Wi-Fi).
+export const studentOtpRecipientLimiter = rateLimit({
+    store: rateLimitStore('rl:student_otp_recipient:'),
+    windowMs: 15 * 60 * 1000,
+    max: 12,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: req => `${String(req.body?.instituteSlug || '').toLowerCase()}:${String(req.body?.mobileNumber || '').replace(/\D/g, '').slice(-10)}`,
+    message: { error: 'Too many verification attempts for this number. Please try again in 15 minutes.' }
 });

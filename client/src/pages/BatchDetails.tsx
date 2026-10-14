@@ -1,26 +1,30 @@
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, API_URL } from '../utils/api';
 import Layout from '../components/Layout';
 import Dropdown from '../components/Dropdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CalendarDays, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, MoreVertical, Pause, Play, Archive, Eye, FileText, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Monitor, Copy, Share2, Sparkles, ChevronRight } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock, Download, Mail, Phone, Edit2, Trash2, X, Save, Plus, Users, Settings, User, Book, Fingerprint, Search, Eye, Printer, ArrowUp, ArrowDown, ArrowUpDown, Receipt, Share2, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
-import QRCode from 'react-qr-code';
 import { cn } from '../utils/cn';
-import { getInstallmentPaidMap, getStudentJoinDate, type LegacyFee } from '../utils/fees';
+import { getInstallmentPaidMap, isFeeInstallmentApplicable, type LegacyFee } from '../utils/fees';
 import StudentProfileDrawer from '../components/StudentProfileDrawer';
 import { BatchRegistrationQrModal } from '../components/batch/BatchRegistrationQrModal';
 import { StudentFeeStartDialog } from '../features/month-coverage/StudentFeeStartDialog';
 import { confirmStudentFeeProfile, loadMonthCoverageSummary } from '../features/month-coverage/api';
 import type { MonthCoverageProfile, MonthCoverageStudentSummary, MonthCoverageSummary } from '../features/month-coverage/types';
 import { MonthCoveragePaymentDialog } from '../features/month-coverage/MonthCoveragePaymentDialog';
-import { formatCoverageRange, monthStatusCopy } from '../features/month-coverage/monthCoverageViewModel';
+import { monthStatusCopy } from '../features/month-coverage/monthCoverageViewModel';
 import { BatchExportDialog, type BatchExportColumn } from '../features/batch-export/BatchExportDialog';
+import { AddStudentFlow } from '../features/enrollments/AddStudentFlow';
+import { EndEnrollmentDialog } from '../features/enrollments/EndEnrollmentDialog';
 
 interface Student {
     id: string;
+    enrollmentId: string;
+    enrollmentStartedAt?: string;
+    feeDecision?: string;
     humanId: string | null;
     name: string;
     parentName: string;
@@ -112,7 +116,7 @@ export default function BatchDetails() {
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [showAddStudent, setShowAddStudent] = useState(false);
-    const [showRegMenu, setShowRegMenu] = useState(false);
+    const [] = useState(false);
     const [showRegModal, setShowRegModal] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -180,8 +184,6 @@ export default function BatchDetails() {
         return (totalNormalized / student.marks.length).toFixed(1);
     };
 
-    const [newWhatsapp, setNewWhatsapp] = useState('');
-
     // Edit Batch State
     const [showEditBatch, setShowEditBatch] = useState(false);
     const [editBatchData, setEditBatchData] = useState({
@@ -207,6 +209,7 @@ export default function BatchDetails() {
     const [customInvoice, setCustomInvoice] = useState({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
 
     // Payment Modal State
+    const paymentRequestRef = useRef<{ fingerprint: string; key: string } | null>(null);
     const [paymentModal, setPaymentModal] = useState<{ student: Student, installment: FeeInstallment, date: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -490,21 +493,6 @@ export default function BatchDetails() {
         }
     };
 
-    const handleAddStudent = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const toastId = toast.loading('Sending invite...');
-        try {
-            await apiRequest(`/batches/${id}/invite`, 'POST', {
-                whatsappNumber: newWhatsapp
-            });
-            toast.success('Invite link sent to WhatsApp!', { id: toastId });
-            setShowAddStudent(false);
-            setNewWhatsapp('');
-        } catch {
-            toast.error('Failed to send invite', { id: toastId });
-        }
-    };
-
     const setStudentFeeStart = async (feeStartMonth: string) => {
         if (!feeStartStudent) return;
         const result = await confirmStudentFeeProfile(feeStartStudent.id, feeStartMonth);
@@ -519,32 +507,9 @@ export default function BatchDetails() {
     };
 
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
-    const [deleteInput, setDeleteInput] = useState('');
-    const [leaveReason, setLeaveReason] = useState('');
 
     const handleDelete = (student: Student) => {
         setStudentToDelete(student);
-        setDeleteInput('');
-        setLeaveReason('');
-    };
-
-    const confirmDeleteStudent = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (deleteInput.toLowerCase() !== 'delete' || !studentToDelete) return;
-
-        const toastId = toast.loading('Removing student...');
-        try {
-            const res = await apiRequest(`/students/${studentToDelete.id}/archive`, 'DELETE', { leaveReason });
-            if (res.action === 'archived') {
-                toast.success('Student has been archived', { id: toastId });
-            } else {
-                toast.success('Student permanently deleted', { id: toastId });
-            }
-            setStudentToDelete(null);
-            setTimeout(() => fetchDetails(), 300);
-        } catch {
-            toast.error('Failed to remove student', { id: toastId });
-        }
     };
 
 
@@ -743,6 +708,8 @@ export default function BatchDetails() {
 
         // Capture values to avoid closure issues or mutations
         const { student, installment, date } = paymentModal;
+        const fingerprint = JSON.stringify([student.id, installment.id, installment.amount, date]);
+        if (paymentRequestRef.current?.fingerprint !== fingerprint) paymentRequestRef.current = { fingerprint, key: crypto.randomUUID() };
 
         // Optimistic Update
         const newPayment = {
@@ -775,8 +742,10 @@ export default function BatchDetails() {
                 studentId: student.id,
                 installmentId: installment.id,
                 amount: Number(installment.amount), // Ensure amount is number
-                date: date
+                date: date,
+                idempotencyKey: paymentRequestRef.current.key
             });
+            paymentRequestRef.current = null;
             toast.success('Payment recorded', { id: toastId });
             setPaymentModal(null);
             setTimeout(() => fetchDetails(), 300); // Small delay to ensure backend processed
@@ -785,7 +754,7 @@ export default function BatchDetails() {
             const errorMessage = getErrorMessage(error, 'Failed to record payment');
 
             // If payment already exists, treat as success/info and keep the UI state
-            if (errorMessage.includes('already exists') || errorMessage.includes('409')) {
+            if (errorMessage.includes('PAYMENT_ALREADY_RECORDED')) {
                 toast.success('Payment already recorded', { id: toastId, icon: 'info' });
                 setPaymentModal(null);
                 setTimeout(() => fetchDetails(), 300);
@@ -1196,10 +1165,7 @@ export default function BatchDetails() {
                                             const isFullyPaid = paidAmount >= inst.amount;
                                             const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
 
-                                            const studentJoinDate = getStudentJoinDate(student.createdAt);
-                                            const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
-                                            const isAssigned = student.feeAssignments?.some(a => a.installmentId === inst.id);
-                                            const isNotApplicable = instDate < studentJoinDate && payments.length === 0 && !isAssigned;
+                                            const isNotApplicable = !isFeeInstallmentApplicable(student, inst);
 
                                             if (isNotApplicable) {
                                                 return (
@@ -1345,7 +1311,7 @@ export default function BatchDetails() {
                                                 <button
                                                     onClick={() => handleDelete(student)}
                                                     className="p-2 bg-neutral-50 hover:bg-red-50 text-red-600 rounded-xl border border-black/5 transition-colors"
-                                                    title="Delete"
+                                                    title="Remove from batch" aria-label={`Remove ${student.name} from batch`}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -1456,11 +1422,7 @@ export default function BatchDetails() {
                                             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 mb-1">
                                                 {batch.feeInstallments.filter((inst) => {
                                                     if (inst.studentId) return false;
-                                                    const studentJoinDate = getStudentJoinDate(student.createdAt);
-                                                    const instDate = new Date(inst.createdAt).setHours(0, 0, 0, 0);
-                                                    const hasPayment = student.feePayments?.some(p => p.installmentId === inst.id);
-                                                    const isAssigned = student.feeAssignments?.some(a => a.installmentId === inst.id);
-                                                    return instDate >= studentJoinDate || hasPayment || isAssigned;
+                                                    return isFeeInstallmentApplicable(student, inst);
                                                 }).map((inst) => {
                                                     const payments = student.feePayments?.filter(p => p.installmentId === inst.id) || [];
                                                     const paidAmount = instPaidMap[inst.id] !== undefined ? instPaidMap[inst.id] : payments.reduce((sum, p) => sum + p.amountPaid, 0);
@@ -1602,7 +1564,7 @@ export default function BatchDetails() {
                                             className="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-red-400 hover:bg-red-50 active:bg-red-100 transition-colors"
                                         >
                                             <Trash2 className="w-4 h-4" />
-                                            <span className="text-[9px] font-bold uppercase tracking-wide">Delete</span>
+                                            <span className="text-[9px] font-bold uppercase tracking-wide">Remove</span>
                                         </button>
                                     </div>
                                 </div>
@@ -1873,7 +1835,7 @@ export default function BatchDetails() {
                                                     {rows.length === 0 && (
                                                         <tr><td colSpan={5} className="px-6 py-12 text-center text-app-text-tertiary">No test records found.</td></tr>
                                                     )}
-                                                    {rows.map((row, i) => {
+                                                    {rows.map((row) => {
                                                         if (row.type === 'absent') {
                                                             const parsedDate = row.test.date ? new Date(row.test.date) : null;
                                                             const dateStr = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate.toLocaleDateString() : '-';
@@ -1989,146 +1951,16 @@ export default function BatchDetails() {
                 )}
             </AnimatePresence>
 
-            {/* Add Student Modal */}
-            <AnimatePresence>
-                {
-                    showAddStudent && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute inset-0 bg-black/40 backdrop-blur-md"
-                                onClick={() => setShowAddStudent(false)}
-                            />
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-5 md:p-8 max-w-lg w-full shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide"
-                            >
-                                <div className="flex justify-between items-center mb-8">
-                                    <div>
-                                        <h3 className="text-xl font-bold text-app-text">Invite Student</h3>
-                                        <p className="text-sm text-app-text-tertiary">Send a secure registration link via WhatsApp.</p>
-                                    </div>
-                                    <button onClick={() => setShowAddStudent(false)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
-                                </div>
+            {showAddStudent && batch ? <AddStudentFlow batch={batch} onClose={() => setShowAddStudent(false)} onComplete={fetchDetails} /> : null}
 
-                                <form onSubmit={handleAddStudent} className="grid grid-cols-1 gap-6">
-                                    <div className="space-y-4 pt-2">
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider ml-1">Student's WhatsApp</label>
-                                            <div className="relative">
-                                                <Phone className="absolute left-3 top-3 w-4 h-4 text-app-text-tertiary" />
-                                                <input
-                                                    type="tel"
-                                                    maxLength={10}
-                                                    value={newWhatsapp}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(/\D/g, '');
-                                                        if (val.length <= 10) setNewWhatsapp(val);
-                                                    }}
-                                                    className="w-full !bg-neutral-50 border-[1.5px] border-black/5 rounded-xl pl-10 pr-4 py-2.5 text-app-text  focus:ring-2 focus:ring-accent/10 focus:border-accent outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                                    required
-                                                    autoFocus
-                                                    placeholder="10-digit Number"
-                                                />
-                                            </div>
-                                            <p className="text-xs text-app-text-tertiary ml-1 mt-1">A unique 24-hour validity link will be sent.</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end pt-2">
-                                        <button
-                                            type="submit"
-                                            className="!bg-black hover:!bg-neutral-800 !text-white border-2 !border-black  px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition-all active:scale-[0.98] w-full justify-center"
-                                        >
-                                            <Mail className="w-4 h-4 mr-2" /> Send Invite Link
-                                        </button>
-                                    </div>
-                                    <div className="h-4 md:hidden"></div>
-                                </form>
-                            </motion.div>
-                        </div>
-                    )
-                }
-            </AnimatePresence >
-
-            {/* Delete Student Confirmation Modal */}
-            <AnimatePresence>
-                {studentToDelete && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] pb-10 md:p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-md"
-                            onClick={() => setStudentToDelete(null)}
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="!bg-white border-[1.5px] border-black/5 rounded-[32px] p-8 max-w-md w-full shadow-2xl relative z-10"
-                        >
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center mb-4">
-                                        <Trash2 className="w-6 h-6" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-app-text">Remove Student?</h3>
-                                    <p className="text-app-text-secondary mt-1 text-sm">
-                                        If the student has fee or attendance records, they will be <span className="font-bold text-app-text">Archived</span>. Otherwise, they will be permanently deleted.
-                                    </p>
-                                </div>
-                                <button type="button" onClick={() => setStudentToDelete(null)} className="text-app-text-tertiary hover:text-app-text p-1 rounded-full hover:bg-neutral-50/50"><X className="w-5 h-5" /></button>
-                            </div>
-
-                            <form onSubmit={confirmDeleteStudent} className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider mb-2 block">
-                                        Reason for leaving (Optional)
-                                    </label>
-                                    <input
-                                        value={leaveReason}
-                                        onChange={(e) => setLeaveReason(e.target.value)}
-                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-black/20 outline-none transition-all mb-4 placeholder:text-app-text-tertiary/50"
-                                        placeholder="e.g. Graduated, Transferred, Dropped out"
-                                    />
-                                    <label className="text-xs font-bold text-app-text-tertiary uppercase tracking-wider mb-2 block">
-                                        Type <span className="text-red-500">delete</span> to confirm
-                                    </label>
-                                    <input
-                                        value={deleteInput}
-                                        onChange={(e) => setDeleteInput(e.target.value)}
-                                        className="w-full bg-white border-[1.5px] border-black/5 rounded-xl px-4 py-3 text-app-text focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all placeholder:text-app-text-tertiary/50"
-                                        placeholder="Type 'delete'"
-                                        autoFocus
-                                    />
-                                </div>
-
-                                <div className="flex gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setStudentToDelete(null)}
-                                        className="flex-1 py-3 rounded-xl font-bold bg-neutral-50/50 border-[1.5px] border-black/5 text-app-text hover:bg-neutral-50/50-hover transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={deleteInput.toLowerCase() !== 'delete'}
-                                        className="flex-1 py-3 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            {studentToDelete && batch ? <EndEnrollmentDialog
+                batchId={batch.id}
+                batchName={batch.name}
+                enrollmentId={studentToDelete.enrollmentId}
+                studentName={studentToDelete.name}
+                onClose={() => setStudentToDelete(null)}
+                onEnded={fetchDetails}
+            /> : null}
 
             <AnimatePresence>
                 {
@@ -2400,7 +2232,7 @@ export default function BatchDetails() {
                                                                     <button onClick={() => { setEditingInstallment(inst); setFeeView('edit'); }} className="p-2 hover:bg-blue-50 text-app-text-tertiary hover:text-blue-600 rounded-xl transition-colors" title="Edit">
                                                                         <Edit2 className="w-4 h-4" />
                                                                     </button>
-                                                                    <button onClick={() => { setInstallmentToDelete(inst); setFeeView('delete-confirm'); }} className="p-2 hover:bg-red-50 text-app-text-tertiary hover:text-red-500 rounded-xl transition-colors" title="Delete">
+                                                                    <button onClick={() => { setInstallmentToDelete(inst); setFeeView('delete-confirm'); }} className="p-2 hover:bg-red-50 text-app-text-tertiary hover:text-red-500 rounded-xl transition-colors" title="Remove from batch" aria-label={`Remove installment ${inst.name}`}>
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </button>
                                                                 </div>

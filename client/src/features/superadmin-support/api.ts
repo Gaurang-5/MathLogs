@@ -1,5 +1,5 @@
 import { API_URL, apiRequest } from '../../utils/api';
-import type { InternalCase, SupportStatus, SupportTicket } from './types';
+import type { InternalCase, SupportPriority, SupportStatus, SupportTicket } from './types';
 
 type Method = 'GET' | 'POST' | 'PATCH';
 type Envelope<T> = { success: boolean; data: T; error?: string; message?: string };

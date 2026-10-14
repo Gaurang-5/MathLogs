@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Trash2, Image, Upload, Check, ArrowUp, ArrowDown, Sparkles, Layers, BookOpen, Clock, Loader2, Globe, Lock } from 'lucide-react';
+import { X, Plus, Trash2, Upload, Check, ArrowUp, ArrowDown, Sparkles, Layers, Loader2, Globe, Lock } from 'lucide-react';
 import { api, apiRequest } from '../utils/api';
 import toast from 'react-hot-toast';
 import Dropdown from './Dropdown';
@@ -121,7 +121,6 @@ export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, qui
         }
     }, [isOpen, quizToEdit, batches, isQuizOnly]);
 
-    const batchOptions = useMemo(() => batches.map(b => ({ value: b.id, label: b.name })), [batches]);
 
     // ── QUESTION BUILDER ACTIONS ──────────────────────────────────────────────
 
@@ -441,6 +440,7 @@ export default function ManualQuizModal({ isOpen, onClose, batches, onSaved, qui
                                     Difficulty Level
                                 </label>
                                 <Dropdown
+                                    label="Difficulty level"
                                     options={difficultyOptions}
                                     value={difficulty}
                                     onChange={setDifficulty}

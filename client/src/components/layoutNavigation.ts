@@ -2,6 +2,11 @@ import { CreditCard, FileText, Headphones, LayoutDashboard, ReceiptIndianRupee, 
 
 type InstituteNavigationItem = { name: string; path: string; icon: typeof LayoutDashboard };
 
+export function isInstitutePathActive(currentPath: string, itemPath: string): boolean {
+  if (itemPath === '/dashboard') return currentPath === itemPath;
+  return currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
+}
+
 export function getInstituteNavigation({ isPageOnly, isQuizOnly, supportEnabled }: { isPageOnly: boolean; isQuizOnly: boolean; supportEnabled: boolean }): InstituteNavigationItem[] {
   const support = supportEnabled ? [{ name: 'Support', path: '/support', icon: Headphones }] : [];
   if (isPageOnly) return [

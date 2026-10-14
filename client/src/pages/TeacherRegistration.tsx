@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GraduationCap, User, Phone, MapPin, Lock, Loader2, CheckCircle2, Sparkles, ArrowRight, ArrowLeft, Building2, Plus, MessageCircle, AlertCircle } from 'lucide-react';
+import { User, Phone, MapPin, Lock, Loader2, CheckCircle2, Sparkles, ArrowRight, ArrowLeft, Building2, Plus, MessageCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { MARKETPLACE_CITY, MARKETPLACE_CITY_OPTIONS } from '../features/marketplace/location';
 
@@ -45,7 +45,7 @@ export default function TeacherRegistration() {
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [otpResendTimer, setOtpResendTimer] = useState(0);
-  const otpTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const otpTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cleanPhone = phoneNumber.trim().replace(/\D/g, '').slice(0, 10);
 
@@ -604,7 +604,7 @@ export default function TeacherRegistration() {
           <Sparkles className="w-6 h-6 text-amber-400 mx-auto mb-2" />
           <h3 className="text-base font-extrabold">Need Complete Coaching Management Software?</h3>
           <p className="text-xs text-neutral-400 font-medium mt-1 max-w-sm mx-auto">
-            Upgrade to MathLogs ERP for digital student attendance, automated fee tracking, WhatsApp messaging, test series, and more.
+            Upgrade to MathLogs ERP for student records, automated fee tracking, WhatsApp messaging, test series, and more.
           </p>
           <Link
             to="/onboarding"

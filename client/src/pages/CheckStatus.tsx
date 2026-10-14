@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { motion } from 'framer-motion';
 import { Search, CheckCircle, XCircle, ArrowLeft, Smartphone } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { appleSpringDefault, appleSpringSnappy } from '../utils/appleDesign';
 
 interface RegistrationStatusStudent {
@@ -54,7 +54,6 @@ export default function CheckStatus() {
 
     return (
         <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] relative overflow-hidden font-sans text-neutral-900 selection:bg-neutral-900 selection:text-white">
-            <Toaster position="top-center" />
 
             {/* Background Effects */}
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-neutral-200/50 rounded-full blur-[120px] translate-x-1/3 -translate-y-1/3 pointer-events-none"></div>

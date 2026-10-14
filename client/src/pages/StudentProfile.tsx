@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
-import { ArrowLeft, User, Phone, Book, GraduationCap, CheckCircle2, CreditCard, Activity, CalendarDays, TrendingUp, MessageCircle, Mail, School, AlertCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { ArrowLeft, User, Phone, Book, GraduationCap, CheckCircle2, CreditCard, Activity, CalendarDays, TrendingUp, MessageCircle, School } from 'lucide-react';
+import { TeacherButton } from '../components/teacher-ui/TeacherButton';
 import { cn } from '../utils/cn';
 import { ConfiguredStudentFields } from '../features/student-profile/ConfiguredStudentFields';
-import type { RegistrationFieldDefinition } from '../features/student-profile/registrationFields';
+import { additionalRegistrationFields, type RegistrationFieldDefinition } from '../features/student-profile/registrationFields';
 
 interface StudentProfileData {
     id: string;
@@ -26,18 +26,12 @@ interface StudentProfileData {
         className: string | null;
         subject: string | null;
     };
+    enrollments?: Array<{
+        id: string; status: 'ACTIVE' | 'ENDED'; startedAt: string; endedAt: string | null; endReason: string | null;
+        batch: { id: string; name: string; className: string | null; subject: string | null };
+    }>;
     status: string;
     createdAt?: string;
-    stats: {
-        attendancePercentage: number | null;
-    };
-    attendanceRecords: Array<{
-        id: string;
-        attendanceDate: string;
-        checkedInAt: string;
-        source: string;
-        note: string | null;
-    }>;
     marks: Array<{
         id: string;
         score: number;
@@ -78,35 +72,33 @@ export default function StudentProfile() {
     const navigate = useNavigate();
     const [student, setStudent] = useState<StudentProfileData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadAttempt, setLoadAttempt] = useState(0);
     const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'fees'>('overview');
 
     useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        setLoadError(null);
         const fetchProfile = async () => {
             try {
                 const data = await apiRequest<StudentProfileData>(`/students/${id}/profile`);
-                setStudent(data);
+                if (!cancelled) setStudent(data);
             } catch (err) {
-                toast.error('Failed to load student profile');
-                navigate('/batches');
+                if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Could not load this student profile.');
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
-        fetchProfile();
-    }, [id, navigate]);
+        void fetchProfile();
+        return () => { cancelled = true; };
+    }, [id, loadAttempt]);
 
     const avgScore = useMemo(() => {
         if (!student?.marks?.length) return 0;
         return student.marks.reduce((acc, mark) => acc + scorePercent(mark.score, mark.test.maxMarks), 0) / student.marks.length;
     }, [student?.marks]);
 
-    const feeCollectionPercent = useMemo(() => {
-        if (student?.coachingFeeMode === 'MONTH_COVERAGE') return student.monthCoverageStats?.progressPercent ?? 0;
-        const total = student?.balance?.totalFee || 0;
-        const paid = student?.balance?.totalPaid || 0;
-        if (total <= 0) return 100;
-        return Math.min(100, Math.round((paid / total) * 100));
-    }, [student?.balance, student?.coachingFeeMode, student?.monthCoverageStats?.progressPercent]);
 
     if (loading) {
         return (
@@ -123,11 +115,12 @@ export default function StudentProfile() {
         );
     }
 
-    if (!student) return null;
+    if (loadError || !student) return <Layout hideMobileNav><section role="alert" className="mx-auto max-w-md rounded-2xl border border-app-border bg-app-surface-opaque p-6 text-app-text"><h1 className="text-xl font-semibold">Could not load profile</h1><p className="mt-3 text-sm text-app-text-secondary">{loadError || 'Student profile was not returned.'}</p><div className="mt-5 flex gap-3"><TeacherButton onClick={() => setLoadAttempt(value => value + 1)}>Retry</TeacherButton><TeacherButton variant="secondary" onClick={() => navigate('/batches')}>Back to batches</TeacherButton></div></section></Layout>;
 
     const sanitizedWhatsapp = student.parentWhatsapp?.replace(/\D/g, '') || '';
     const whatsappHref = sanitizedWhatsapp ? `https://wa.me/${sanitizedWhatsapp.length === 10 ? `91${sanitizedWhatsapp}` : sanitizedWhatsapp}` : '';
     const phoneHref = student.parentWhatsapp ? `tel:${student.parentWhatsapp}` : '';
+    const onboardingFields = additionalRegistrationFields(student.registrationFields || []);
 
     const getInitials = (name: string) => (name || 'Unknown').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 
@@ -288,15 +281,24 @@ export default function StudentProfile() {
                                         </div>
                                     </div>
                                 </div>
+                                {onboardingFields.length > 0 && (
+                                    <div className="mt-3 border-t border-black/[0.04] pt-3">
+                                        <ConfiguredStudentFields student={student} fields={onboardingFields} />
+                                    </div>
+                                )}
                             </div>
 
-                            {(student.registrationFields?.length || 0) > 0 && (
-                                <div className="bg-neutral-50/60 border border-black/[0.06] rounded-2xl p-4 sm:p-5">
-                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3">Onboarding details</h3>
-                                    <ConfiguredStudentFields student={student} fields={student.registrationFields || []} />
+                            <div className="bg-neutral-50/60 border border-black/[0.06] rounded-2xl p-4 sm:p-5">
+                                <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3">Batch enrollment history</h3>
+                                <div className="space-y-2">
+                                    {(student.enrollments || []).map(enrollment => <div key={enrollment.id} className="rounded-xl border border-black/[0.06] bg-white p-3">
+                                        <div className="flex items-center justify-between gap-3"><strong className="text-sm">{enrollment.batch.name}</strong><span className={cn('rounded-full px-2 py-0.5 text-[10px] font-black', enrollment.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{enrollment.status}</span></div>
+                                        <p className="mt-1 text-xs text-neutral-500">{formatDate(enrollment.startedAt)} → {enrollment.endedAt ? formatDate(enrollment.endedAt) : 'Present'}</p>
+                                        {enrollment.endReason ? <p className="mt-1 text-xs text-neutral-600">Reason: {enrollment.endReason}</p> : null}
+                                    </div>)}
+                                    {(student.enrollments || []).length === 0 ? <p className="text-sm text-neutral-400">No enrollment periods recorded.</p> : null}
                                 </div>
-                            )}
-
+                            </div>
                             {/* Recent Performance */}
                             <div>
                                 <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3 px-1">Latest Test Marks</h3>

@@ -1,20 +1,16 @@
 
 import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { Html5Qrcode } from 'html5-qrcode';
 import { apiRequest } from '../utils/api';
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Check, Loader2 } from 'lucide-react';
-import { extractMarksFromSticker } from '../utils/ocr';
-import { loadOpenCV, detectAndWarpSticker } from '../utils/cv';
-
-declare global {
-    interface Window {
-        cv?: unknown;
-    }
-}
-
+import { captureStickerFrame, stickerFrameBlob, readStudentQR, readStudentQRFromPhoto, extractMarksFromSticker } from '../utils/ocr';
+import { useStickerCamera } from '../utils/useStickerCamera';
+import { TeacherButton } from '../components/teacher-ui/TeacherButton';
+import { StickerStudentPicker } from '../components/StickerStudentPicker';
+import { scanDeadline } from '../utils/scanDeadline';
 interface ScanTest {
     id: string;
     name?: string;
@@ -31,49 +27,78 @@ interface StudentMark {
 interface StudentLookupResponse {
     id: string;
     name: string;
+    humanId?: string;
     batch?: {
+        name?: string;
         className?: string | null;
     };
     marks?: StudentMark[];
-}
-
-interface OCRScanResult {
-    score: string;
-    confidence: number;
-    debugImage?: string | null;
-}
-
-interface FocusCapabilities extends MediaTrackCapabilities {
-    focusMode?: string[];
+    testEligible?: boolean;
 }
 
 export default function ScanMarks() {
     const [searchParams] = useSearchParams();
     const [scanning, setScanning] = useState(false);
+    const [cameraSessionOpen, setCameraSessionOpen] = useState(false);
+    const [usingPhoneCamera, setUsingPhoneCamera] = useState(false);
+    const photoInput = useRef<HTMLInputElement>(null);
+    const [readStatus, setReadStatus] = useState<'read' | 'needs_review' | null>(null);
     const [student, setStudent] = useState<StudentLookupResponse | null>(null);
     const [score, setScore] = useState('');
     const [tests, setTests] = useState<ScanTest[]>([]);
     const [selectedTestId, setSelectedTestId] = useState(searchParams.get('testId') || '');
 
-    // Restored State Variables
+    // Review and overwrite state
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [existingMark, setExistingMark] = useState<number | null>(null);
     const [pendingStudent, setPendingStudent] = useState<StudentLookupResponse | null>(null);
 
     // OCR State
     const [isProcessingOCR, setIsProcessingOCR] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const savingRef = useRef(false);
     const [debugImage, setDebugImage] = useState<string | null>(null);
 
-    const scannerRef = useRef<Html5Qrcode | null>(null);
+    const { videoRef, ready: cameraReady, error: cameraError, devices: cameraDevices,
+        deviceId: cameraDeviceId, markReady: markCameraReady, selectDevice: selectCameraDevice,
+        restart: restartCamera } = useStickerCamera(cameraSessionOpen && !usingPhoneCamera);
     const mountedRef = useRef(true);
     const processingRef = useRef(false);
-    const testsRef = useRef<ScanTest[]>([]);
+    const captureRequest = useRef<AbortController | null>(null);
+    const previewUrl = useRef<string | null>(null);
+    const overlayRef = useRef<HTMLDivElement>(null);
+    const [scanError, setScanError] = useState('');
+    const [identityError, setIdentityError] = useState('');
+    const [ocrError, setOcrError] = useState('');
+    const [captureStage, setCaptureStage] = useState('Taking photo…');
+    const [elapsed, setElapsed] = useState(0);
+
+    useEffect(() => {
+        const input = photoInput.current;
+        const restoreCamera = () => setUsingPhoneCamera(false);
+        input?.addEventListener('cancel', restoreCamera);
+        return () => input?.removeEventListener('cancel', restoreCamera);
+    }, [cameraSessionOpen]);
+
+    useEffect(() => {
+        if (!isProcessingOCR) return;
+        const started = Date.now();
+        setElapsed(0);
+        const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+        return () => clearInterval(timer);
+    }, [isProcessingOCR]);
+
+    const clearPreview = () => {
+        if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+        previewUrl.current = null;
+        setDebugImage(null);
+    };
 
     // Helper function for toast notifications
     const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
         const toast = document.createElement('div');
         const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-yellow-500';
-        toast.className = `fixed top-20 left-1/2 -translate-x-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-[300] animate-fadeIn max-w-md text-center`;
+        toast.className = `fixed top-20 left-1/2 -translate-x-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-[300] motion-safe:animate-fadeIn max-w-md text-center`;
         toast.textContent = message;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
@@ -81,265 +106,162 @@ export default function ScanMarks() {
 
     useEffect(() => {
         mountedRef.current = true;
-        // Fetch available tests
         apiRequest<ScanTest[]>('/tests').then(setTests).catch(console.error);
-
         return () => {
             mountedRef.current = false;
-            // Immediate cleanup if unmounting
-            if (scannerRef.current) {
-                if (scannerRef.current.isScanning) {
-                    scannerRef.current.stop().catch(err => console.error("Failed to stop scanner", err));
-                }
-                // clear() returns Promise<void> usually, but let's be safe
-                scannerRef.current.clear().catch((error: unknown) => {
-                    console.debug("Failed to clear scanner on unmount", error);
-                });
-            }
+            captureRequest.current?.abort();
+            if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
         };
     }, []);
 
+    // Trap focus in camera/review overlays and restore the initiating control on close.
     useEffect(() => {
-        testsRef.current = tests;
-    }, [tests]);
+        if (!scanning && !student && !pendingStudent && !identityError) return;
+        const previous = document.activeElement as HTMLElement | null;
+        const overlay = overlayRef.current;
+        overlay?.focus();
+        const trap = (event: KeyboardEvent) => {
+            if (event.key !== 'Tab' || !overlay) return;
+            const controls = Array.from(overlay.querySelectorAll<HTMLElement>('button:not(:disabled), input:not([hidden]):not(:disabled), select:not(:disabled), [tabindex="0"]'));
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (!first) { event.preventDefault(); return; }
+            if (event.shiftKey && (document.activeElement === first || document.activeElement === overlay)) {
+                event.preventDefault(); last.focus();
+            } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === overlay)) {
+                event.preventDefault(); first.focus();
+            }
+        };
+        document.addEventListener('keydown', trap);
+        return () => { document.removeEventListener('keydown', trap); previous?.focus(); };
+    }, [scanning, student, pendingStudent, identityError]);
 
-    // Load OpenCV on mount
-    useEffect(() => {
-        loadOpenCV().then(() => console.log("OpenCV Loaded")).catch(console.error);
-    }, []);
+    const cancelCapture = () => {
+        captureRequest.current?.abort();
+        processingRef.current = false;
+        setIsProcessingOCR(false);
+        setScanning(false);
+        setCameraSessionOpen(false);
+        setUsingPhoneCamera(false);
+        setScanError('');
+        setIdentityError('');
+        clearPreview();
+    };
 
-    // Use a unique ID to prevent collisions
-    const READER_ID = "reader-scan-marks";
-
-    // Effect to start scanner when 'scanning' state becomes true
-    useEffect(() => {
-        if (scanning && mountedRef.current) {
-            console.log("🎬 Scanner initialization triggered");
-            // Slight delay to ensure DOM is ready and previous instance is cleaned
-            const timer = setTimeout(async () => {
-                console.log("⏰ Timer executed, checking DOM...");
-                // Double check if element exists
-                const readerElement = document.getElementById(READER_ID);
-                if (!readerElement) {
-                    console.error("❌ Reader element not found!");
-                    setScanning(false);
-                    return;
-                }
-                console.log("✅ Reader element found:", readerElement);
-
-                // Reset processing lock
-                processingRef.current = false;
-
-                // Prevent multiple initializations
-                if (scannerRef.current?.isScanning) {
-                    console.log("⚠️ Scanner already running, skipping init");
-                    return;
-                }
-
-                // Cleanup any existing instance
-                if (scannerRef.current) {
-                    console.log("🧹 Cleaning up existing scanner...");
-                    await scannerRef.current.clear();
-                }
-
-                console.log("🚀 Creating new Html5Qrcode instance...");
-                const html5QrCode = new Html5Qrcode(READER_ID);
-                scannerRef.current = html5QrCode;
-
-                try {
-                    console.log("📸 Starting camera with config...");
-                    await html5QrCode.start(
-                        {
-                            facingMode: "environment"
-                        },
-                        {
-                            fps: 10, // Lower FPS is more stable on iOS/mobile
-                            // Scan the full frame. In iOS PWAs, object-fit: cover can cause qrbox 
-                            // to internally scan the wrong region of the camera feed.
-                            disableFlip: false
-                        },
-                        async (decodedText) => {
-                            if (processingRef.current) return;
-                            processingRef.current = true;
-
-                            console.log("✅ QR Matched: " + decodedText);
-
-                            // Start student lookup immediately (doesn't need the frame)
-                            const studentLookupPromise = apiRequest<StudentLookupResponse>('/students/lookup/' + encodeURIComponent(decodedText) + '?testId=' + selectedTestId);
-
-                            setIsProcessingOCR(true);
-                            setDebugImage(null);
-                            let extractedMark = "";
-
-                            // OCR processing — brief settle then capture
-                            const ocrPromise = (async (): Promise<OCRScanResult> => {
-                                try {
-                                    // ⏳ Brief settle: QR fires instantly but sticker may
-                                    // still be moving. 100ms is enough.
-                                    await new Promise(r => setTimeout(r, 100));
-
-                                    // NOW pause (video still had live frames during the wait)
-                                    html5QrCode.pause();
-
-                                    const videoElement = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement;
-                                    if (!videoElement) return { score: "", confidence: 0, debugImage: null };
-
-                                    // CV detection: 3 attempts × 100ms = max 300ms
-                                    let smartImage = null;
-                                    if (window.cv) {
-                                        try {
-                                            const cvCanvas = document.createElement('canvas');
-                                            for (let i = 0; i < 3; i++) {
-                                                smartImage = await detectAndWarpSticker(videoElement, cvCanvas);
-                                                if (smartImage) {
-                                                    console.log(`✅ CV warp succeeded on attempt ${i + 1}`);
-                                                    break;
-                                                }
-                                                if (i < 2) await new Promise(r => setTimeout(r, 100));
-                                            }
-                                        } catch (error) {
-                                            console.debug('CV warp attempt failed', error);
-                                        }
-                                    }
-
-                                    if (!smartImage) console.warn("⚠️ CV warp failed — using raw video fallback");
-
-                                    // Get maxMarks from the selected test for OCR range validation
-                                    const currentTest = testsRef.current.find(t => t.id === selectedTestId);
-                                    const testMaxMarks = currentTest?.maxMarks;
-
-                                    return smartImage
-                                        ? await extractMarksFromSticker(videoElement, smartImage, testMaxMarks)
-                                        : await extractMarksFromSticker(videoElement, undefined, testMaxMarks);
-                                } catch (ocrErr) {
-                                    console.error("❌ OCR Error:", ocrErr);
-                                    return { score: "", confidence: 0, debugImage: null };
-                                }
-                            })();
-
-
-                            // Wait for both in parallel
-                            try {
-                                console.log("⏳ Waiting for student lookup and OCR...");
-                                const [studentData, ocrResult] = await Promise.all([studentLookupPromise, ocrPromise]);
-
-                                console.log("✅ Student Data:", studentData);
-                                console.log("✅ OCR Result:", ocrResult);
-
-                                extractedMark = ocrResult.score;
-                                if (ocrResult.debugImage) setDebugImage(ocrResult.debugImage);
-                                setIsProcessingOCR(false);
-
-                                // Check if student belongs to the selected test's batch
-                                const selectedTest = testsRef.current.find(t => t.id === selectedTestId);
-                                if (selectedTest && studentData.batch) {
-                                    // Check if className matches (if test has className)
-                                    if (selectedTest.className && studentData.batch.className !== selectedTest.className) {
-                                        setScanning(false);
-                                        showToast(`⚠️ Wrong Batch! ${studentData.name} is in ${studentData.batch.className}, but test is for ${selectedTest.className}`, 'warning');
-                                        processingRef.current = false;
-                                        setTimeout(() => setScanning(true), 3000); // Auto-resume after 3s
-                                        return;
-                                    }
-                                }
-
-                                const existing = studentData.marks?.find((mark) => mark.testId === selectedTestId);
-
-                                // Hide scanner overlay so modal can appear
-                                setScanning(false);
-
-                                if (existing) {
-                                    console.log("⚠️ Student already has marks:", existing.score);
-                                    setExistingMark(existing.score);
-                                    setPendingStudent(studentData);
-                                    if (extractedMark && extractedMark.trim() !== "") {
-                                        setScore(extractedMark);
-                                    }
-                                } else {
-                                    console.log("✅ Setting student and score:", extractedMark);
-                                    setStudent(studentData);
-                                    if (extractedMark && extractedMark.trim() !== "") {
-                                        setScore(extractedMark);
-                                    }
-                                }
-
-                                // Reset processing flag so modal can appear and next scan can work
-                                processingRef.current = false;
-                                console.log("✅ Modal should appear now!");
-                            } catch (error: unknown) {
-                                console.error("❌ Error in scan processing:", error);
-                                setIsProcessingOCR(false);
-                                setScanning(false);
-                                showToast(error instanceof Error ? error.message : 'Student not found or Invalid QR Code', 'error');
-                                processingRef.current = false;
-                                setTimeout(() => setScanning(true), 2000); // Auto-resume after 2s
-                            }
-                        },
-                        () => undefined
-                    );
-
-                    // Enable tap-to-focus on the video element
-                    setTimeout(() => {
-                        const videoElement = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement;
-                        if (videoElement && videoElement.srcObject) {
-                            const stream = videoElement.srcObject as MediaStream;
-                            const track = stream.getVideoTracks()[0];
-
-                            videoElement.addEventListener('click', async () => {
-                                try {
-                                    const capabilities = track.getCapabilities() as FocusCapabilities;
-                                    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-                                        await track.applyConstraints({
-                                            advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet]
-                                        } as MediaTrackConstraints);
-                                        console.log('📷 Autofocus enabled');
-                                    }
-                                } catch (error) {
-                                    console.warn('Tap-to-focus not supported:', error);
-                                }
-                            });
-                        }
-                    }, 1000);
-
-                    console.log("✅ Scanner started successfully!");
-                } catch (error: unknown) {
-                    console.error("❌ Error starting scanner:", error);
-                    console.error("Error details:", {
-                        message: error instanceof Error ? error.message : 'Unknown error',
-                        name: error instanceof Error ? error.name : 'UnknownError',
-                        stack: error instanceof Error ? error.stack : undefined
-                    });
-                    setScanning(false);
-                    showToast('Failed to start camera: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
-                }
-            }, 300); // Increased delay for safety
-
-            return () => {
-                clearTimeout(timer);
-                if (scannerRef.current && scannerRef.current.isScanning) {
-                    scannerRef.current.stop().catch(console.error);
-                }
-            };
+    const handleCapture = async (photo?: File) => {
+        if (!mountedRef.current || !cameraSessionOpen || processingRef.current) return;
+        if (!photo && (!videoRef.current || videoRef.current.readyState < 2 || !videoRef.current.videoWidth)) {
+            void videoRef.current?.play().catch(() => undefined);
+            setScanError('Camera is starting. Try Capture again when the preview is moving, or use phone camera.');
+            return;
         }
-    }, [scanning, selectedTestId]);
+        processingRef.current = true;
+        const request = new AbortController();
+        captureRequest.current = request;
+        setIsProcessingOCR(true);
+        setScanError('');
+        setIdentityError('');
+        setOcrError('');
+        setCaptureStage('Taking photo…');
+        setScore('');
+        setReadStatus(null);
+        clearPreview();
+        try {
+            if (photo && !['image/jpeg', 'image/png', 'image/webp'].includes(photo.type)) {
+                throw new Error('Choose a JPEG, PNG, or WebP photo. Other formats are not converted automatically.');
+            }
+            const frame = photo ? null : captureStickerFrame(videoRef.current!);
+            const image = photo ?? await stickerFrameBlob(frame!);
+            if (image.size > 14 * 1024 * 1024) throw new Error('This photo exceeds the 14 MB upload limit. Please take another photo.');
+            if (request.signal.aborted) return;
+            previewUrl.current = URL.createObjectURL(image);
+            setDebugImage(previewUrl.current);
+            // Start OCR immediately. QR and identity lookup use the very same captured frame.
+            setCaptureStage('Reading student QR…');
+            const current = () => mountedRef.current && !request.signal.aborted && captureRequest.current === request;
+            const ocrPromise = scanDeadline(extractMarksFromSticker(image, request.signal, selectedTestId), 20000, 'Reading marks timed out. Enter them manually.', request.signal)
+                .catch((error: Error) => ({ score: '', status: 'needs_review' as const, error: error.message }))
+                .then(ocr => {
+                    if (!current()) return;
+                    const selectedTest = tests.find(test => test.id === selectedTestId);
+                    const outOfRange = ocr.score !== '' && selectedTest?.maxMarks != null && Number(ocr.score) > selectedTest.maxMarks;
+                    setScore(outOfRange ? '' : ocr.score);
+                    setReadStatus(ocr.score !== '' && !outOfRange ? 'read' : 'needs_review');
+                    setOcrError(outOfRange
+                        ? `Read ${ocr.score}, which exceeds this test's maximum of ${selectedTest.maxMarks}. Check the photo and enter the correct mark.`
+                        : 'error' in ocr ? String(ocr.error) : '');
+                });
+            const identityPromise = (async () => {
+                const humanId = photo ? await readStudentQRFromPhoto(photo, request.signal) : await readStudentQR(frame!, request.signal);
+                if (current()) setCaptureStage('Finding student…');
+                return await scanDeadline(lookupStudent(humanId), 15000, 'Student lookup timed out. Select the student below.', request.signal);
+            })().then(studentData => {
+                if (current()) reviewStudent(studentData);
+            }).catch((error: Error) => {
+                if (current()) setIdentityError(error.message || 'QR not readable. Select the student below.');
+            }).finally(() => {
+                // The teacher can review/type/save as soon as identity is available.
+                // OCR keeps running independently and cannot overwrite a manual entry.
+                if (current()) setScanning(false);
+            });
+            await Promise.all([identityPromise, ocrPromise]);
+        } catch (error) {
+            if (!request.signal.aborted && mountedRef.current) {
+                setScanError(error instanceof Error ? error.message : 'Capture failed. Please try again.');
+                clearPreview();
+            }
+            request.abort();
+        } finally {
+            if (captureRequest.current === request && mountedRef.current) {
+                processingRef.current = false;
+                setIsProcessingOCR(false);
+            }
+        }
+    };
+
+    const lookupStudent = (humanId: string) => apiRequest<StudentLookupResponse>(
+        '/students/lookup/' + encodeURIComponent(humanId) + '?testId=' + encodeURIComponent(selectedTestId), 'GET', undefined, { timeoutMs: 15000 });
+
+    const reviewStudent = (studentData: StudentLookupResponse) => {
+        const selectedTest = tests.find(test => test.id === selectedTestId);
+        if (!studentData.testEligible && selectedTest?.className && studentData.batch?.className !== selectedTest.className) {
+            throw new Error(`${studentData.name} is not in this test's class. Select the correct student.`);
+        }
+        const existing = studentData.marks?.find(mark => mark.testId === selectedTestId);
+        setExistingMark(existing?.score ?? null);
+        if (existing) setPendingStudent(studentData);
+        else setStudent(studentData);
+        setIdentityError('');
+    };
 
     const startScanner = () => {
         if (!selectedTestId) {
             alert("Please select a test first!");
             return;
         }
+        setScanError('');
+        setCameraSessionOpen(true);
         setScanning(true);
     };
 
     const handleSubmitMark = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!student || !selectedTestId) return;
-
+        if (!student || !selectedTestId || savingRef.current || !/^\d+(?:\.\d+)?$/.test(score)) return;
+        const maxMarks = tests.find(test => test.id === selectedTestId)?.maxMarks;
+        if (maxMarks != null && Number(score) > maxMarks) {
+            setOcrError(`Marks cannot exceed this test's maximum of ${maxMarks}.`);
+            return;
+        }
+        captureRequest.current?.abort();
+        setIsProcessingOCR(false);
+        savingRef.current = true;
+        setIsSaving(true);
         try {
             await apiRequest('/marks', 'POST', {
                 testId: selectedTestId,
                 studentId: student.id,
-                score
+                score,
+                expectedScore: existingMark
             });
 
             // Single success toast
@@ -352,27 +274,8 @@ export default function ScanMarks() {
             setPendingStudent(null);
             setDebugImage(null);
 
-            // CONTINUOUS SCANNING: Immediately resume scanner
+            clearPreview();
             processingRef.current = false;
-
-            // Resume the scanner if it exists and is paused
-            if (scannerRef.current) {
-                try {
-                    // Check if scanner is in a paused state
-                    if (scannerRef.current.getState() === 2) { // State 2 = PAUSED
-                        await scannerRef.current.resume();
-                        console.log('✅ Scanner resumed for next scan');
-                    }
-                } catch (resumeError) {
-                    console.warn('Could not resume scanner, will restart:', resumeError);
-                    // If resume fails, restart the scanner
-                    setScanning(false);
-                    setTimeout(() => setScanning(true), 100);
-                    return;
-                }
-            }
-
-            // Keep scanning overlay visible
             setScanning(true);
         } catch (error: unknown) {
             console.error('Save mark error:', error);
@@ -380,43 +283,36 @@ export default function ScanMarks() {
             const errorMsg = error instanceof Error ? error.message : 'Failed to save mark';
             showToast(errorMsg, 'error');
             // Don't resume scanning on error - let user fix the issue
+        } finally {
+            savingRef.current = false;
+            setIsSaving(false);
         }
     };
 
     const handleCancelInput = () => {
+        if (savingRef.current) return;
+        captureRequest.current?.abort();
+        setIsProcessingOCR(false);
+        setIdentityError('');
         setStudent(null);
+        setPendingStudent(null);
+        setExistingMark(null);
         setScore('');
+        setScanError('');
         setDebugImage(null);
         processingRef.current = false;
 
-        // Resume scanner
-        if (scannerRef.current) {
-            try {
-                if (scannerRef.current.getState() === 2) { // State 2 = PAUSED
-                    scannerRef.current.resume();
-                }
-            } catch (error) {
-                console.warn('Could not resume scanner on cancel:', error);
-            }
-        }
-        setScanning(true); // Show scanner overlay again
+        clearPreview();
+        setScanning(true);
     };
 
     return (
-        <Layout title="Scan Marks">
-            {/* Hide top and bottom navigation bars when in immersive scanning mode or showing modals */}
-            {(scanning || student || pendingStudent) && (
-                <style>{`
-                    nav.fixed.bottom-6 { display: none !important; }
-                    header.fixed.top-0 { display: none !important; }
-                `}</style>
-            )}
-
+        <Layout title="Scan Marks" hideMobileNav={scanning || !!student || !!pendingStudent || !!identityError}>
             {/* Test Selector */}
-            {!scanning && (
+            {!scanning && !student && !pendingStudent && !identityError && (
                 <div className="max-w-md mx-auto mt-10">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                        <h2 className="text-xl font-bold mb-6 text-slate-800">Start Assessment</h2>
+                        <h2 className="text-xl font-bold mb-6 text-app-text">Start Assessment</h2>
                         <div className="mb-6">
                             <label className="block text-sm font-semibold text-slate-700 mb-2">Select Test</label>
                             <div className="relative">
@@ -424,7 +320,7 @@ export default function ScanMarks() {
                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-left flex justify-between items-center outline-none focus:ring-2 focus:ring-blue-500 transition"
                                 >
-                                    <span className={selectedTestId ? "text-slate-800 font-medium" : "text-slate-400"}>
+                                    <span className={selectedTestId ? "text-app-text font-medium" : "text-app-text-tertiary"}>
                                         {selectedTestId
                                             ? (() => {
                                                 const t = tests.find(t => t.id === selectedTestId);
@@ -432,7 +328,7 @@ export default function ScanMarks() {
                                             })()
                                             : "-- Choose Test --"}
                                     </span>
-                                    <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
+                                    <ChevronDown className={`w-5 h-5 text-app-text-tertiary transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
                                 </button>
 
                                 <AnimatePresence>
@@ -454,13 +350,13 @@ export default function ScanMarks() {
                                                 >
                                                     <div className="flex flex-col text-left">
                                                         <span className="text-slate-700 font-medium group-hover:text-blue-600 transition-colors">{t.name}</span>
-                                                        <span className="text-slate-400 text-xs font-normal">{t.subject} • {t.className}</span>
+                                                        <span className="text-app-text-tertiary text-xs font-normal">{t.subject} • {t.className}</span>
                                                     </div>
                                                     {selectedTestId === t.id && <Check className="w-4 h-4 text-blue-600" />}
                                                 </button>
                                             ))}
                                             {tests.length === 0 && (
-                                                <div className="p-4 text-center text-slate-400 text-sm">No tests available</div>
+                                                <div className="p-4 text-center text-app-text-tertiary text-sm">No tests available</div>
                                             )}
                                         </motion.div>
                                     )}
@@ -472,7 +368,7 @@ export default function ScanMarks() {
                             className={`w-full font-bold py-4 rounded-xl transition-all shadow-md flex items-center justify-center
                                 ${selectedTestId
                                     ? 'bg-gray-900 hover:bg-black text-white shadow-lg shadow-gray-200 hover:shadow-gray-300'
-                                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                    : 'bg-slate-200 text-app-text-tertiary cursor-not-allowed'}`}
                             disabled={!selectedTestId}
                         >
                             <span className="mr-2">📷</span> Start Camera
@@ -482,98 +378,100 @@ export default function ScanMarks() {
             )}
 
             {/* Scanner Active - Immersive Fullscreen Mobile UI */}
-            {scanning && (
-                <div className="fixed inset-0 z-[200] bg-black overflow-hidden">
+            {cameraSessionOpen && createPortal(
+                <div ref={scanning ? overlayRef : undefined} tabIndex={scanning ? -1 : undefined}
+                    role={scanning ? 'dialog' : undefined} aria-modal={scanning || undefined} aria-hidden={!scanning}
+                    aria-label="Capture marks sticker" onKeyDown={event => { if (event.key === 'Escape') cancelCapture(); }}
+                    className={`fixed inset-0 bg-black overflow-hidden ${scanning ? 'z-[200]' : 'invisible pointer-events-none -z-10'}`}>
+                    <input ref={photoInput} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden
+                        onChange={event => {
+                            const photo = event.target.files?.[0];
+                            event.target.value = '';
+                            setUsingPhoneCamera(false);
+                            if (photo) void handleCapture(photo);
+                        }} />
                     {/* Camera Viewfinder */}
-                    <style>{`
-                        /* Hide html5-qrcode's default qrbox border AND background */
-                        #${READER_ID} #qr-shaded-region { 
-                            border: none !important; 
-                            box-shadow: none !important;
-                            background: transparent !important;
-                        }
-                        #${READER_ID} div[style*="border"] { 
-                            border: none !important; 
-                        }
-                        /* Hide the gray rectangle background */
-                        #${READER_ID} > div:not(video) {
-                            background: transparent !important;
-                        }
-                    `}</style>
-                    <div id={READER_ID} className="w-full h-full absolute inset-0 flex items-center justify-center bg-black"></div>
+                    <video ref={videoRef} autoPlay playsInline muted onLoadedData={markCameraReady} onCanPlay={markCameraReady} onPlaying={markCameraReady}
+                        className="absolute inset-0 h-full w-full object-contain" aria-label="Sticker camera preview" />
+                    {isProcessingOCR && debugImage && <img src={debugImage} alt="Captured sticker" className="absolute inset-0 h-full w-full object-contain" />}
 
-                    {/* Dark Backdrop for non-scanned area */}
-                    <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
-
-                    {/* Minimal Corner Guides - No rectangle, just corners */}
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[75vw] max-w-lg aspect-[39/21] pointer-events-none">
-                        {/* Top-left corner */}
-                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 rounded-tl-lg shadow-[0_0_20px_rgba(74,222,128,0.6)]"></div>
-
-                        {/* Top-right corner */}
-                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 rounded-tr-lg shadow-[0_0_20px_rgba(74,222,128,0.6)]"></div>
-
-                        {/* Bottom-left corner */}
-                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 rounded-bl-lg shadow-[0_0_20px_rgba(74,222,128,0.6)]"></div>
-
-                        {/* Bottom-right corner */}
-                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 rounded-br-lg shadow-[0_0_20px_rgba(74,222,128,0.6)]"></div>
-
-                        {/* Subtle center guide text */}
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/70 text-sm font-medium bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm">
-                            Align sticker here
+                    {scanning && !isProcessingOCR && !usingPhoneCamera && (
+                        <div className="absolute top-[max(1rem,env(safe-area-inset-top))] inset-x-4 z-20 mx-auto flex max-w-lg flex-wrap gap-2">
+                            {cameraDevices.length > 1 && <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-app-surface-opaque px-3 text-app-text text-sm">
+                                <span>Camera</span>
+                                <select aria-label="Camera lens" value={cameraDeviceId} onChange={event => selectCameraDevice(event.target.value)}
+                                    className="min-h-11 min-w-0 flex-1 bg-transparent focus-visible:outline-2">
+                                    <option value="">Auto (rear)</option>
+                                    {cameraDevices.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Camera ${index + 1}`}</option>)}
+                                </select>
+                            </label>}
+                            <TeacherButton variant="secondary" onClick={restartCamera}>Restart camera</TeacherButton>
                         </div>
-                    </div>
-
+                    )}
                     {/* Bottom Controls */}
-                    <div className="absolute bottom-10 left-0 right-0 z-20 flex flex-col items-center gap-4 px-6">
+                    <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-0 right-0 z-20 flex flex-col items-center gap-4 px-6">
                         {isProcessingOCR ? (
                             <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl animate-in slide-in-from-bottom-4">
                                 <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                                <span className="font-bold text-slate-800">Hold steady — reading marks...</span>
+                                <span role="status" className="font-bold text-app-text">{captureStage} {elapsed}s</span>
                             </div>
                         ) : (
                             <div className="bg-black/60 backdrop-blur-md text-white text-center px-4 py-2 rounded-full border border-white/10 max-w-xs">
-                                <p className="text-xs font-medium">Hold 10-15cm from sticker</p>
-                                <p className="text-[10px] text-white/70 mt-0.5">Tap screen to focus if blurry</p>
+                                <p className="text-sm font-medium">{cameraReady ? 'Ready — tap Capture' : 'Starting camera…'}</p>
+                                <p className="text-xs text-white/70 mt-0.5">Keep one whole sticker visible. It does not need to fill the screen.</p>
                             </div>
                         )}
 
-                        <button
-                            onClick={() => window.location.reload()} // Reload is safest way to cleanly kill camera stream
-                            className="mt-4 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/50 px-8 py-3 rounded-xl font-bold transition active:scale-95 backdrop-blur-sm"
-                        >
-                            Cancel Scan
-                        </button>
+                        {(scanError || cameraError) && <p role="alert" className="max-w-sm rounded-xl bg-app-surface-opaque p-3 text-app-text">{scanError || cameraError}</p>}
+                        <TeacherButton variant="secondary" size="lg" onClick={() => void handleCapture()}
+                            disabled={isProcessingOCR || usingPhoneCamera} loading={isProcessingOCR} className="w-full max-w-xs">
+                            {isProcessingOCR ? 'Reading marks…' : 'Capture'}
+                        </TeacherButton>
+                        <div className="flex flex-wrap justify-center gap-2">
+                            <TeacherButton variant="secondary" disabled={isProcessingOCR} onClick={() => {
+                                if (usingPhoneCamera) { setUsingPhoneCamera(false); return; }
+                                // Release the live track before handing camera control to iOS/Android.
+                                const stream = videoRef.current?.srcObject as MediaStream | null;
+                                stream?.getTracks().forEach(track => track.stop());
+                                setUsingPhoneCamera(true);
+                                photoInput.current?.click();
+                            }}>{usingPhoneCamera ? 'Return to live camera' : 'Use phone camera'}</TeacherButton>
+                            <TeacherButton variant="secondary" onClick={cancelCapture}>Cancel Scan</TeacherButton>
+                        </div>
                     </div>
-                </div>
+                </div>, document.body
+            )}
+
+            {identityError && createPortal(
+                <div ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Select student for captured photo"
+                    onKeyDown={event => { if (event.key === 'Escape') handleCancelInput(); }}
+                    className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 p-4 py-[max(1rem,env(safe-area-inset-top))]">
+                    <StickerStudentPicker image={debugImage} message={identityError} score={score} onRetake={handleCancelInput}
+                        onSelect={async humanId => {
+                            const request = captureRequest.current;
+                            const selected = await lookupStudent(humanId);
+                            if (mountedRef.current && request && !request.signal.aborted && request === captureRequest.current) reviewStudent(selected);
+                        }} />
+                </div>, document.body
             )}
 
 
             {/* Warning Modal */}
             {
-                pendingStudent && (
-                    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] z-50 animate-fadeIn">
-                        <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center">
+                pendingStudent && createPortal(
+                    <div ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review captured marks" onKeyDown={event => { if (event.key === 'Escape') handleCancelInput(); }} className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 py-[max(1rem,env(safe-area-inset-top))] z-50 motion-safe:animate-fadeIn">
+                        <div className="bg-app-surface-opaque rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center">
                             <div className="w-16 h-16 bg-yellow-50 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold shadow-sm">!</div>
-                            <h2 className="text-xl font-bold text-slate-800 mb-2">Marks Already Exist</h2>
-                            <p className="text-slate-600 mb-4">
+                            <h2 className="text-xl font-bold text-app-text mb-2">Marks Already Exist</h2>
+                            <p className="text-app-text-secondary mb-4">
                                 <span className="font-bold">{pendingStudent.name}</span> has already scored <span className="font-bold">{existingMark}</span> in this test.
                             </p>
-                            <p className="text-sm text-slate-500 mb-6">Do you want to overwrite the score?</p>
+                            <p className="text-sm text-app-text-secondary mb-6">Do you want to overwrite the score?</p>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <button
-                                    onClick={() => {
-                                        setPendingStudent(null);
-                                        setExistingMark(null);
-                                        if (scannerRef.current) {
-                                            scannerRef.current.resume();
-                                            processingRef.current = false;
-                                        }
-                                        setScanning(true); // Show scanner overlay again
-                                    }}
-                                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl transition"
+                                    onClick={handleCancelInput}
+                                    className="bg-slate-100 hover:bg-slate-200 text-app-text-secondary font-bold py-3 rounded-xl transition"
                                 >
                                     Cancel
                                 </button>
@@ -581,7 +479,6 @@ export default function ScanMarks() {
                                     onClick={() => {
                                         setStudent(pendingStudent);
                                         setPendingStudent(null);
-                                        setExistingMark(null);
                                     }}
                                     className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition"
                                 >
@@ -589,24 +486,24 @@ export default function ScanMarks() {
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </div>, document.body
                 )
             }
 
             {/* Mark Entry Modal */}
             {
-                student && (
-                    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(5.5rem+env(safe-area-inset-top))] z-[150] animate-fadeIn">
-                        <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 transform transition-all scale-100 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-teal-500"></div>
+                student && createPortal(
+                    <div ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review captured marks" onKeyDown={event => { if (event.key === 'Escape') handleCancelInput(); }} className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 py-[max(1rem,env(safe-area-inset-top))] z-[150] motion-safe:animate-fadeIn">
+                        <div className="bg-app-surface-opaque rounded-3xl shadow-2xl max-w-sm w-full max-h-[85dvh] overflow-y-auto p-6 transform transition-all scale-100 relative">
+
 
                             <div className="text-center mb-8">
-                                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold shadow-sm">
+                                <div className="w-16 h-16 bg-app-bg text-app-text rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold shadow-sm">
                                     {student.name.charAt(0)}
                                 </div>
-                                <h2 className="text-2xl font-bold text-slate-800">{student.name}</h2>
-                                <p className="text-slate-500 text-sm mt-1">{student.batch?.name}</p>
-                                <div className="inline-block bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded mt-2 font-mono">
+                                <h2 className="text-2xl font-bold text-app-text">{student.name}</h2>
+                                <p className="text-app-text-secondary text-sm mt-1">{student.batch?.name}</p>
+                                <div className="inline-block bg-slate-100 text-app-text-secondary text-xs px-2 py-1 rounded mt-2 font-mono">
                                     {student.humanId}
                                 </div>
                             </div>
@@ -614,45 +511,45 @@ export default function ScanMarks() {
                             {/* Debug Image Preview */}
                             {debugImage && (
                                 <div className="mb-4">
-                                    <p className="text-xs text-slate-400 mb-1 text-center">AI Vision Capture:</p>
-                                    <img src={debugImage} alt="OCR Debug" className="w-full h-auto rounded-lg border border-slate-200" />
+                                    <p className="text-xs text-app-text-tertiary mb-1 text-center">Captured photo:</p>
+                                    <img src={debugImage} alt="Original captured sticker" className="w-full max-h-40 object-contain rounded-lg border border-app-border" />
                                 </div>
                             )}
 
+                            <p role="status" className="mb-4 text-center text-sm text-app-text-secondary">
+                                {isProcessingOCR ? `Reading marks… ${elapsed}s. You can enter them now.` : ocrError || (readStatus === 'read' ? 'Read successfully. Confirm the marks before saving.' : 'Needs review. Enter the marks or retake the photo.')}
+                            </p>
                             <form onSubmit={handleSubmitMark}>
                                 <div className="mb-8">
-                                    <label className="block text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Obtained Marks</label>
+                                    <label className="block text-center text-xs font-bold text-app-text-tertiary uppercase tracking-widest mb-2">Obtained Marks</label>
                                     <input
                                         type="text"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        className="w-full text-center text-5xl font-black text-slate-800 bg-transparent border-none focus:ring-0 placeholder-slate-200 outline-none"
-                                        placeholder="00"
-                                        autoFocus
+                                        inputMode="decimal"
+                                        pattern="[0-9]+([.][0-9]+)?"
+                                        className="w-full text-center text-5xl font-black text-app-text bg-transparent border-none focus:ring-0 placeholder-slate-200 rounded-xl border border-app-border outline-none focus-visible:ring-2 focus-visible:ring-app-text"
+                                        aria-label="Obtained marks"
+                                        placeholder="—"
+                                        disabled={isSaving}
                                         value={score}
-                                        onChange={e => setScore(e.target.value.replace(/[^0-9.]/g, ''))}
+                                        onChange={e => {
+                                            captureRequest.current?.abort();
+                                            setIsProcessingOCR(false);
+                                            processingRef.current = false;
+                                            setReadStatus(null);
+                                            setOcrError('');
+                                            setScore(e.target.value.replace(/[^0-9.]/g, ''));
+                                        }}
                                         required
                                     />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <button
-                                        type="button"
-                                        onClick={handleCancelInput}
-                                        className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3.5 rounded-xl transition"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-green-200 transition"
-                                    >
-                                        Save
-                                    </button>
+                                    <TeacherButton variant="secondary" disabled={isSaving} onClick={handleCancelInput}>Retake</TeacherButton>
+                                    <TeacherButton type="submit" disabled={isSaving || score === ''}>{isSaving ? 'Saving…' : 'Save'}</TeacherButton>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </div>, document.body
                 )
             }
         </Layout >

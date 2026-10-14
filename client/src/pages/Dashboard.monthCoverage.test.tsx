@@ -77,4 +77,26 @@ describe('Dashboard fee-mode rendering', () => {
     expect(container.textContent).toContain('Pending Dues by Batch');
     expect(apiGet).toHaveBeenCalledWith('/dashboard/installment-stats');
   });
+
+  it('loads the primary dashboard summary before starting secondary class analytics', async () => {
+    let resolveSummary!: (value: typeof monthSummary) => void;
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/dashboard/summary') return new Promise(resolve => { resolveSummary = resolve; });
+      return Promise.resolve([]);
+    });
+
+    await act(async () => root.render(
+      <MemoryRouter><QueryClientProvider client={queryClient}><Dashboard /></QueryClientProvider></MemoryRouter>
+    ));
+
+    expect(apiGet).toHaveBeenCalledWith('/dashboard/summary');
+    expect(apiGet).not.toHaveBeenCalledWith('/stats/class-average');
+
+    await act(async () => {
+      resolveSummary(monthSummary);
+      await settle();
+    });
+    expect(container.textContent).toContain('8 / 12');
+    expect(apiGet).toHaveBeenCalledWith('/stats/class-average');
+  });
 });

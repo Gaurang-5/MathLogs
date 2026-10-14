@@ -13,6 +13,7 @@ import { sendStudentAlertForStudent } from '../services/studentAlertRecipientSer
 import { getJwtSecret } from '../utils/env';
 import { buildBatchExportRows, parseBatchExportColumnIds, resolveBatchExportColumns } from '../services/batchExportService';
 import { getMonthCoverageSummary } from '../services/monthCoverageSummaryService';
+import { compareMonths, currentMonthInTimezone, parseMonth } from '../domain/monthCoverage/calendar';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -130,12 +131,13 @@ export const getBatches = async (req: Request, res: Response) => {
             ],
             include: {
                 _count: {
-                    select: { students: { where: { status: 'APPROVED' } } }
+                    select: { enrollments: { where: { status: 'ACTIVE' } } }
                 }
             }
         });
         res.json(batches.map(batch => ({
             ...batch,
+            _count: { ...batch._count, students: batch._count.enrollments },
             coachingFeeMode: institute?.coachingFeeMode ?? 'CURRENT_DUE_BASED',
             timezone: institute?.timezone ?? 'Asia/Kolkata',
         })));
@@ -179,57 +181,41 @@ export const getBatchDetails = async (req: Request, res: Response) => {
                     },
                     orderBy: { createdAt: 'asc' }
                 },
-                students: {
+                enrollments: {
+                    where: { status: 'ACTIVE' },
                     select: {
                         id: true,
-                        humanId: true,
-                        name: true,
-                        parentName: true,
-                        parentWhatsapp: true,
-                        parentEmail: true,
-                        schoolName: true,
-                        status: true,
-                        createdAt: true,
-                        additionalData: true,
+                        startedAt: true,
+                        feeDecision: true,
                         monthCoverageProfile: true,
-                        feePayments: {
-                            select: {
-                                id: true,
-                                amountPaid: true,
-                                date: true,
-                                installmentId: true
-                            }
-                        },
-                        feeAssignments: {
-                            select: {
-                                installmentId: true
-                            }
-                        },
-                        fees: {
-                            select: {
-                                id: true,
-                                amount: true,
-                                status: true,
-                                date: true
-                            }
-                        },
-                        marks: {
-                            select: {
-                                id: true,
-                                score: true,
-                                test: {
-                                    select: {
-                                        id: true,
-                                        name: true,
-                                        maxMarks: true,
-                                        date: true,
-                                        isQuiz: true
+                        student: { select: {
+                            id: true, humanId: true, name: true, parentName: true, parentWhatsapp: true,
+                            parentEmail: true, schoolName: true, createdAt: true, additionalData: true,
+                            feePayments: {
+                                where: { installment: { batchId: id } },
+                                select: { id: true, amountPaid: true, date: true, installmentId: true }
+                            },
+                            feeAssignments: {
+                                where: { installment: { batchId: id } },
+                                select: { installmentId: true }
+                            },
+                            fees: { select: { id: true, amount: true, status: true, date: true } },
+                            marks: {
+                                where: {
+                                    test: {
+                                        OR: [
+                                            { batchId: id },
+                                            { batches: { some: { id } } }
+                                        ]
                                     }
-                                }
+                                },
+                                select: { id: true, score: true, test: { select: {
+                                    id: true, name: true, maxMarks: true, date: true, isQuiz: true
+                                } } }
                             }
-                        }
+                        } }
                     },
-                    orderBy: { name: 'asc' }
+                    orderBy: { student: { name: 'asc' } }
                 },
                 tests: {
                     select: {
@@ -268,9 +254,18 @@ export const getBatchDetails = async (req: Request, res: Response) => {
         const allTests = [...(batch.tests || []), ...((batch as any).sharedTests || [])]
             .filter(t => { if (seenTestIds.has(t.id)) return false; seenTestIds.add(t.id); return true; })
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const activeStudents = batch.enrollments.map(enrollment => ({
+            ...enrollment.student,
+            enrollmentId: enrollment.id,
+            enrollmentStartedAt: enrollment.startedAt,
+            feeDecision: enrollment.feeDecision,
+            monthCoverageProfile: enrollment.monthCoverageProfile,
+        }));
 
         res.json({
             ...batch,
+            students: activeStudents,
+            enrollments: undefined,
             coachingFeeMode: batch.institute?.coachingFeeMode ?? 'CURRENT_DUE_BASED',
             timezone: batch.institute?.timezone ?? 'Asia/Kolkata',
             tests: allTests,
@@ -296,14 +291,14 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
             where: { id },
             include: {
                 institute: { select: { config: true, coachingFeeMode: true, timezone: true } },
-                students: {
-                    where: { status: 'APPROVED' },
-                    orderBy: { name: 'asc' },
-                    include: {
+                enrollments: {
+                    where: { status: 'ACTIVE' },
+                    orderBy: { student: { name: 'asc' } },
+                    include: { student: { include: {
                         fees: { select: { amount: true, date: true, status: true } },
                         feePayments: { select: { amountPaid: true, date: true, installmentId: true } },
                         marks: { select: { score: true, test: { select: { maxMarks: true } } } }
-                    }
+                    } } }
                 },
                 feeInstallments: { orderBy: { createdAt: 'asc' } }
             }
@@ -338,7 +333,7 @@ export const downloadBatchPDF = async (req: Request, res: Response) => {
             ? await getMonthCoverageSummary({ instituteId: user.instituteId, teacherId: user.id, batchId: id, now: new Date() })
             : null;
         const rows = buildBatchExportRows({
-            students: batch.students,
+            students: batch.enrollments.map(enrollment => enrollment.student),
             columns,
             installments: batch.feeInstallments,
             monthMetrics: monthSummary?.students,
@@ -408,18 +403,18 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
             where: { id },
             include: {
                 institute: { select: { name: true, slug: true } },
-                students: {
-                    where: { status: 'APPROVED' },
-                    select: {
-                        id: true, // Needed for studentId match
-                        name: true,
-                        parentWhatsapp: true,
+                enrollments: {
+                    where: { status: 'ACTIVE' },
+                    select: { startedAt: true, feeDecision: true, applyFutureInstallments: true, student: { select: {
+                        id: true, name: true, parentWhatsapp: true,
+                        feeAssignments: { select: { installmentId: true } },
+                        fees: { select: { status: true, amount: true } },
                         feePayments: {
                             where: { installment: { batchId: id } }
                         }
-                    }
+                    } } }
                 },
-                feeInstallments: { select: { id: true, name: true, amount: true } }
+                feeInstallments: { select: { id: true, name: true, amount: true, studentId: true, createdAt: true } }
             }
         });
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
@@ -428,7 +423,7 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
         if (studentId) {
-            const studentExists = batch.students.find(s => s.id === studentId);
+            const studentExists = batch.enrollments.find(enrollment => enrollment.student.id === studentId);
             if (!studentExists) return res.status(400).json({ error: 'Student not found in this batch' });
         }
 
@@ -447,8 +442,8 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
                 data: { studentId, installmentId: installment.id }
             });
         } else {
-            const studentsToAssign = batch.students.map(s => ({
-                studentId: s.id,
+            const studentsToAssign = batch.enrollments.filter(enrollment => enrollment.applyFutureInstallments).map(({ student }) => ({
+                studentId: student.id,
                 installmentId: installment.id
             }));
             if (studentsToAssign.length > 0) {
@@ -464,23 +459,31 @@ export const createFeeInstallment = async (req: Request, res: Response) => {
         const instituteName = batch.institute?.name || 'Coaching Institute';
         const upiPaymentLink = batch.institute?.slug ? `https://mathlogs.app/pay/${batch.institute.slug}` : 'Please contact admin for payment details.';
         const allInstallments = [...batch.feeInstallments, installment];
+        const enrolledStudents = batch.enrollments.filter(enrollment => studentId ? enrollment.student.id === studentId : enrollment.applyFutureInstallments).map(enrollment => enrollment.student);
         
         // Target only the specific student if a custom invoice, otherwise notify everyone
         const studentsToNotify = studentId 
-            ? batch.students.filter(s => s.parentWhatsapp && s.id === studentId)
-            : batch.students.filter(s => s.parentWhatsapp);
+            ? enrolledStudents.filter(s => s.parentWhatsapp && s.id === studentId)
+            : enrolledStudents.filter(s => s.parentWhatsapp);
 
         // Fire in background — don't block the HTTP response
         setImmediate(async () => {
             let sent = 0, failed = 0;
             for (const student of studentsToNotify) {
+                const enrollment = batch.enrollments.find(e => e.student.id === student.id)!;
+                let genericPaid = student.fees.filter(f => f.status === 'PAID').reduce((sum, f) => sum + f.amount, 0);
                 let totalDue = 0;
                 const breakupLines: string[] = [];
 
-                for (const inst of allInstallments) {
+                for (const inst of [...allInstallments].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
+                    const applies = inst.studentId ? inst.studentId === student.id : inst.id === installment.id || student.feeAssignments.some(a => a.installmentId === inst.id) || student.feePayments.some(p => p.installmentId === inst.id) || (enrollment.feeDecision === 'LEGACY' && inst.createdAt >= enrollment.startedAt);
+                    if (!applies) continue;
                     const payments = student.feePayments.filter(p => p.installmentId === inst.id);
                     const paidForInst = payments.reduce((sum, p) => sum + p.amountPaid, 0);
-                    const dueForInst = inst.amount - paidForInst;
+                    const unpaid = Math.max(0, inst.amount - paidForInst);
+                    const coverage = Math.min(genericPaid, unpaid);
+                    genericPaid -= coverage;
+                    const dueForInst = unpaid - coverage;
                     if (dueForInst > 0) {
                         totalDue += dueForInst;
                         breakupLines.push(`- ${inst.name}: ₹${dueForInst}`);
@@ -534,6 +537,7 @@ export const updateFeeInstallment = async (req: Request, res: Response) => {
 
         const user = req.user;
         if (installment.batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+        if (installment.lockedAt && amount !== undefined && Number(amount) !== installment.amount) return res.status(409).json({ error: 'This installment is part of a confirmed registration fee plan. Create a separate installment to change the fee.' });
 
         const updated = await prisma.feeInstallment.update({
             where: { id: String(id) },
@@ -561,6 +565,7 @@ export const deleteFeeInstallment = async (req: Request, res: Response) => {
 
         const user = req.user;
         if (installment.batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
+        if (installment.lockedAt) return res.status(409).json({ error: 'This installment is part of a confirmed registration fee plan. Create a separate installment to change the fee.' });
 
         if (installment._count.payments > 0) {
             return res.status(400).json({ error: `Cannot delete fee column: ${installment._count.payments} payment(s) have already been made.` });
@@ -652,6 +657,7 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
 
         let isTokenValid = false;
         let invitePhone: string | null = null;
+        let identityReviewRequired = false;
 
         if (token) {
             try {
@@ -659,9 +665,13 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
                 if (decoded.batchId === id && decoded.whatsapp) {
                     isTokenValid = true;
                     invitePhone = decoded.whatsapp;
-                    const existingStudent = await prisma.student.findFirst({
-                        where: { batchId: id, parentWhatsapp: decoded.whatsapp }
-                    });
+                    const invitation = decoded.nonce ? await prisma.inviteToken.findUnique({ where: { token: decoded.nonce } }) : null;
+                    const intent = invitation?.enrollmentIntent as any;
+                    const review = intent?.reviewId ? await prisma.studentIdentityReview.findUnique({ where: { id: intent.reviewId } }) : null;
+                    identityReviewRequired = review?.status === 'PENDING';
+                    const existingStudent = invitation?.isUsed && !identityReviewRequired ? await prisma.student.findFirst({
+                        where: { batchId: id, parentWhatsapp: decoded.whatsapp, ...(review?.resolvedStudentId ? { id: review.resolvedStudentId } : {}) }
+                    }) : null;
 
                     if (existingStudent) {
                         isAlreadyRegistered = true;
@@ -683,6 +693,7 @@ export const getBatchPublicStatus = async (req: Request, res: Response) => {
         const responseData = {
             ...safeBatchData,
             alreadyRegistered: isAlreadyRegistered,
+            identityReviewRequired,
             registeredStudent: registeredStudentData
         };
 
@@ -769,40 +780,19 @@ export const updateBatch = async (req: Request, res: Response) => {
 };
 
 export const deleteBatch = async (req: Request, res: Response) => {
-    const { id } = req.params;
-
     try {
-        const batch = await prisma.batch.findUnique({
-            where: { id: String(id) },
-            include: {
-                _count: {
-                    select: { feeInstallments: true }
-                }
-            }
+        const result = await prisma.$transaction(async tx => {
+            const id = String(req.params.id);
+            await tx.$queryRaw`SELECT id FROM "Batch" WHERE id=${id} FOR UPDATE`;
+            const batch = await tx.batch.findUnique({ where: { id }, include: { _count: { select: { students: true, enrollments: true, tests: true, sharedTests: true, onlineQuizzes: true, sharedOnlineQuizzes: true, feeInstallments: true, monthCoverageProfiles: true, monthCoveragePayments: true, monthCoverageAllocations: true, studentLeads: true, studentIdentityReviews: true } } } });
+            if (!batch) return { status: 404, body: { error: 'Batch not found' } };
+            if (batch.instituteId !== req.user.instituteId || batch.teacherId !== req.user.id) return { status: 403, body: { error: 'Unauthorized' } };
+            if (Object.values(batch._count).some(count => count > 0)) return { status: 409, body: { error: 'This batch has student, assessment or fee history and cannot be permanently deleted. End registration to retain its records.' } };
+            await tx.batch.delete({ where: { id } });
+            return { status: 200, body: { success: true } };
         });
-        if (!batch) return res.status(404).json({ error: 'Batch not found' });
-
-        const user = req.user;
-        if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
-
-        // FINANCIAL SAFETY GUARD (P1-A): Prevent destruction of payment history.
-        // Hard-deleting a batch with payments cascades and wipes the entire financial ledger.
-        // Admins must archive/soft-delete instead if payment records exist.
-        const paymentCount = await prisma.feePayment.count({
-            where: { installment: { batchId: String(id) } }
-        });
-        if (paymentCount > 0) {
-            return res.status(409).json({
-                error: `Cannot delete batch with ${paymentCount} existing payment record(s). This would permanently destroy financial history. Please contact support to archive this batch instead.`
-            });
-        }
-
-        await prisma.batch.delete({ where: { id: String(id) } });
-        res.json({ success: true });
-    } catch (e) {
-        console.error('Error deleting batch:', e);
-        res.status(500).json({ error: 'Failed to delete batch' });
-    }
+        return res.status(result.status).json(result.body);
+    } catch { return res.status(409).json({ error: 'Batch changed or still has linked records. Refresh before trying again.' }); }
 };
 
 // --- WhatsApp Invitation Feature ---
@@ -818,7 +808,7 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
         const batch = await prisma.batch.findUnique({
             where: { id: String(id) },
             include: {
-                students: { where: { status: 'APPROVED' } },
+                enrollments: { where: { status: 'ACTIVE' }, include: { student: true } },
                 institute: true
             }
         });
@@ -838,7 +828,8 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
         const replyTo = batch.institute?.email || undefined;
 
         // 1. Queue email invites for students who have an email
-        const emailJobs = batch.students
+        const students = batch.enrollments.map(enrollment => enrollment.student);
+        const emailJobs = students
             .filter(student => student.parentEmail)
             .map(student => {
                 const body = `Hello ${student.name},\n\nWelcome to ${batch.name} (${batch.subject || 'Course'}).\n\nBatch Details:\n• Class: ${batch.className || 'N/A'}\n• Time: ${batch.timeSlot || 'N/A'}\n• Student ID: ${student.humanId || 'N/A'}\n\nJoin the official WhatsApp group for announcements and updates:\n👉 ${link}\n\nPlease join the group to stay informed.\n\n– ${senderName}`;
@@ -861,7 +852,7 @@ export const sendBatchWhatsappInvite = async (req: Request, res: Response) => {
         let whatsappCount = 0;
         let whatsappFailed = 0;
 
-        for (const student of batch.students) {
+        for (const student of students) {
             if (!student.parentWhatsapp) continue;
 
             try {
@@ -1042,7 +1033,7 @@ export const downloadBatchQRPDF = async (req: Request, res: Response) => {
 
 export const inviteStudentToBatch = async (req: Request, res: Response) => {
     const { id } = req.params;
-    let { whatsappNumber } = req.body;
+    let { whatsappNumber, fee } = req.body;
 
     if (!whatsappNumber) {
         return res.status(400).json({ error: "WhatsApp number is required" });
@@ -1056,7 +1047,7 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
     try {
         const batch = await prisma.batch.findUnique({
             where: { id: String(id) },
-            include: { institute: true }
+            include: { institute: true, feeInstallments: { where: { studentId: null }, select: { id: true, amount: true } } }
         });
 
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
@@ -1064,10 +1055,57 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
         const user = req.user;
         if (batch.instituteId !== user.instituteId) return res.status(403).json({ error: 'Unauthorized' });
 
+        if (fee.mode !== batch.institute?.coachingFeeMode) {
+            return res.status(400).json({ error: 'FEE_MODE_MISMATCH' });
+        }
+        if (fee.mode === 'MONTH_COVERAGE') {
+            if (!batch.startDate || !batch.endDate || !batch.institute?.timezone) {
+                return res.status(400).json({ error: 'BATCH_DATES_REQUIRED' });
+            }
+            parseMonth(fee.feeStartMonth);
+            const first = currentMonthInTimezone(batch.startDate, batch.institute.timezone);
+            const last = currentMonthInTimezone(batch.endDate, batch.institute.timezone);
+            if (compareMonths(fee.feeStartMonth, first) < 0 || compareMonths(fee.feeStartMonth, last) > 0) {
+                return res.status(400).json({ error: 'INVALID_FEE_START_MONTH' });
+            }
+        } else {
+            if (!fee.decision) return res.status(400).json({ error: 'Choose installments, no fee, or decide later before sending the link.' });
+            if ((fee.decision === 'SELECTED' && !fee.installmentIds.length) || (fee.decision !== 'SELECTED' && (fee.installmentIds.length || fee.applyFutureInstallments))) return res.status(400).json({ error: 'Invalid fee decision.' });
+            if (fee.installmentIds.length && !fee.amounts) return res.status(400).json({ error: 'Refresh the fee plan before sending the invitation.' });
+            if (fee.installmentIds.some((id: string) => fee.amounts?.[id] !== batch.feeInstallments.find(row => row.id === id)?.amount)) return res.status(409).json({ error: 'The selected fees changed. Refresh the batch and confirm the updated amounts.' });
+            const allowed = new Set(batch.feeInstallments.map(item => item.id));
+            if (fee.installmentIds.some((installmentId: string) => !allowed.has(installmentId))) {
+                return res.status(400).json({ error: 'INVALID_INSTALLMENT_SELECTION' });
+            }
+        }
+
+        const nonce = crypto.randomBytes(24).toString('hex');
+        const expiresAt = new Date(Date.now() + (60 * 60 * 24 * 7 * 1000));
+        await prisma.$transaction(async tx => {
+          if (fee.mode === 'CURRENT_DUE_BASED' && fee.installmentIds.length) {
+            const locked = await tx.feeInstallment.updateMany({
+              where: { batchId: batch.id, studentId: null, OR: fee.installmentIds.map((id: string) => ({ id, amount: fee.amounts[id] })) },
+              data: { lockedAt: new Date() },
+            });
+            if (locked.count !== new Set(fee.installmentIds).size) throw new Error('FEE_AMOUNT_CHANGED_REFRESH_REQUIRED');
+          }
+          await tx.inviteToken.create({
+            data: {
+                token: nonce,
+                instituteId: user.instituteId,
+                expiresAt,
+                enrollmentIntent: { batchId: batch.id, fee, issuedById: user.id, whatsapp: whatsappNumber } as any,
+            },
+        });
+        });
         const payload = {
+            instituteId: user.instituteId,
             batchId: String(id),
             whatsapp: whatsappNumber,
-            exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days expiration
+            fee,
+            issuedById: user.id,
+            nonce,
+            exp: Math.floor(expiresAt.getTime() / 1000),
         };
         const token = jwt.sign(payload, JWT_SECRET);
         const fullUrl = `${getClientUrl(req)}/register/${batch.id}?token=${token}`;
@@ -1082,14 +1120,17 @@ export const inviteStudentToBatch = async (req: Request, res: Response) => {
         const registrationLink = `${getClientUrl(req)}/s/${shortCode}`;
 
         // Send via WhatsApp
-        await sendStudentInviteWhatsApp(whatsappNumber, {
+        const queued = await sendStudentInviteWhatsApp(whatsappNumber, {
             instituteName: batch.institute?.name || "Education Center",
             batchName: batch.name,
-            registrationLink
+            registrationLink,
+            instituteId: user.instituteId
         });
 
-        res.json({ success: true, message: "Registration link sent successfully to WhatsApp." });
+        if (!queued) return res.status(502).json({ error: "The registration link could not be queued. Please retry." });
+        res.json({ success: true, message: "Registration link queued for WhatsApp delivery." });
     } catch (error) {
+        if (error instanceof Error && error.message === 'FEE_AMOUNT_CHANGED_REFRESH_REQUIRED') return res.status(409).json({ error: 'The selected fees changed. Refresh the batch and confirm the updated amounts.' });
         console.error("Error creating student invite:", error);
         res.status(500).json({ error: "Failed to send invite link" });
     }

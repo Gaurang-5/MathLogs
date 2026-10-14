@@ -17,7 +17,7 @@ const PLAN_TIER_RANK: Record<CanonicalPlan, number> = {
   ENTERPRISE: 3,
 };
 
-export function PlanCards({ selectedPlan, currentBillingCycle, onSelect, compact = false }: Props) {
+export function PlanCards({ selectedPlan, onSelect, compact = false }: Props) {
   const [cards, setCards] = useState<PlanCardViewModel[]>([]);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -68,7 +68,6 @@ export function PlanCards({ selectedPlan, currentBillingCycle, onSelect, compact
       {cards.map(card => {
         const isCurrent = Boolean(selectedPlan && selectedPlan === card.id);
         const cardRank = PLAN_TIER_RANK[card.id] || 0;
-        const isHigher = selectedPlan ? cardRank > currentRank : true;
         const isLower = selectedPlan ? cardRank < currentRank : false;
         const isHighestTier = card.id === 'ENTERPRISE';
 

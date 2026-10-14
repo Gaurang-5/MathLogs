@@ -19,7 +19,6 @@ async function main() {
       include: {
         fees: true,
         feePayments: true,
-        attendanceRecords: true,
         marks: true,
         quizSubmissions: true
       }
@@ -33,12 +32,11 @@ async function main() {
     const hasActivity = 
       student.fees.length > 0 || 
       student.feePayments.length > 0 || 
-      student.attendanceRecords.length > 0 || 
       student.marks.length > 0 || 
       student.quizSubmissions.length > 0;
 
     if (hasActivity) {
-      console.log(`Archiving ${student.name}... (Has financial/attendance data)`);
+      console.log(`Archiving ${student.name}... (Has durable history)`);
       await prisma.student.update({
         where: { id },
         data: {

@@ -1,3 +1,4 @@
+import { collectExplicitPayment, loadPaymentOptions } from '../services/explicitFeePaymentService';
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 // const PDFDocument = require('pdfkit');
@@ -21,22 +22,20 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
         const instituteId = user?.instituteId;
         const role = user?.role;
 
-        const whereClause: any = {
-            status: 'APPROVED',
-        };
+        const whereClause: any = { enrollments: { some: { status: 'ACTIVE' } } };
 
         if (instituteId) {
             whereClause.instituteId = instituteId;
         }
 
         if (role !== 'SUPER_ADMIN') {
-            whereClause.batch = { teacherId };
+            whereClause.enrollments = { some: { status: 'ACTIVE', batch: { teacherId } } };
         }
 
         const students = await prisma.student.findMany({
             where: whereClause,
             include: {
-                batch: { include: { feeInstallments: true } },
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { feeInstallments: true } } } },
                 fees: true,
                 feePayments: true
             },
@@ -50,7 +49,7 @@ export const downloadPendingFeesReport = async (req: Request, res: Response) => 
             return {
                 humanId: student.humanId || '-',
                 name: student.name,
-                batch: student.batch?.name || 'N/A',
+                batch: student.enrollments.map((enrollment: any) => enrollment.batch.name).join(', ') || 'N/A',
                 parentName: student.parentName || '-',
                 phone: student.parentWhatsapp || '-',
                 balance,
@@ -87,11 +86,11 @@ export const getPaymentHistory = async (req: Request, res: Response) => {
     try {
         const student = await prisma.student.findUnique({
             where: { id: String(studentId) },
-            include: { batch: true }
+            include: { enrollments: { where: { status: 'ACTIVE' }, select: { batch: { select: { teacherId: true } } } } }
         });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
-        if (student.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
+        if (!student.enrollments.some(enrollment => !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId)) return res.status(403).json({ error: 'Unauthorized' });
 
         const history = await prisma.feePayment.findMany({
             where: { studentId: String(studentId) },
@@ -141,16 +140,14 @@ export const getFeeSummary = async (req: Request, res: Response) => {
         const role = user?.role;
         const installmentFilter = (req.query.installment as string) || 'All';
 
-        const whereClause: any = {
-            status: 'APPROVED',
-        };
+        const whereClause: any = { enrollments: { some: { status: 'ACTIVE' } } };
 
         if (instituteId) {
             whereClause.instituteId = instituteId;
         }
 
         if (role !== 'SUPER_ADMIN') {
-            whereClause.batch = { teacherId };
+            whereClause.enrollments = { some: { status: 'ACTIVE', batch: { teacherId } } };
         }
 
         const students = await prisma.student.findMany({
@@ -161,11 +158,11 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 name: true,
                 parentWhatsapp: true,
                 createdAt: true, // Needed for oldestDue fallback
-                batch: {
+                enrollments: {
+                    where: { status: 'ACTIVE' },
                     select: {
-                        name: true,
-                        feeAmount: true,
-                        feeInstallments: {
+                        startedAt: true, feeDecision: true,
+                        batch: { select: { name: true, feeAmount: true, feeInstallments: {
                             select: {
                                 id: true,
                                 name: true,
@@ -174,7 +171,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                                 createdAt: true
                             },
                             orderBy: { createdAt: 'asc' }
-                        }
+                        } } }
                     }
                 },
                 fees: {
@@ -203,16 +200,14 @@ export const getFeeSummary = async (req: Request, res: Response) => {
         // Collect all distinct installment names across all students
         const allInstallmentNamesSet = new Set<string>();
         students.forEach((s: any) => {
-            (s.batch?.feeInstallments || []).forEach((inst: any) => {
+            s.enrollments.flatMap((enrollment: any) => enrollment.batch.feeInstallments).forEach((inst: any) => {
                 if (inst.name) allInstallmentNamesSet.add(inst.name.trim());
             });
         });
 
         const summary = students.map((student: any) => {
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const allBatchInstallments = student.batch?.feeInstallments || [];
-
-            const isBatchInstallmentActive = allBatchInstallments.some((inst: any) => !inst.studentId);
+            const allBatchInstallments = student.enrollments.flatMap((enrollment: any) =>
+                enrollment.batch.feeInstallments.map((installment: any) => ({ ...installment, enrollmentStartedAt: enrollment.startedAt, feeDecision: enrollment.feeDecision })));
 
             // Build a set of installment IDs that have existing payments for this student
             const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
@@ -226,7 +221,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 if (inst.studentId) {
                     return inst.studentId === student.id;
                 }
-                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
+                const isAfterJoin = (!inst.feeDecision || inst.feeDecision === 'LEGACY') && new Date(inst.createdAt) >= new Date(inst.enrollmentStartedAt);
                 const hasPayment = paidInstallmentIds.has(inst.id);
                 const isAssigned = assignedIds.has(inst.id);
                 return isAfterJoin || hasPayment || isAssigned;
@@ -288,7 +283,11 @@ export const getFeeSummary = async (req: Request, res: Response) => {
             if (installmentFilter !== 'All') {
                 totalFee = globalInstallmentsTotal + customInstallmentsTotal;
             } else {
-                totalFee = (isBatchInstallmentActive ? globalInstallmentsTotal : (student.batch?.feeAmount || 0)) + customInstallmentsTotal;
+                const fallbackBatchFees = student.enrollments.reduce((sum: number, enrollment: any) => {
+                    const hasGlobals = enrollment.batch.feeInstallments.some((installment: any) => !installment.studentId);
+                    return sum + (hasGlobals || (enrollment.feeDecision && enrollment.feeDecision !== 'LEGACY') ? 0 : Number(enrollment.batch.feeAmount || 0));
+                }, 0);
+                totalFee = globalInstallmentsTotal + fallbackBatchFees + customInstallmentsTotal;
             }
 
             const totalPaid = paidSimple + paidInstallments;
@@ -312,7 +311,7 @@ export const getFeeSummary = async (req: Request, res: Response) => {
                 humanId: student.humanId,
                 name: student.name,
                 phone: student.parentWhatsapp,
-                batchName: student.batch?.name || 'N/A',
+                batchName: student.enrollments.map((enrollment: any) => enrollment.batch.name).join(', ') || 'N/A',
                 totalFee,
                 totalPaid,
                 balance,
@@ -329,294 +328,44 @@ export const getFeeSummary = async (req: Request, res: Response) => {
     }
 };
 
-export const recordPayment = async (req: Request, res: Response) => {
-    const { studentId, amount } = req.body;
-    const parsedAmount = parseFloat(amount);
-
-    if (!studentId || !amount || isNaN(parsedAmount)) {
-        res.status(400).json({ error: 'Invalid Payment Data' });
-        return;
-    }
-
+export const getStudentPaymentOptions = async (req: Request, res: Response) => {
     try {
-        const teacherId = (req as any).user?.id;
+        const result = await loadPaymentOptions(prisma, String(req.params.id), req.user as any);
+        return res.json({ studentId: result.student.id, installments: result.installments });
+    } catch (error: any) { return res.status(error.statusCode || 500).json({error: error.statusCode ? error.message : 'Could not load applicable installments.'}); }
+};
 
-        // CONCURRENCY FIX: Wrap entire read-validate-write in a serializable transaction.
-        // Previously, two concurrent payments could both pass the balance check
-        // (both see balance = Rs. 5000) and create duplicate payments (total Rs. 10000).
-        // With serializable isolation, the second request will see the updated balance
-        // after the first transaction commits.
-        const result = await prisma.$transaction(async (tx) => {
-            // 1. Fetch Student & Installments (inside transaction for consistency)
-            const student = await tx.student.findUnique({
-                where: { id: studentId },
-                include: {
-                    batch: { include: { feeInstallments: { orderBy: { createdAt: 'asc' } }, institute: true } },
-                    feePayments: true,
-                    fees: true
-                }
-            });
+// Notify only after a newly committed payment; retries must not send a second receipt.
+async function notifyExplicitPayment(result: any) {
+    if (result.replayed || process.env.NODE_ENV === 'test') return;
+    const student = await prisma.student.findUnique({where:{id:result.studentId},include:{institute:true}});
+    if (!student) return;
+    const { sendPaymentReceiptWhatsApp } = await import('../utils/whatsapp');
+    await sendStudentAlertForStudent(student.id, phone => sendPaymentReceiptWhatsApp(phone, {
+        studentName: student.name,
+        amountPaid: `Rs. ${Number(result.amount).toLocaleString('en-IN')}`,
+        installmentName: result.allocations.map((a: any) => a.name).join(', '),
+        instituteName: student.institute?.name || 'our institute',
+        instituteId: student.instituteId || undefined
+    }));
+}
 
-            if (student?.batch?.teacherId && student.batch.teacherId !== teacherId) {
-                throw { statusCode: 403, message: 'Unauthorized' };
-            }
-
-            if (!student) {
-                throw { statusCode: 404, message: 'Student not found' };
-            }
-
-            const studentJoinDate = student.createdAt ? new Date(student.createdAt) : new Date(0);
-            const allBatchInstallments = student.batch?.feeInstallments || [];
-            const paidInstallmentIds = new Set(student.feePayments.map((p: any) => p.installmentId));
-            const installments = allBatchInstallments.filter((inst: any) => {
-                if (inst.studentId) {
-                    return inst.studentId === studentId;
-                }
-                const isAfterJoin = new Date(inst.createdAt) >= studentJoinDate;
-                const hasPayment = paidInstallmentIds.has(inst.id);
-                return isAfterJoin || hasPayment;
-            });
-            const validInstallmentIds = new Set(installments.map(i => i.id));
-
-            // Validation: Prevent Overpayment
-            const batchHasInstallments = allBatchInstallments.length > 0;
-            const installmentSum = installments.reduce((sum, i) => sum + i.amount, 0);
-            const totalFee = batchHasInstallments ? installmentSum : (student.batch?.feeAmount || 0);
-
-            const paidGeneric = student.fees
-                .filter((f: any) => f.status === 'PAID')
-                .reduce((sum: number, f: any) => sum + f.amount, 0);
-            // Only count payments for valid installments
-            const paidLinked = student.feePayments
-                .filter((p: any) => validInstallmentIds.has(p.installmentId))
-                .reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-
-            const currentBalance = Math.max(0, totalFee - (paidGeneric + paidLinked));
-
-            if (parsedAmount > currentBalance) {
-                throw { statusCode: 400, message: `Amount (Rs. ${parsedAmount}) exceeds outstanding balance (Rs. ${currentBalance})` };
-            }
-
-            let remainingAmount = parsedAmount;
-
-            // 2. Auto-Allocate to Installments
-            for (const inst of installments) {
-                if (remainingAmount <= 0) break;
-
-                const paymentsForThisInstallment = student.feePayments.filter(p => p.installmentId === inst.id);
-                const paidSoFar = paymentsForThisInstallment.reduce((sum, p) => sum + p.amountPaid, 0);
-                const pendingForThis = inst.amount - paidSoFar;
-
-                if (pendingForThis > 0) {
-                    const allocate = Math.min(pendingForThis, remainingAmount);
-
-                    await tx.feePayment.create({
-                        data: {
-                            studentId,
-                            installmentId: inst.id,
-                            amountPaid: allocate,
-                            date: new Date()
-                        }
-                    });
-
-                    remainingAmount -= allocate;
-                }
-            }
-
-            // 3. Stash Surplus (if any)
-            if (remainingAmount > 0) {
-                await tx.feeRecord.create({
-                    data: {
-                        studentId,
-                        amount: remainingAmount,
-                        status: 'PAID',
-                        date: new Date()
-                    }
-                });
-            }
-
-            await tx.systemLog.create({
-                data: {
-                    instituteId: student.instituteId!,
-                    action: 'FEE_COLLECTED',
-                    entityId: student.id,
-                    entityName: student.name,
-                    details: { amount: parsedAmount, type: 'Automated Allocation' }
-                }
-            });
-
-            return student; // Return for WhatsApp notification
-        }, {
-            isolationLevel: 'Serializable', // Prevents phantom reads / double-payment
-            timeout: 15000 // 15s timeout for the transaction
-        });
-
-        // Send WhatsApp receipt OUTSIDE transaction (fire-and-forget)
-        if (result.parentWhatsapp) {
-            const studentJoinDate = result.createdAt ? new Date(result.createdAt) : new Date(0);
-            const installments = (result.batch?.feeInstallments || []).filter((inst: any) => new Date(inst.createdAt) >= studentJoinDate);
-            const allocatedInstallments = installments
-                .filter(inst => {
-                    const paidBefore = result.feePayments.filter(p => p.installmentId === inst.id).reduce((s, p) => s + p.amountPaid, 0);
-                    return inst.amount - paidBefore > 0;
-                })
-                .map(inst => inst.name)
-                .join(', ') || 'Fee Payment';
-
-            import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
-                void sendStudentAlertForStudent(result.id, phone => sendPaymentReceiptWhatsApp(phone, {
-                    studentName: result.name,
-                    amountPaid: `Rs. ${parsedAmount.toLocaleString()}`,
-                    installmentName: allocatedInstallments,
-                    instituteName: result.batch?.institute?.name || 'our institute',
-                    instituteId: result.instituteId || undefined
-                })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
-            });
-        }
-
-        res.json({ success: true, message: 'Payment recorded and allocated' });
-    } catch (error: any) {
-        // Handle structured errors from within the transaction
-        if (error.statusCode) {
-            return res.status(error.statusCode).json({ error: error.message });
-        }
-        console.error("Error recording payment:", error);
-        res.status(500).json({ error: 'Failed to record payment' });
-    }
+export const recordPayment = async (req: Request, res: Response) => {
+    try {
+        const result = await collectExplicitPayment(req.body, req.user as any);
+        void notifyExplicitPayment(result).catch(() => secureLogger.warn('Payment saved; receipt notification failed.'));
+        return res.json(result);
+    } catch (error: any) { return res.status(error.statusCode || (error.code === 'P2034' ? 409 : 500)).json({error: error.statusCode ? error.message : 'Could not save payment. Retry with the same payment details.'}); }
 };
 
 export const payInstallment = async (req: Request, res: Response) => {
-    const { studentId, installmentId, amount, date } = req.body;
-
-    secureLogger.debug('payInstallment called', { studentId, installmentId, amount, date });
-
-    if (!studentId || !installmentId || amount === undefined || amount === null) {
-        res.status(400).json({ error: 'Missing required fields' });
-        return;
-    }
-
     try {
-        const teacherId = (req as any).user?.id;
-        const user = (req as any).user;
-
-        // Verify student ownership
-        const student = await prisma.student.findUnique({
-            where: { id: studentId },
-            include: {
-                batch: { include: { institute: true } },
-                feeAssignments: { select: { installmentId: true } }
-            }
-        });
-
-        secureLogger.debug('Student found', student ? { id: student.id, name: student.name, batchId: student.batchId, hasBatch: !!student.batch } : 'NOT FOUND');
-
-        if (!student) return res.status(404).json({ error: 'Student not found' });
-
-        // ✅ SECURITY: Defense-in-depth - validate instituteId directly
-        if (!student.batch) {
-            return res.status(400).json({ error: 'Student has no batch assigned' });
-        }
-        if (student.instituteId && student.instituteId !== user.instituteId) {
-            return res.status(403).json({ error: 'Unauthorized: Cross-institute access denied' });
-        }
-        if (student.batch.teacherId && student.batch.teacherId !== teacherId) {
-            return res.status(403).json({ error: 'Unauthorized' });
-        }
-
-        // Calculate total already paid for this installment
-        const existingPayments = await prisma.feePayment.findMany({
-            where: { studentId, installmentId }
-        });
-
-        const totalPaidSoFar = existingPayments.reduce((sum, p) => sum + p.amountPaid, 0);
-
-        // Find the installment details to get the max amount
-        const installment = await prisma.feeInstallment.findUnique({
-            where: { id: installmentId }
-        });
-
-        if (!installment) {
-            return res.status(404).json({ error: 'Installment not found' });
-        }
-
-        const isSameBatch = installment.batchId === student.batchId;
-        const isAssigned = student.feeAssignments?.some((assignment) => assignment.installmentId === installment.id) ?? false;
-        const isExistingPayment = existingPayments.length > 0;
-        const isAfterJoin = new Date(installment.createdAt).getTime() >= new Date(student.createdAt).getTime();
-        const isValidCustomInstallment = Boolean(installment.studentId) && installment.studentId === student.id && isSameBatch;
-        const isValidBatchInstallment = !installment.studentId && isSameBatch && (isAfterJoin || isExistingPayment || isAssigned);
-
-        if (!isValidCustomInstallment && !isValidBatchInstallment) {
-            return res.status(403).json({ error: 'Forbidden: Installment is not valid for this student' });
-        }
-
-        const remainingBalance = installment.amount - totalPaidSoFar;
-        const newPaymentAmount = parseFloat(String(amount));
-
-        // Precision check (handle floating point tiny differences)
-        if (remainingBalance <= 0.01) {
-            return res.status(400).json({ error: 'Installment is already fully paid' });
-        }
-
-        if (newPaymentAmount > remainingBalance + 0.01) {
-            return res.status(400).json({
-                error: `Payment amount (₹${newPaymentAmount}) exceeds remaining balance (₹${remainingBalance})`
-            });
-        }
-
-
-        // Create payment record
-        const payment = await prisma.feePayment.create({
-            data: {
-                studentId,
-                installmentId,
-                amountPaid: newPaymentAmount,
-                date: date ? new Date(date) : new Date(),
-            }
-        });
-
-        if (student.instituteId) {
-            try {
-                await prisma.systemLog.create({
-                    data: {
-                        instituteId: student.instituteId,
-                        action: 'FEE_COLLECTED',
-                        entityId: student.id,
-                        entityName: student.name,
-                        details: { amount: newPaymentAmount, installmentName: installment.name }
-                    }
-                });
-            } catch (logError) {
-                console.warn('[WARN] Failed to write fee collection audit log:', logError);
-            }
-        }
-
-        console.log('[DEBUG] Payment created successfully:', {
-            paymentId: payment.id,
-            studentId: payment.studentId,
-            installmentId: payment.installmentId,
-            amount: payment.amountPaid,
-            date: payment.date
-        });
-
-        // Send WhatsApp receipt to parent (fire-and-forget)
-        if (student.parentWhatsapp) {
-            import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
-                void sendStudentAlertForStudent(student.id, phone => sendPaymentReceiptWhatsApp(phone, {
-                    studentName: student.name,
-                    amountPaid: `Rs. ${newPaymentAmount.toLocaleString()}`,
-                    installmentName: installment.name,
-                    instituteName: student.batch?.institute?.name || 'our institute',
-                    instituteId: student.instituteId || undefined
-                })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
-            });
-        }
-
-        // Payment recorded successfully (this will automatically appear in transaction reports)
-        res.json(payment);
-    } catch (error) {
-        console.error('[ERROR] Error paying installment:', error);
-        res.status(500).json({ error: 'Failed to record payment' });
+        const { studentId, installmentId, amount, idempotencyKey, date } = req.body;
+        const result = await collectExplicitPayment({ studentId, amount, allocations: [{ installmentId, amount }], idempotencyKey, date }, req.user as any);
+        void notifyExplicitPayment(result).catch(() => secureLogger.warn('Payment saved; receipt notification failed.'));
+        return res.json(result);
+    } catch (error: any) {
+        return res.status(error.statusCode || (error.code === 'P2034' ? 409 : 500)).json({ error: error.statusCode ? error.message : 'Could not save payment. Retry with the same payment reference.' });
     }
 };
 
@@ -628,18 +377,17 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
         const student = await prisma.student.findUnique({
             where: { id: studentId },
             include: {
-                batch: { include: { feeInstallments: true, institute: true } },
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: { include: { feeInstallments: true, institute: true } } } },
                 feePayments: true,
                 feeAssignments: { select: { installmentId: true } },
                 fees: true
             }
         });
 
-        if (student?.batch?.teacherId && student.batch.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
-
         if (!student || !student.parentEmail) {
             return res.status(400).json({ error: 'Student email not found' });
         }
+        if (!student.enrollments.some(enrollment => !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId)) return res.status(403).json({ error: 'Unauthorized' });
 
         const snapshot = calculateStudentFeeSnapshot(student);
         const totalPendingCalc = Math.max(0, snapshot.balance);
@@ -649,14 +397,16 @@ export const sendFeeReminder = async (req: Request, res: Response) => {
         const breakdownLines = [`- Outstanding Balance: Rs. ${totalPendingCalc.toLocaleString()}`];
 
         const subject = `Fee Payment Reminder for ${student.name}`;
-        const senderName = student.batch?.institute?.name || 'Coaching Administration';
-        const replyTo = student.batch?.institute?.email || undefined;
+        const institute = student.enrollments[0]?.batch.institute;
+        const batchNames = student.enrollments.map(enrollment => enrollment.batch.name).join(', ') || 'Class';
+        const senderName = institute?.name || 'Coaching Administration';
+        const replyTo = institute?.email || undefined;
 
         const body = `Dear ${student.parentName || 'Parent/Guardian'},
 
 We hope you are doing well.
 
-This is a gentle reminder regarding the pending fee for your child, ${student.name} (${student.batch?.name || 'Class'}).
+This is a gentle reminder regarding the pending fee for your child, ${student.name} (${batchNames}).
 
 Fee Breakdown:
 ${breakdownLines.join('\n')}
@@ -677,7 +427,7 @@ ${senderName}`;
                 body,
                 status: 'PENDING',
                 options: { senderName, replyTo, senderType: 'NOREPLY' },
-                instituteId: student.batch?.instituteId
+                instituteId: student.instituteId
             } as any
         });
 
@@ -688,14 +438,14 @@ ${senderName}`;
                 const feeBreakupText = breakdownLines.join(' | ');
 
                 const phoneDigits = student.parentWhatsapp!.replace(/\D/g, '').slice(-10);
-                const upiLink = `${process.env.FRONTEND_URL || 'https://mathlogs.com'}/pay/${student.batch?.institute?.slug}?phone=${phoneDigits}`;
+                const upiLink = `${process.env.FRONTEND_URL || 'https://mathlogs.com'}/pay/${institute?.slug}?phone=${phoneDigits}`;
 
                 void sendStudentAlertForStudent(student.id, phone => sendFeeReminderUpiWhatsApp(phone, {
                         studentName: student.name,
-                        batchName: student.batch?.name || "the batch",
+                        batchName: batchNames,
                         feeBreakup: feeBreakupText,
                         totalAmount: totalPendingCalc.toLocaleString(),
-                        instituteName: student.batch?.institute?.name || "our institute",
+                        instituteName: institute?.name || "our institute",
                         upiPaymentLink: upiLink,
                         instituteId: student.instituteId || undefined
                     }
@@ -940,163 +690,12 @@ class PaymentValidationError extends Error {
 
 export const approveUpiVerification = async (req: Request, res: Response) => {
     try {
-        const id = req.params.id as string;
-        const teacherId = (req as any).user?.id;
-        const instituteId = (req as any).user?.instituteId;
-
-        const rawVerification = await prisma.upiPaymentVerification.findUnique({
-            where: { id },
-            include: {
-                student: { include: { batch: { include: { institute: true } } } },
-                installment: true
-            }
-        });
-        const verification = rawVerification as any;
-
-        if (!verification || verification.instituteId !== instituteId) {
-            return res.status(404).json({ error: 'Verification not found' });
-        }
-        if (verification.student.batch?.teacherId && verification.student.batch.teacherId !== teacherId) {
-            return res.status(403).json({ error: 'Unauthorized' });
-        }
-        if (verification.status !== 'PENDING') {
-            return res.status(400).json({ error: `This payment has already been ${verification.status.toLowerCase()}.`, alreadyProcessed: true });
-        }
-
-        // Inside a transaction to approve and pay
-        await prisma.$transaction(async (tx) => {
-            // VERIFICATION: Check the materialized balance to absolutely prevent double-logging
-            const studentBalance = await tx.studentBalance.findUnique({
-                where: { studentId: verification.studentId }
-            });
-            const pendingAmount = studentBalance?.balance || 0;
-
-            if (pendingAmount <= 0) {
-                throw new PaymentValidationError("Cannot approve! This student has no pending fee. The payment was likely logged directly by another method.");
-            }
-            if (verification.amount > pendingAmount) {
-                throw new PaymentValidationError(`Cannot approve! The receipt amount (₹${verification.amount}) is greater than the student's current due balance (₹${pendingAmount}).`);
-            }
-
-            // Atomically claim this verification row so concurrent approvers cannot double-collect.
-            const claimed = await tx.upiPaymentVerification.updateMany({
-                where: {
-                    id,
-                    status: 'PENDING'
-                },
-                data: { status: 'APPROVED' }
-            });
-            if (claimed.count !== 1) {
-                throw new AlreadyProcessedError('This payment has already been processed.');
-            }
-
-            // Create fee payment
-            if (verification.installmentId) {
-                await tx.feePayment.create({
-                    data: {
-                        studentId: verification.studentId,
-                        installmentId: verification.installmentId,
-                        amountPaid: verification.amount,
-                        date: new Date()
-                    }
-                });
-            } else {
-                // If it was custom amount without installment, intelligently waterfall allocate
-                const studentData = await tx.student.findUnique({
-                    where: { id: verification.studentId },
-                    include: { feePayments: true, batch: { include: { feeInstallments: true } } }
-                });
-
-                if (!studentData || !studentData.batch) {
-                    throw new Error("Student data missing during allocation.");
-                }
-
-                let remainingAmount = verification.amount;
-                const studentJoinDate = studentData.createdAt ? new Date(studentData.createdAt) : new Date(0);
-                const installments = studentData.batch.feeInstallments
-                    .filter(inst => new Date(inst.createdAt) >= studentJoinDate)
-                    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-                for (const inst of installments) {
-                    if (remainingAmount <= 0) break;
-
-                    const paidSoFar = studentData.feePayments.filter(p => p.installmentId === inst.id).reduce((sum, p) => sum + p.amountPaid, 0);
-                    const pendingForThis = inst.amount - paidSoFar;
-
-                    if (pendingForThis > 0) {
-                        const allocate = Math.min(pendingForThis, remainingAmount);
-
-                        await tx.feePayment.create({
-                            data: {
-                                studentId: verification.studentId,
-                                installmentId: inst.id,
-                                amountPaid: allocate,
-                                date: new Date()
-                            }
-                        });
-
-                        remainingAmount -= allocate;
-                    }
-                }
-
-                if (remainingAmount > 0) {
-                    await tx.feeRecord.create({
-                        data: {
-                            studentId: verification.studentId,
-                            amount: remainingAmount,
-                            status: 'PAID',
-                            date: new Date()
-                        }
-                    });
-                }
-            }
-
-            // System log
-            await tx.systemLog.create({
-                data: {
-                    instituteId,
-                    action: 'FEE_COLLECTED',
-                    entityId: verification.studentId,
-                    entityName: verification.student.name,
-                    details: { amount: verification.amount, type: 'UPI Verification' }
-                }
-            });
-        });
-
-        // Send success response FIRST — transaction is committed, don't let side-effects cause 500
-        res.json({ success: true, message: 'Payment approved successfully!' });
-
-        // Fire-and-forget side effects (won't affect response)
-        try {
-            // 1. Delete the physical screenshot (Space saving)
-            deletePaymentScreenshot(verification.storageKey).catch(e => console.error('Failed to delete screenshot after approval:', e));
-
-            // 2. WhatsApp Notification
-            const phoneRaw = verification.student.parentWhatsapp;
-            if (phoneRaw) {
-                import('../utils/whatsapp').then(({ sendPaymentReceiptWhatsApp }) => {
-                    void sendStudentAlertForStudent(verification.student.id, phone => sendPaymentReceiptWhatsApp(phone, {
-                        studentName: verification.student.name,
-                        amountPaid: `Rs. ${verification.amount.toLocaleString()}`,
-                        installmentName: verification.installment?.name || 'Fee Payment',
-                        instituteName: verification.student.batch?.institute?.name || 'our institute',
-                        instituteId: instituteId || undefined
-                    })).catch(err => console.error('WhatsApp Payment Receipt Error:', err));
-                }).catch(err => console.error('WhatsApp import error:', err));
-            }
-        } catch (sideEffectErr) {
-            console.error('Post-approval side-effect error (non-critical):', sideEffectErr);
-        }
-    } catch (e: any) {
-        if (e instanceof AlreadyProcessedError) {
-            return res.status(400).json({ error: e.message, alreadyProcessed: true });
-        }
-        if (e instanceof PaymentValidationError) {
-            return res.status(400).json({ error: e.message });
-        }
-        console.error('Approve UPI Payment Error:', e?.message, e?.stack);
-        res.status(500).json({ error: 'Failed to approve payment', detail: e?.message });
-    }
+        const verification = await prisma.upiPaymentVerification.findUnique({where:{id:String(req.params.id)}});
+        if (!verification || verification.instituteId !== req.user.instituteId) return res.status(404).json({error:'Verification not found.'});
+        const result = await collectExplicitPayment({studentId:verification.studentId,amount:verification.amount,allocations:req.body.allocations,idempotencyKey:`upi:${verification.id}`,verificationId:verification.id},req.user as any);
+        void notifyExplicitPayment(result).catch(() => secureLogger.warn('Payment saved; receipt notification failed.'));
+        return res.json(result);
+    } catch(error:any) { return res.status(error.statusCode || 500).json({error:error.statusCode ? error.message : 'Could not approve payment. Retry with the same allocation.'}); }
 };
 
 export const rejectUpiVerification = async (req: Request, res: Response) => {
@@ -1404,7 +1003,7 @@ export const assignFeeInstallment = async (req: Request, res: Response) => {
 
         const student = await prisma.student.findUnique({
             where: { id: String(studentId) },
-            include: { batch: true }
+            include: { enrollments: { where: { status: 'ACTIVE' }, select: { batchId: true } } }
         });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -1417,7 +1016,7 @@ export const assignFeeInstallment = async (req: Request, res: Response) => {
         });
 
         if (!installment) return res.status(404).json({ error: 'Installment not found' });
-        if (installment.batchId !== student.batchId) {
+        if (!student.enrollments.some(enrollment => enrollment.batchId === installment.batchId)) {
             return res.status(400).json({ error: 'Installment does not belong to student batch' });
         }
 

@@ -1,0 +1,6 @@
+mobile/
+docs/
+outputs/
+graphify-out/
+server/tests/
+client/src/**/*.test.*

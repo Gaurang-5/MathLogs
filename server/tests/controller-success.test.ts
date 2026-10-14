@@ -169,69 +169,31 @@ test('refreshTokenUser rotates the refresh token on success', async () => {
     assert.equal(refreshTokenCreateCalls, 1);
 });
 
-test('payInstallment records a valid installment payment', async () => {
-    replaceMethod(prisma.student, 'findUnique', (async () => ({
-        id: 'student-1',
-        name: 'Aarav Sharma',
-        batchId: 'batch-1',
-        parentWhatsapp: '',
-        instituteId: 'inst-1',
-        createdAt: new Date('2026-01-01T00:00:00Z'),
-        batch: {
-            id: 'batch-1',
-            teacherId: 'teacher-1',
-            institute: { name: 'MathLogs Institute' },
-        },
-    }) as never) as typeof prisma.student.findUnique);
-    replaceMethod(prisma.feePayment, 'findMany', (async () => [] as never) as typeof prisma.feePayment.findMany);
-    replaceMethod(prisma.feeInstallment, 'findUnique', (async () => ({
-        id: 'installment-1',
-        name: 'April Fee',
-        amount: 500,
-        studentId: null,
-        batchId: 'batch-1',
-        createdAt: new Date('2026-04-01T00:00:00Z')
-    }) as never) as typeof prisma.feeInstallment.findUnique);
 
-    let paymentCreateCalls = 0;
-    replaceMethod(prisma.feePayment, 'create', (async ({ data }: { data: Record<string, unknown> }) => {
-        paymentCreateCalls += 1;
-        return {
-            id: 'payment-1',
-            studentId: data.studentId,
-            installmentId: data.installmentId,
-            amountPaid: data.amountPaid,
-            date: data.date,
-        } as never;
-    }) as typeof prisma.feePayment.create);
-    replaceMethod(prisma.systemLog, 'create', (async () => ({ id: 'system-log-1' }) as never) as typeof prisma.systemLog.create);
-    replaceMethod(prisma, '$transaction', (async (callback: any) => callback(prisma)) as typeof prisma.$transaction);
-
-    const req = {
-        body: {
-            studentId: 'student-1',
-            installmentId: 'installment-1',
-            amount: 500,
-            date: '2026-04-03',
-        },
-        user: {
-            id: 'teacher-1',
-            instituteId: 'inst-1',
-        },
-    } as MockRequest;
-    const res = createMockResponse();
-
-    await payInstallment(req as never, res as never);
-
-    assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, {
-        id: 'payment-1',
-        studentId: 'student-1',
-        installmentId: 'installment-1',
-        amountPaid: 500,
-        date: new Date('2026-04-03'),
-    });
-    assert.equal(paymentCreateCalls, 1);
+function mockExplicitCollection(studentId: string, installmentId: string) {
+    const payments: any[] = [];
+    const actions = new Map<string, any>();
+    let queue = Promise.resolve();
+    replaceMethod(prisma, '$transaction', (async (callback: any) => {
+        const previous=queue; let release!:()=>void;
+        queue=new Promise<void>(resolve=>{release=resolve;});await previous;
+        try { return await callback(prisma); } finally { release(); }
+    }) as never);
+    replaceMethod(prisma, '$queryRaw', (async()=>[]) as never);
+    replaceMethod(prisma.student,'findUnique',(async()=>({id:studentId,name:'Fixture',instituteId:'inst-1',fees:[],feeAssignments:[],feePayments:payments,
+        enrollments:[{feeDecision:'LEGACY',startedAt:new Date('2026-01-01'),batch:{teacherId:'teacher-1',name:'Batch',feeInstallments:[{id:installmentId,name:'October',amount:500,studentId:null,createdAt:new Date('2026-04-01')}]}}]})) as never);
+    replaceMethod(prisma.feePayment,'create',(async({data}:any)=>{const payment={id:`payment-${payments.length+1}`,...data};payments.push(payment);return payment;}) as never);
+    replaceMethod(prisma.systemLog,'create',(async()=>({})) as never);
+    replaceMethod(prisma.enrollmentAction,'findUnique',(async({where}:any)=>actions.get(where.instituteId_idempotencyKey.idempotencyKey)||null) as never);
+    replaceMethod(prisma.enrollmentAction,'create',(async({data}:any)=>{actions.set(data.idempotencyKey,data);return data;}) as never);
+    return payments;
+}
+test('payInstallment records a valid installment payment',async()=>{
+    const payments=mockExplicitCollection('student-1','installment-1');
+    const res=createMockResponse();
+    await payInstallment({body:{studentId:'student-1',installmentId:'installment-1',amount:500,date:'2026-04-03',idempotencyKey:'controller-payment'},user:{id:'teacher-1',instituteId:'inst-1'}} as never,res as never);
+    assert.equal(res.statusCode,200);assert.equal(payments.length,1);
+    assert.equal(payments[0].date.toISOString(),'2026-04-03T00:00:00.000Z');
 });
 
 test('startOnlineQuiz creates an attempt without exposing correct answers', async () => {

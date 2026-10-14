@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
@@ -17,6 +18,7 @@ import { getStudentProfile } from '../src/controllers/studentController';
 
 function response() {
   return {
+    setHeader() { return this; },
     statusCode: 200, body: undefined as unknown,
     status(code: number) { this.statusCode = code; return this; },
     json(body: unknown) { this.body = body; return this; },
@@ -126,9 +128,10 @@ test('month student profile returns configured fields and month counts without l
         config: { registrationForm: { fields: [{ id: 'emergencyPhone', label: 'Emergency phone', type: 'tel' }] } },
       },
       batch: { name: 'Target', className: null, subject: 'Maths', startDate: new Date('2026-07-01'), endDate: new Date('2026-09-30') },
+      enrollments: [{ status: 'ACTIVE', batch: { name: 'Target' }, monthCoverageProfile: { id:'profile-1', enrollmentId:'e1', feeStartMonth:'2026-07',feeEndMonth:'2026-09',status:'ACTIVE' } }],
       monthCoverageProfile: { id: 'profile-1', batchId: 'batch-1', feeStartMonth: '2026-07', feeEndMonth: '2026-09', status: 'ACTIVE' },
-      monthCoverageAllocations: [{ coverageMonth: '2026-07', payment: { status: 'ACTIVE' } }],
-      marks: [], attendanceRecords: [],
+      monthCoverageAllocations: [{ enrollmentId:'e1', coverageMonth: '2026-07', payment: { status: 'ACTIVE' } }],
+      marks: [],
     } as never;
   }) as typeof prisma.student.findUnique);
   const res = response();
@@ -148,7 +151,7 @@ test('month student profile returns configured fields and month counts without l
 
 test('student profile forbids a student from another institute', async () => {
   replaceMethod(prisma.student, 'findUnique', (async () => ({
-    id: 'student-foreign', instituteId: 'inst-2', attendanceRecords: [], institute: null,
+    id: 'student-foreign', instituteId: 'inst-2', institute: null,
   }) as never) as typeof prisma.student.findUnique);
   const res = response();
 
@@ -228,9 +231,9 @@ for (const surface of ['fees', 'upi'] as const) {
     const res = response();
 
     if (surface === 'fees') {
-      await getPublicStudentFees({ params: { slug: 'mathlogs' }, query: { phone: '9876543210' } } as never, res as never);
+      await getPublicStudentFees({ headers: { authorization: `Bearer ${jwt.sign({role:'STUDENT',authenticationMethod:'WHATSAPP_OTP', studentId:'s1', instituteId:'inst-1'},'test-secret')}` }, params: { slug: 'mathlogs' }, query: { phone: '9876543210' } } as never, res as never);
     } else {
-      await submitUpiPayment({ params: { slug: 'mathlogs' }, body: {}, file: undefined } as never, res as never);
+      await submitUpiPayment({ headers: { authorization: `Bearer ${jwt.sign({role:'STUDENT',authenticationMethod:'WHATSAPP_OTP', studentId:'s1', instituteId:'inst-1'},'test-secret')}` }, params: { slug: 'mathlogs' }, body: {}, file: undefined } as never, res as never);
     }
 
     assert.equal(res.statusCode, 403);

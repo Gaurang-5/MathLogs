@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ChevronRight, MessageSquare, Shield,
-    CheckCircle, CheckCircle2, ArrowRight, Database, LineChart,
+    CheckCircle, CheckCircle2, ArrowRight, Database,
     Camera, X, Maximize2, Settings,
     Download, FileText, Printer, Wallet, Plus, Minus,
     Sparkles
@@ -222,7 +222,7 @@ export default function Home() {
 
     useMetaTags({
         title: 'MathLogs | Coaching Marketplace, AI Quiz Generator & Management Software',
-        description: 'Find coaching institutes, generate AI-powered online quizzes, and manage attendance, fees, tests and parent communication with MathLogs.',
+        description: 'Find coaching institutes, generate AI-powered online quizzes, and manage students, fees, tests and parent communication with MathLogs.',
         canonicalPath: '/',
         structuredData: HOME_STRUCTURED_DATA
     });

@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, Clock, Smartphone, Mail, User, UserCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { IdentityReviewQueue } from '../features/enrollments/IdentityReviewQueue';
 
 interface Student {
     id: string;
@@ -93,6 +94,7 @@ export default function Approvals() {
 
     return (
         <Layout title="Pending Approvals">
+            <IdentityReviewQueue />
             {loading ? (
                 <div className="text-slate-500 animate-pulse">Loading requests...</div>
             ) : (

@@ -129,6 +129,32 @@ test('dashboard returns month totals and oldest overdue follow-ups without legac
   assert.equal('finances' in result, false);
 });
 
+test('dashboard reuses its known institute and loads month data in parallel', async () => {
+  let countStarted = false;
+  const deps: MonthCoverageSummaryDeps = {
+    loadInstitute: async () => assert.fail('known dashboard institute must not be loaded again'),
+    loadStudents: async () => {
+      await Promise.resolve();
+      assert.equal(countStarted, true, 'student and batch queries should start together');
+      return [source()];
+    },
+    countBatches: async () => {
+      countStarted = true;
+      return 2;
+    },
+  };
+
+  const result = await getMonthCoverageDashboard(
+    'inst-1',
+    'teacher-1',
+    new Date('2026-09-10T00:00:00.000Z'),
+    deps,
+    { id: 'inst-1', coachingFeeMode: 'MONTH_COVERAGE', timezone: 'Asia/Kolkata', teacherName: 'Gaurang' },
+  );
+
+  assert.deepEqual(result.stats, { batches: 2, students: 1 });
+});
+
 test('dashboard controller dispatches month mode without querying legacy fee SQL', async () => {
   replaceMethod(prisma.institute, 'findUnique', (async () => ({
     id: 'inst-1', coachingFeeMode: 'MONTH_COVERAGE', timezone: 'Asia/Kolkata', teacherName: 'Gaurang',

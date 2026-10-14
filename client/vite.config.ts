@@ -61,6 +61,8 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Keep the local QR decoder available in the installed app after an update.
+        globPatterns: ['**/*.{js,css,html,wasm}'],
         // Exclude student portal and marketplace routes from SW navigation fallback
         navigateFallbackDenylist: [/^\/[^/]+\/student/, /^\/api\//, /^\/coaching/, /^\/list-coaching/],
         // Exclude source maps and very large files from precache (prevents SW startup errors)

@@ -43,7 +43,7 @@ interface QuizLiveMonitorProps {
 }
 
 // Live ticking timer for a single student card
-function StudentTimer({ student, timeLimitMins }: { student: StudentData; timeLimitMins: number }) {
+function StudentTimer({ student }: { student: StudentData; timeLimitMins: number }) {
     const [secondsLeft, setSecondsLeft] = useState(student.remainingSeconds);
 
     useEffect(() => {
@@ -125,7 +125,7 @@ export default function QuizLiveMonitor({ quizId, onClose }: QuizLiveMonitorProp
 
     const handleUnlock = async (submissionId: string) => {
         try {
-            await api.post(`/tests/online/${quizId}/submissions/${submissionId}/unlock`);
+            await api.post(`/tests/online/${quizId}/submissions/${submissionId}/unlock`, {});
             toast.success('Student unlocked and warnings reset!');
             loadMonitorData(true); // silent refresh
         } catch (err: any) {
@@ -331,7 +331,7 @@ export default function QuizLiveMonitor({ quizId, onClose }: QuizLiveMonitorProp
 
                                     {/* Live metrics / scores */}
                                     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-3.5 mt-1 shrink-0">
-                                        <StudentTimer student={student} timeLimitMins={data.quiz.timeLimitMins} />
+                                        <StudentTimer student={student} timeLimitMins={data?.quiz.timeLimitMins ?? 0} />
                                         
                                         {student.submittedAt && student.score !== null ? (
                                             <div className="text-right shrink-0">

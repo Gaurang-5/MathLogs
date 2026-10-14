@@ -24,7 +24,7 @@ export default function AboutUs() {
                         <h2 className="text-2xl font-extrabold text-neutral-900 tracking-[-0.02em] mb-4">Our Story</h2>
                         <p>
                             MathLogs was born out of a simple observation: independent teachers and small coaching centre
-                            owners spend far too much time managing spreadsheets, taking attendance, chasing fee payments,
+                            owners spend far too much time managing spreadsheets, maintaining student records, chasing fee payments,
                             and sending manual WhatsApp messages to parents. We built MathLogs to automate the repetitive
                             administrative tasks so that teachers can return to what they do best: teaching.
                         </p>

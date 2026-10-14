@@ -55,6 +55,7 @@ interface AITestGeneratorModalProps {
 
 // A generated question with an optional `kept` flag for user approval
 interface GeneratedQuestion {
+    regenId?: string;
     id?: string;
     questionText: string;
     marks: number;
@@ -294,7 +295,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                 formData.append('comments', comments.trim());
             }
 
-            const initialRes = await api.post('/tests/generate', formData, {
+            const initialRes = await api.post<{jobId: string}>('/tests/generate', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 timeoutMs: 60000 // 1 min timeout for initial trigger
             });
@@ -307,14 +308,14 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
 
             const pollJobStatus = async () => {
                 try {
-                    const statusRes = await api.get(`/tests/generate/status/${jobId}`);
+                    const statusRes = await api.get<{status: 'completed'; result: {title:string;totalMarks:number;questions:GeneratedQuestion[];warnings?:string[]}} | {status:'failed'|'pending'|'processing'; error?:string}>(`/tests/generate/status/${jobId}`);
                     if (statusRes.status === 'completed') {
                         const res = statusRes.result;
                         // Attach `kept: false` to all generated questions
                         const questions: GeneratedQuestion[] = (res.questions || []).map((q: any) => ({ ...q, kept: false }));
                         setGeneratedTest({ ...res, questions });
 
-                        if (res.warnings?.length > 0) {
+                        if (res.warnings?.length) {
                             toast.error(res.warnings.join('\n'), { duration: 6000 });
                         }
                         toast.success('Test generated successfully!');
@@ -339,13 +340,6 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
     };
 
     // Toggle kept state for one question
-    const toggleKept = (index: number) => {
-        if (!generatedTest) return;
-        const updatedQuestions = generatedTest.questions.map((q, i) =>
-            i === index ? { ...q, kept: !q.kept } : q
-        );
-        setGeneratedTest({ ...generatedTest, questions: updatedQuestions });
-    };
 
     // Regenerate a single question (or variant group) and allow reverting
     const handleRegenerateQuestion = async (index: number) => {
@@ -364,7 +358,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
             }
 
             const excludeQuestions = generatedTest.questions.map(q => q.questionText);
-            const res = await api.post('/tests/generate-single-question', {
+            const res = await api.post<GeneratedQuestion>('/tests/generate-single-question', {
                 topic,
                 grade,
                 difficulty,
@@ -378,7 +372,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                 const newVariantGroup = Date.now().toString();
                 newQuestions.push({ ...res, variantGroup: newVariantGroup });
 
-                const variantRes = await api.post('/tests/generate-variant-question', {
+                const variantRes = await api.post<GeneratedQuestion>('/tests/generate-variant-question', {
                     topic,
                     grade,
                     difficulty,
@@ -421,7 +415,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
         setRegeneratingIndex(index);
         try {
             const originalQuestion = generatedTest.questions[index];
-            const res = await api.post('/tests/generate-variant-question', {
+            const res = await api.post<GeneratedQuestion>('/tests/generate-variant-question', {
                 topic,
                 grade,
                 difficulty,
@@ -468,7 +462,7 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
             for (let i = 0; i < updatedQuestions.length; i++) {
                 if (updatedQuestions[i].kept) continue;
 
-                const res = await api.post('/tests/generate-single-question', {
+                const res = await api.post<GeneratedQuestion>('/tests/generate-single-question', {
                     topic,
                     grade,
                     difficulty,
@@ -796,7 +790,6 @@ export default function AITestGeneratorModal({ isOpen, onClose, batches, onSaved
                                     <div className="space-y-4">
                                         {generatedTest.questions.map((q, i) => {
                                             const isVariantA = q.variantGroup && generatedTest.questions.findIndex(x => x.variantGroup === q.variantGroup) === i;
-                                            const isVariantB = q.variantGroup && !isVariantA;
 
                                             return (
                                                 <div

@@ -26,13 +26,15 @@ export type MonthCoverageSummaryStudentSource = {
   }>;
 };
 
+export type MonthCoverageInstituteSource = {
+  id: string;
+  coachingFeeMode: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE';
+  timezone: string;
+  teacherName: string | null;
+};
+
 export type MonthCoverageSummaryDeps = {
-  loadInstitute(instituteId: string): Promise<{
-    id: string;
-    coachingFeeMode: 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE';
-    timezone: string;
-    teacherName: string | null;
-  } | null>;
+  loadInstitute(instituteId: string): Promise<MonthCoverageInstituteSource | null>;
   loadStudents(input: {
     instituteId: string;
     teacherId?: string;
@@ -138,11 +140,13 @@ export async function getMonthCoverageSummary(
   query: MonthCoverageSummaryQuery,
   deps: MonthCoverageSummaryDeps = prismaMonthCoverageSummaryDeps,
 ): Promise<MonthCoverageSummaryResponse> {
-  const institute = await deps.loadInstitute(query.instituteId);
+  const [institute, sources] = await Promise.all([
+    deps.loadInstitute(query.instituteId),
+    deps.loadStudents(query),
+  ]);
   if (!institute || institute.id !== query.instituteId) throw new MonthCoverageError('INSTITUTE_NOT_FOUND');
   if (institute.coachingFeeMode !== 'MONTH_COVERAGE') throw new MonthCoverageError('FEE_MODE_MISMATCH');
   const currentMonth = currentMonthInTimezone(query.now, institute.timezone);
-  const sources = await deps.loadStudents(query);
 
   const students = sources.map(source => {
     const setupRequired = source.profileStatus === 'PENDING_SETUP' || !source.feeStartMonth || !source.feeEndMonth;
@@ -212,10 +216,19 @@ export async function getMonthCoverageDashboard(
   teacherId: string,
   now: Date,
   deps: MonthCoverageSummaryDeps = prismaMonthCoverageSummaryDeps,
+  knownInstitute?: MonthCoverageInstituteSource,
 ) {
-  const summary = await getMonthCoverageSummary({ instituteId, teacherId, now }, deps);
-  const institute = await deps.loadInstitute(instituteId);
-  const batches = await deps.countBatches(instituteId, teacherId);
+  const query = { instituteId, teacherId, now };
+  const [institute, sources, batches] = await Promise.all([
+    knownInstitute ? Promise.resolve(knownInstitute) : deps.loadInstitute(instituteId),
+    deps.loadStudents(query),
+    deps.countBatches(instituteId, teacherId),
+  ]);
+  const summary = await getMonthCoverageSummary(query, {
+    ...deps,
+    loadInstitute: async () => institute,
+    loadStudents: async () => sources,
+  });
   return {
     feeMode: 'MONTH_COVERAGE' as const,
     stats: { batches, students: summary.students.length },
