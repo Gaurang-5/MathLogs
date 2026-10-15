@@ -5,6 +5,7 @@ import { TeacherButton, TeacherSurface } from './teacher-ui';
 import { apiRequest } from '../utils/api';
 import { extractAllPhotoMarks, readPhotoCodes, type PhotoCode, type PhotoCodes, type PhotoMatch } from '../utils/multiSticker';
 import type { OCRProgress } from '../utils/ocr';
+import { StickerScanProgress } from './StickerScanProgress';
 import { StickerStudentPicker } from './StickerStudentPicker';
 
 type Student = { id:string; name:string; humanId:string; marks?:{testId:string;score:number}[] };
@@ -123,12 +124,12 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
         <div className="mx-auto max-w-2xl pb-20">
             <div className="relative z-20 flex justify-end"><h2 className="sr-only">Review marks</h2><TeacherButton variant="secondary" aria-label="Retake photo" disabled={saving} onClick={close}><X aria-hidden="true" size={20}/></TeacherButton></div>
             {busy&&<div className="fixed inset-0 z-10 flex items-center justify-center bg-app-bg px-8" aria-live="polite">
-                <div className="w-full max-w-xs -translate-y-4 text-center">
+                {!saving ? <StickerScanProgress imageUrl={imageUrl} geometry={geometry} message={matching?'Finding students…':message} percent={percent} /> : <div className="w-full max-w-xs -translate-y-4 text-center">
                 <p className="mb-5 text-lg font-semibold tracking-tight text-app-text">{saving?'Saving marks':matching?'Finding students':'Reading your stickers'}</p>
                 <div role="progressbar" aria-label={saving?'Saving marks':matching?'Finding students':message} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1.5 overflow-hidden rounded-full bg-app-border">
                     <div className={`h-full rounded-full bg-app-text transition-[width] motion-reduce:transition-none ${percent===undefined?'w-1/3 sticker-reading-sweep':' '}`} style={percent===undefined?undefined:{width:`${percent}%`}}/>
                 </div><p role="status" className="mt-4 text-xs text-app-text-secondary">{saving?`${rows.filter(row=>row.saved).length} of ${rows.length} marks saved`:matching?'Finding students…':message}</p>
-                </div>
+                </div>}
             </div>}
             {qrError?<StickerStudentPicker image={imageUrl} message={qrError} score="" onRetake={onClose} onSelect={async humanId=>{
                 const student=await apiRequest<Student>(`/students/lookup/${encodeURIComponent(humanId)}?testId=${encodeURIComponent(testId)}`);
