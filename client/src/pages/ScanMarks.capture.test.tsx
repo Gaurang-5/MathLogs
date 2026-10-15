@@ -34,7 +34,7 @@ beforeEach(async () => {
   vi.stubGlobal('navigator', { ...navigator, mediaDevices: { getUserMedia, enumerateDevices } });
   vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
   vi.stubGlobal('URL', { createObjectURL: vi.fn().mockReturnValue('blob:photo'), revokeObjectURL: vi.fn() });
-  mocks.api.mockImplementation(async (path: string) => path === '/tests'
+  mocks.api.mockImplementation(async (path: string,_method,body) => path === '/marks/batch'?{results:body.marks.map((m:any)=>({studentId:m.studentId,saved:true}))}:path === '/tests'
     ? [{ id: 'test', className: '10', maxMarks: 100 }]
     : {results:[{humanId:'A',student:{id:'student',humanId:'A',name:'Aarav',marks:[]}}]});
   mocks.codes.mockResolvedValue({width:100,height:100,codes:[{humanId:'A',corners:[]}]});
@@ -52,7 +52,7 @@ beforeEach(async () => {
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 it('captures only on click and uses one review without a mode selector',async()=>{
- expect(mocks.capture).not.toHaveBeenCalled();expect(document.querySelector('input[type=radio]')).toBeNull();await click('Capture');expect(mocks.capture).toHaveBeenCalledTimes(1);expect(mocks.marks).toHaveBeenCalledTimes(1);expect(document.querySelector<HTMLInputElement>('#sticker-score-0')!.value).toBe('0');expect(mocks.api.mock.calls.some(([path])=>path==='/marks')).toBe(false);await click('Confirm');expect(mocks.api).toHaveBeenCalledWith('/marks','POST',{testId:'test',studentId:'student',score:'0',expectedScore:null});expect(getUserMedia).toHaveBeenCalledTimes(1);
+ expect(mocks.capture).not.toHaveBeenCalled();expect(document.querySelector('input[type=radio]')).toBeNull();await click('Capture');expect(mocks.capture).toHaveBeenCalledTimes(1);expect(mocks.marks).toHaveBeenCalledTimes(1);expect(document.querySelector<HTMLInputElement>('#sticker-score-0')!.value).toBe('0');expect(mocks.api.mock.calls.some(([path])=>path==='/marks')).toBe(false);await click('Confirm');expect(mocks.api).toHaveBeenCalledWith('/marks/batch','POST',{testId:'test',marks:[{studentId:'student',score:'0',expectedScore:null}]});expect(getUserMedia).toHaveBeenCalledTimes(1);
 });
 it('ignores late frame encoding after cancellation',async()=>{
  let finish!:(b:Blob)=>void;mocks.blob.mockReturnValue(new Promise(resolve=>finish=resolve));await click('Capture');await click('Cancel Scan');await act(async()=>finish(new Blob(['photo'])));expect(mocks.codes).not.toHaveBeenCalled();expect(document.querySelector('video')).toBeNull();

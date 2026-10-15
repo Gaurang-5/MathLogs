@@ -1,10 +1,11 @@
+import { submitMarksBatch } from '../controllers/marksBatchController';
 import { Router } from 'express';
 import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
 import { requireCoachingFeeMode } from '../middleware/requireCoachingFeeMode';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resendEnrollmentNotificationSchema, resolveIdentityReviewSchema, retryEnrollmentNotificationSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resendEnrollmentNotificationSchema, resolveIdentityReviewSchema, retryEnrollmentNotificationSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, submitMarksBatchSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
 import { addStudentManually, approveStudent, archiveStudent, confirmMonthCoverageProfileController, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
@@ -382,6 +383,7 @@ router.delete('/tests/:id', authenticateToken as any, deleteTest as any);
 router.post('/tests/:id/send-results', authenticateToken as any, bulkNotifyLimiter, sendTestResultsEmail as any);
 router.get('/tests/:id/download', authenticateToken as any, downloadTestReport as any);
 router.get('/tests/:id/eligible-students', authenticateToken as any, getTestEligibleStudents as any);
+router.post('/marks/batch', authenticateToken as any, validateRequest(submitMarksBatchSchema), submitMarksBatch as any);
 router.post('/marks', authenticateToken as any, validateRequest(submitMarkSchema), submitMark as any);
 
 // Fees

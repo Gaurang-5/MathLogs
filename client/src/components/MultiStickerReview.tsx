@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { TeacherButton, TeacherSurface } from './teacher-ui';
 import { apiRequest } from '../utils/api';
 import { extractAllPhotoMarks, readPhotoCodes, type PhotoCode, type PhotoCodes, type PhotoMatch } from '../utils/multiSticker';
@@ -7,7 +8,7 @@ import type { OCRProgress } from '../utils/ocr';
 import { StickerStudentPicker } from './StickerStudentPicker';
 
 type Student = { id:string; name:string; humanId:string; marks?:{testId:string;score:number}[] };
-type Row = {code:PhotoCode;score:string;student?:Student;previous:number|null;saved:boolean;blocked?:string;error?:string};
+type Row = {code:PhotoCode;score:string;student?:Student;previous:number|null;saved:boolean;blocked?:string;error?:string;conflict?:{currentScore:number|null}};
 type LookupResult = {humanId:string;student?:Student;error?:string};
 export const validPhotoScore=(score:string,max:number)=>/^\d+(?:\.\d{1,2})?$/.test(score)&&Number(score)<=max;
 const lookupStudents=async(codes:PhotoCode[],testId:string,signal?:AbortSignal):Promise<Map<string,LookupResult>>=>{
@@ -87,16 +88,34 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
         document.addEventListener('keydown',keyboard);return()=>{document.removeEventListener('keydown',keyboard);previous?.focus();};
     },[]);
     const pending=rows.filter(row=>!row.saved);
-    const canConfirm=pending.length>0&&pending.every(row=>row.student&&!row.blocked&&validPhotoScore(row.score,maxMarks));
+    const canConfirm=pending.length>0&&pending.every(row=>row.student&&!row.blocked&&!row.conflict&&validPhotoScore(row.score,maxMarks));
     const save=async()=>{
         if(lock.current||reading||matching||!canConfirm)return;
+        const replacements=pending.filter(row=>row.previous!==null&&Number(row.score)!==row.previous).length;
+        if(replacements&&!window.confirm(`Replace ${replacements} previously saved ${replacements===1?'mark':'marks'} with the values shown?`))return;
         lock.current=true;setSaving(true);let failed=false;
-        for(const [i,row] of rows.entries()){
-            if(row.saved||!alive.current)continue;
-            try{await apiRequest('/marks','POST',{testId,studentId:row.student!.id,score:row.score,expectedScore:row.previous});if(alive.current)patch(i,{saved:true,error:undefined});}
-            catch(error){failed=true;if(alive.current)patch(i,{error:error instanceof Error?error.message:'Could not save. Confirm to retry.'});}
+        const entries=rows.map((row,i)=>({row,i})).filter(({row})=>!row.saved);
+        for(let start=0;start<entries.length&&alive.current;start+=20){
+            const group=entries.slice(start,start+20);
+            try{
+                const response=await apiRequest<{results:{studentId:string;saved:boolean;error?:string;conflict?:boolean;currentScore?:number|null}[]}>('/marks/batch','POST',{
+                    testId,marks:group.map(({row})=>({studentId:row.student!.id,score:row.score,expectedScore:row.previous}))
+                });
+                const results=new Map(response.results.map(result=>[result.studentId,result]));
+                for(const {row,i} of group){
+                    const result=results.get(row.student!.id);
+                    if(!result?.saved)failed=true;
+                    if(alive.current)patch(i,{saved:result?.saved===true,error:result?.saved?undefined:result?.error||'No save confirmation received. Confirm to retry.',
+                        conflict:result?.conflict?{currentScore:result.currentScore??null}:undefined});
+                }
+            }catch(error){
+                failed=true;
+                if(alive.current)for(const {i} of group)patch(i,{error:error instanceof Error?error.message:'Could not save. Confirm to retry.'});
+                // A server/network failure should not trigger a long chain of failing requests.
+                break;
+            }
         }
-        lock.current=false;if(alive.current){setSaving(false);if(!failed)onClose();else setMessage('Some marks could not be saved. Confirm to retry only those rows.');}
+        lock.current=false;if(alive.current){setSaving(false);if(!failed){toast.success(`${rows.length} ${rows.length===1?'mark':'marks'} saved`);onClose();}else setMessage('Some marks were not confirmed saved. Your entries are kept. Retry only the remaining rows.');}
     };
     const busy=reading||matching||saving;
     const percent=saving?Math.round(rows.filter(row=>row.saved).length/rows.length*100):reading&&progress?.stage==='uploading'?progress.percent:undefined;
@@ -108,7 +127,7 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
                 <p className="mb-5 text-lg font-semibold tracking-tight text-app-text">{saving?'Saving marks':matching?'Finding students':'Reading your stickers'}</p>
                 <div role="progressbar" aria-label={saving?'Saving marks':matching?'Finding students':message} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1.5 overflow-hidden rounded-full bg-app-border">
                     <div className={`h-full rounded-full bg-app-text transition-[width] motion-reduce:transition-none ${percent===undefined?'w-1/3 sticker-reading-sweep':' '}`} style={percent===undefined?undefined:{width:`${percent}%`}}/>
-                </div><p role="status" className="mt-4 text-xs text-app-text-secondary">{saving?'Saving marks…':matching?'Finding students…':message}</p>
+                </div><p role="status" className="mt-4 text-xs text-app-text-secondary">{saving?`${rows.filter(row=>row.saved).length} of ${rows.length} marks saved`:matching?'Finding students…':message}</p>
                 </div>
             </div>}
             {qrError?<StickerStudentPicker image={imageUrl} message={qrError} score="" onRetake={onClose} onSelect={async humanId=>{
@@ -126,6 +145,10 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
                         {row.blocked&&<p role="alert" className="mt-2 text-sm text-danger">{row.blocked}</p>}
                         {!row.saved&&row.score&&!validPhotoScore(row.score,maxMarks)&&<p role="alert" className="mt-2 text-sm text-danger">Enter 0–{maxMarks}, with at most two decimal places.</p>}
                         {!row.saved&&row.error&&<p role="alert" className="mt-2 text-xs text-app-text-secondary">{row.error}</p>}
+                        {row.conflict&&<div className="mt-2 text-sm text-app-text-secondary">
+                            <p>Currently saved: <strong>{row.conflict.currentScore??'No mark'}</strong>. Your entry: <strong>{row.score}</strong>.</p>
+                            <TeacherButton variant="secondary" className="mt-2" onClick={()=>patch(i,{previous:row.conflict!.currentScore,conflict:undefined,error:undefined})}>Review complete — use my entry</TeacherButton>
+                        </div>}
                         {row.saved&&<span className="sr-only">Saved</span>}
                     </div>)}
                 </TeacherSurface>

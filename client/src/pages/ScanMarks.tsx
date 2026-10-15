@@ -84,8 +84,8 @@ export default function ScanMarks(){
                     {/* Bottom Controls */}
                     <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-0 right-0 z-20 flex flex-col items-center gap-4 px-6">
                         {isProcessingOCR ? (
-                            <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl animate-in slide-in-from-bottom-4">
-                                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                            <div className="flex items-center gap-3 bg-app-surface-opaque px-6 py-3 rounded-full shadow-sm">
+                                <Loader2 className="w-5 h-5 motion-safe:animate-spin text-app-text" />
                                 <span role="status" className="font-bold text-app-text">Taking photo…</span>
                             </div>
                         ) : (
