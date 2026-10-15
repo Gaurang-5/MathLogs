@@ -232,6 +232,11 @@ router.post('/scan-ocr', (req, res, next) => {
         res.locals.scanPhase = 'reading_marks';
         if (req.body.mode === 'multiple') {
             if (!req.file) return res.status(400).json({ error: 'Upload the original photo.' });
+            let targets: {x:number;y:number}[] | undefined;
+            if(req.body.targets !== undefined){
+                try { targets=JSON.parse(req.body.targets); } catch { return res.status(400).json({error:'Invalid QR positions.'}); }
+                if(!Array.isArray(targets)||targets.length<1||targets.length>10||targets.some(p=>!p||typeof p.x!=='number'||typeof p.y!=='number'||!Number.isFinite(p.x)||!Number.isFinite(p.y)||p.x<0||p.x>1000||p.y<0||p.y>1000)) return res.status(400).json({error:'Invalid QR positions.'});
+            }
             const progress = req.body.progress === '1';
             if (progress) {
                 // Acknowledge receipt at the origin, not merely the proxy edge.
@@ -245,7 +250,7 @@ router.post('/scan-ocr', (req, res, next) => {
             const disconnected = () => { if (!res.writableEnded) controller.abort(); };
             res.once('close', disconnected);
             try {
-                const result = await processMultiStickerOCR(req.file.buffer, req.file.mimetype, test.maxMarks, { signal: controller.signal });
+                const result = await processMultiStickerOCR(req.file.buffer, req.file.mimetype, test.maxMarks, { signal: controller.signal, targets });
                 secureLogger.info('Multi-sticker OCR completed', { count: result.stickers.length, reason: result.reason, elapsedMs: Date.now() - started });
                 if (!controller.signal.aborted) { if (progress) res.end(JSON.stringify(result)); else res.json(result); }
             } finally { res.off('close', disconnected); }

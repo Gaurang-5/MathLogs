@@ -20,3 +20,9 @@ it('blocks separate copies of the same student QR',()=>{
 it('converts normalized coordinates using both photo dimensions',()=>{
  expect(matchStickerReadings({codes:[code('A',200,100)],width:2000,height:1000},[{x:100,y:100,score:'4'}])[0].score).toBe('4');
 });
+
+it('spatially groups more than ten QRs without dropping any and retains writing-area margins',async()=>{
+ const {photoGroups}=await import('./multiSticker');const codes=Array.from({length:31},(_,i)=>code(String(i),150+(i%4)*400,150+Math.floor(i/4)*400));
+ const groups=photoGroups({codes,width:2000,height:4000});expect(groups.every(g=>g.codes.length<=10)).toBe(true);expect(groups.flatMap(g=>g.codes).length).toBe(31);expect(new Set(groups.flatMap(g=>g.codes.map(c=>c.humanId))).size).toBe(31);
+ for(const g of groups){expect(g.x).toBeGreaterThanOrEqual(0);expect(g.y).toBeGreaterThanOrEqual(0);expect(g.x+g.width).toBeLessThanOrEqual(2000);expect(g.y+g.height).toBeLessThanOrEqual(4000);for(const c of g.codes)for(const p of c.corners){expect(p.x).toBeGreaterThanOrEqual(g.x);expect(p.x).toBeLessThanOrEqual(g.x+g.width);expect(p.y).toBeGreaterThanOrEqual(g.y);expect(p.y).toBeLessThanOrEqual(g.y+g.height);}}
+});

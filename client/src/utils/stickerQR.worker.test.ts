@@ -61,13 +61,13 @@ it('returns every valid QR position in multiple mode without invoking the first-
     await import('./stickerQR.worker');
     await worker.onmessage!({data:{pixels:new Uint8ClampedArray(16),width:2,height:2,multiple:true}} as MessageEvent);
     expect(worker.postMessage).toHaveBeenCalledWith({codes:[{humanId:'A',corners:Object.values(position)},{humanId:'B',corners:Object.values(position)}]});
-    expect(mocks.read.mock.calls[0][1].maxNumberOfSymbols).toBe(11);
+    expect(mocks.read.mock.calls[0][1].maxNumberOfSymbols).toBe(0);
     expect(mocks.jsqr).not.toHaveBeenCalled();
 });
 it('does not silently fall back to one QR when the multiple decoder is unavailable', async () => {
     mocks.prepare.mockRejectedValue(new Error('Offline'));
     await import('./stickerQR.worker');
     await worker.onmessage!({data:{pixels:new Uint8ClampedArray(16),width:2,height:2,multiple:true}} as MessageEvent);
-    expect(worker.postMessage).toHaveBeenCalledWith({error:expect.stringContaining('One sticker')});
+    expect(worker.postMessage).toHaveBeenCalledWith({error:expect.stringContaining('smaller group')});
     expect(mocks.jsqr).not.toHaveBeenCalled();
 });

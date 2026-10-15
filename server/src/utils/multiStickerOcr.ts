@@ -10,7 +10,7 @@ Return x and y for that QR center on a 0–1000 coordinate scale relative to the
 with (0,0) at its top-left and (1000,1000) at its bottom-right. Do not rotate the coordinate system.
 Read only the handwritten score inside THAT SAME sticker's writing area next to its QR.
 The current sticker has a full printed name above a QR on the left and ONE blank marks box on the right.
-Stickers may each be rotated differently. Older stickers may have three digit boxes: combine only handwritten digits.
+Stickers may each be rotated differently. First establish EACH sticker's upright orientation from its printed name above the QR and the writing box to its right. Read handwriting in that sticker's upright orientation, especially 6 versus 9; never use the photograph's orientation for digits. Keep reported QR coordinates in the original input coordinate system. Older stickers may have three digit boxes: combine only handwritten digits.
 Ignore printed names, IDs, QR modules, borders and all writing outside the sticker. Borders are never digits.
 Return exact numbers including zero, decimals or explicitly written fractions, never an inferred denominator.
 If a score is blank, obscured, ambiguous or crossed out without a clear replacement, use ERROR_UNCERTAIN.
@@ -31,10 +31,14 @@ export function validateStickerReadings(value: unknown, maxMarks: number): Stick
 }
 
 export async function processMultiStickerOCR(image: Buffer, mimeType: string, maxMarks: number,
-    options: { signal?: AbortSignal; timeoutMs?: number; fallbackDelayMs?: number } = {}): Promise<MultiStickerResult> {
+    options: { signal?: AbortSignal; timeoutMs?: number; fallbackDelayMs?: number; targets?: {x:number;y:number}[] } = {}): Promise<MultiStickerResult> {
     const key = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (!key) return { stickers: [], reason: 'provider_error' };
     const ai = new GoogleGenerativeAI(key);
+    const prompt = options.targets?.length
+        ? MULTI_STICKER_PROMPT.replace('Read up to 10 student stickers in this full photograph.', 'Read ONLY the requested stickers in this photograph.').replace('If there are more than 10 stickers or their QR-to-writing-area association is unclear, return an empty stickers array.', '')
+          + `\nRequested QR centers (0–1000): ${JSON.stringify(options.targets)}. Other stickers may be visible at crop edges: ignore them. Return only requested stickers, at most ${options.targets.length}. Report observed QR centers; do not invent a reading where a requested sticker is not visible.`
+        : MULTI_STICKER_PROMPT;
     const controller = new AbortController();
     const abort = () => controller.abort();
     options.signal?.addEventListener('abort', abort, { once: true });
@@ -52,7 +56,7 @@ export async function processMultiStickerOCR(image: Buffer, mimeType: string, ma
                 }, required: ['stickers'] },
             };
             const result = await ai.getGenerativeModel({ model: name, generationConfig }).generateContent([
-                MULTI_STICKER_PROMPT, { inlineData: { data: image.toString('base64'), mimeType } },
+                prompt, { inlineData: { data: image.toString('base64'), mimeType } },
             ], { signal: controller.signal });
             const stickers = validateStickerReadings(JSON.parse(result.response.text()).stickers, maxMarks);
             secureLogger.info('Multi-sticker OCR model completed', { model: name, elapsedMs: Date.now() - started, count: stickers.length });

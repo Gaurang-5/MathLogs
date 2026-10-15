@@ -36,3 +36,9 @@ test('a slow primary can win after fallback starts and cancellation stops both a
   const controller=new AbortController();const pending=processMultiStickerOCR(Buffer.from('photo'),'image/jpeg',20,{signal:controller.signal});controller.abort();assert.equal((await pending).reason,'timeout');assert.ok(signals.every(s=>s.aborted));
  }finally{GoogleGenerativeAI.prototype.getGenerativeModel=original;}
 });
+
+test('targeted groups ignore other visible stickers without changing their coordinates',async()=>{
+ const {processMultiStickerOCR}=await import('../src/utils/multiStickerOcr');const original=GoogleGenerativeAI.prototype.getGenerativeModel;
+ GoogleGenerativeAI.prototype.getGenerativeModel=(()=>({generateContent:async(parts:any[])=>{assert.match(parts[0],/Read ONLY the requested/);assert.match(parts[0],/"x":123,"y":456/);assert.doesNotMatch(parts[0],/If there are more than 10 stickers/);return {response:{text:()=>'{"stickers":[{"x":123,"y":456,"score":"0"}]}'}};}})) as any;
+ try{assert.deepEqual((await processMultiStickerOCR(Buffer.from('photo'),'image/jpeg',20,{targets:[{x:123,y:456}]})).stickers,[{x:123,y:456,score:'0'}]);}finally{GoogleGenerativeAI.prototype.getGenerativeModel=original;}
+});

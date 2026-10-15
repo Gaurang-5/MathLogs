@@ -19,6 +19,9 @@ test('multi-photo route requires a teacher-owned test and forwards the original 
   permitted=true;
   const response=await request(app).post('/api/scan-ocr').set('Authorization',`Bearer ${token}`).field('testId','exam').field('mode','multiple').attach('image',image,{filename:'photo.png',contentType:'image/png'});
   assert.equal(response.status,200,JSON.stringify(response.body));assert.deepEqual(response.body,{stickers:[{x:100,y:200,score:'0'}]});assert.equal(calls,1);
+  for(const targets of ['not-json','[]','[{"x":-1,"y":5}]',JSON.stringify(Array.from({length:11},()=>({x:1,y:2})))]){
+   const invalid=await request(app).post('/api/scan-ocr').set('Authorization',`Bearer ${token}`).field('testId','exam').field('mode','multiple').field('targets',targets).attach('image',image,{filename:'photo.png',contentType:'image/png'});assert.equal(invalid.status,400);assert.equal(calls,1);
+  }
   let release!:()=>void,acknowledged=false;
   GoogleGenerativeAI.prototype.getGenerativeModel=(()=>({generateContent:()=>new Promise(resolve=>{release=()=>resolve({response:{text:()=>'{"stickers":[{"x":100,"y":200,"score":"4"}]}'}});})})) as any;
   const streamed=await request(app).post('/api/scan-ocr').set('Authorization',`Bearer ${token}`).field('testId','exam').field('mode','multiple').field('progress','1').attach('image',image,{filename:'photo.png',contentType:'image/png'}).buffer(true).parse((res,done)=>{

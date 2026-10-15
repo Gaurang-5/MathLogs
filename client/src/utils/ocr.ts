@@ -33,7 +33,7 @@ export function stickerFrameBlob(canvas: HTMLCanvasElement): Promise<Blob> {
     )), 6000, 'Camera capture stalled. Try Use phone camera.');
 }
 
-export type OCRProgress = { stage: 'preparing' | 'uploading' | 'receiving' | 'reading'; percent?: number };
+export type OCRProgress = { stage: 'preparing' | 'uploading' | 'receiving' | 'reading'; percent?: number; completed?:number; total?:number };
 
 /** Keep the full photo; make only the OCR upload smaller. QR and review use the original. */
 export async function prepareOCRUpload(original: Blob, signal?: AbortSignal): Promise<Blob> {
@@ -65,7 +65,7 @@ export async function prepareOCRUpload(original: Blob, signal?: AbortSignal): Pr
 
 /** Separate upload time from the server's OCR allowance, including on slow mobile connections. */
 export async function uploadStickerPhoto<T>(image: Blob, signal?: AbortSignal, testId?: string,
-    onProgress?: (progress: OCRProgress) => void, mode: 'single' | 'multiple' = 'single'): Promise<T> {
+    onProgress?: (progress: OCRProgress) => void, mode: 'single' | 'multiple' = 'single', targets?: {x:number;y:number}[]): Promise<T> {
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Authentication required for scanning');
     onProgress?.({ stage: 'preparing' });
@@ -74,6 +74,7 @@ export async function uploadStickerPhoto<T>(image: Blob, signal?: AbortSignal, t
     const formData = new FormData();
     if (testId) formData.append('testId', testId);
     if (mode === 'multiple') { formData.append('mode', mode); formData.append('progress', '1'); }
+    if(targets) formData.append('targets',JSON.stringify(targets));
     formData.append('image', upload, upload.type === 'image/jpeg' ? 'sticker.jpg' : upload.type === 'image/webp' ? 'sticker.webp' : 'sticker.png');
     return new Promise<T>((resolve, reject) => {
         const xhr = new XMLHttpRequest();

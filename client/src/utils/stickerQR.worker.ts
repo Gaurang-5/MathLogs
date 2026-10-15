@@ -14,7 +14,7 @@ self.onmessage = async (event: MessageEvent<{ pixels: Uint8ClampedArray; width: 
         try {
             const results = await readBarcodes({ data: pixels, width, height } as ImageData, {
                 formats: ['QRCode'], tryHarder: true, tryRotate: true, tryInvert: true,
-                maxNumberOfSymbols: multiple ? 11 : 2,
+                maxNumberOfSymbols: multiple ? 0 : 2,
             });
             if (multiple) {
                 self.postMessage({ codes: results.filter(result => result.isValid && result.text.trim()).map(result => ({
@@ -38,7 +38,7 @@ self.onmessage = async (event: MessageEvent<{ pixels: Uint8ClampedArray; width: 
     }
     // Multi-photo recognition needs all QR positions, not a first-code fallback.
     if (multiple) {
-        self.postMessage({ error: 'The multiple-sticker QR reader could not load. Retry or use One sticker.' });
+        self.postMessage({ error: 'The multiple-sticker QR reader could not load. Retry or photograph a smaller group.' });
         return;
     }
     try {
