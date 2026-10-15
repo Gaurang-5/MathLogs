@@ -4,13 +4,14 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '../prisma';
 import { ownsTest, eligibleEnrollment } from '../services/testAccess';
 import { secureLogger } from '../utils/secureLogger';
+import { submitMarksBatchSchema } from '../schemas';
 
-type Input = { studentId: string; score: number; expectedScore: number | null };
 type Result = { studentId: string; saved: boolean; error?: string; conflict?: boolean; currentScore?: number | null };
 
 /** One bounded transaction and set-based writes for a photo's marks. */
 export async function submitMarksBatch(req: Request, res: Response) {
-    const { testId, marks } = req.body as { testId: string; marks: Input[] };
+    // Validation middleware checks the request but does not replace it with transformed values.
+    const { testId, marks } = submitMarksBatchSchema.parse({ body: req.body }).body;
     const actor = req.user;
     const started = Date.now();
     try {
