@@ -167,6 +167,38 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
     }
 };
 
+/** One authenticated/test-scoped read for all QRs in a photo, avoiding ten competing requests. */
+export const getStudentsByHumanIds = async (req: Request, res: Response) => {
+    const { humanIds, testId } = req.body ?? {};
+    if (typeof testId !== 'string' || !testId.trim() || !Array.isArray(humanIds) || humanIds.length < 1 || humanIds.length > 10
+        || humanIds.some(id => typeof id !== 'string' || !id.trim() || id.length > 128)) {
+        return res.status(400).json({ error: 'Select a test and provide 1–10 student QR IDs.' });
+    }
+    const user = req.user;
+    if (!user?.id || !user.instituteId) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const test = await prisma.test.findFirst({ where: { id: testId, instituteId: user.instituteId, teacherId: user.id }, include: { batches: { select: { id: true } } } });
+        if (!test || !ownsTest(test, user)) return res.status(403).json({ error: 'Unauthorized test' });
+        const ids = [...new Set<string>(humanIds.map((id: string) => id.trim()))];
+        const students = await prisma.student.findMany({
+            where: { humanId: { in: ids }, instituteId: user.instituteId },
+            select: { id: true, name: true, humanId: true,
+                enrollments: { where: { status: 'ACTIVE' }, include: { batch: true } },
+                marks: { where: { testId }, select: { testId: true, score: true } },
+            },
+        });
+        const byId = new Map(students.map(student => [student.humanId, student]));
+        return res.json({ results: ids.map(humanId => {
+            const student = byId.get(humanId);
+            const enrollment = student && eligibleEnrollment(test, student.enrollments, user.id);
+            if (!student || !enrollment) return { humanId, error: 'Student not found or not actively enrolled for this test.' };
+            return { humanId, student: { id: student.id, name: student.name, humanId: student.humanId, marks: student.marks, batch: enrollment.batch, testEligible: true } };
+        }) });
+    } catch {
+        return res.status(500).json({ error: 'Student lookup failed. Retry student lookup.' });
+    }
+};
+
 export const getTestDetails = async (req: Request, res: Response) => {
     const { id } = req.params;
     const teacherId = req.user?.id;

@@ -9,7 +9,7 @@ import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, d
 import { addStudentManually, approveStudent, archiveStudent, confirmMonthCoverageProfileController, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
-import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
+import { createTest, getTests, submitMark, getStudentByHumanId, getStudentsByHumanIds, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
 import { getOnlineQuizAnalytics, getLiveQuizStatus, unlockQuizSubmission } from '../controllers/analyticsController';
 import { getStudentPaymentOptions, assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt, getFeeInstallmentsList, getPaymentHistory } from '../controllers/feeController';
 import { getDashboardSummary, getFinancialGrowthStats, getInstallmentGrowthStats } from '../controllers/dashboardController';
@@ -220,11 +220,14 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) 
         if (!test) return res.status(403).json({ error: 'Select an authorized test before scanning.' });
         if (req.body.mode === 'multiple') {
             if (!req.file) return res.status(400).json({ error: 'Upload the original photo.' });
+            const started = Date.now();
+            secureLogger.info('Multi-sticker OCR received', { bytes: req.file.size, mime: req.file.mimetype });
             const controller = new AbortController();
             const disconnected = () => { if (!res.writableEnded) controller.abort(); };
             res.once('close', disconnected);
             try {
                 const result = await processMultiStickerOCR(req.file.buffer, req.file.mimetype, test.maxMarks, { signal: controller.signal });
+                secureLogger.info('Multi-sticker OCR completed', { count: result.stickers.length, reason: result.reason, elapsedMs: Date.now() - started });
                 if (!controller.signal.aborted) res.json(result);
             } finally { res.off('close', disconnected); }
             return;
@@ -322,6 +325,7 @@ router.delete('/students/:id/archive', authenticateToken as any, archiveStudent 
 router.put('/students/:id', authenticateToken as any, validateRequest(updateStudentSchema), updateStudent as any);
 router.get('/identity-reviews', authenticateToken as any, listIdentityReviews as any);
 router.post('/identity-reviews/:id/resolve', authenticateToken as any, validateRequest(resolveIdentityReviewSchema), resolveIdentityReview as any);
+router.post('/students/lookup-many', authenticateToken as any, getStudentsByHumanIds as any);
 router.get('/students/lookup/:humanId', authenticateToken as any, getStudentByHumanId as any);
 router.get('/students/:id/profile', authenticateToken as any, getStudentProfile as any);
 router.put('/month-coverage/students/:studentId/profile', authenticateToken as any, requireMonthCoverageFeeMode as any, validateRequest(confirmMonthCoverageProfileSchema), confirmMonthCoverageProfileController as any);

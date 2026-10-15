@@ -1,4 +1,4 @@
-import { API_URL } from './api';
+import { uploadStickerPhoto, type OCRProgress } from './ocr';
 import { scanDeadline } from './scanDeadline';
 
 export type Point = { x: number; y: number };
@@ -70,16 +70,9 @@ export async function readPhotoCodes(image: Blob, signal?: AbortSignal): Promise
     finally{URL.revokeObjectURL(url);}
 }
 
-export async function extractPhotoMarks(image: Blob,testId: string,signal?: AbortSignal):Promise<PhotoReading[]> {
-    const token=localStorage.getItem('token');if(!token)throw new Error('Sign in again to read marks.');
-    const form=new FormData();form.append('testId',testId);form.append('mode','multiple');form.append('image',image,'stickers.'+(image.type==='image/jpeg'?'jpg':image.type==='image/webp'?'webp':'png'));
-    const controller=new AbortController();const abort=()=>controller.abort();signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)controller.abort();
-    try{
-        const response=await scanDeadline(fetch(`${API_URL}/scan-ocr`,{method:'POST',body:form,signal:controller.signal,headers:{Authorization:`Bearer ${token}`}}),20000,'Reading marks timed out. Enter them from the photo.',signal);
-        if(!response.ok)throw new Error(response.status===413?'Photo exceeds 14 MB. Take a smaller group.':'Could not read marks. Enter them from the photo or retake.');
-        const data=await scanDeadline(response.json(),2000,'The marks response stalled.',signal);
-        if(data.reason)throw new Error(data.reason==='timeout'?'Reading marks timed out. Enter them from the photo.':'The marks reader is unavailable. Enter them from the photo.');
-        if(!Array.isArray(data.stickers)||data.stickers.length>10)throw new Error('Invalid marks response. Retake the photo.');
-        return data.stickers.filter((row:PhotoReading)=>Number.isFinite(row.x)&&Number.isFinite(row.y)&&row.x>=0&&row.x<=1000&&row.y>=0&&row.y<=1000&&typeof row.score==='string');
-    }finally{controller.abort();signal?.removeEventListener('abort',abort);}
+export async function extractPhotoMarks(image: Blob,testId: string,signal?: AbortSignal,
+    onProgress?: (progress: OCRProgress) => void):Promise<PhotoReading[]> {
+    const data = await uploadStickerPhoto<{stickers?: PhotoReading[]}>(image,signal,testId,onProgress,'multiple');
+    if(!Array.isArray(data.stickers)||data.stickers.length>10)throw new Error('Invalid marks response. Retake the photo.');
+    return data.stickers.filter(row=>Number.isFinite(row.x)&&Number.isFinite(row.y)&&row.x>=0&&row.x<=1000&&row.y>=0&&row.y<=1000&&typeof row.score==='string');
 }

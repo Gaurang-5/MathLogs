@@ -5,6 +5,17 @@ import { extractPhotoMarks, matchStickerReadings, readPhotoCodes, type PhotoCode
 
 type Student = { id: string; name: string; humanId: string; marks?: { testId:string; score:number }[] };
 type Row = { code:PhotoCode; score:string; student?:Student; previous:number|null; confirmed:boolean; overwrite:boolean; saved:boolean; blocked?:string; error?:string };
+type LookupResult = { humanId:string; student?:Student; error?:string };
+const lookupStudents=async(codes:PhotoCode[],testId:string):Promise<Map<string,LookupResult>>=>{
+    const humanIds=[...new Set(codes.map(code=>code.humanId))];
+    if(!humanIds.length)return new Map();
+    try {
+        const data=await apiRequest<{results:LookupResult[]}>('/students/lookup-many','POST',{humanIds,testId},{timeoutMs:25000});
+        return new Map(data.results.map(result=>[result.humanId,result]));
+    } catch {
+        return new Map(humanIds.map(humanId=>[humanId,{humanId,error:'Student lookup failed. Retry matching students; your marks are kept.'}]));
+    }
+};
 export const validPhotoScore=(score:string,max:number)=>/^\d+(?:\.\d{1,2})?$/.test(score)&&Number(score)<=max;
 
 export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose }: {
@@ -14,7 +25,9 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
     const [geometry,setGeometry]=useState<PhotoCodes|null>(null);
     const [reading,setReading]=useState(true);
     const [saving,setSaving]=useState(false);
-    const [message,setMessage]=useState('Reading student QRs and marks…');
+    const [matching,setMatching]=useState(false);
+    const [ocrStatus,setOcrStatus]=useState('Preparing photo…');
+    const [message,setMessage]=useState('Reading student QRs…');
     const [selected,setSelected]=useState(0);
     const [elapsed,setElapsed]=useState(0);
     const root=useRef<HTMLDivElement>(null);
@@ -26,25 +39,26 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
         let disposed=false;
         const request=new AbortController();
         const timer=setInterval(()=>setElapsed(value=>value+1),1000);
-        const ocr=extractPhotoMarks(photo,testId,request.signal).then(readings=>({readings,error:''}),error=>({readings:[],error:error.message as string}));
+        const ocr=extractPhotoMarks(photo,testId,request.signal,progress=>{
+            if(!disposed)setOcrStatus(progress.stage==='preparing'?'Preparing photo…':progress.stage==='reading'?'Reading marks…':`Uploading photo${progress.percent===undefined?'':` ${progress.percent}%`}…`);
+        }).then(readings=>{if(!disposed)setOcrStatus('Marks read.');return {readings,error:''};},error=>{if(!disposed)setOcrStatus('Marks need review.');return {readings:[],error:error.message as string};});
         const identities=readPhotoCodes(photo,request.signal).then(async codes=>{
             if(!disposed){setGeometry(codes);setMessage(`${codes.codes.length} QR codes found. Matching students and marks…`);}
-            const students=await Promise.all(codes.codes.map(async code=>{
-                try {return {student:await apiRequest<Student>(`/students/lookup/${encodeURIComponent(code.humanId)}?testId=${encodeURIComponent(testId)}`,'GET',undefined,{timeoutMs:12000})};}
-                catch(error){return {error:error instanceof Error?error.message:'Student lookup failed.'};}
-            }));
+            const students=await lookupStudents(codes.codes,testId);
+            if(!disposed)setMessage(`${codes.codes.length} QR codes found. Student matching finished.`);
             return {codes,students};
         });
         void Promise.all([identities,ocr]).then(([{codes,students},marks])=>{
             if(disposed)return;
             const matched=matchStickerReadings(codes,marks.readings);
-            setRows(matched.map((match,i)=>{
-                const student=students[i].student;
+            setRows(matched.map(match=>{
+                const result=students.get(match.code.humanId);
+                const student=result?.student;
                 const duplicate=codes.codes.filter(code=>code.humanId===match.code.humanId).length>1;
                 return {code:match.code,score:validPhotoScore(match.score,maxMarks)?match.score:'',student,
                     previous:student?.marks?.find(mark=>mark.testId===testId)?.score??null,
                     confirmed:false,overwrite:false,saved:false,
-                    blocked:duplicate?'Duplicate student QR. Retake with one sticker per student.':students[i].error,
+                    blocked:duplicate?'Duplicate student QR. Retake with one sticker per student.':student?undefined:result?.error||'Student lookup failed. Retry matching students.',
                     error:marks.error||match.error,
                 };
             }));
@@ -55,6 +69,19 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
         }).finally(()=>{clearInterval(timer);if(!disposed)setReading(false);});
         return()=>{disposed=true;alive.current=false;request.abort();clearInterval(timer);};
     },[photo,testId,maxMarks]);
+    const retryStudents=async()=>{
+        if(matching||saving)return;
+        setMatching(true);
+        const results=await lookupStudents(rows.filter(row=>!row.student).map(row=>row.code),testId);
+        if(!alive.current)return;
+        setRows(current=>current.map(row=>{
+            if(row.student||current.filter(other=>other.code.humanId===row.code.humanId).length>1)return row;
+            const result=results.get(row.code.humanId),student=result?.student;
+            return {...row,student,previous:student?.marks?.find(mark=>mark.testId===testId)?.score??null,
+                confirmed:false,overwrite:false,blocked:student?undefined:result?.error||row.blocked};
+        }));
+        setMatching(false);
+    };
     const close=()=>{
         if(saveLock.current)return;
         if(rows.some(row=>!row.saved)&&!window.confirm('Discard the unsaved results from this photo?'))return;
@@ -77,7 +104,7 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
     const canSave=(row:Row)=>!row.saved&&!row.blocked&&!!row.student&&row.confirmed&&validPhotoScore(row.score,maxMarks)&&(row.previous===null||row.overwrite);
     const count=rows.filter(canSave).length;
     const save=async()=>{
-        if(saveLock.current||reading||!count)return;
+        if(saveLock.current||reading||matching||!count)return;
         saveLock.current=true;setSaving(true);let saved=0;
         for(const [i,row] of rows.entries()){
             if(!canSave(row)||!alive.current)continue;
@@ -92,7 +119,8 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
     return <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review multiple stickers" className="fixed inset-0 z-[210] overflow-y-auto bg-app-bg p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-5xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold text-app-text">Review multiple stickers</h2><TeacherButton variant="secondary" disabled={saving} onClick={close}>{reading?'Cancel':'Back to camera'}</TeacherButton></div>
-            <p role="status" className="text-sm text-app-text-secondary">{message}{reading?` ${elapsed}s`:''}</p>
+            <p role="status" className="text-sm text-app-text-secondary">{reading?`${ocrStatus} ${message} ${elapsed}s`:message}</p>
+            {!reading&&rows.some(row=>!row.student)&&<TeacherButton variant="secondary" disabled={matching||saving} loading={matching} onClick={()=>void retryStudents()}>Retry student lookup</TeacherButton>}
             <div className="grid items-start gap-4 md:grid-cols-2">
                 <TeacherSurface className="p-2 md:sticky md:top-2">
                     <div className="relative">
@@ -119,7 +147,7 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
                     {row.error&&!row.saved&&<p role="alert" className="text-sm text-app-text-secondary">{row.error}</p>}
                 </TeacherSurface>)}</div>
             </div>
-            {!reading&&<div className="sticky bottom-0 rounded-xl border border-app-border bg-app-surface-opaque p-3"><TeacherButton className="w-full" disabled={!count||saving} loading={saving} onClick={()=>void save()}>Save {count} confirmed results</TeacherButton></div>}
+            {!reading&&<div className="sticky bottom-0 rounded-xl border border-app-border bg-app-surface-opaque p-3"><TeacherButton className="w-full" disabled={!count||saving||matching} loading={saving} onClick={()=>void save()}>Save {count} confirmed results</TeacherButton></div>}
         </div>
     </div>;
 }

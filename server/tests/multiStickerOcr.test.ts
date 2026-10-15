@@ -22,3 +22,17 @@ test('multi-photo provider fallback is bounded and explicit uncertainty is not r
  assert.equal((await processMultiStickerOCR(Buffer.from('photo'),'image/jpeg',20,{timeoutMs:10})).reason,'timeout');
  }finally{GoogleGenerativeAI.prototype.getGenerativeModel=original;}
 });
+
+test('a slow primary can win after fallback starts and cancellation stops both attempts',async()=>{
+ const {processMultiStickerOCR}=await import('../src/utils/multiStickerOcr');const original=GoogleGenerativeAI.prototype.getGenerativeModel;
+ const signals:AbortSignal[]=[];let finishPrimary:()=>void=()=>{};
+ GoogleGenerativeAI.prototype.getGenerativeModel=((config:any)=>({generateContent:(_:any,options:any)=>{
+  signals.push(options.signal);
+  return new Promise(resolve=>{if(config.model==='gemini-3.5-flash-lite')finishPrimary=()=>resolve({response:{text:()=>'{"stickers":[{"x":1,"y":2,"score":"4"}]}'}});else finishPrimary();});
+ }})) as any;
+ try {
+  const result=await processMultiStickerOCR(Buffer.from('photo'),'image/jpeg',20,{timeoutMs:1000,fallbackDelayMs:5});assert.equal(result.stickers[0].score,'4');assert.equal(signals.length,2);assert.ok(signals.every(s=>s.aborted));
+  GoogleGenerativeAI.prototype.getGenerativeModel=(()=>({generateContent:(_:any,options:any)=>{signals.push(options.signal);return new Promise(()=>{})}})) as any;
+  const controller=new AbortController();const pending=processMultiStickerOCR(Buffer.from('photo'),'image/jpeg',20,{signal:controller.signal});controller.abort();assert.equal((await pending).reason,'timeout');assert.ok(signals.every(s=>s.aborted));
+ }finally{GoogleGenerativeAI.prototype.getGenerativeModel=original;}
+});
