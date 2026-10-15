@@ -1,5 +1,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { captureStickerFrame, extractMarksFromSticker, stickerFrameBlob } from './ocr';
+import { captureStickerFrame, extractMarksFromSticker, stickerFrameBlob, prepareOCRUpload } from './ocr';
+
+class FakeXHR {
+  static last: FakeXHR;
+  upload = { onprogress: null as ((event: { loaded: number; total: number; lengthComputable: boolean }) => void) | null, onload: null as (() => void) | null };
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  status = 200;
+  responseText = '';
+  body!: FormData;
+  aborted = false;
+  open = vi.fn();
+  setRequestHeader = vi.fn();
+  constructor() { FakeXHR.last = this; }
+  send(body: FormData) { this.body = body; }
+  abort() { this.aborted = true; this.onabort?.(); }
+  respond(data: unknown, status = 200) { this.status = status; this.responseText = JSON.stringify(data); this.onload?.(); }
+}
+const start = async (signal?: AbortSignal, progress?: (value: unknown) => void) => {
+  localStorage.setItem('token', 'test-token');
+  vi.stubGlobal('XMLHttpRequest', FakeXHR);
+  const promise = extractMarksFromSticker(new Blob(['original-image-bytes'], { type: 'image/png' }), signal, 'authorized-test', progress);
+  await Promise.resolve();
+  return { promise, xhr: FakeXHR.last };
+};
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); localStorage.clear(); });
 
@@ -18,12 +43,12 @@ describe('original sticker photo', () => {
   });
 
   it.each(['0', '7.5', '45/50', 'ERROR_UNCERTAIN'])( 'uploads unchanged image bytes and handles score %s', async score => {
-    localStorage.setItem('token', 'test-token');
     const image = new Blob(['original-image-bytes'], { type: 'image/png' });
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ score, status: 'read' }) });
-    vi.stubGlobal('fetch', fetchMock);
-    const result = await extractMarksFromSticker(image, undefined, 'authorized-test');
-    const form = fetchMock.mock.calls[0][1].body as FormData;
+    const { promise, xhr } = await start();
+    xhr.upload.onload?.();
+    xhr.respond({ score, status: 'read' });
+    const result = await promise;
+    const form = xhr.body;
     expect(form.get('testId')).toBe('authorized-test');
     const uploaded = form.get('image') as File;
     const read = (blob: Blob) => new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsText(blob); });
@@ -35,29 +60,96 @@ describe('original sticker photo', () => {
 
 it('bounds a stalled upload and aborts the underlying request', async () => {
   vi.useFakeTimers();
-  localStorage.setItem('token', 'test-token');
-  const fetchMock = vi.fn().mockReturnValue(new Promise(() => {}));
-  vi.stubGlobal('fetch', fetchMock);
-  const result = extractMarksFromSticker(new Blob(['photo'])).catch(error => error.message);
+  const { promise, xhr } = await start();
+  const result = promise.catch(error => error.message);
+  await vi.advanceTimersByTimeAsync(25001);
+  expect(await result).toContain('upload stalled');
+  expect(xhr.aborted).toBe(true);
+});
+
+it('gives OCR its own deadline after an upload exceeding the old 30 second limit', async () => {
+  vi.useFakeTimers();
+  const progress = vi.fn();
+  const { promise, xhr } = await start(undefined, progress);
+  for (let i = 1; i <= 4; i++) {
+    await vi.advanceTimersByTimeAsync(10000);
+    xhr.upload.onprogress?.({ loaded: i, total: 4, lengthComputable: true });
+  }
+  xhr.upload.onload?.();
+  await vi.advanceTimersByTimeAsync(22000);
+  expect(xhr.aborted).toBe(false);
+  xhr.respond({ score: '4' });
+  expect(await promise).toEqual({ score: '4', status: 'read' });
+  expect(progress.mock.calls.map(([p]) => p.stage)).toEqual(['preparing', 'uploading', 'uploading', 'uploading', 'uploading', 'uploading', 'reading']);
+});
+
+it('bounds the reading stage independently', async () => {
+  vi.useFakeTimers();
+  const { promise, xhr } = await start();
+  const result = promise.catch(error => error.message);
+  xhr.upload.onload?.();
   await vi.advanceTimersByTimeAsync(28001);
-  expect(await result).toContain('timed out');
-  expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  expect(await result).toContain('reader timed out');
+  expect(xhr.aborted).toBe(true);
+});
+
+it('caps uploads even when they keep making progress', async () => {
+  vi.useFakeTimers();
+  const { promise, xhr } = await start();
+  const result = promise.catch(error => error.message);
+  for (let i = 0; i < 9; i++) {
+    await vi.advanceTimersByTimeAsync(10000);
+    xhr.upload.onprogress?.({ loaded: i, total: 100, lengthComputable: true });
+  }
+  expect(await result).toContain('upload took too long');
+  expect(xhr.aborted).toBe(true);
 });
 
 it('aborts an upload when capture is cancelled', async () => {
-  localStorage.setItem('token', 'test-token');
-  const fetchMock = vi.fn().mockReturnValue(new Promise(() => {}));
-  vi.stubGlobal('fetch', fetchMock);
   const controller = new AbortController();
-  const result = extractMarksFromSticker(new Blob(['photo']), controller.signal).catch(error => error.name);
+  const { promise, xhr } = await start(controller.signal);
+  const result = promise.catch(error => error.name);
   controller.abort();
   expect(await result).toBe('AbortError');
-  expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  expect(xhr.aborted).toBe(true);
 });
 
-
 it.each(['timeout', 'provider_error'])('reports provider %s separately from unclear handwriting', async reason => {
+  const { promise, xhr } = await start();
+  xhr.respond({ score: 'ERROR_UNCERTAIN', reason });
+  await expect(promise).rejects.toThrow(reason === 'timeout' ? 'timed out' : 'unavailable');
+});
+
+it.each([[401, 'session expired'], [413, 'too large'], [503, 'Could not read']])('handles HTTP %s without inventing a mark', async (status, message) => {
+  const { promise, xhr } = await start();
+  xhr.respond({}, Number(status));
+  await expect(promise).rejects.toThrow(String(message));
+});
+
+it('optimizes a large photo without cropping and keeps already-small originals', async () => {
+  const large = new Blob([new Uint8Array(600000)], { type: 'image/png' });
+  const jpeg = new Blob(['jpeg'], { type: 'image/jpeg' });
+  const drawImage = vi.fn();
+  vi.stubGlobal('Image', class { naturalWidth = 4032; naturalHeight = 3024; src = ''; decode = async () => {}; });
+  vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:photo'), revokeObjectURL: vi.fn() });
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage, fillRect: vi.fn() } as unknown as CanvasRenderingContext2D);
+  const encode = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(callback => callback(jpeg));
+  expect(await prepareOCRUpload(large)).toBe(jpeg);
+  expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 3200, 2400);
+  expect(encode).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.9);
+  expect(await prepareOCRUpload(jpeg)).toBe(jpeg);
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:photo');
+});
+
+it('cancels preparation without starting an upload and releases the preview URL', async () => {
   localStorage.setItem('token', 'test-token');
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ score: 'ERROR_UNCERTAIN', reason }) }));
-  await expect(extractMarksFromSticker(new Blob(['photo']))).rejects.toThrow(reason === 'timeout' ? 'timed out' : 'unavailable');
+  vi.stubGlobal('XMLHttpRequest', vi.fn());
+  vi.stubGlobal('Image', class { src = ''; decode = () => new Promise<void>(() => {}); });
+  vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:photo'), revokeObjectURL: vi.fn() });
+  const controller = new AbortController();
+  const result = extractMarksFromSticker(new Blob([new Uint8Array(600000)]), controller.signal);
+  controller.abort();
+  await expect(result).rejects.toMatchObject({ name: 'AbortError' });
+  expect(XMLHttpRequest).not.toHaveBeenCalled();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:photo');
 });

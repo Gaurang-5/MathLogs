@@ -72,6 +72,7 @@ export default function ScanMarks() {
     const [ocrError, setOcrError] = useState('');
     const [captureStage, setCaptureStage] = useState('Taking photo…');
     const [elapsed, setElapsed] = useState(0);
+    const [ocrStage, setOcrStage] = useState('Preparing photo…');
 
     useEffect(() => {
         const input = photoInput.current;
@@ -163,6 +164,7 @@ export default function ScanMarks() {
         setIdentityError('');
         setOcrError('');
         setCaptureStage('Taking photo…');
+        setOcrStage('Preparing photo…');
         setScore('');
         setReadStatus(null);
         clearPreview();
@@ -172,14 +174,17 @@ export default function ScanMarks() {
             }
             const frame = photo ? null : captureStickerFrame(videoRef.current!);
             const image = photo ?? await stickerFrameBlob(frame!);
-            if (image.size > 14 * 1024 * 1024) throw new Error('This photo exceeds the 14 MB upload limit. Please take another photo.');
             if (request.signal.aborted) return;
             previewUrl.current = URL.createObjectURL(image);
             setDebugImage(previewUrl.current);
             // Start OCR immediately. QR and identity lookup use the very same captured frame.
             setCaptureStage('Reading student QR…');
             const current = () => mountedRef.current && !request.signal.aborted && captureRequest.current === request;
-            const ocrPromise = scanDeadline(extractMarksFromSticker(image, request.signal, selectedTestId), 30000, 'Reading marks timed out. Enter them manually.', request.signal)
+            const ocrPromise = extractMarksFromSticker(image, request.signal, selectedTestId, progress => {
+                if (current()) setOcrStage(progress.stage === 'preparing' ? 'Preparing photo…'
+                    : progress.stage === 'reading' ? 'Reading marks…'
+                    : `Uploading photo${progress.percent == null ? '' : ` ${progress.percent}%`}…`);
+            })
                 .catch((error: Error) => ({ score: '', status: 'needs_review' as const, error: error.message }))
                 .then(ocr => {
                     if (!current()) return;
@@ -517,7 +522,7 @@ export default function ScanMarks() {
                             )}
 
                             <p role="status" className="mb-4 text-center text-sm text-app-text-secondary">
-                                {isProcessingOCR ? `Reading marks… ${elapsed}s. You can enter them now.` : ocrError || (readStatus === 'read' ? 'Read successfully. Confirm the marks before saving.' : 'Needs review. Enter the marks or retake the photo.')}
+                                {isProcessingOCR ? `${ocrStage} You can enter marks now.` : ocrError || (readStatus === 'read' ? 'Read successfully. Confirm the marks before saving.' : 'Needs review. Enter the marks or retake the photo.')}
                             </p>
                             <form onSubmit={handleSubmitMark}>
                                 <div className="mb-8">

@@ -144,12 +144,12 @@ it('restarts a stuck camera only when requested', async () => {
   expect(mocks.ocr).not.toHaveBeenCalled();
 });
 
-it('sends the original phone-camera file to OCR and reads QR from that same file', async () => {
+it('passes the original phone photo to the optimizer and independently to QR decoding', async () => {
   const file = new File(['unaltered original camera photo'], 'photo.jpg', { type: 'image/jpeg' });
   const input = document.body.querySelector<HTMLInputElement>('input[type="file"]')!;
   Object.defineProperty(input, 'files', { value: [file] });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(mocks.ocr).toHaveBeenCalledWith(file, expect.any(AbortSignal), 'test');
+  expect(mocks.ocr).toHaveBeenCalledWith(file, expect.any(AbortSignal), 'test', expect.any(Function));
   expect(mocks.photoQR).toHaveBeenCalledWith(file, expect.any(AbortSignal));
   expect(mocks.capture).not.toHaveBeenCalled();
   expect(document.body.querySelector<HTMLInputElement>('input:not([type="file"])')?.value).toBe('0');
@@ -189,15 +189,24 @@ it('keeps the photo and marks when QR fails and requires choosing a student befo
   expect(mocks.api.mock.calls.some(([path]) => path === '/marks')).toBe(false);
 });
 
-it('exits a stalled OCR operation into manual entry and ignores its late result', async () => {
+it('shows upload progress without cutting off a slow upload at 30 seconds', async () => {
   vi.useFakeTimers();
   let finish!: (value: {score: string; status: string}) => void;
-  mocks.ocr.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  mocks.ocr.mockImplementationOnce((_image, _signal, _test, progress) => {
+    progress({ stage: 'uploading', percent: 52 });
+    return new Promise(resolve => { finish = resolve; });
+  });
   await click('Capture');
-  await act(async () => { await vi.advanceTimersByTimeAsync(30001); });
-  expect(document.body.textContent).toContain('Reading marks timed out');
-  expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('');
-  await act(async () => finish({ score: '91', status: 'read' }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(40000); });
+  expect(document.body.textContent).toContain('Uploading photo 52%');
+  await act(async () => finish({ score: '4', status: 'read' }));
+  expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('4');
+});
+
+it('shows transport timeout errors and leaves marks empty for manual entry', async () => {
+  mocks.ocr.mockRejectedValueOnce(new Error('Photo upload stalled. Check your connection and retry, or enter marks manually.'));
+  await click('Capture');
+  expect(document.body.textContent).toContain('Photo upload stalled');
   expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('');
 });
 
@@ -227,7 +236,7 @@ it('shows the identified student before OCR finishes and preserves a manual mark
   mocks.ocr.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
   await click('Capture');
   expect(document.body.textContent).toContain('Aarav');
-  expect(document.body.textContent).toContain('You can enter them now');
+  expect(document.body.textContent).toContain('You can enter marks now');
   const input = document.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')!;
   expect(input.value).toBe('');
   expect([...document.querySelectorAll('button')].find(b => b.textContent === 'Save')?.disabled).toBe(true);
