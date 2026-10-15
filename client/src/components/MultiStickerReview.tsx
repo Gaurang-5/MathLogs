@@ -102,11 +102,14 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
     const percent=saving?Math.round(rows.filter(row=>row.saved).length/rows.length*100):reading&&progress?.stage==='uploading'?progress.percent:undefined;
     return <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review marks" className="fixed inset-0 z-[210] overflow-y-auto bg-app-bg p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-2xl pb-20">
-            <div className="flex justify-end"><h2 className="sr-only">Review marks</h2><TeacherButton variant="secondary" aria-label="Retake photo" disabled={saving} onClick={close}><X aria-hidden="true" size={20}/></TeacherButton></div>
-            {busy&&<div className="mb-5" aria-live="polite">
-                <div role="progressbar" aria-label={saving?'Saving marks':matching?'Finding students':message} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1 overflow-hidden rounded-full bg-app-border">
-                    <div className={`h-full rounded-full bg-app-text transition-[width] motion-reduce:transition-none ${percent===undefined?'w-1/3 motion-safe:animate-pulse':' '}`} style={percent===undefined?undefined:{width:`${percent}%`}}/>
-                </div><p role="status" className="mt-2 text-xs text-app-text-secondary">{saving?'Saving marks…':matching?'Finding students…':message}</p>
+            <div className="relative z-20 flex justify-end"><h2 className="sr-only">Review marks</h2><TeacherButton variant="secondary" aria-label="Retake photo" disabled={saving} onClick={close}><X aria-hidden="true" size={20}/></TeacherButton></div>
+            {busy&&<div className="fixed inset-0 z-10 flex items-center justify-center bg-app-bg px-8" aria-live="polite">
+                <div className="w-full max-w-xs -translate-y-4 text-center">
+                <p className="mb-5 text-lg font-semibold tracking-tight text-app-text">{saving?'Saving marks':matching?'Finding students':'Reading your stickers'}</p>
+                <div role="progressbar" aria-label={saving?'Saving marks':matching?'Finding students':message} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1.5 overflow-hidden rounded-full bg-app-border">
+                    <div className={`h-full rounded-full bg-app-text transition-[width] motion-reduce:transition-none ${percent===undefined?'w-1/3 sticker-reading-sweep':' '}`} style={percent===undefined?undefined:{width:`${percent}%`}}/>
+                </div><p role="status" className="mt-4 text-xs text-app-text-secondary">{saving?'Saving marks…':matching?'Finding students…':message}</p>
+                </div>
             </div>}
             {qrError?<StickerStudentPicker image={imageUrl} message={qrError} score="" onRetake={onClose} onSelect={async humanId=>{
                 const student=await apiRequest<Student>(`/students/lookup/${encodeURIComponent(humanId)}?testId=${encodeURIComponent(testId)}`);

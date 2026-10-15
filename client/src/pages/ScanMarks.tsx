@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import Layout from '../components/Layout';
+import Dropdown from '../components/Dropdown';
 import { TeacherButton, TeacherSurface } from '../components/teacher-ui';
 import { MultiStickerReview } from '../components/MultiStickerReview';
 import { captureStickerFrame, stickerFrameBlob } from '../utils/ocr';
@@ -43,7 +44,7 @@ export default function ScanMarks(){
     return <Layout title="Scan Marks" hideMobileNav={scanning||!!multiPhoto}>
         {!cameraSessionOpen&&<TeacherSurface className="mx-auto mt-10 max-w-md space-y-5 p-6">
             <h2 className="text-xl font-semibold text-app-text">Scan marks</h2>
-            <label className="block text-sm font-medium text-app-text">Select test<select aria-label="Select test" value={selectedTestId} onChange={event=>setSelectedTestId(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-app-border bg-app-bg px-3 text-app-text"><option value="">Choose test</option>{tests.map(test=><option key={test.id} value={test.id}>{test.name}{test.subject?` · ${test.subject}`:''}</option>)}</select></label>
+            <Dropdown label="Select test" value={selectedTestId} onChange={setSelectedTestId} placeholder="Choose test" searchable options={tests.map(test=>({value:test.id,label:`${test.name||'Test'}${test.subject?` · ${test.subject}`:''}`}))}/>
             <p className="text-sm text-app-text-secondary">Capture one sticker or several together. Keep every QR and handwritten mark clearly visible.</p>
             {scanError&&<p role="alert" className="text-sm text-danger">{scanError}</p>}
             <TeacherButton className="w-full" disabled={!selectedTestId} onClick={()=>{setScanError('');setCameraSessionOpen(true);setScanning(true);}}>Start Camera</TeacherButton>
