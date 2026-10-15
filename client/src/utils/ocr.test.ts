@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { extractPhotoMarks } from './multiSticker';
 import { captureStickerFrame, extractMarksFromSticker, stickerFrameBlob, prepareOCRUpload } from './ocr';
 
 class FakeXHR {
   static last: FakeXHR;
   upload = { onprogress: null as ((event: { loaded: number; total: number; lengthComputable: boolean }) => void) | null, onload: null as (() => void) | null };
+  readyState=1;
+  onreadystatechange:(()=>void)|null=null;
+  getResponseHeader=vi.fn(()=>null as string|null);
+  acknowledge(){this.readyState=2;this.getResponseHeader.mockReturnValue('reading');this.onreadystatechange?.();}
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onabort: (() => void) | null = null;
@@ -152,4 +157,22 @@ it('cancels preparation without starting an upload and releases the preview URL'
   await expect(result).rejects.toMatchObject({ name: 'AbortError' });
   expect(XMLHttpRequest).not.toHaveBeenCalled();
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:photo');
+});
+
+it('multi-photo upload retains progress and a separate OCR budget after a slow upload', async () => {
+ vi.useFakeTimers();localStorage.setItem('token','fixture');vi.stubGlobal('XMLHttpRequest',FakeXHR);
+ const progress=vi.fn();const result=extractPhotoMarks(new Blob(['photo']),'test',undefined,progress);await Promise.resolve();
+ const xhr=FakeXHR.last;expect(xhr.body.get('mode')).toBe('multiple');expect(xhr.body.get('testId')).toBe('test');
+ for(let i=1;i<=4;i++){await vi.advanceTimersByTimeAsync(10000);xhr.upload.onprogress?.({loaded:i,total:4,lengthComputable:true});}
+ xhr.upload.onload?.();await vi.advanceTimersByTimeAsync(40000);expect(xhr.aborted).toBe(false);expect(progress).toHaveBeenLastCalledWith({stage:'receiving'});
+ xhr.acknowledge();await vi.advanceTimersByTimeAsync(30000);expect(xhr.aborted).toBe(false);
+ xhr.respond({stickers:[{x:100,y:200,score:'0'}]});expect(await result).toEqual([{x:100,y:200,score:'0'}]);
+ expect(progress).toHaveBeenLastCalledWith({stage:'reading'});
+});
+
+it('does not call a proxy transfer delay a marks-reader timeout',async()=>{
+ vi.useFakeTimers();localStorage.setItem('token','fixture');vi.stubGlobal('XMLHttpRequest',FakeXHR);
+ const promise=extractPhotoMarks(new Blob(['photo']),'test').catch(e=>e.message);await Promise.resolve();
+ FakeXHR.last.upload.onload?.();await vi.advanceTimersByTimeAsync(90001);
+ expect(await promise).toContain('Photo upload took too long');expect(FakeXHR.last.aborted).toBe(true);
 });

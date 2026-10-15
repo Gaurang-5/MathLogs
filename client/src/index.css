@@ -348,3 +348,15 @@ html {
         scroll-margin-top: 15vh;
     }
 }
+
+/* Indeterminate sticker reading: quiet motion without a fictitious percentage. */
+@keyframes sticker-reading-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sticker-reading-sweep { animation: sticker-reading-sweep 1.6s ease-in-out infinite; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sticker-reading-sweep { margin-inline: auto; }
+}

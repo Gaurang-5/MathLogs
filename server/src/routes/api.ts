@@ -1,15 +1,16 @@
+import { submitMarksBatch } from '../controllers/marksBatchController';
 import { Router } from 'express';
 import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
 import { requireCoachingFeeMode } from '../middleware/requireCoachingFeeMode';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
-import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resendEnrollmentNotificationSchema, resolveIdentityReviewSchema, retryEnrollmentNotificationSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resendEnrollmentNotificationSchema, resolveIdentityReviewSchema, retryEnrollmentNotificationSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, submitMarksBatchSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
 import { addStudentManually, approveStudent, archiveStudent, confirmMonthCoverageProfileController, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
 import { generateStickerSheet } from '../controllers/stickerController';
-import { createTest, getTests, submitMark, getStudentByHumanId, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
+import { createTest, getTests, submitMark, getStudentByHumanId, getStudentsByHumanIds, getTestDetails, updateTest, deleteTest, downloadTestReport, getTestEligibleStudents, sendTestResultsEmail, generateAITest, saveOnlineQuiz, getOnlineQuizzes, finalizeOnlineQuiz, downloadOnlineQuizReport, updateOnlineQuiz, deleteOnlineQuiz, downloadOnlineQuizQuestionsPdf, downloadOnlineQuizReportPdf, generateSingleQuestionRoute, generateVariantQuestionRoute, getAITestJobStatus } from '../controllers/testController';
 import { getOnlineQuizAnalytics, getLiveQuizStatus, unlockQuizSubmission } from '../controllers/analyticsController';
 import { getStudentPaymentOptions, assignFeeInstallment, getFeeSummary, recordPayment, payInstallment, downloadPendingFeesReport, getRecentTransactions, sendFeeReminder, downloadMonthlyReport, getUpiVerifications, approveUpiVerification, rejectUpiVerification, getCustomInvoices, createCustomInvoice, scanReceipt, getFeeInstallmentsList, getPaymentHistory } from '../controllers/feeController';
 import { getDashboardSummary, getFinancialGrowthStats, getInstallmentGrowthStats } from '../controllers/dashboardController';
@@ -17,6 +18,7 @@ import { validateInvite, setupAccount } from '../controllers/inviteController';
 import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } from '../controllers/onboardingController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
+import { processMultiStickerOCR } from '../utils/multiStickerOcr';
 import { buildGeminiOcrResult } from '../utils/ocrResult';
 import { readOcrCacheFast } from '../utils/ocrTiming';
 import { secureLogger } from '../utils/secureLogger';
@@ -189,12 +191,23 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // OCR Scan Endpoint
-router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) => {
+router.post('/scan-ocr', (req, res, next) => {
+    const started = Date.now();
+    res.locals.scanPhase = 'authenticating';
+    secureLogger.info('Sticker request arrived', { requestId: req.correlationId, bytes: Number(req.headers['content-length']) || undefined });
+    res.once('close', () => secureLogger.info('Sticker request closed', {
+        requestId: req.correlationId, phase: res.locals.scanPhase, received: req.complete,
+        responded: res.writableEnded, status: res.statusCode, elapsedMs: Date.now() - started,
+    }));
+    next();
+}, authenticateToken as any, ocrLimiter, (req, res, next) => {
+    res.locals.scanPhase = 'receiving_photo';
     ocrUpload.single('image')(req, res, error => {
         if (error) {
             res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Photo exceeds the 14 MB upload limit.' : error.message });
             return;
         }
+        res.locals.scanPhase = 'authorizing_test';
         next();
     });
 }, async (req, res) => {
@@ -217,6 +230,33 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) 
         const rawBuffer = (req as any).file ? (req as any).file.buffer : Buffer.from(imageBuffer.toString().replace(/^data:image\/[^;]+;base64,/, ''), 'base64');
         const test = typeof req.body.testId === 'string' ? await prisma.test.findFirst({ where: { id: req.body.testId, instituteId: req.user.instituteId, teacherId: req.user.id } }) : null;
         if (!test) return res.status(403).json({ error: 'Select an authorized test before scanning.' });
+        res.locals.scanPhase = 'reading_marks';
+        if (req.body.mode === 'multiple') {
+            if (!req.file) return res.status(400).json({ error: 'Upload the original photo.' });
+            let targets: {x:number;y:number}[] | undefined;
+            if(req.body.targets !== undefined){
+                try { targets=JSON.parse(req.body.targets); } catch { return res.status(400).json({error:'Invalid QR positions.'}); }
+                if(!Array.isArray(targets)||targets.length<1||targets.length>10||targets.some(p=>!p||typeof p.x!=='number'||typeof p.y!=='number'||!Number.isFinite(p.x)||!Number.isFinite(p.y)||p.x<0||p.x>1000||p.y<0||p.y>1000)) return res.status(400).json({error:'Invalid QR positions.'});
+            }
+            const progress = req.body.progress === '1';
+            if (progress) {
+                // Acknowledge receipt at the origin, not merely the proxy edge.
+                res.status(200).set({ 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-transform', 'X-OCR-Stage': 'reading' });
+                res.flushHeaders();
+                res.write(' ');
+            }
+            const started = Date.now();
+            secureLogger.info('Multi-sticker OCR received', { bytes: req.file.size, mime: req.file.mimetype });
+            const controller = new AbortController();
+            const disconnected = () => { if (!res.writableEnded) controller.abort(); };
+            res.once('close', disconnected);
+            try {
+                const result = await processMultiStickerOCR(req.file.buffer, req.file.mimetype, test.maxMarks, { signal: controller.signal, targets });
+                secureLogger.info('Multi-sticker OCR completed', { count: result.stickers.length, reason: result.reason, elapsedMs: Date.now() - started });
+                if (!controller.signal.aborted) { if (progress) res.end(JSON.stringify(result)); else res.json(result); }
+            } finally { res.off('close', disconnected); }
+            return;
+        }
         const hash = crypto.createHash('sha256').update(`sticker-single-box-v5-gemini35-38:${req.user.instituteId}:${test.id}:${test.maxMarks}:`).update(rawBuffer).digest('hex');
 
         // Check DB-backed cache first (works across all server instances)
@@ -246,6 +286,7 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) 
 
 
     } catch (error: any) {
+        if (res.headersSent) { if (!res.writableEnded) res.end(JSON.stringify({ stickers: [], reason: 'provider_error' })); return; }
         console.error("❌ OCR Proxy Error:", error);
         res.status(500).json({ error: "OCR Processing Failed", details: error.message });
     }
@@ -310,6 +351,7 @@ router.delete('/students/:id/archive', authenticateToken as any, archiveStudent 
 router.put('/students/:id', authenticateToken as any, validateRequest(updateStudentSchema), updateStudent as any);
 router.get('/identity-reviews', authenticateToken as any, listIdentityReviews as any);
 router.post('/identity-reviews/:id/resolve', authenticateToken as any, validateRequest(resolveIdentityReviewSchema), resolveIdentityReview as any);
+router.post('/students/lookup-many', authenticateToken as any, getStudentsByHumanIds as any);
 router.get('/students/lookup/:humanId', authenticateToken as any, getStudentByHumanId as any);
 router.get('/students/:id/profile', authenticateToken as any, getStudentProfile as any);
 router.put('/month-coverage/students/:studentId/profile', authenticateToken as any, requireMonthCoverageFeeMode as any, validateRequest(confirmMonthCoverageProfileSchema), confirmMonthCoverageProfileController as any);
@@ -341,6 +383,7 @@ router.delete('/tests/:id', authenticateToken as any, deleteTest as any);
 router.post('/tests/:id/send-results', authenticateToken as any, bulkNotifyLimiter, sendTestResultsEmail as any);
 router.get('/tests/:id/download', authenticateToken as any, downloadTestReport as any);
 router.get('/tests/:id/eligible-students', authenticateToken as any, getTestEligibleStudents as any);
+router.post('/marks/batch', authenticateToken as any, validateRequest(submitMarksBatchSchema), submitMarksBatch as any);
 router.post('/marks', authenticateToken as any, validateRequest(submitMarkSchema), submitMark as any);
 
 // Fees

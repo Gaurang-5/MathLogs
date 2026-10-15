@@ -33,7 +33,7 @@ export function stickerFrameBlob(canvas: HTMLCanvasElement): Promise<Blob> {
     )), 6000, 'Camera capture stalled. Try Use phone camera.');
 }
 
-export type OCRProgress = { stage: 'preparing' | 'uploading' | 'reading'; percent?: number };
+export type OCRProgress = { stage: 'preparing' | 'uploading' | 'receiving' | 'reading'; percent?: number; completed?:number; total?:number };
 
 /** Keep the full photo; make only the OCR upload smaller. QR and review use the original. */
 export async function prepareOCRUpload(original: Blob, signal?: AbortSignal): Promise<Blob> {
@@ -64,8 +64,8 @@ export async function prepareOCRUpload(original: Blob, signal?: AbortSignal): Pr
 }
 
 /** Separate upload time from the server's OCR allowance, including on slow mobile connections. */
-export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal, testId?: string,
-    onProgress?: (progress: OCRProgress) => void): Promise<OCRResult> {
+export async function uploadStickerPhoto<T>(image: Blob, signal?: AbortSignal, testId?: string,
+    onProgress?: (progress: OCRProgress) => void, mode: 'single' | 'multiple' = 'single', targets?: {x:number;y:number}[]): Promise<T> {
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Authentication required for scanning');
     onProgress?.({ stage: 'preparing' });
@@ -73,14 +73,17 @@ export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal,
     if (upload.size > 14 * 1024 * 1024) throw new Error('Photo is too large to upload. Please enter the marks manually.');
     const formData = new FormData();
     if (testId) formData.append('testId', testId);
+    if (mode === 'multiple') { formData.append('mode', mode); formData.append('progress', '1'); }
+    if(targets) formData.append('targets',JSON.stringify(targets));
     formData.append('image', upload, upload.type === 'image/jpeg' ? 'sticker.jpg' : upload.type === 'image/webp' ? 'sticker.webp' : 'sticker.png');
-    return new Promise<OCRResult>((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         let settled = false;
         let reading = false;
+        let uploaded = false;
         let stageTimer: ReturnType<typeof setTimeout>;
         let stallTimer: ReturnType<typeof setTimeout>;
-        const finish = (error?: Error, result?: OCRResult) => {
+        const finish = (error?: Error, result?: T) => {
             if (settled) return;
             settled = true;
             clearTimeout(stageTimer);
@@ -94,17 +97,28 @@ export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal,
         const resetStall = () => { clearTimeout(stallTimer); stallTimer = setTimeout(uploadStalled, 25000); };
         // Register before open/send for upload-event compatibility across browsers.
         xhr.upload.onprogress = event => {
-            if (settled || reading) return;
+            if (settled || uploaded || reading) return;
             resetStall();
             onProgress?.({ stage: 'uploading', percent: event.lengthComputable ? Math.min(100, Math.round(event.loaded / event.total * 100)) : undefined });
         };
-        xhr.upload.onload = () => {
-            if (settled) return;
+        const startReading = () => {
+            if (settled || reading) return;
             reading = true;
-            clearTimeout(stallTimer);
-            clearTimeout(stageTimer);
+            clearTimeout(stallTimer); clearTimeout(stageTimer);
             onProgress?.({ stage: 'reading' });
-            stageTimer = setTimeout(() => finish(new Error('The marks reader timed out. Enter the marks manually or retry.')), 28000);
+            stageTimer = setTimeout(() => finish(new Error('The marks reader timed out. Enter the marks manually or retry.')), mode === 'multiple' ? 35000 : 28000);
+        };
+        xhr.upload.onload = () => {
+            if (settled || reading) return;
+            uploaded = true;
+            clearTimeout(stallTimer);
+            if (mode === 'single') { startReading(); return; }
+            // Upload completion may only mean the proxy received the bytes. Keep
+            // the original 90s transfer budget until the origin acknowledges them.
+            onProgress?.({ stage: 'receiving' });
+        };
+        xhr.onreadystatechange = () => {
+            if (mode === 'multiple' && xhr.readyState >= 2 && xhr.getResponseHeader('X-OCR-Stage') === 'reading') startReading();
         };
         xhr.onload = () => {
             if (settled) return;
@@ -118,9 +132,7 @@ export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal,
                 const data = JSON.parse(xhr.responseText);
                 if (data.reason === 'timeout') throw new Error('The marks reader timed out. Enter the marks manually or retry.');
                 if (data.reason === 'provider_error') throw new Error('The marks reader is unavailable. Enter the marks manually or retry.');
-                const raw = String(data.score ?? '');
-                const valid = /^\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?$/.test(raw);
-                finish(undefined, { score: valid ? raw.split('/')[0] : '', status: valid ? 'read' : 'needs_review' });
+                finish(undefined, data as T);
             } catch (error) {
                 finish(error instanceof SyntaxError ? new Error('Could not read the marks response. Retry or enter marks manually.') : error as Error);
             }
@@ -136,6 +148,14 @@ export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal,
         resetStall();
         try { xhr.send(formData); } catch (error) { finish(error as Error); }
     });
+}
+
+export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal, testId?: string,
+    onProgress?: (progress: OCRProgress) => void): Promise<OCRResult> {
+    const data = await uploadStickerPhoto<{ score?: unknown }>(image, signal, testId, onProgress);
+    const raw = String(data.score ?? '');
+    const valid = /^\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?$/.test(raw);
+    return { score: valid ? raw.split('/')[0] : '', status: valid ? 'read' : 'needs_review' };
 }
 
 /** Decode the original photo for QR lookup independently of the optimized OCR upload. */

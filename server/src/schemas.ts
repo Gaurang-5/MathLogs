@@ -196,6 +196,14 @@ export const submitMarkSchema = z.object({
     })
 });
 
+export const submitMarksBatchSchema = z.object({
+    body: z.object({
+        testId: z.string().uuid("Invalid Test ID"),
+        marks: z.array(submitMarkSchema.shape.body.omit({ testId: true }).extend({ expectedScore: z.number().min(0).nullable() })).min(1).max(20)
+            .refine(rows => new Set(rows.map(row => row.studentId)).size === rows.length, "Duplicate student marks"),
+    })
+});
+
 export const createTestSchema = z.object({
     body: z.object({
         name: z.string().min(1, "Test name is required").max(200),
