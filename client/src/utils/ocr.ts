@@ -33,41 +33,112 @@ export function stickerFrameBlob(canvas: HTMLCanvasElement): Promise<Blob> {
     )), 6000, 'Camera capture stalled. Try Use phone camera.');
 }
 
-/** Upload the original captured bytes, without crops, filters, warping, or recompression. */
-export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal, testId?: string): Promise<OCRResult> {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('Authentication required for scanning');
-    const formData = new FormData();
-    if (testId) formData.append('testId', testId);
-    formData.append('image', image, image.type === 'image/jpeg' ? 'sticker.jpg' : image.type === 'image/webp' ? 'sticker.webp' : 'sticker.png');
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    signal?.addEventListener('abort', abort, { once: true });
-    if (signal?.aborted) controller.abort();
+export type OCRProgress = { stage: 'preparing' | 'uploading' | 'reading'; percent?: number };
+
+/** Keep the full photo; make only the OCR upload smaller. QR and review use the original. */
+export async function prepareOCRUpload(original: Blob, signal?: AbortSignal): Promise<Blob> {
+    if (signal?.aborted) throw new DOMException('Capture cancelled', 'AbortError');
+    // Already-small photos gain little from another lossy encoding.
+    if (original.size <= 350 * 1024) return original;
+    const url = URL.createObjectURL(original);
+    const photo = new Image();
     try {
-        const response = await scanDeadline(fetch(`${API_URL}/scan-ocr`, {
-            method: 'POST', body: formData, signal: controller.signal,
-            headers: { Authorization: `Bearer ${token}` },
-        }), 28000, 'Reading marks timed out. Enter the marks manually or retry.', signal);
-        if (!response.ok) {
-            throw new Error(response.status === 401 ? 'Your session expired. Sign in again to read marks.' : response.status === 413
-                ? 'Photo is too large to upload. Please enter the marks manually.'
-                : 'Could not read marks. Please retry or enter them manually.');
-        }
-        const data = await scanDeadline(response.json(), 2000, 'The marks response stalled. Enter the marks manually.', signal);
-        if (data.reason === 'timeout') throw new Error('The marks reader timed out. Enter the marks manually or retry.');
-        if (data.reason === 'provider_error') throw new Error('The marks reader is unavailable. Enter the marks manually or retry.');
-        // A fraction is the obtained score followed by the total, never their concatenation.
-        const raw = String(data.score ?? '');
-        const valid = /^\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?$/.test(raw);
-        return { score: valid ? raw.split('/')[0] : '', status: valid ? 'read' : 'needs_review' };
+        photo.src = url;
+        await scanDeadline(photo.decode(), 8000, 'Photo preparation stalled. Try another photo.', signal);
+        const scale = Math.min(1, 3200 / Math.max(photo.naturalWidth, photo.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(photo.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(photo.naturalHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) return original;
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(photo, 0, 0, canvas.width, canvas.height);
+        const jpeg = await scanDeadline(new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9)),
+            8000, 'Photo preparation stalled. Try another photo.', signal);
+        return jpeg && jpeg.size < original.size ? jpeg : original;
     } finally {
-        controller.abort();
-        signal?.removeEventListener('abort', abort);
+        photo.src = '';
+        URL.revokeObjectURL(url);
     }
 }
 
-/** Decode only for QR lookup; upload the original File separately, untouched. */
+/** Separate upload time from the server's OCR allowance, including on slow mobile connections. */
+export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal, testId?: string,
+    onProgress?: (progress: OCRProgress) => void): Promise<OCRResult> {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Authentication required for scanning');
+    onProgress?.({ stage: 'preparing' });
+    const upload = await prepareOCRUpload(image, signal);
+    if (upload.size > 14 * 1024 * 1024) throw new Error('Photo is too large to upload. Please enter the marks manually.');
+    const formData = new FormData();
+    if (testId) formData.append('testId', testId);
+    formData.append('image', upload, upload.type === 'image/jpeg' ? 'sticker.jpg' : upload.type === 'image/webp' ? 'sticker.webp' : 'sticker.png');
+    return new Promise<OCRResult>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        let settled = false;
+        let reading = false;
+        let stageTimer: ReturnType<typeof setTimeout>;
+        let stallTimer: ReturnType<typeof setTimeout>;
+        const finish = (error?: Error, result?: OCRResult) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(stageTimer);
+            clearTimeout(stallTimer);
+            signal?.removeEventListener('abort', abort);
+            if (error) { xhr.abort(); reject(error); }
+            else resolve(result!);
+        };
+        const abort = () => finish(new DOMException('Capture cancelled', 'AbortError'));
+        const uploadStalled = () => finish(new Error('Photo upload stalled. Check your connection and retry, or enter marks manually.'));
+        const resetStall = () => { clearTimeout(stallTimer); stallTimer = setTimeout(uploadStalled, 25000); };
+        // Register before open/send for upload-event compatibility across browsers.
+        xhr.upload.onprogress = event => {
+            if (settled || reading) return;
+            resetStall();
+            onProgress?.({ stage: 'uploading', percent: event.lengthComputable ? Math.min(100, Math.round(event.loaded / event.total * 100)) : undefined });
+        };
+        xhr.upload.onload = () => {
+            if (settled) return;
+            reading = true;
+            clearTimeout(stallTimer);
+            clearTimeout(stageTimer);
+            onProgress?.({ stage: 'reading' });
+            stageTimer = setTimeout(() => finish(new Error('The marks reader timed out. Enter the marks manually or retry.')), 28000);
+        };
+        xhr.onload = () => {
+            if (settled) return;
+            if (xhr.status < 200 || xhr.status >= 300) {
+                finish(new Error(xhr.status === 401 ? 'Your session expired. Sign in again to read marks.' : xhr.status === 413
+                    ? 'Photo is too large to upload. Please enter the marks manually.'
+                    : 'Could not read marks. Please retry or enter them manually.'));
+                return;
+            }
+            try {
+                const data = JSON.parse(xhr.responseText);
+                if (data.reason === 'timeout') throw new Error('The marks reader timed out. Enter the marks manually or retry.');
+                if (data.reason === 'provider_error') throw new Error('The marks reader is unavailable. Enter the marks manually or retry.');
+                const raw = String(data.score ?? '');
+                const valid = /^\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?$/.test(raw);
+                finish(undefined, { score: valid ? raw.split('/')[0] : '', status: valid ? 'read' : 'needs_review' });
+            } catch (error) {
+                finish(error instanceof SyntaxError ? new Error('Could not read the marks response. Retry or enter marks manually.') : error as Error);
+            }
+        };
+        xhr.onerror = () => finish(new Error('Connection lost. Retry the photo or enter marks manually.'));
+        xhr.onabort = abort;
+        xhr.open('POST', `${API_URL}/scan-ocr`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        signal?.addEventListener('abort', abort, { once: true });
+        if (signal?.aborted) { abort(); return; }
+        onProgress?.({ stage: 'uploading', percent: 0 });
+        stageTimer = setTimeout(() => finish(new Error('Photo upload took too long. Check your connection and retry, or enter marks manually.')), 90000);
+        resetStall();
+        try { xhr.send(formData); } catch (error) { finish(error as Error); }
+    });
+}
+
+/** Decode the original photo for QR lookup independently of the optimized OCR upload. */
 export async function readStudentQRFromPhoto(photo: File, signal?: AbortSignal): Promise<string> {
     const url = URL.createObjectURL(photo);
     try {
