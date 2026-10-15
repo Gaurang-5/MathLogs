@@ -360,3 +360,13 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .sticker-reading-sweep { margin-inline: auto; }
 }
+
+/* Overlay follows the photo viewBox, including portrait/landscape letterboxing. */
+.sticker-photo-sweep { transform-box: view-box; transform: translateY(50%); }
+@keyframes sticker-photo-sweep {
+  from { transform: translateY(2%); }
+  to { transform: translateY(98%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sticker-photo-sweep { animation: sticker-photo-sweep 2.8s ease-in-out infinite alternate; }
+}
