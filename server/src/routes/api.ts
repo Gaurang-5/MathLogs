@@ -17,6 +17,7 @@ import { validateInvite, setupAccount } from '../controllers/inviteController';
 import { createOrder, verifyPayment, trackLead, startTrial, resendSetupLink } from '../controllers/onboardingController';
 import multer from 'multer';
 import { processOCR } from '../utils/ocr';
+import { processMultiStickerOCR } from '../utils/multiStickerOcr';
 import { buildGeminiOcrResult } from '../utils/ocrResult';
 import { readOcrCacheFast } from '../utils/ocrTiming';
 import { secureLogger } from '../utils/secureLogger';
@@ -217,6 +218,17 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) 
         const rawBuffer = (req as any).file ? (req as any).file.buffer : Buffer.from(imageBuffer.toString().replace(/^data:image\/[^;]+;base64,/, ''), 'base64');
         const test = typeof req.body.testId === 'string' ? await prisma.test.findFirst({ where: { id: req.body.testId, instituteId: req.user.instituteId, teacherId: req.user.id } }) : null;
         if (!test) return res.status(403).json({ error: 'Select an authorized test before scanning.' });
+        if (req.body.mode === 'multiple') {
+            if (!req.file) return res.status(400).json({ error: 'Upload the original photo.' });
+            const controller = new AbortController();
+            const disconnected = () => { if (!res.writableEnded) controller.abort(); };
+            res.once('close', disconnected);
+            try {
+                const result = await processMultiStickerOCR(req.file.buffer, req.file.mimetype, test.maxMarks, { signal: controller.signal });
+                if (!controller.signal.aborted) res.json(result);
+            } finally { res.off('close', disconnected); }
+            return;
+        }
         const hash = crypto.createHash('sha256').update(`sticker-single-box-v5-gemini35-38:${req.user.instituteId}:${test.id}:${test.maxMarks}:`).update(rawBuffer).digest('hex');
 
         // Check DB-backed cache first (works across all server instances)

@@ -9,6 +9,7 @@ import { ChevronDown, Check, Loader2 } from 'lucide-react';
 import { captureStickerFrame, stickerFrameBlob, readStudentQR, readStudentQRFromPhoto, extractMarksFromSticker } from '../utils/ocr';
 import { useStickerCamera } from '../utils/useStickerCamera';
 import { TeacherButton } from '../components/teacher-ui/TeacherButton';
+import { MultiStickerReview } from '../components/MultiStickerReview';
 import { StickerStudentPicker } from '../components/StickerStudentPicker';
 import { scanDeadline } from '../utils/scanDeadline';
 interface ScanTest {
@@ -39,6 +40,8 @@ interface StudentLookupResponse {
 export default function ScanMarks() {
     const [searchParams] = useSearchParams();
     const [scanning, setScanning] = useState(false);
+    const [multiple, setMultiple] = useState(false);
+    const [multiPhoto, setMultiPhoto] = useState<Blob | null>(null);
     const [cameraSessionOpen, setCameraSessionOpen] = useState(false);
     const [usingPhoneCamera, setUsingPhoneCamera] = useState(false);
     const photoInput = useRef<HTMLInputElement>(null);
@@ -137,6 +140,7 @@ export default function ScanMarks() {
     }, [scanning, student, pendingStudent, identityError]);
 
     const cancelCapture = () => {
+        setMultiPhoto(null);
         captureRequest.current?.abort();
         processingRef.current = false;
         setIsProcessingOCR(false);
@@ -176,6 +180,7 @@ export default function ScanMarks() {
             if (request.signal.aborted) return;
             previewUrl.current = URL.createObjectURL(image);
             setDebugImage(previewUrl.current);
+            if (multiple) { setMultiPhoto(image); setScanning(false); return; }
             // Start OCR immediately. QR and identity lookup use the very same captured frame.
             setCaptureStage('Reading student QR…');
             const current = () => mountedRef.current && !request.signal.aborted && captureRequest.current === request;
@@ -307,9 +312,9 @@ export default function ScanMarks() {
     };
 
     return (
-        <Layout title="Scan Marks" hideMobileNav={scanning || !!student || !!pendingStudent || !!identityError}>
+        <Layout title="Scan Marks" hideMobileNav={scanning || !!student || !!pendingStudent || !!identityError || !!multiPhoto}>
             {/* Test Selector */}
-            {!scanning && !student && !pendingStudent && !identityError && (
+            {!scanning && !student && !pendingStudent && !identityError && !multiPhoto && (
                 <div className="max-w-md mx-auto mt-10">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                         <h2 className="text-xl font-bold mb-6 text-app-text">Start Assessment</h2>
@@ -363,6 +368,12 @@ export default function ScanMarks() {
                                 </AnimatePresence>
                             </div>
                         </div>
+                        <fieldset className="mb-4 flex flex-wrap gap-3 text-sm text-app-text">
+                            <legend className="mb-2 font-medium">Stickers per photo</legend>
+                            <label className="flex min-h-11 items-center gap-2"><input type="radio" name="sticker-mode" checked={!multiple} onChange={() => setMultiple(false)} />One sticker</label>
+                            <label className="flex min-h-11 items-center gap-2"><input type="radio" name="sticker-mode" checked={multiple} onChange={() => setMultiple(true)} />Multiple stickers (up to 10)</label>
+                            {multiple && <p className="w-full text-app-text-secondary">Arrange stickers so every QR and marks box is visible. Review each result before saving.</p>}
+                        </fieldset>
                         <button
                             onClick={startScanner}
                             className={`w-full font-bold py-4 rounded-xl transition-all shadow-md flex items-center justify-center
@@ -376,6 +387,10 @@ export default function ScanMarks() {
                     </div>
                 </div>
             )}
+
+            {multiPhoto && debugImage && createPortal(<MultiStickerReview photo={multiPhoto} imageUrl={debugImage}
+                testId={selectedTestId} maxMarks={tests.find(test => test.id === selectedTestId)?.maxMarks ?? 100}
+                onClose={() => { setMultiPhoto(null); clearPreview(); setScanning(true); }} />, document.body)}
 
             {/* Scanner Active - Immersive Fullscreen Mobile UI */}
             {cameraSessionOpen && createPortal(
