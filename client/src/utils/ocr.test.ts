@@ -39,7 +39,7 @@ it('bounds a stalled upload and aborts the underlying request', async () => {
   const fetchMock = vi.fn().mockReturnValue(new Promise(() => {}));
   vi.stubGlobal('fetch', fetchMock);
   const result = extractMarksFromSticker(new Blob(['photo'])).catch(error => error.message);
-  await vi.advanceTimersByTimeAsync(18001);
+  await vi.advanceTimersByTimeAsync(28001);
   expect(await result).toContain('timed out');
   expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
 });

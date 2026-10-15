@@ -98,3 +98,32 @@ test('provider outages do not become an uncertain handwriting result', async () 
         assert.equal((await processOCR(Buffer.from('photo'))).reason, 'provider_error');
     } finally { GoogleGenerativeAI.prototype.getGenerativeModel = original; }
 });
+
+test('starts fallback for a slow primary and cancels the losing request after a reading', async () => {
+    const { processOCR } = await import('../src/utils/ocr');
+    const original = GoogleGenerativeAI.prototype.getGenerativeModel;
+    const calls: string[] = []; let primarySignal: AbortSignal | undefined;
+    GoogleGenerativeAI.prototype.getGenerativeModel = ((config: any) => ({ generateContent: async (_: any, options: any) => {
+        calls.push(config.model);
+        if (config.model === 'gemini-3.5-flash-lite') { primarySignal = options.signal; return new Promise(() => {}); }
+        return { response: { text: () => '{"score":"4"}' } };
+    } })) as any;
+    try {
+        assert.equal((await processOCR(Buffer.from('large original photo'), 'image/png', { timeoutMs: 500, fallbackDelayMs: 10 })).score, '4');
+        assert.deepEqual(calls, ['gemini-3.5-flash-lite', 'gemini-3.8-flash']);
+        assert.equal(primarySignal?.aborted, true);
+    } finally { GoogleGenerativeAI.prototype.getGenerativeModel = original; }
+});
+
+test('a healthy slow primary can still succeed after the fallback becomes unavailable', async () => {
+    const { processOCR } = await import('../src/utils/ocr');
+    const original = GoogleGenerativeAI.prototype.getGenerativeModel;
+    GoogleGenerativeAI.prototype.getGenerativeModel = ((config: any) => ({ generateContent: async () => {
+        if (config.model === 'gemini-3.8-flash') throw Object.assign(new Error('Unavailable'), { status: 503 });
+        await new Promise(resolve => setTimeout(resolve, 30));
+        return { response: { text: () => '{"score":"12"}' } };
+    } })) as any;
+    try {
+        assert.equal((await processOCR(Buffer.from('photo'), 'image/png', { timeoutMs: 500, fallbackDelayMs: 5 })).score, '12');
+    } finally { GoogleGenerativeAI.prototype.getGenerativeModel = original; }
+});

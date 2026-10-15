@@ -194,7 +194,7 @@ it('exits a stalled OCR operation into manual entry and ignores its late result'
   let finish!: (value: {score: string; status: string}) => void;
   mocks.ocr.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
   await click('Capture');
-  await act(async () => { await vi.advanceTimersByTimeAsync(20001); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(30001); });
   expect(document.body.textContent).toContain('Reading marks timed out');
   expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Obtained marks"]')?.value).toBe('');
   await act(async () => finish({ score: '91', status: 'read' }));

@@ -48,7 +48,7 @@ export async function extractMarksFromSticker(image: Blob, signal?: AbortSignal,
         const response = await scanDeadline(fetch(`${API_URL}/scan-ocr`, {
             method: 'POST', body: formData, signal: controller.signal,
             headers: { Authorization: `Bearer ${token}` },
-        }), 18000, 'Reading marks timed out. Enter the marks manually or retry.', signal);
+        }), 28000, 'Reading marks timed out. Enter the marks manually or retry.', signal);
         if (!response.ok) {
             throw new Error(response.status === 401 ? 'Your session expired. Sign in again to read marks.' : response.status === 413
                 ? 'Photo is too large to upload. Please enter the marks manually.'

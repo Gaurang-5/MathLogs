@@ -184,7 +184,7 @@ export default function ScanMarks() {
             // Start OCR immediately. QR and identity lookup use the very same captured frame.
             setCaptureStage('Reading student QR…');
             const current = () => mountedRef.current && !request.signal.aborted && captureRequest.current === request;
-            const ocrPromise = scanDeadline(extractMarksFromSticker(image, request.signal, selectedTestId), 20000, 'Reading marks timed out. Enter them manually.', request.signal)
+            const ocrPromise = scanDeadline(extractMarksFromSticker(image, request.signal, selectedTestId), 30000, 'Reading marks timed out. Enter them manually.', request.signal)
                 .catch((error: Error) => ({ score: '', status: 'needs_review' as const, error: error.message }))
                 .then(ocr => {
                     if (!current()) return;
