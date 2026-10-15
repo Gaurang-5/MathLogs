@@ -19,18 +19,18 @@ afterEach(()=>{act(()=>root.unmount());container.remove();vi.restoreAllMocks();}
 it('saves in one request, preserves zero, and retries only failed rows',async()=>{
  await render();expect(document.querySelector<HTMLInputElement>('#sticker-score-0')!.value).toBe('0');expect(document.querySelector('img')).toBeNull();
  let fail=true;mocks.api.mockImplementation(async(_path,_method,body)=>({results:body.marks.map((m:any)=>({studentId:m.studentId,saved:m.studentId!=='b'||!fail,error:m.studentId==='b'&&fail?'Network failed':undefined}))}));
- await click('Confirm');expect(close).not.toHaveBeenCalled();fail=false;await click('Confirm');expect(close).toHaveBeenCalledTimes(1);
+ await click('Confirm');expect(close).not.toHaveBeenCalled();fail=false;await click('Confirm');expect(close).not.toHaveBeenCalled();await click('Done');expect(close).toHaveBeenCalledTimes(1);
  const saves=mocks.api.mock.calls.filter(([path])=>path==='/marks/batch');expect(saves.map(c=>c[2].marks.map((m:any)=>m.studentId))).toEqual([['a','b'],['b']]);expect(saves[0][2].marks[0]).toEqual({studentId:'a',score:'0',expectedScore:null});expect(mocks.toast).toHaveBeenCalledWith('2 marks saved');
 });
-it('asks before replacing existing marks and retains optimistic protection',async()=>{
- mocks.api.mockResolvedValueOnce({results:[{humanId:'A',student:{id:'a',name:'Aarav',humanId:'A',marks:[{testId:'test',score:7}]}},{humanId:'B',student:{id:'b',name:'Bela',humanId:'B',marks:[]}}]});await render();vi.mocked(window.confirm).mockReturnValueOnce(false);await click('Confirm');expect(mocks.api).toHaveBeenCalledTimes(1);await click('Confirm');expect(mocks.api.mock.calls[1][2].marks[0]).toEqual({studentId:'a',score:'0',expectedScore:7});
+it('shows previous marks inline without an overwrite popup and retains optimistic protection',async()=>{
+ mocks.api.mockResolvedValueOnce({results:[{humanId:'A',student:{id:'a',name:'Aarav',humanId:'A',marks:[{testId:'test',score:7}]}},{humanId:'B',student:{id:'b',name:'Bela',humanId:'B',marks:[]}}]});await render();expect(document.body.textContent).toContain('Previously saved: 7 · Will be replaced');await click('Confirm');expect(window.confirm).not.toHaveBeenCalled();expect(mocks.api.mock.calls[1][2].marks[0]).toEqual({studentId:'a',score:'0',expectedScore:7});
 });
 it('requires reviewing a concurrent change before replacement',async()=>{
  await render();mocks.api.mockResolvedValueOnce({results:[{studentId:'a',saved:false,conflict:true,currentScore:9,error:'The saved mark changed.'},{studentId:'b',saved:true}]});await click('Confirm');expect(document.body.textContent).toContain('Currently saved: 9');expect([...document.querySelectorAll('button')].find(b=>b.textContent==='Confirm')!.disabled).toBe(true);
  await click('Review complete — use my entry');await click('Confirm');expect(mocks.api.mock.calls.at(-1)![2].marks).toEqual([{studentId:'a',score:'0',expectedScore:9}]);
 });
 it('keeps entries after a request timeout and reports no success until retry confirms',async()=>{
- await render();mocks.api.mockRejectedValueOnce(new Error('Request timeout'));await click('Confirm');expect(close).not.toHaveBeenCalled();expect(mocks.toast).not.toHaveBeenCalled();expect(document.querySelector<HTMLInputElement>('#sticker-score-0')!.value).toBe('0');await click('Confirm');expect(close).toHaveBeenCalledTimes(1);
+ await render();mocks.api.mockRejectedValueOnce(new Error('Request timeout'));await click('Confirm');expect(close).not.toHaveBeenCalled();expect(mocks.toast).not.toHaveBeenCalled();expect(document.querySelector<HTMLInputElement>('#sticker-score-0')!.value).toBe('0');await click('Confirm');expect(close).not.toHaveBeenCalled();await click('Done');expect(close).toHaveBeenCalledTimes(1);
 });
 it('aborts pending recognition on dismissal and shows accessible upload progress',async()=>{
  mocks.marks.mockImplementation((_image,_codes,_test,_signal,progress)=>{progress({stage:'uploading',percent:42});return new Promise(()=>{});});await render();expect(document.querySelector('[role=progressbar]')!.getAttribute('aria-valuenow')).toBe('42');const signal=mocks.marks.mock.calls[0][3];await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label="Retake photo"]')!.click());act(()=>root.unmount());root=createRoot(container);expect(signal.aborted).toBe(true);
@@ -58,4 +58,11 @@ it('saves larger photos in bounded batches and reports the complete saved count'
  mocks.codes.mockResolvedValue({width:1000,height:1000,codes:Array.from({length:43},(_,i)=>({humanId:String(i),corners:[]}))});
  mocks.api.mockImplementation(async(path,_method,body)=>path==='/marks/batch'?{results:body.marks.map((m:any)=>({studentId:m.studentId,saved:true}))}:{results:body.humanIds.map((humanId:string)=>({humanId,student:{id:humanId,humanId,name:'Student '+humanId,marks:[]}}))});
  await render();await click('Confirm');expect(mocks.api.mock.calls.filter(c=>c[0]==='/marks/batch').map(c=>c[2].marks.length)).toEqual([20,20,3]);expect(mocks.toast).toHaveBeenCalledWith('43 marks saved');
+});
+
+it('keeps names visible while saving and shows ticks only after server confirmation',async()=>{
+ await render();let finish!:(value:any)=>void;mocks.api.mockImplementationOnce(()=>new Promise(resolve=>finish=resolve));await click('Confirm');
+ expect(document.body.textContent).toContain('Aarav');expect(document.querySelectorAll('[role=progressbar]')).toHaveLength(2);expect(document.querySelectorAll('.sticker-saved-check')).toHaveLength(0);expect(document.querySelector('img')).toBeNull();
+ await act(async()=>finish({results:[{studentId:'a',saved:true},{studentId:'b',saved:false,error:'Please retry'}]}));
+ expect(document.querySelectorAll('.sticker-saved-check')).toHaveLength(1);expect(document.querySelectorAll('[role=progressbar]')).toHaveLength(0);expect(document.body.textContent).toContain('Please retry');expect(close).not.toHaveBeenCalled();
 });

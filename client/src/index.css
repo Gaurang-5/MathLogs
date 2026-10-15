@@ -370,3 +370,14 @@ html {
 @media (prefers-reduced-motion: no-preference) {
   .sticker-photo-sweep { animation: sticker-photo-sweep 2.8s ease-in-out infinite alternate; }
 }
+
+@keyframes sticker-saved-check {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sticker-saved-check path, .sticker-saved-check polyline {
+    stroke-dasharray: 24;
+    animation: sticker-saved-check 240ms ease-out both;
+  }
+}

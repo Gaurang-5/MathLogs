@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { TeacherButton, TeacherSurface } from './teacher-ui';
 import { apiRequest } from '../utils/api';
@@ -28,6 +28,7 @@ const progressText=(p:OCRProgress)=>p.stage==='preparing'?'Preparing photo…':p
 
 export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{photo:Blob;imageUrl:string;testId:string;maxMarks:number;onClose:()=>void}){
     const [rows,setRows]=useState<Row[]>([]),[geometry,setGeometry]=useState<PhotoCodes|null>(null);
+    const [savingRows,setSavingRows]=useState<number[]>([]);
     const [reading,setReading]=useState(true),[saving,setSaving]=useState(false),[matching,setMatching]=useState(false);
     const [progress,setProgress]=useState<OCRProgress|null>(null),[message,setMessage]=useState('Reading student QRs…');
     const [ocrFailed,setOcrFailed]=useState(false),[qrError,setQrError]=useState('');
@@ -92,12 +93,11 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
     const canConfirm=pending.length>0&&pending.every(row=>row.student&&!row.blocked&&!row.conflict&&validPhotoScore(row.score,maxMarks));
     const save=async()=>{
         if(lock.current||reading||matching||!canConfirm)return;
-        const replacements=pending.filter(row=>row.previous!==null&&Number(row.score)!==row.previous).length;
-        if(replacements&&!window.confirm(`Replace ${replacements} previously saved ${replacements===1?'mark':'marks'} with the values shown?`))return;
         lock.current=true;setSaving(true);let failed=false;
         const entries=rows.map((row,i)=>({row,i})).filter(({row})=>!row.saved);
         for(let start=0;start<entries.length&&alive.current;start+=20){
             const group=entries.slice(start,start+20);
+            setSavingRows(group.map(({i})=>i));
             try{
                 const response=await apiRequest<{results:{studentId:string;saved:boolean;error?:string;conflict?:boolean;currentScore?:number|null}[]}>('/marks/batch','POST',{
                     testId,marks:group.map(({row})=>({studentId:row.student!.id,score:row.score,expectedScore:row.previous}))
@@ -116,20 +116,16 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
                 break;
             }
         }
-        lock.current=false;if(alive.current){setSaving(false);if(!failed){toast.success(`${rows.length} ${rows.length===1?'mark':'marks'} saved`);onClose();}else setMessage('Some marks were not confirmed saved. Your entries are kept. Retry only the remaining rows.');}
+        lock.current=false;if(alive.current){setSavingRows([]);setSaving(false);if(!failed){setMessage('');toast.success(`${rows.length} ${rows.length===1?'mark':'marks'} saved`);}else setMessage('Some marks were not confirmed saved. Your entries are kept. Retry only the remaining rows.');}
     };
     const busy=reading||matching||saving;
-    const percent=saving?Math.round(rows.filter(row=>row.saved).length/rows.length*100):reading&&progress?.stage==='uploading'?progress.percent:undefined;
+    const allSaved=rows.length>0&&rows.every(row=>row.saved);
+    const percent=reading&&progress?.stage==='uploading'?progress.percent:undefined;
     return <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review marks" className="fixed inset-0 z-[210] overflow-y-auto bg-app-bg p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-2xl pb-20">
             <div className="relative z-20 flex justify-end"><h2 className="sr-only">Review marks</h2><TeacherButton variant="secondary" aria-label="Retake photo" disabled={saving} onClick={close}><X aria-hidden="true" size={20}/></TeacherButton></div>
-            {busy&&<div className="fixed inset-0 z-10 flex items-center justify-center bg-app-bg px-8" aria-live="polite">
-                {!saving ? <StickerScanProgress imageUrl={imageUrl} geometry={geometry} message={matching?'Finding students…':message} percent={percent} /> : <div className="w-full max-w-xs -translate-y-4 text-center">
-                <p className="mb-5 text-lg font-semibold tracking-tight text-app-text">{saving?'Saving marks':matching?'Finding students':'Reading your stickers'}</p>
-                <div role="progressbar" aria-label={saving?'Saving marks':matching?'Finding students':message} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1.5 overflow-hidden rounded-full bg-app-border">
-                    <div className={`h-full rounded-full bg-app-text transition-[width] motion-reduce:transition-none ${percent===undefined?'w-1/3 sticker-reading-sweep':' '}`} style={percent===undefined?undefined:{width:`${percent}%`}}/>
-                </div><p role="status" className="mt-4 text-xs text-app-text-secondary">{saving?`${rows.filter(row=>row.saved).length} of ${rows.length} marks saved`:matching?'Finding students…':message}</p>
-                </div>}
+            {(reading||matching)&&<div className="fixed inset-0 z-10 flex items-center justify-center bg-app-bg px-8" aria-live="polite">
+                <StickerScanProgress imageUrl={imageUrl} geometry={geometry} message={matching?'Finding students…':message} percent={percent} />
             </div>}
             {qrError?<StickerStudentPicker image={imageUrl} message={qrError} score="" onRetake={onClose} onSelect={async humanId=>{
                 const student=await apiRequest<Student>(`/students/lookup/${encodeURIComponent(humanId)}?testId=${encodeURIComponent(testId)}`);
@@ -139,7 +135,16 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
                 <TeacherSurface className="divide-y divide-app-border overflow-hidden">
                     {rows.map((row,i)=><div key={`${row.code.humanId}-${i}`} className="px-4 py-4">
                         <div className="flex items-center gap-4">
-                            <label htmlFor={`sticker-score-${i}`} className="min-w-0 flex-1 break-words text-base font-bold text-app-text">{row.student?.name||row.code.humanId}</label>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor={`sticker-score-${i}`} className="min-w-0 break-words text-base font-bold text-app-text">{row.student?.name||row.code.humanId}</label>
+                                    {row.saved&&<span role="status" aria-label={`Saved for ${row.student?.name||row.code.humanId}`} className="shrink-0 text-success"><Check aria-hidden="true" size={20} strokeWidth={2.5} className="sticker-saved-check"/></span>}
+                                </div>
+                                {!row.saved&&row.previous!==null&&<p className="mt-1 text-xs text-app-text-secondary">Previously saved: <strong>{row.previous}</strong>{validPhotoScore(row.score,maxMarks)&&Number(row.score)!==row.previous?' · Will be replaced':''}</p>}
+                                {(savingRows.includes(i)||row.saved)&&<div role={row.saved?undefined:'progressbar'} aria-label={row.saved?undefined:`Saving marks for ${row.student?.name||row.code.humanId}`} className="mt-2 h-0.5 overflow-hidden rounded-full bg-app-border">
+                                    <div className={`h-full rounded-full bg-success ${row.saved?'w-full':'w-1/3 sticker-reading-sweep'}`}/>
+                                </div>}
+                            </div>
                             <input id={`sticker-score-${i}`} aria-label={`Marks for ${row.student?.name||row.code.humanId}`} aria-invalid={!row.saved&&!!row.score&&!validPhotoScore(row.score,maxMarks)} inputMode="decimal" value={row.score} placeholder="—" disabled={busy||row.saved||!!row.blocked}
                                 onChange={event=>patch(i,{score:event.target.value,error:undefined})} className="min-h-11 w-24 shrink-0 rounded-lg border border-app-border bg-app-bg px-2 text-center text-xl font-bold text-app-text focus-visible:outline-2 focus-visible:outline-offset-2"/>
                         </div>
@@ -150,12 +155,11 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
                             <p>Currently saved: <strong>{row.conflict.currentScore??'No mark'}</strong>. Your entry: <strong>{row.score}</strong>.</p>
                             <TeacherButton variant="secondary" className="mt-2" onClick={()=>patch(i,{previous:row.conflict!.currentScore,conflict:undefined,error:undefined})}>Review complete — use my entry</TeacherButton>
                         </div>}
-                        {row.saved&&<span className="sr-only">Saved</span>}
                     </div>)}
                 </TeacherSurface>
                 {!busy&&ocrFailed&&pending.some(row=>!row.score)&&<TeacherButton variant="secondary" className="mt-3" onClick={()=>void retryMarks()}>Retry reading marks</TeacherButton>}
                 {!busy&&rows.some(row=>!row.student)&&<TeacherButton variant="secondary" className="mt-3" onClick={()=>void retryStudents()}>Retry student lookup</TeacherButton>}
-                <div className="fixed inset-x-0 bottom-0 border-t border-app-border bg-app-surface-opaque p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"><TeacherButton className="mx-auto w-full max-w-2xl" disabled={busy||!canConfirm} loading={saving} onClick={()=>void save()}>Confirm</TeacherButton></div>
+                <div className="fixed inset-x-0 bottom-0 border-t border-app-border bg-app-surface-opaque p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"><TeacherButton className="mx-auto w-full max-w-2xl" disabled={busy||(!allSaved&&!canConfirm)} onClick={()=>allSaved?onClose():void save()}>{allSaved?'Done':saving?'Saving…':'Confirm'}</TeacherButton></div>
             </>}
         </div>
     </div>;
