@@ -19,5 +19,12 @@ test('multi-photo route requires a teacher-owned test and forwards the original 
   permitted=true;
   const response=await request(app).post('/api/scan-ocr').set('Authorization',`Bearer ${token}`).field('testId','exam').field('mode','multiple').attach('image',image,{filename:'photo.png',contentType:'image/png'});
   assert.equal(response.status,200,JSON.stringify(response.body));assert.deepEqual(response.body,{stickers:[{x:100,y:200,score:'0'}]});assert.equal(calls,1);
+  let release!:()=>void,acknowledged=false;
+  GoogleGenerativeAI.prototype.getGenerativeModel=(()=>({generateContent:()=>new Promise(resolve=>{release=()=>resolve({response:{text:()=>'{"stickers":[{"x":100,"y":200,"score":"4"}]}'}});})})) as any;
+  const streamed=await request(app).post('/api/scan-ocr').set('Authorization',`Bearer ${token}`).field('testId','exam').field('mode','multiple').field('progress','1').attach('image',image,{filename:'photo.png',contentType:'image/png'}).buffer(true).parse((res,done)=>{
+   assert.equal(res.headers['x-ocr-stage'],'reading');assert.equal(res.headers['cache-control'],'no-store, no-transform');
+   let data='';res.on('data',chunk=>{data+=chunk.toString();if(!acknowledged){acknowledged=true;release();}});res.on('end',()=>done(null,JSON.parse(data)));
+  }).timeout(3000);
+  assert.ok(acknowledged);assert.equal(streamed.body.stickers[0].score,'4');
  }finally{prisma.admin.findUnique=admin;prisma.test.findFirst=exam;GoogleGenerativeAI.prototype.getGenerativeModel=model;}
 });

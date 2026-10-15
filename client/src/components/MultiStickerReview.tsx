@@ -26,6 +26,8 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
     const [reading,setReading]=useState(true);
     const [saving,setSaving]=useState(false);
     const [matching,setMatching]=useState(false);
+    const [ocrFailed,setOcrFailed]=useState(false);
+    const recognition=useRef<AbortController|null>(null);
     const [ocrStatus,setOcrStatus]=useState('Preparing photo…');
     const [message,setMessage]=useState('Reading student QRs…');
     const [selected,setSelected]=useState(0);
@@ -37,10 +39,10 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
     useEffect(()=>{
         alive.current=true;
         let disposed=false;
-        const request=new AbortController();
+        const request=new AbortController();recognition.current=request;
         const timer=setInterval(()=>setElapsed(value=>value+1),1000);
         const ocr=extractPhotoMarks(photo,testId,request.signal,progress=>{
-            if(!disposed)setOcrStatus(progress.stage==='preparing'?'Preparing photo…':progress.stage==='reading'?'Reading marks…':`Uploading photo${progress.percent===undefined?'':` ${progress.percent}%`}…`);
+            if(!disposed)setOcrStatus(progress.stage==='preparing'?'Preparing photo…':progress.stage==='reading'?'Reading marks…':progress.stage==='receiving'?'Sending photo to the marks reader…':`Uploading photo${progress.percent===undefined?'':` ${progress.percent}%`}…`);
         }).then(readings=>{if(!disposed)setOcrStatus('Marks read.');return {readings,error:''};},error=>{if(!disposed)setOcrStatus('Marks need review.');return {readings:[],error:error.message as string};});
         const identities=readPhotoCodes(photo,request.signal).then(async codes=>{
             if(!disposed){setGeometry(codes);setMessage(`${codes.codes.length} QR codes found. Matching students and marks…`);}
@@ -50,6 +52,7 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
         });
         void Promise.all([identities,ocr]).then(([{codes,students},marks])=>{
             if(disposed)return;
+            setOcrFailed(!!marks.error);
             const matched=matchStickerReadings(codes,marks.readings);
             setRows(matched.map(match=>{
                 const result=students.get(match.code.humanId);
@@ -67,8 +70,25 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
             request.abort();
             if(!disposed)setMessage(error.message||'The photo could not be read. Retake with fewer stickers.');
         }).finally(()=>{clearInterval(timer);if(!disposed)setReading(false);});
-        return()=>{disposed=true;alive.current=false;request.abort();clearInterval(timer);};
+        return()=>{disposed=true;alive.current=false;request.abort();recognition.current?.abort();clearInterval(timer);};
     },[photo,testId,maxMarks]);
+    const retryMarks=async()=>{
+        if(reading||saving||matching||!geometry)return;
+        const request=new AbortController();recognition.current=request;
+        setReading(true);setElapsed(0);setOcrStatus('Preparing photo…');setMessage('Keeping the matched students and entered marks.');
+        const timer=setInterval(()=>setElapsed(value=>value+1),1000);
+        try {
+            const readings=await extractPhotoMarks(photo,testId,request.signal,progress=>{
+                if(alive.current)setOcrStatus(progress.stage==='preparing'?'Preparing photo…':progress.stage==='reading'?'Reading marks…':progress.stage==='receiving'?'Sending photo to the marks reader…':`Uploading photo${progress.percent===undefined?'':` ${progress.percent}%`}…`);
+            });
+            if(!alive.current)return;
+            const matches=matchStickerReadings(geometry,readings);
+            setRows(current=>current.map((row,i)=>row.saved||row.score?row:{...row,score:validPhotoScore(matches[i].score,maxMarks)?matches[i].score:'',confirmed:false,error:matches[i].error}));
+            setOcrFailed(false);setMessage('Check the numbered photo and confirm every result you want to save.');
+        } catch(error) {
+            if(alive.current){setOcrFailed(true);setMessage(error instanceof Error?error.message:'Could not read marks. Retry or enter them manually.');}
+        } finally {clearInterval(timer);if(alive.current)setReading(false);}
+    };
     const retryStudents=async()=>{
         if(matching||saving)return;
         setMatching(true);
@@ -120,6 +140,7 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
         <div className="mx-auto max-w-5xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold text-app-text">Review multiple stickers</h2><TeacherButton variant="secondary" disabled={saving} onClick={close}>{reading?'Cancel':'Back to camera'}</TeacherButton></div>
             <p role="status" className="text-sm text-app-text-secondary">{reading?`${ocrStatus} ${message} ${elapsed}s`:message}</p>
+            {!reading&&ocrFailed&&<TeacherButton variant="secondary" disabled={saving||matching} onClick={()=>void retryMarks()}>Retry reading marks</TeacherButton>}
             {!reading&&rows.some(row=>!row.student)&&<TeacherButton variant="secondary" disabled={matching||saving} loading={matching} onClick={()=>void retryStudents()}>Retry student lookup</TeacherButton>}
             <div className="grid items-start gap-4 md:grid-cols-2">
                 <TeacherSurface className="p-2 md:sticky md:top-2">
@@ -139,15 +160,15 @@ export function MultiStickerReview({ photo, imageUrl, testId, maxMarks, onClose 
                     <button type="button" onClick={()=>setSelected(i)} className="min-h-11 w-full text-left font-semibold text-app-text">{i+1}. {row.student?.name||row.code.humanId}{row.saved?' · Saved':''}</button>
                     <p className="text-xs text-app-text-secondary">{row.code.humanId}</p>
                     {row.blocked?<p role="alert" className="text-sm text-danger">{row.blocked}</p>:<>
-                        <label className="block text-sm text-app-text">Marks out of {maxMarks}<input aria-label={`Marks for sticker ${i+1}`} inputMode="decimal" value={row.score} disabled={saving||row.saved} onFocus={()=>setSelected(i)} onChange={e=>patch(i,{score:e.target.value,confirmed:false,error:undefined})} className="mt-1 block min-h-11 w-32 rounded-xl border border-app-border bg-app-bg px-3" /></label>
+                        <label className="block text-sm text-app-text">Marks out of {maxMarks}<input aria-label={`Marks for sticker ${i+1}`} inputMode="decimal" value={row.score} disabled={reading||saving||row.saved} onFocus={()=>setSelected(i)} onChange={e=>patch(i,{score:e.target.value,confirmed:false,error:undefined})} className="mt-1 block min-h-11 w-32 rounded-xl border border-app-border bg-app-bg px-3" /></label>
                         {row.score&&!validPhotoScore(row.score,maxMarks)&&<p role="alert" className="text-sm text-danger">Enter 0–{maxMarks}, with at most two decimal places.</p>}
                         {row.previous!==null&&!row.saved&&<label className="flex min-h-11 gap-3 items-center text-sm"><input type="checkbox" checked={row.overwrite} disabled={saving} onChange={e=>patch(i,{overwrite:e.target.checked})}/>Replace existing score {row.previous}</label>}
-                        {!row.saved&&<label className="flex min-h-11 gap-3 items-center text-sm"><input aria-label={`Confirm sticker ${i+1}`} type="checkbox" checked={row.confirmed} disabled={saving||!validPhotoScore(row.score,maxMarks)} onChange={e=>patch(i,{confirmed:e.target.checked})}/>I checked this student and mark</label>}
+                        {!row.saved&&<label className="flex min-h-11 gap-3 items-center text-sm"><input aria-label={`Confirm sticker ${i+1}`} type="checkbox" checked={row.confirmed} disabled={reading||saving||!validPhotoScore(row.score,maxMarks)} onChange={e=>patch(i,{confirmed:e.target.checked})}/>I checked this student and mark</label>}
                     </>}
                     {row.error&&!row.saved&&<p role="alert" className="text-sm text-app-text-secondary">{row.error}</p>}
                 </TeacherSurface>)}</div>
             </div>
-            {!reading&&<div className="sticky bottom-0 rounded-xl border border-app-border bg-app-surface-opaque p-3"><TeacherButton className="w-full" disabled={!count||saving||matching} loading={saving} onClick={()=>void save()}>Save {count} confirmed results</TeacherButton></div>}
+            {!reading&&<div className="sticky bottom-0 rounded-xl border border-app-border bg-app-surface-opaque p-3"><TeacherButton className="w-full" disabled={!count||reading||saving||matching} loading={saving} onClick={()=>void save()}>Save {count} confirmed results</TeacherButton></div>}
         </div>
     </div>;
 }

@@ -33,7 +33,7 @@ export function stickerFrameBlob(canvas: HTMLCanvasElement): Promise<Blob> {
     )), 6000, 'Camera capture stalled. Try Use phone camera.');
 }
 
-export type OCRProgress = { stage: 'preparing' | 'uploading' | 'reading'; percent?: number };
+export type OCRProgress = { stage: 'preparing' | 'uploading' | 'receiving' | 'reading'; percent?: number };
 
 /** Keep the full photo; make only the OCR upload smaller. QR and review use the original. */
 export async function prepareOCRUpload(original: Blob, signal?: AbortSignal): Promise<Blob> {
@@ -73,12 +73,13 @@ export async function uploadStickerPhoto<T>(image: Blob, signal?: AbortSignal, t
     if (upload.size > 14 * 1024 * 1024) throw new Error('Photo is too large to upload. Please enter the marks manually.');
     const formData = new FormData();
     if (testId) formData.append('testId', testId);
-    if (mode === 'multiple') formData.append('mode', mode);
+    if (mode === 'multiple') { formData.append('mode', mode); formData.append('progress', '1'); }
     formData.append('image', upload, upload.type === 'image/jpeg' ? 'sticker.jpg' : upload.type === 'image/webp' ? 'sticker.webp' : 'sticker.png');
     return new Promise<T>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         let settled = false;
         let reading = false;
+        let uploaded = false;
         let stageTimer: ReturnType<typeof setTimeout>;
         let stallTimer: ReturnType<typeof setTimeout>;
         const finish = (error?: Error, result?: T) => {
@@ -95,17 +96,28 @@ export async function uploadStickerPhoto<T>(image: Blob, signal?: AbortSignal, t
         const resetStall = () => { clearTimeout(stallTimer); stallTimer = setTimeout(uploadStalled, 25000); };
         // Register before open/send for upload-event compatibility across browsers.
         xhr.upload.onprogress = event => {
-            if (settled || reading) return;
+            if (settled || uploaded || reading) return;
             resetStall();
             onProgress?.({ stage: 'uploading', percent: event.lengthComputable ? Math.min(100, Math.round(event.loaded / event.total * 100)) : undefined });
         };
-        xhr.upload.onload = () => {
-            if (settled) return;
+        const startReading = () => {
+            if (settled || reading) return;
             reading = true;
-            clearTimeout(stallTimer);
-            clearTimeout(stageTimer);
+            clearTimeout(stallTimer); clearTimeout(stageTimer);
             onProgress?.({ stage: 'reading' });
             stageTimer = setTimeout(() => finish(new Error('The marks reader timed out. Enter the marks manually or retry.')), mode === 'multiple' ? 35000 : 28000);
+        };
+        xhr.upload.onload = () => {
+            if (settled || reading) return;
+            uploaded = true;
+            clearTimeout(stallTimer);
+            if (mode === 'single') { startReading(); return; }
+            // Upload completion may only mean the proxy received the bytes. Keep
+            // the original 90s transfer budget until the origin acknowledges them.
+            onProgress?.({ stage: 'receiving' });
+        };
+        xhr.onreadystatechange = () => {
+            if (mode === 'multiple' && xhr.readyState >= 2 && xhr.getResponseHeader('X-OCR-Stage') === 'reading') startReading();
         };
         xhr.onload = () => {
             if (settled) return;

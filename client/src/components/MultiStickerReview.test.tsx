@@ -56,3 +56,12 @@ it('uses one batch request and recovers identities without losing OCR or rereadi
  expect(document.body.textContent).toContain('Aarav');expect(mocks.marks).toHaveBeenCalledTimes(1);expect(mocks.codes).toHaveBeenCalledTimes(1);
  expect(mocks.api).toHaveBeenCalledTimes(2);
 });
+
+it('retries failed OCR on the same photo without looking up students again',async()=>{
+ mocks.marks.mockRejectedValueOnce(new Error('The marks reader timed out.'));
+ await render();expect(document.body.textContent).toContain('Aarav');
+ await click('Retry reading marks');
+ expect(mocks.marks).toHaveBeenCalledTimes(2);expect(mocks.api).toHaveBeenCalledTimes(1);expect(mocks.codes).toHaveBeenCalledTimes(1);
+ expect(document.querySelector<HTMLInputElement>('[aria-label="Marks for sticker 1"]')!.value).toBe('0');
+ expect(document.querySelector<HTMLInputElement>('[aria-label="Confirm sticker 1"]')!.checked).toBe(false);
+});

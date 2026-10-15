@@ -118,7 +118,7 @@ export function createApp() {
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-Id', 'X-Superadmin-Challenge', 'Idempotency-Key'],
-        exposedHeaders: ['Content-Disposition', 'X-Correlation-Id'],
+        exposedHeaders: ['Content-Disposition', 'X-Correlation-Id', 'X-OCR-Stage'],
         maxAge: 86400
     }));
 

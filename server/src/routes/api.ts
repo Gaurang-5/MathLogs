@@ -190,12 +190,23 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // OCR Scan Endpoint
-router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) => {
+router.post('/scan-ocr', (req, res, next) => {
+    const started = Date.now();
+    res.locals.scanPhase = 'authenticating';
+    secureLogger.info('Sticker request arrived', { requestId: req.correlationId, bytes: Number(req.headers['content-length']) || undefined });
+    res.once('close', () => secureLogger.info('Sticker request closed', {
+        requestId: req.correlationId, phase: res.locals.scanPhase, received: req.complete,
+        responded: res.writableEnded, status: res.statusCode, elapsedMs: Date.now() - started,
+    }));
+    next();
+}, authenticateToken as any, ocrLimiter, (req, res, next) => {
+    res.locals.scanPhase = 'receiving_photo';
     ocrUpload.single('image')(req, res, error => {
         if (error) {
             res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Photo exceeds the 14 MB upload limit.' : error.message });
             return;
         }
+        res.locals.scanPhase = 'authorizing_test';
         next();
     });
 }, async (req, res) => {
@@ -218,8 +229,16 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) 
         const rawBuffer = (req as any).file ? (req as any).file.buffer : Buffer.from(imageBuffer.toString().replace(/^data:image\/[^;]+;base64,/, ''), 'base64');
         const test = typeof req.body.testId === 'string' ? await prisma.test.findFirst({ where: { id: req.body.testId, instituteId: req.user.instituteId, teacherId: req.user.id } }) : null;
         if (!test) return res.status(403).json({ error: 'Select an authorized test before scanning.' });
+        res.locals.scanPhase = 'reading_marks';
         if (req.body.mode === 'multiple') {
             if (!req.file) return res.status(400).json({ error: 'Upload the original photo.' });
+            const progress = req.body.progress === '1';
+            if (progress) {
+                // Acknowledge receipt at the origin, not merely the proxy edge.
+                res.status(200).set({ 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-transform', 'X-OCR-Stage': 'reading' });
+                res.flushHeaders();
+                res.write(' ');
+            }
             const started = Date.now();
             secureLogger.info('Multi-sticker OCR received', { bytes: req.file.size, mime: req.file.mimetype });
             const controller = new AbortController();
@@ -228,7 +247,7 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) 
             try {
                 const result = await processMultiStickerOCR(req.file.buffer, req.file.mimetype, test.maxMarks, { signal: controller.signal });
                 secureLogger.info('Multi-sticker OCR completed', { count: result.stickers.length, reason: result.reason, elapsedMs: Date.now() - started });
-                if (!controller.signal.aborted) res.json(result);
+                if (!controller.signal.aborted) { if (progress) res.end(JSON.stringify(result)); else res.json(result); }
             } finally { res.off('close', disconnected); }
             return;
         }
@@ -261,6 +280,7 @@ router.post('/scan-ocr', authenticateToken as any, ocrLimiter, (req, res, next) 
 
 
     } catch (error: any) {
+        if (res.headersSent) { if (!res.writableEnded) res.end(JSON.stringify({ stickers: [], reason: 'provider_error' })); return; }
         console.error("❌ OCR Proxy Error:", error);
         res.status(500).json({ error: "OCR Processing Failed", details: error.message });
     }
