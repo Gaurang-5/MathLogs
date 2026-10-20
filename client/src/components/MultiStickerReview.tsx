@@ -4,12 +4,12 @@ import toast from 'react-hot-toast';
 import { TeacherButton, TeacherSurface } from './teacher-ui';
 import { apiRequest } from '../utils/api';
 import { extractAllPhotoMarks, readPhotoCodes, type PhotoCode, type PhotoCodes, type PhotoMatch } from '../utils/multiSticker';
-import type { OCRProgress } from '../utils/ocr';
+import { markStickerResearchOutcome, startStickerResearchCapture, updateStickerResearchGeometry, type OCRProgress } from '../utils/ocr';
 import { StickerScanProgress } from './StickerScanProgress';
 import { StickerStudentPicker } from './StickerStudentPicker';
 
 type Student = { id:string; name:string; humanId:string; marks?:{testId:string;score:number}[] };
-type Row = {code:PhotoCode;score:string;student?:Student;previous:number|null;saved:boolean;blocked?:string;error?:string;conflict?:{currentScore:number|null}};
+type Row = {code:PhotoCode;score:string;ocrScore:string;student?:Student;previous:number|null;saved:boolean;blocked?:string;error?:string;conflict?:{currentScore:number|null}};
 type LookupResult = {humanId:string;student?:Student;error?:string};
 export const validPhotoScore=(score:string,max:number)=>/^\d+(?:\.\d{1,2})?$/.test(score)&&Number(score)<=max;
 const lookupStudents=async(codes:PhotoCode[],testId:string,signal?:AbortSignal):Promise<Map<string,LookupResult>>=>{
@@ -26,42 +26,49 @@ const lookupStudents=async(codes:PhotoCode[],testId:string,signal?:AbortSignal):
 };
 const progressText=(p:OCRProgress)=>p.stage==='preparing'?'Preparing photo…':p.stage==='uploading'?'Uploading photo…':p.stage==='receiving'?'Sending photo to the reader…':`Reading marks…${p.total?` ${p.completed ?? 0}/${p.total}`:''}`;
 
-export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{photo:Blob;imageUrl:string;testId:string;maxMarks:number;onClose:()=>void}){
+export function MultiStickerReview({photo,imageUrl,testId,researchCaptureId,maxMarks,onClose}:{photo:Blob;imageUrl:string;testId:string;researchCaptureId?:string;maxMarks:number;onClose:()=>void}){
     const [rows,setRows]=useState<Row[]>([]),[geometry,setGeometry]=useState<PhotoCodes|null>(null);
     const [savingRows,setSavingRows]=useState<number[]>([]);
     const [reading,setReading]=useState(true),[saving,setSaving]=useState(false),[matching,setMatching]=useState(false);
     const [progress,setProgress]=useState<OCRProgress|null>(null),[message,setMessage]=useState('Reading student QRs…');
     const [ocrFailed,setOcrFailed]=useState(false),[qrError,setQrError]=useState('');
     const root=useRef<HTMLDivElement>(null),alive=useRef(true),lock=useRef(false),request=useRef<AbortController|null>(null);
+    const reviewStartedAt=useRef(Date.now()),completed=useRef(false);
     const patch=(i:number,values:Partial<Row>)=>setRows(current=>current.map((row,index)=>i===index?{...row,...values}:row));
     const updateProgress=(p:OCRProgress)=>{if(alive.current){setProgress(p);setMessage(progressText(p));}};
     useEffect(()=>{
         alive.current=true;let disposed=false;const controller=new AbortController();request.current=controller;
         void(async()=>{
+            // Research storage is best-effort: an outage must never stop a teacher saving marks.
+            const researchUpload=researchCaptureId
+                ? startStickerResearchCapture(photo,testId,researchCaptureId,controller.signal).catch(()=>undefined)
+                : Promise.resolve(undefined);
             let codes:PhotoCodes;
             try{codes=await readPhotoCodes(photo,controller.signal);}catch(error){if(!disposed){setQrError(error instanceof Error?error.message:'QR not readable.');setReading(false);}return;}
-            if(disposed)return;setGeometry(codes);
-            const marks=extractAllPhotoMarks(photo,codes,testId,controller.signal,p=>{if(!disposed)updateProgress(p);})
+            await researchUpload;
+            if(disposed)return;setGeometry(codes);if(researchCaptureId)void updateStickerResearchGeometry(researchCaptureId,codes,controller.signal).catch(()=>undefined);
+            const marks=extractAllPhotoMarks(photo,codes,testId,controller.signal,p=>{if(!disposed)updateProgress(p);},researchCaptureId)
                 .catch((error:Error):PhotoMatch[]=>codes.codes.map(code=>({code,score:'',error:error.message})));
             const [students,matches]=await Promise.all([lookupStudents(codes.codes,testId,controller.signal),marks]);
             if(disposed)return;
             setRows(matches.map(match=>{
                 const result=students.get(match.code.humanId),student=result?.student;
                 const duplicate=codes.codes.filter(c=>c.humanId===match.code.humanId).length>1;
-                return {code:match.code,score:validPhotoScore(match.score,maxMarks)?match.score:'',student,previous:student?.marks?.find(m=>m.testId===testId)?.score??null,saved:false,
+                const readScore=validPhotoScore(match.score,maxMarks)?match.score:'';
+                return {code:match.code,score:readScore,ocrScore:readScore,student,previous:student?.marks?.find(m=>m.testId===testId)?.score??null,saved:false,
                     blocked:duplicate?'Duplicate student QR. Retake with one sticker per student.':student?undefined:result?.error||'Student not found.',error:match.error};
             }));
             setOcrFailed(matches.some(m=>!!m.error));setReading(false);setMessage('');
         })().catch(()=>{if(!disposed){setMessage('Could not read the photo. Retake it.');setReading(false);}});
         return()=>{disposed=true;alive.current=false;controller.abort();request.current?.abort();};
-    },[photo,testId,maxMarks]);
+    },[photo,testId,maxMarks,researchCaptureId]);
     const retryMarks=async()=>{
         if(lock.current||reading||matching||!geometry)return;
         const controller=new AbortController();request.current=controller;setReading(true);updateProgress({stage:'preparing'});
         try{
-            const matches=await extractAllPhotoMarks(photo,geometry,testId,controller.signal,updateProgress);
+            const matches=await extractAllPhotoMarks(photo,geometry,testId,controller.signal,updateProgress,researchCaptureId);
             if(!alive.current)return;
-            setRows(current=>current.map((row,i)=>row.saved||row.score?row:{...row,score:validPhotoScore(matches[i].score,maxMarks)?matches[i].score:'',error:matches[i].error}));
+            setRows(current=>current.map((row,i)=>row.saved||row.score?row:{...row,score:validPhotoScore(matches[i].score,maxMarks)?matches[i].score:'',ocrScore:validPhotoScore(matches[i].score,maxMarks)?matches[i].score:'',error:matches[i].error}));
             setOcrFailed(matches.some(m=>!!m.error));setMessage('');
         }catch(error){if(alive.current)setMessage(error instanceof Error?error.message:'Could not read marks.');}
         finally{if(alive.current)setReading(false);}
@@ -76,7 +83,7 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
             return {...row,student,previous:student?.marks?.find(m=>m.testId===testId)?.score??null,blocked:student?undefined:result?.error||row.blocked};
         }));setMatching(false);
     };
-    const close=()=>{if(lock.current)return;if(rows.some(row=>!row.saved)&&!window.confirm('Discard these unsaved marks?'))return;onClose();};
+    const close=()=>{if(lock.current)return;if(rows.some(row=>!row.saved)&&!window.confirm('Discard these unsaved marks?'))return;if(researchCaptureId&&!completed.current)void markStickerResearchOutcome(researchCaptureId,'RETAKE').catch(()=>undefined);onClose();};
     const closeRef=useRef(close);closeRef.current=close;
     useEffect(()=>{
         const previous=document.activeElement as HTMLElement|null;root.current?.focus();
@@ -100,7 +107,13 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
             setSavingRows(group.map(({i})=>i));
             try{
                 const response=await apiRequest<{results:{studentId:string;saved:boolean;error?:string;conflict?:boolean;currentScore?:number|null}[]}>('/marks/batch','POST',{
-                    testId,marks:group.map(({row})=>({studentId:row.student!.id,score:row.score,expectedScore:row.previous}))
+                    testId,marks:group.map(({row,i})=>{
+                        const center=row.code.corners.length?{x:row.code.corners.reduce((sum,p)=>sum+p.x,0)/row.code.corners.length,y:row.code.corners.reduce((sum,p)=>sum+p.y,0)/row.code.corners.length}:null;
+                        return {studentId:row.student!.id,score:row.score,expectedScore:row.previous,...(researchCaptureId?{researchCaptureId,researchStickerIndex:i,
+                            researchOcrScore:row.ocrScore||undefined,researchQrHumanId:row.code.humanId,
+                            researchQrX:center&&geometry?center.x/geometry.width*1000:undefined,researchQrY:center&&geometry?center.y/geometry.height*1000:undefined,
+                            researchIdentitySource:row.code.corners.length?'qr':'manual_picker',researchReviewDurationMs:Math.max(0,Date.now()-reviewStartedAt.current)}:{})};
+                    })
                 });
                 const results=new Map(response.results.map(result=>[result.studentId,result]));
                 for(const {row,i} of group){
@@ -116,7 +129,7 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
                 break;
             }
         }
-        lock.current=false;if(alive.current){setSavingRows([]);setSaving(false);if(!failed){setMessage('');toast.success(`${rows.length} ${rows.length===1?'mark':'marks'} saved`);}else setMessage('Some marks were not confirmed saved. Your entries are kept. Retry only the remaining rows.');}
+        lock.current=false;if(alive.current){setSavingRows([]);setSaving(false);if(!failed){completed.current=true;setMessage('');toast.success(`${rows.length} ${rows.length===1?'mark':'marks'} saved`);}else setMessage('Some marks were not confirmed saved. Your entries are kept. Retry only the remaining rows.');}
     };
     const busy=reading||matching||saving;
     const allSaved=rows.length>0&&rows.every(row=>row.saved);
@@ -127,9 +140,9 @@ export function MultiStickerReview({photo,imageUrl,testId,maxMarks,onClose}:{pho
             {(reading||matching)&&<div className="fixed inset-0 z-10 flex items-center justify-center bg-app-bg px-8" aria-live="polite">
                 <StickerScanProgress imageUrl={imageUrl} geometry={geometry} message={matching?'Finding students…':message} percent={percent} />
             </div>}
-            {qrError?<StickerStudentPicker image={imageUrl} message={qrError} score="" onRetake={onClose} onSelect={async humanId=>{
+            {qrError?<StickerStudentPicker image={imageUrl} message={qrError} score="" onRetake={close} onSelect={async humanId=>{
                 const student=await apiRequest<Student>(`/students/lookup/${encodeURIComponent(humanId)}?testId=${encodeURIComponent(testId)}`);
-                if(alive.current){setRows([{code:{humanId,corners:[]},student,score:'',previous:student.marks?.find(m=>m.testId===testId)?.score??null,saved:false}]);setQrError('');setMessage('');}
+                if(alive.current){setRows([{code:{humanId,corners:[]},student,score:'',ocrScore:'',previous:student.marks?.find(m=>m.testId===testId)?.score??null,saved:false}]);setQrError('');setMessage('');}
             }}/>:<>
                 {!busy&&message&&<p role="alert" className="mb-3 text-sm text-app-text-secondary">{message}</p>}
                 <TeacherSurface className="divide-y divide-app-border overflow-hidden">

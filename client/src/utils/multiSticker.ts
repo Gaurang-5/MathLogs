@@ -71,8 +71,8 @@ export async function readPhotoCodes(image: Blob, signal?: AbortSignal): Promise
 }
 
 export async function extractPhotoMarks(image: Blob,testId: string,signal?: AbortSignal,
-    onProgress?: (progress: OCRProgress) => void, targets?: Point[]):Promise<PhotoReading[]> {
-    const data = await uploadStickerPhoto<{stickers?: PhotoReading[]}>(image,signal,testId,onProgress,'multiple',targets);
+    onProgress?: (progress: OCRProgress) => void, targets?: Point[], researchCaptureId?: string):Promise<PhotoReading[]> {
+    const data = await uploadStickerPhoto<{stickers?: PhotoReading[]}>(image,signal,testId,onProgress,'multiple',targets,researchCaptureId);
     if(!Array.isArray(data.stickers)||data.stickers.length>10)throw new Error('Invalid marks response. Retake the photo.');
     return data.stickers.filter(row=>Number.isFinite(row.x)&&Number.isFinite(row.y)&&row.x>=0&&row.x<=1000&&row.y>=0&&row.y<=1000&&typeof row.score==='string');
 }
@@ -115,8 +115,8 @@ export function photoGroups(photo:PhotoCodes):PhotoGroup[] {
     return groups;
 }
 export async function extractAllPhotoMarks(image:Blob,photo:PhotoCodes,testId:string,signal?:AbortSignal,
-    onProgress?:(progress:OCRProgress)=>void):Promise<PhotoMatch[]> {
-    if(photo.codes.length<=10 && photo.codes.every(c=>stickerQuarterTurn(c)===0)) return matchStickerReadings(photo,await extractPhotoMarks(image,testId,signal,onProgress));
+    onProgress?:(progress:OCRProgress)=>void,researchCaptureId?:string):Promise<PhotoMatch[]> {
+    if(photo.codes.length<=10 && photo.codes.every(c=>stickerQuarterTurn(c)===0)) return matchStickerReadings(photo,await extractPhotoMarks(image,testId,signal,onProgress,undefined,researchCaptureId));
     const url=URL.createObjectURL(image),source=new Image();
     try {
         source.src=url;await scanDeadline(source.decode(),8000,'Could not open photo for reading.',signal);
@@ -133,7 +133,7 @@ export async function extractAllPhotoMarks(image:Blob,photo:PhotoCodes,testId:st
             try {
                 const blob=await scanDeadline(new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Could not prepare photo.')),'image/jpeg',.9)),8000,'Photo preparation timed out.',signal);
                 const targets=localCodes.map(c=>({x:center(c).x/canvas.width*1000,y:center(c).y/canvas.height*1000}));
-                const readings=await extractPhotoMarks(blob,testId,signal,p=>onProgress?.({...p,completed,total:photo.codes.length}),targets);
+                const readings=await extractPhotoMarks(blob,testId,signal,p=>onProgress?.({...p,completed,total:photo.codes.length}),targets,researchCaptureId);
                 const matches=matchStickerReadings({codes:localCodes,width:canvas.width,height:canvas.height},readings);
                 matches.forEach((match,i)=>results.set(group.codes[i],{...match,code:group.codes[i]}));
             } catch(error) {

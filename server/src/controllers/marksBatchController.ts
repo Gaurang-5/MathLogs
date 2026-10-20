@@ -5,6 +5,7 @@ import { prisma } from '../prisma';
 import { ownsTest, eligibleEnrollment } from '../services/testAccess';
 import { secureLogger } from '../utils/secureLogger';
 import { submitMarksBatchSchema } from '../schemas';
+import { finalizeStickerResearchItems } from '../services/stickerResearchService';
 
 type Result = { studentId: string; saved: boolean; error?: string; conflict?: boolean; currentScore?: number | null };
 
@@ -43,6 +44,12 @@ export async function submitMarksBatch(req: Request, res: Response) {
             return { status: 200, body: { results } };
         }, { maxWait: 3000, timeout: 15000 });
         secureLogger.info('Batch marks save completed', { count: marks.length, elapsedMs: Date.now() - started, status: response.status });
+        const researchResults = 'results' in response.body && Array.isArray(response.body.results) ? response.body.results : undefined;
+        if (response.status === 200 && researchResults) {
+            const savedStudentIds = new Set(researchResults.filter(result => result.saved).map(result => result.studentId));
+            await finalizeStickerResearchItems({ teacherId: actor.id, testId, marks, savedStudentIds })
+                .catch(error => secureLogger.error('[Sticker research] Batch finalization failed.', { error: error instanceof Error ? error.message : String(error) }));
+        }
         return res.status(response.status).json(response.body);
     } catch (error) {
         // Log only safe diagnostics, never connection strings or student records.

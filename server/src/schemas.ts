@@ -192,7 +192,15 @@ export const submitMarkSchema = z.object({
         studentId: z.string().uuid("Invalid Student ID"),
         expectedScore: z.number().min(0).nullable().optional(),
         score: z.number().min(0, "Score cannot be negative")
-            .or(z.string().regex(/^\d+(\.\d+)?$/).transform(Number))
+            .or(z.string().regex(/^\d+(\.\d+)?$/).transform(Number)),
+        researchCaptureId: z.string().uuid().optional(),
+        researchStickerIndex: z.number().int().min(0).max(99).optional(),
+        researchOcrScore: z.string().max(40).optional(),
+        researchQrHumanId: z.string().max(128).optional(),
+        researchQrX: z.number().min(0).max(1000).optional(),
+        researchQrY: z.number().min(0).max(1000).optional(),
+        researchIdentitySource: z.enum(['qr', 'manual_picker']).optional(),
+        researchReviewDurationMs: z.number().int().min(0).max(30 * 60 * 1000).optional(),
     })
 });
 

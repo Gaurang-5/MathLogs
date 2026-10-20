@@ -22,6 +22,8 @@ import { processMultiStickerOCR } from '../utils/multiStickerOcr';
 import { buildGeminiOcrResult } from '../utils/ocrResult';
 import { readOcrCacheFast } from '../utils/ocrTiming';
 import { secureLogger } from '../utils/secureLogger';
+import { ensureStickerResearchCapture, recordStickerResearchOcrAttempt } from '../services/stickerResearchService';
+import { createStickerResearchCapture, patchStickerResearchGeometry, updateStickerResearchOutcome } from '../controllers/stickerResearchController';
 
 import { getPublicInstituteProfile, submitPublicLead } from '../controllers/publicController';
 import superAdminRoutes from './superAdminRoutes';
@@ -93,6 +95,15 @@ const upload = multer({
 const ocrUpload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 14 * 1024 * 1024, files: 1 },
+    fileFilter: (_req, file, callback) => {
+        if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) callback(null, true);
+        else callback(new Error('Only JPEG, PNG and WebP photos are supported.'));
+    },
+});
+
+const stickerResearchUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 30 * 1024 * 1024, files: 1 },
     fileFilter: (_req, file, callback) => {
         if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) callback(null, true);
         else callback(new Error('Only JPEG, PNG and WebP photos are supported.'));
@@ -191,6 +202,9 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // OCR Scan Endpoint
+router.post('/sticker-research/captures', authenticateToken as any, stickerResearchUpload.single('image'), createStickerResearchCapture as any);
+router.patch('/sticker-research/captures/:id/geometry', authenticateToken as any, patchStickerResearchGeometry as any);
+router.post('/sticker-research/captures/:id/outcome', authenticateToken as any, updateStickerResearchOutcome as any);
 router.post('/scan-ocr', (req, res, next) => {
     const started = Date.now();
     res.locals.scanPhase = 'authenticating';
@@ -230,6 +244,11 @@ router.post('/scan-ocr', (req, res, next) => {
         const rawBuffer = (req as any).file ? (req as any).file.buffer : Buffer.from(imageBuffer.toString().replace(/^data:image\/[^;]+;base64,/, ''), 'base64');
         const test = typeof req.body.testId === 'string' ? await prisma.test.findFirst({ where: { id: req.body.testId, instituteId: req.user.instituteId, teacherId: req.user.id } }) : null;
         if (!test) return res.status(403).json({ error: 'Select an authorized test before scanning.' });
+        const researchCaptureId = await ensureStickerResearchCapture({
+            id: req.body.researchCaptureId, instituteId: req.user.instituteId, teacherId: req.user.id, teacherName: req.user.username,
+            test, image: rawBuffer, contentType: req.file?.mimetype || 'image/jpeg', captureSource: req.body.captureSource,
+            clientPlatform: req.body.clientPlatform,
+        });
         res.locals.scanPhase = 'reading_marks';
         if (req.body.mode === 'multiple') {
             if (!req.file) return res.status(400).json({ error: 'Upload the original photo.' });
@@ -253,7 +272,13 @@ router.post('/scan-ocr', (req, res, next) => {
             try {
                 const result = await processMultiStickerOCR(req.file.buffer, req.file.mimetype, test.maxMarks, { signal: controller.signal, targets });
                 secureLogger.info('Multi-sticker OCR completed', { count: result.stickers.length, reason: result.reason, elapsedMs: Date.now() - started });
-                if (!controller.signal.aborted) { if (progress) res.end(JSON.stringify(result)); else res.json(result); }
+                if (!controller.signal.aborted) {
+                    await recordStickerResearchOcrAttempt({ captureId: researchCaptureId, teacherId: req.user.id, mode: 'multiple', targets,
+                        image: req.file.buffer, contentType: req.file.mimetype, result, status: result.reason ? 'error' : 'read', reason: result.reason,
+                        elapsedMs: Date.now() - started });
+                    const response = { ...result, researchCaptureId };
+                    if (progress) res.end(JSON.stringify(response)); else res.json(response);
+                }
             } finally { res.off('close', disconnected); }
             return;
         }
@@ -264,7 +289,10 @@ router.post('/scan-ocr', (req, res, next) => {
         secureLogger.info('Sticker OCR received', { bytes: rawBuffer.length, mime: req.file?.mimetype });
         const cached = await readOcrCacheFast(() => checkOcrCache(hash));
         if (cached) {
-            return res.json(cached);
+            await recordStickerResearchOcrAttempt({ captureId: researchCaptureId, teacherId: req.user.id, mode: 'single', targets: undefined,
+                image: rawBuffer, contentType: req.file?.mimetype || 'image/jpeg', result: cached, status: cached.status || 'unknown', reason: cached.reason,
+                elapsedMs: Date.now() - started, cacheHit: true });
+            return res.json({ ...cached, researchCaptureId });
         }
 
         const controller = new AbortController();
@@ -281,7 +309,10 @@ router.post('/scan-ocr', (req, res, next) => {
         secureLogger.info('Sticker OCR completed', { status: primary.status, reason: primary.reason, elapsedMs: Date.now() - started });
 
         if (primary.status === 'read') void setOcrCache(hash, primary);
-        res.json(primary);
+        await recordStickerResearchOcrAttempt({ captureId: researchCaptureId, teacherId: req.user.id, mode: 'single', targets: undefined,
+            image: rawBuffer, contentType: req.file?.mimetype || 'image/jpeg', result: primary, status: primary.status, reason: primary.reason,
+            elapsedMs: Date.now() - started });
+        res.json({ ...primary, researchCaptureId });
 
 
 
