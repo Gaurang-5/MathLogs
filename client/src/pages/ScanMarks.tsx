@@ -13,7 +13,7 @@ export default function ScanMarks() {
     const [searchParams] = useSearchParams();
     const [tests, setTests] = useState<ScanTest[]>([]);
     const [selectedTestId, setSelectedTestId] = useState(searchParams.get('testId') || '');
-    const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
+    const [photo, setPhoto] = useState<{ file: File; url: string; researchCaptureId: string } | null>(null);
     const [error, setError] = useState('');
     const photoInput = useRef<HTMLInputElement>(null), previewUrl = useRef<string | null>(null);
     useEffect(() => {
@@ -40,10 +40,10 @@ export default function ScanMarks() {
                 if (!file) return;
                 if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setError('Choose a JPEG, PNG, or WebP photo.'); return; }
                 clearPhoto(); setError('');
-                const url = URL.createObjectURL(file); previewUrl.current = url; setPhoto({ file, url });
+                const url = URL.createObjectURL(file); previewUrl.current = url; setPhoto({ file, url, researchCaptureId: crypto.randomUUID() });
             }} />
         </TeacherSurface>
         {photo && createPortal(<MultiStickerReview photo={photo.file} imageUrl={photo.url} testId={selectedTestId}
-            maxMarks={tests.find(test => test.id === selectedTestId)?.maxMarks ?? 100} onClose={clearPhoto} />, document.body)}
+            researchCaptureId={photo.researchCaptureId} maxMarks={tests.find(test => test.id === selectedTestId)?.maxMarks ?? 100} onClose={clearPhoto} />, document.body)}
     </Layout>;
 }

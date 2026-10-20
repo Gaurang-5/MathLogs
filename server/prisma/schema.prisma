@@ -736,6 +736,88 @@ model OcrScanCache {
   @@index([createdAt])
 }
 
+/// Consent-backed image-level record for the marks-sticker OCR study.
+model StickerResearchCapture {
+  id               String                       @id @default(uuid())
+  instituteId      String
+  instituteName    String
+  teacherId        String
+  teacherName      String
+  testId           String
+  testName         String
+  maxMarks         Float
+  storageKey       String                       @unique
+  imageSha256      String
+  contentType      String
+  sizeBytes        Int
+  imageWidth       Int?
+  imageHeight      Int?
+  qrCount          Int?
+  captureSource    String
+  clientPlatform   String
+  outcome          String                       @default("CAPTURED")
+  consentReference String
+  retentionUntil   DateTime
+  completedAt      DateTime?
+  createdAt        DateTime                     @default(now())
+  attempts         StickerResearchOcrAttempt[]
+  items            StickerResearchItem[]
+
+  @@index([instituteId, createdAt])
+  @@index([teacherId, createdAt])
+  @@index([testId, createdAt])
+  @@index([outcome, createdAt])
+  @@index([retentionUntil])
+}
+
+model StickerResearchOcrAttempt {
+  id           String                 @id @default(uuid())
+  captureId    String
+  mode         String
+  targets      Json?
+  inputSha256  String
+  contentType  String
+  sizeBytes    Int
+  result       Json
+  status       String
+  reason       String?
+  elapsedMs    Int
+  cacheHit     Boolean                @default(false)
+  createdAt    DateTime               @default(now())
+  capture      StickerResearchCapture @relation(fields: [captureId], references: [id], onDelete: Cascade)
+
+  @@index([captureId, createdAt])
+  @@index([status, createdAt])
+}
+
+model StickerResearchItem {
+  id               String                 @id @default(uuid())
+  captureId        String
+  stickerIndex     Int
+  studentId        String
+  studentHumanId   String?
+  studentName      String
+  batchId          String?
+  batchName        String?
+  qrHumanId        String?
+  qrMatched        Boolean?
+  qrX               Float?
+  qrY               Float?
+  identitySource   String
+  ocrScore         String?
+  finalScore       Float
+  reviewDurationMs Int?
+  wasCorrected     Boolean?
+  wasOverwrite     Boolean
+  outcome          String
+  createdAt        DateTime               @default(now())
+  capture          StickerResearchCapture @relation(fields: [captureId], references: [id], onDelete: Cascade)
+
+  @@unique([captureId, stickerIndex])
+  @@index([studentId, createdAt])
+  @@index([outcome, createdAt])
+}
+
 model AdminOnboardingLink {
   id                      String   @id @default(uuid())
   token                   String   @unique

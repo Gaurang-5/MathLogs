@@ -9,6 +9,7 @@ import { sendQuizMarksBroadcast, sendQuizScheduleBroadcast } from '../utils/quiz
 import { secureLogger } from '../utils/secureLogger';
 import { QuizCreditWalletError, consumeQuizCreditsInTransaction } from '../services/quizCreditWalletService';
 import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
+import { finalizeStickerResearchItems } from '../services/stickerResearchService';
 
 function normalizeCorrectAnswer(value: unknown): string | string[] {
     if (Array.isArray(value)) {
@@ -119,6 +120,14 @@ export const submitMark = async (req: Request, res: Response) => {
             await tx.systemLog.create({ data: { instituteId: req.user.instituteId, action: previous ? 'MARK_CORRECTED' : 'MARK_RECORDED', entityId: studentId, entityName: student.name, details: { testId, actorId: req.user.id, previousScore: previous?.score ?? null, score: numericScore } } });
             return { status: 200, body: mark };
         });
+        if (result.status === 200) {
+            await finalizeStickerResearchItems({
+                teacherId: req.user.id,
+                testId,
+                marks: [{ ...req.body, score: Number(score), expectedScore: expectedScore ?? null }],
+                savedStudentIds: new Set([studentId]),
+            }).catch(error => secureLogger.error('[Sticker research] Single finalization failed.', { error: error instanceof Error ? error.message : String(error) }));
+        }
         return res.status(result.status).json(result.body);
     } catch (e) {
         secureLogger.error('Failed to save mark', e);

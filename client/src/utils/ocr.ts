@@ -35,6 +35,38 @@ export function stickerFrameBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 
 export type OCRProgress = { stage: 'preparing' | 'uploading' | 'receiving' | 'reading'; percent?: number; completed?:number; total?:number };
 
+const authToken = () => {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Authentication required for scanning');
+    return token;
+};
+
+/** Store the consent-backed original photograph before any OCR resizing or grouping. */
+export async function startStickerResearchCapture(original: Blob, testId: string, researchCaptureId: string, signal?: AbortSignal) {
+    const form = new FormData();
+    form.append('testId', testId);
+    form.append('researchCaptureId', researchCaptureId);
+    form.append('captureSource', 'phone_camera');
+    form.append('clientPlatform', 'web');
+    form.append('image', original, original.type === 'image/png' ? 'stickers.png' : original.type === 'image/webp' ? 'stickers.webp' : 'stickers.jpg');
+    const response = await fetch(`${API_URL}/sticker-research/captures`, { method: 'POST', body: form, signal, headers: { Authorization: `Bearer ${authToken()}` } });
+    if (!response.ok) throw new Error('The research photograph could not be stored. Retake before continuing.');
+    return response.json() as Promise<{ researchCaptureId?: string }>;
+}
+
+export async function updateStickerResearchGeometry(researchCaptureId: string, geometry: { width: number; height: number; codes: unknown[] }, signal?: AbortSignal) {
+    await fetch(`${API_URL}/sticker-research/captures/${encodeURIComponent(researchCaptureId)}/geometry`, {
+        method: 'PATCH', signal, headers: { Authorization: `Bearer ${authToken()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageWidth: geometry.width, imageHeight: geometry.height, qrCount: geometry.codes.length }),
+    });
+}
+
+export async function markStickerResearchOutcome(researchCaptureId: string, outcome: 'RETAKE' | 'CANCELLED') {
+    await fetch(`${API_URL}/sticker-research/captures/${encodeURIComponent(researchCaptureId)}/outcome`, {
+        method: 'POST', headers: { Authorization: `Bearer ${authToken()}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ outcome }),
+    });
+}
+
 /** Keep the full photo; make only the OCR upload smaller. QR and review use the original. */
 export async function prepareOCRUpload(original: Blob, signal?: AbortSignal): Promise<Blob> {
     if (signal?.aborted) throw new DOMException('Capture cancelled', 'AbortError');
@@ -65,7 +97,7 @@ export async function prepareOCRUpload(original: Blob, signal?: AbortSignal): Pr
 
 /** Separate upload time from the server's OCR allowance, including on slow mobile connections. */
 export async function uploadStickerPhoto<T>(image: Blob, signal?: AbortSignal, testId?: string,
-    onProgress?: (progress: OCRProgress) => void, mode: 'single' | 'multiple' = 'single', targets?: {x:number;y:number}[]): Promise<T> {
+    onProgress?: (progress: OCRProgress) => void, mode: 'single' | 'multiple' = 'single', targets?: {x:number;y:number}[], researchCaptureId?: string): Promise<T> {
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Authentication required for scanning');
     onProgress?.({ stage: 'preparing' });
@@ -73,6 +105,11 @@ export async function uploadStickerPhoto<T>(image: Blob, signal?: AbortSignal, t
     if (upload.size > 14 * 1024 * 1024) throw new Error('Photo is too large to upload. Please enter the marks manually.');
     const formData = new FormData();
     if (testId) formData.append('testId', testId);
+    if (researchCaptureId) {
+        formData.append('researchCaptureId', researchCaptureId);
+        formData.append('captureSource', 'phone_camera');
+        formData.append('clientPlatform', 'web');
+    }
     if (mode === 'multiple') { formData.append('mode', mode); formData.append('progress', '1'); }
     if(targets) formData.append('targets',JSON.stringify(targets));
     formData.append('image', upload, upload.type === 'image/jpeg' ? 'sticker.jpg' : upload.type === 'image/webp' ? 'sticker.webp' : 'sticker.png');
