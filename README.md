@@ -363,6 +363,7 @@ Production deployments require:
 Ticket-based Support is currently held back. Keep `SUPPORT_FEATURE_ENABLED=false` and `VITE_SUPPORT_FEATURE_ENABLED=false` in production. Operational communication preferences, plan lifecycle notices, billing reminders, and configured email/WhatsApp delivery remain active while Support is disabled. A later Support launch requires both flags to be `true`, with the client flag present during the production build.
 
 See [Deploy to Heroku](./docs/guides/DEPLOY_TO_HEROKU.md) for the project deployment guide.
+See [CI/CD](./docs/guides/CI_CD.md) for the GitHub Actions quality gates, production environment setup, and rollback procedure.
 
 ## Documentation
 
