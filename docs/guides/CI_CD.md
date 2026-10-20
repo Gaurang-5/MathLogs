@@ -6,13 +6,13 @@ MathLogs uses `.github/workflows/ci-cd.yml` for GitHub Actions CI and gated Hero
 
 | Trigger | Client checks | Server checks | Production deploy |
 | --- | --- | --- | --- |
-| Pull request | advisory lint, required tests and build | Prisma validation, stable tests, advisory full suite, build | No |
-| Push to `main` | advisory lint, required tests and build | Prisma validation, stable tests, advisory full suite, build | Yes, after both gates pass |
-| Manual run | advisory lint, required tests and build | Prisma validation, stable tests, advisory full suite, build | No |
+| Pull request | advisory lint, required tests and build | Prisma validation, required smoke tests, advisory full suite, build | No |
+| Push to `main` | advisory lint, required tests and build | Prisma validation, required smoke tests, advisory full suite, build | Yes, after both gates pass |
+| Manual run | advisory lint, required tests and build | Prisma validation, required smoke tests, advisory full suite, build | No |
 
 Server tests use a disposable PostgreSQL service. CI does not receive or connect to the production database. Because the repository's historical migration chain is not a clean bootstrap path, CI creates the current schema with `prisma db push`; migration-specific tests continue to run their migration SQL against isolated schemas.
 
-The first live workflow audit found 16 existing failures in nine server test files while 373 tests passed. Those nine files are excluded from the blocking stable suite and are still executed by the advisory full-suite step. Fix each file and remove it from the exclusion list; when all nine are green, delete the advisory split and make `npm test --prefix server` the single blocking server test step.
+The first live workflow audit found 16 existing failures in the full server suite while 373 tests passed. A deterministic 49-test smoke set covering fee rules and security, schemas, plan catalogue, OCR/stickers, and student IDs remains blocking; the entire server suite still runs in the advisory step. When the existing failures are repaired, delete the advisory split and make `npm test --prefix server` the single blocking server test step.
 
 Client lint currently runs as an advisory step because `main` already contains lint errors unrelated to the pipeline. Tests and production builds remain blocking. After the existing lint errors are fixed, remove `continue-on-error: true` from the lint step to make it a required gate.
 
