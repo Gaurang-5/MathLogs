@@ -26,7 +26,7 @@ export default function ScanMarks() {
         if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
         previewUrl.current = null; setPhoto(null);
     };
-    return <Layout title="Scan Marks" hideMobileNav={!!photo}>
+    return <Layout title="Scan Marks" hideMobileNav={!!photo} disablePullToRefresh={!!photo}>
         <TeacherSurface className="mx-auto mt-10 max-w-md space-y-5 p-6">
             <h2 className="text-xl font-semibold text-app-text">Scan marks</h2>
             <Dropdown label="Select test" value={selectedTestId} onChange={setSelectedTestId} placeholder="Choose test" searchable

@@ -19,9 +19,10 @@ interface LayoutProps {
     title?: string;
     headerAction?: React.ReactNode;
     hideMobileNav?: boolean;
+    disablePullToRefresh?: boolean;
 }
 
-export default function Layout({ children, title, headerAction, hideMobileNav = false }: LayoutProps) {
+export default function Layout({ children, title, headerAction, hideMobileNav = false, disablePullToRefresh = false }: LayoutProps) {
     const location = useLocation();
     const navigate = useNavigate();
     const reduceMotion = useReducedMotion();
@@ -76,8 +77,19 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
     const [isRefreshing, setIsRefreshing] = useState(false);
     const startYRef = useRef(0);
 
+    const refreshBlocked = (target?: EventTarget | null) => disablePullToRefresh ||
+        document.body.getAttribute('data-modal-open') === 'true' ||
+        !!document.querySelector('[role="dialog"][aria-modal="true"]') ||
+        (target instanceof Element && !!target.closest('[role="dialog"]'));
+
+    const resetPull = () => {
+        setPullY(0);
+        startYRef.current = 0;
+    };
+
     const handleTouchStart = (e: React.TouchEvent) => {
-        if (window.scrollY === 0) {
+        resetPull();
+        if (!refreshBlocked(e.target) && e.touches.length === 1 && window.scrollY === 0) {
             startYRef.current = e.touches[0].clientY;
         } else {
             startYRef.current = 0;
@@ -85,23 +97,24 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
+        if (refreshBlocked(e.target) || e.touches.length !== 1) {
+            resetPull();
+            return;
+        }
         if (startYRef.current > 0 && window.scrollY === 0) {
             const currentY = e.touches[0].clientY;
             const diff = currentY - startYRef.current;
-            if (diff > 0) {
-                // simple resistance
-                setPullY(Math.min(diff * 0.4, 80));
-            }
+            // Reset the indicator when the teacher reverses the gesture.
+            setPullY(Math.max(0, Math.min(diff * 0.4, 80)));
         }
     };
 
     const handleTouchEnd = () => {
-        if (pullY >= 60 && !isModalOpen) {
+        if (pullY >= 60 && !refreshBlocked()) {
             setIsRefreshing(true);
             window.location.reload();
         }
-        setPullY(0);
-        startYRef.current = 0;
+        resetPull();
     };
 
     const mobileNavPaths = ['/dashboard', '/batches', '/tests', '/quizzes', '/fees', '/scan', '/settings', '/billing', '/marketplace-settings', ...(supportFeatureEnabled ? ['/support'] : [])];
@@ -377,6 +390,7 @@ export default function Layout({ children, title, headerAction, hideMobileNav = 
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
+                onTouchCancel={resetPull}
                 className={cn(
                     "flex-1 flex flex-col min-h-screen bg-app-bg relative transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] min-w-0 xl:pb-0",
                     showMobileNav ? "pb-[var(--teacher-bottom-nav-space)]" : "pb-6",

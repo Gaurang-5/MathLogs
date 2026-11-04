@@ -10,7 +10,7 @@ let container:HTMLDivElement,root:Root;const close=vi.fn();
 const click=async(label:string)=>{const button=[...document.querySelectorAll('button')].find(b=>b.textContent===label)!;expect(button).toBeTruthy();await act(async()=>button.click());};
 const render=async()=>act(async()=>root.render(<MultiStickerReview photo={new Blob(['photo'])} imageUrl="blob:fixture" testId="test" maxMarks={20} onClose={close}/>));
 beforeEach(()=>{
- vi.clearAllMocks();vi.spyOn(window,'confirm').mockReturnValue(true);container=document.createElement('div');document.body.append(container);root=createRoot(container);
+ vi.clearAllMocks();vi.spyOn(window,'scrollTo').mockImplementation(()=>undefined);vi.spyOn(window,'confirm').mockReturnValue(true);container=document.createElement('div');document.body.append(container);root=createRoot(container);
  mocks.codes.mockResolvedValue({width:1000,height:1000,codes:['A','B'].map(humanId=>({humanId,corners:[]}))});
  mocks.marks.mockImplementation(async(_image,codes)=>codes.codes.map((code:any,i:number)=>({code,score:i===0?'0':'12'})));
  mocks.api.mockImplementation(async(path,_method,body)=>path==='/marks/batch'?{results:body.marks.map((m:any)=>({studentId:m.studentId,saved:true}))}:{results:[{humanId:'B',student:{id:'b',name:'Bela',humanId:'B',marks:[]}},{humanId:'A',student:{id:'a',name:'Aarav',humanId:'A',marks:[]}}]});
@@ -65,4 +65,33 @@ it('keeps names visible while saving and shows ticks only after server confirmat
  expect(document.body.textContent).toContain('Aarav');expect(document.querySelectorAll('[role=progressbar]')).toHaveLength(2);expect(document.querySelectorAll('.sticker-saved-check')).toHaveLength(0);expect(document.querySelector('img')).toBeNull();
  await act(async()=>finish({results:[{studentId:'a',saved:true},{studentId:'b',saved:false,error:'Please retry'}]}));
  expect(document.querySelectorAll('.sticker-saved-check')).toHaveLength(1);expect(document.querySelectorAll('[role=progressbar]')).toHaveLength(0);expect(document.body.textContent).toContain('Please retry');expect(close).not.toHaveBeenCalled();
+});
+
+
+it('contains review scrolling and restores the background after dismissal',async()=>{
+ const original={position:document.body.style.position,top:document.body.style.top,width:document.body.style.width,overflow:document.body.style.overflow,overscroll:document.documentElement.style.overscrollBehavior};
+ vi.spyOn(window,'scrollY','get').mockReturnValue(240);
+ await render();
+ expect(document.body.style.position).toBe('fixed');
+ expect(document.body.style.top).toBe('-240px');
+ expect(document.body.style.overflow).toBe('hidden');
+ expect(document.documentElement.style.overscrollBehavior).toBe('none');
+ const dialog=document.querySelector('[role="dialog"]')!;
+ expect(dialog.classList.contains('overflow-y-auto')).toBe(true);
+ expect(dialog.classList.contains('overscroll-contain')).toBe(true);
+ for(const type of ['touchstart','touchmove','touchend']){
+  const event=new Event(type,{bubbles:true});
+  Object.defineProperty(event,'touches',{value:[{clientY:type==='touchstart'?100:350}]});
+  await act(async()=>dialog.dispatchEvent(event));
+ }
+ expect(document.querySelector<HTMLInputElement>('#sticker-score-0')!.value).toBe('0');
+ expect(document.querySelector<HTMLInputElement>('#sticker-score-1')!.value).toBe('12');
+ expect(close).not.toHaveBeenCalled();
+ act(()=>root.unmount());root=createRoot(container);
+ expect(document.body.style.position).toBe(original.position);
+ expect(document.body.style.top).toBe(original.top);
+ expect(document.body.style.width).toBe(original.width);
+ expect(document.body.style.overflow).toBe(original.overflow);
+ expect(document.documentElement.style.overscrollBehavior).toBe(original.overscroll);
+ expect(window.scrollTo).toHaveBeenCalledWith(0,240);
 });

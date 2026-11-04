@@ -34,6 +34,31 @@ export function MultiStickerReview({photo,imageUrl,testId,researchCaptureId,maxM
     const [ocrFailed,setOcrFailed]=useState(false),[qrError,setQrError]=useState('');
     const root=useRef<HTMLDivElement>(null),alive=useRef(true),lock=useRef(false),request=useRef<AbortController|null>(null);
     const reviewStartedAt=useRef(Date.now()),completed=useRef(false);
+    useEffect(() => {
+        const body = document.body;
+        const html = document.documentElement;
+        const scrollY = window.scrollY;
+        const previous = {
+            position: body.style.position, top: body.style.top,
+            width: body.style.width, overflow: body.style.overflow,
+            overscroll: html.style.overscrollBehavior,
+        };
+        // Fix the background in place on mobile Safari as well as Chrome.
+        // The review panel remains independently scrollable.
+        body.style.position = 'fixed';
+        body.style.top = `-${scrollY}px`;
+        body.style.width = '100%';
+        body.style.overflow = 'hidden';
+        html.style.overscrollBehavior = 'none';
+        return () => {
+            body.style.position = previous.position;
+            body.style.top = previous.top;
+            body.style.width = previous.width;
+            body.style.overflow = previous.overflow;
+            html.style.overscrollBehavior = previous.overscroll;
+            window.scrollTo(0, scrollY);
+        };
+    }, []);
     const patch=(i:number,values:Partial<Row>)=>setRows(current=>current.map((row,index)=>i===index?{...row,...values}:row));
     const updateProgress=(p:OCRProgress)=>{if(alive.current){setProgress(p);setMessage(progressText(p));}};
     useEffect(()=>{
@@ -134,7 +159,7 @@ export function MultiStickerReview({photo,imageUrl,testId,researchCaptureId,maxM
     const busy=reading||matching||saving;
     const allSaved=rows.length>0&&rows.every(row=>row.saved);
     const percent=reading&&progress?.stage==='uploading'?progress.percent:undefined;
-    return <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review marks" className="fixed inset-0 z-[210] overflow-y-auto bg-app-bg p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+    return <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review marks" className="fixed inset-0 z-[210] overflow-y-auto overscroll-contain bg-app-bg p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-2xl pb-20">
             <div className="relative z-20 flex justify-end"><h2 className="sr-only">Review marks</h2><TeacherButton variant="secondary" aria-label="Retake photo" disabled={saving} onClick={close}><X aria-hidden="true" size={20}/></TeacherButton></div>
             {(reading||matching)&&<div className="fixed inset-0 z-10 flex items-center justify-center bg-app-bg px-8" aria-live="polite">
