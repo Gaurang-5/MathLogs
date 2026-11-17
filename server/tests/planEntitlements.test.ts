@@ -32,6 +32,21 @@ test('Marketplace compatibility requires a Marketplace grant and trial end equal
   assert.equal(effectiveEntitlements({ plan: 'QUIZ', trialEndsAt: now }, now).quiz, true);
 });
 
+test('legacy Pro records retain full quiz and core access', () => {
+  const now = new Date('2026-08-15T00:00:00Z');
+  assert.deepEqual(effectiveEntitlements({
+    plan: 'PRO',
+    planExpiryDate: new Date('2026-09-15T00:00:00Z'),
+    includedQuizCredits: 2,
+    lifetimeQuizCredits: 3,
+  }, now), {
+    marketplace: true,
+    quiz: true,
+    enterprise: true,
+    usableQuizCredits: 5,
+  });
+});
+
 test('yearly plans refresh monthly and clamp a 31st anniversary in UTC', () => {
   assert.equal(nextBillingAnniversary(new Date('2026-01-31T00:00:00Z'), new Date('2026-02-01T00:00:00Z')).toISOString(), '2026-02-28T00:00:00.000Z');
   assert.equal(nextBillingAnniversary(new Date('2024-01-31T12:34:56Z'), new Date('2024-02-01T00:00:00Z')).toISOString(), '2024-02-29T12:34:56.000Z');

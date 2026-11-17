@@ -40,8 +40,9 @@ export function effectiveEntitlements(state: EntitlementState, now = new Date())
   const paidActive = isActiveAt(state.planExpiryDate, now);
   const trialActive = Boolean(state.trialEndsAt && state.trialEndsAt.getTime() >= now.getTime());
   const paidOrTrial = paidActive || trialActive;
-  const quiz = paidOrTrial && (state.plan === 'QUIZ' || state.plan === 'ENTERPRISE');
-  const enterprise = paidOrTrial && state.plan === 'ENTERPRISE';
+  const proCompatible = state.plan === 'ENTERPRISE' || state.plan === 'PRO';
+  const quiz = paidOrTrial && (state.plan === 'QUIZ' || proCompatible);
+  const enterprise = paidOrTrial && proCompatible;
 
   return {
     marketplace: Boolean(state.marketplaceAccessGrantedAt) || quiz,
