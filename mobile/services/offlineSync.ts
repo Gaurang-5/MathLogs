@@ -8,12 +8,21 @@ import * as Network from 'expo-network';
 import { isAxiosError } from 'axios';
 import api from '../services/api';
 import { getItemAsync } from './storage';
+import {
+  parseStoredQueue,
+  reconcileQueuedActions,
+  type OfflineQueueMethod,
+  type QueueOutcome,
+  type QueuedAction,
+} from './offlineQueueCore';
 
 const OFFLINE_QUEUE_PREFIX = '@mathlogs_offline_queue_';
 const CACHE_PREFIX = '@mathlogs_cache_';
 const CACHE_VERSION = 2;
 const CACHE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const queueListeners = new Set<() => void>();
+const queueWriteTails = new Map<string, Promise<void>>();
+const activeQueueSyncs = new Map<string, Promise<{ processed: number; failed: number }>>();
 
 function notifyQueueListeners(): void {
   queueListeners.forEach((listener) => {
@@ -49,17 +58,6 @@ async function getAccountScope(): Promise<string | null> {
 
 function scopedCacheKey(accountScope: string, key: string): string {
   return `${CACHE_PREFIX}${encodeURIComponent(accountScope)}:${encodeURIComponent(key)}`;
-}
-
-interface QueuedAction {
-  id: string;
-  accountScope: string;
-  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  url: string;
-  data?: any;
-  headers?: Record<string, string>;
-  timestamp: number;
-  retryCount: number;
 }
 
 // ─── Cache Layer ───────────────────────────────────────────
@@ -145,8 +143,7 @@ export async function clearCache(): Promise<void> {
 async function getQueueForScope(accountScope: string): Promise<QueuedAction[]> {
   try {
     const raw = await AsyncStorage.getItem(`${OFFLINE_QUEUE_PREFIX}${encodeURIComponent(accountScope)}`);
-    const parsed = raw ? JSON.parse(raw) as QueuedAction[] : [];
-    return parsed.filter((action) => action.accountScope === accountScope);
+    return parseStoredQueue(raw, accountScope);
   } catch {
     return [];
   }
@@ -160,15 +157,30 @@ async function saveQueueForScope(accountScope: string, queue: QueuedAction[]): P
   notifyQueueListeners();
 }
 
+async function withQueueWriteLock<T>(accountScope: string, operation: () => Promise<T>): Promise<T> {
+  const previous = queueWriteTails.get(accountScope) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
+  const tail = previous.catch(() => undefined).then(() => current);
+  queueWriteTails.set(accountScope, tail);
+
+  await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (queueWriteTails.get(accountScope) === tail) queueWriteTails.delete(accountScope);
+  }
+}
+
 export async function enqueueAction(
-  method: QueuedAction['method'],
+  method: OfflineQueueMethod,
   url: string,
-  data?: any,
+  data?: unknown,
   headers?: Record<string, string>,
 ): Promise<void> {
   const accountScope = await getAccountScope();
   if (!accountScope) throw new Error('An authenticated account is required for offline changes.');
-  const queue = await getQueueForScope(accountScope);
   const action: QueuedAction = {
     id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
     accountScope,
@@ -179,8 +191,10 @@ export async function enqueueAction(
     timestamp: Date.now(),
     retryCount: 0,
   };
-  queue.push(action);
-  await saveQueueForScope(accountScope, queue);
+  await withQueueWriteLock(accountScope, async () => {
+    const queue = await getQueueForScope(accountScope);
+    await saveQueueForScope(accountScope, [...queue, action]);
+  });
 }
 
 export async function processQueue(): Promise<{ processed: number; failed: number }> {
@@ -191,37 +205,48 @@ export async function processQueue(): Promise<{ processed: number; failed: numbe
 
   const accountScope = await getAccountScope();
   if (!accountScope) return { processed: 0, failed: 0 };
-  const queue = await getQueueForScope(accountScope);
-  if (queue.length === 0) return { processed: 0, failed: 0 };
+  const activeSync = activeQueueSyncs.get(accountScope);
+  if (activeSync) return activeSync;
 
-  let processed = 0;
-  let failed = 0;
-  const remaining: QueuedAction[] = [];
+  const sync = (async () => {
+    const snapshot = await withQueueWriteLock(accountScope, async () => getQueueForScope(accountScope));
+    if (snapshot.length === 0) return { processed: 0, failed: 0 };
 
-  for (const action of queue) {
-    if (await getAccountScope() !== accountScope) {
-      remaining.push(action, ...queue.slice(queue.indexOf(action) + 1));
-      break;
+    const outcomes: QueueOutcome[] = [];
+    for (const action of snapshot) {
+      if (await getAccountScope() !== accountScope) break;
+      try {
+        await api({
+          method: action.method,
+          url: action.url,
+          data: action.data,
+          headers: action.headers,
+        });
+        outcomes.push({ id: action.id, status: 'processed' });
+      } catch {
+        // Never discard a teacher's work automatically. A later reconnect or
+        // explicit retry may resolve server validation or session issues.
+        outcomes.push({ id: action.id, status: 'failed' });
+      }
     }
-    try {
-      await api({
-        method: action.method,
-        url: action.url,
-        data: action.data,
-        headers: action.headers,
-      });
-      processed++;
-    } catch (error) {
-      action.retryCount++;
-      // Never discard a teacher's work automatically. A later reconnect or
-      // explicit retry may resolve server validation or session issues.
-      remaining.push(action);
-      failed++;
-    }
+
+    await withQueueWriteLock(accountScope, async () => {
+      const latest = await getQueueForScope(accountScope);
+      await saveQueueForScope(accountScope, reconcileQueuedActions(latest, outcomes));
+    });
+
+    return {
+      processed: outcomes.filter((outcome) => outcome.status === 'processed').length,
+      failed: outcomes.filter((outcome) => outcome.status === 'failed').length,
+    };
+  })();
+
+  activeQueueSyncs.set(accountScope, sync);
+  try {
+    return await sync;
+  } finally {
+    if (activeQueueSyncs.get(accountScope) === sync) activeQueueSyncs.delete(accountScope);
   }
-
-  await saveQueueForScope(accountScope, remaining);
-  return { processed, failed };
 }
 
 export async function getQueueSize(): Promise<number> {
