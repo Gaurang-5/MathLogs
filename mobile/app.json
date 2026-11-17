@@ -7,11 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mathlogs",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0F0F14"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.mathlogs.mobile",
@@ -52,7 +47,18 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-image",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0F0F14"
+        }
+      ],
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true

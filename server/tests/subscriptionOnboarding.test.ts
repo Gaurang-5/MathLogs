@@ -63,6 +63,20 @@ test('public monthly onboarding returns the flat shared subscription checkout co
   assert.deepEqual(res.body, expectedCheckout);
 });
 
+test('public monthly onboarding allows the superadmin phone when its admin already exists', async () => {
+  replace(prisma.admin, 'findUnique', (async () => ({ id: 'superadmin-1' }) as never) as typeof prisma.admin.findUnique);
+  replace(planSubscriptionCheckoutService, 'createMonthlySubscriptionCheckout', (async () => session) as typeof planSubscriptionCheckoutService.createMonthlySubscriptionCheckout);
+  const res = response();
+
+  await createOrder({ body: {
+    tuitionName: 'Another Institute', ownerName: 'Teacher', phone: '9557940807', email: 'another@example.com',
+    planId: 'QUIZ', billingCycle: 'MONTHLY',
+  } } as never, res as never);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, expectedCheckout);
+});
+
 test('invite monthly onboarding returns the flat shared subscription checkout contract', async () => {
   replace(prisma.adminOnboardingLink, 'findUnique', (async () => ({
     id: 'link-1', token: 'token-1', status: 'PENDING', expiresAt: new Date('2026-10-01T00:00:00.000Z'),

@@ -29,6 +29,7 @@ export { Feedback } from './Feedback';
 export { TeacherPage, TeacherSection, TEACHER_TAB_CONTENT_INSET } from './Page';
 export { PressableScale } from './PressableScale';
 export { Surface } from './Surface';
+export { TeacherSearchSheet } from './TeacherSearchSheet';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -171,19 +172,8 @@ export function GlassCard({ children, style, onPress, intensity = 30 }: GlassCar
     }
   }, [onPress]);
 
-  const Wrapper = onPress ? AnimatedTouchable : Animated.View;
-
-  return (
-    <Wrapper
-      {...(onPress ? {
-        onPress,
-        onPressIn: handlePressIn,
-        onPressOut: handlePressOut,
-        activeOpacity: 0.95,
-      } : {})}
-      style={[animatedStyle]}
-    >
-      <BlurView
+  const content = (
+    <BlurView
         intensity={intensity}
         tint={colorScheme === 'dark' ? 'dark' : 'light'}
         style={[
@@ -200,7 +190,22 @@ export function GlassCard({ children, style, onPress, intensity = 30 }: GlassCar
       >
         {children}
       </BlurView>
-    </Wrapper>
+  );
+
+  if (!onPress) {
+    return <Animated.View style={animatedStyle}>{content}</Animated.View>;
+  }
+
+  return (
+    <AnimatedTouchable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.95}
+      style={animatedStyle}
+    >
+      {content}
+    </AnimatedTouchable>
   );
 }
 

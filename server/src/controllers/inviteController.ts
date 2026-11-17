@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { secureLogger } from '../utils/secureLogger';
 import { getClientUrl } from '../utils/urlConfig';
 import { paidPlanExpiry } from '../domain/plans/entitlements';
+import { instituteAdminUsername } from '../domain/accounts/accountCreationPolicy';
 
 const SETUP_REPLAY_WINDOW_MS = 5 * 60 * 1000;
 
@@ -237,9 +238,11 @@ export const setupAccount = async (req: Request, res: Response) => {
             return sendSetupSuccess(existing);
         }
 
-        const effectiveUsername = invite.institute.phoneNumber
-            || invite.institute.email
-            || `admin_${invite.instituteId.slice(0, 8)}`;
+        const effectiveUsername = instituteAdminUsername(
+            invite.institute.phoneNumber,
+            invite.institute.email,
+            invite.instituteId,
+        );
         const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
         const effectiveTagline = tagline !== undefined ? tagline : description;
 

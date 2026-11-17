@@ -8,6 +8,7 @@ import { sendQuizMarksBroadcast, sendQuizScheduleBroadcast } from '../utils/quiz
 import { secureLogger } from '../utils/secureLogger';
 import { QuizCreditWalletError, consumeQuizCreditsInTransaction } from '../services/quizCreditWalletService';
 import { sendStudentAlertForStudent } from '../services/studentAlertRecipientService';
+import { finalizeStickerResearchCapture } from '../services/stickerResearchService';
 
 function normalizeCorrectAnswer(value: unknown): string | string[] {
     if (Array.isArray(value)) {
@@ -99,7 +100,7 @@ export const submitMark = async (req: Request, res: Response) => {
 
     try {
         // Verify test ownership
-        const test = await prisma.test.findUnique({ where: { id: testId } });
+        const test = await prisma.test.findUnique({ where: { id: testId }, include: { batches: { select: { id: true } } } });
         if (!test) return res.status(404).json({ error: 'Test not found' });
         if (test.teacherId && test.teacherId !== teacherId) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -117,7 +118,10 @@ export const submitMark = async (req: Request, res: Response) => {
         // Verify Student Eligibility (Security Check)
         const student = await prisma.student.findUnique({
             where: { id: studentId },
-            select: { instituteId: true }
+            select: {
+                id: true, instituteId: true, humanId: true, name: true,
+                enrollments: { where: { status: 'ACTIVE' }, select: { batchId: true, batch: { select: { name: true } } } },
+            }
         });
 
         if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -128,6 +132,7 @@ export const submitMark = async (req: Request, res: Response) => {
         }
 
         // Upsert allows updating if already exists
+        const priorMark = await prisma.mark.findUnique({ where: { studentId_testId: { studentId, testId } }, select: { id: true } });
         const mark = await prisma.mark.upsert({
             where: {
                 studentId_testId: {
@@ -143,6 +148,16 @@ export const submitMark = async (req: Request, res: Response) => {
             },
             include: { student: true, test: true }
         });
+        await finalizeStickerResearchCapture({
+            id: req.body.researchCaptureId,
+            teacherId: String(teacherId),
+            student,
+            test,
+            finalScore: numericScore,
+            reviewDurationMs: req.body.researchReviewDurationMs,
+            identitySource: req.body.researchIdentitySource,
+            wasOverwrite: !!priorMark,
+        }).catch(error => secureLogger.error('[Sticker research] Finalization failed.', { error: error instanceof Error ? error.message : String(error) }));
         res.json(mark);
     } catch (e) {
         console.error(e);
@@ -156,28 +171,46 @@ export const getStudentByHumanId = async (req: Request, res: Response) => {
     const teacherId = req.user?.id;
     const user = req.user;
 
+    if (!teacherId || !user?.instituteId) return res.status(401).json({ error: 'Unauthorized' });
+
     try {
-        // FIX: Use findFirst scoped to instituteId since composite constraint is now humanId_instituteId
-        const student = await prisma.student.findFirst({
+        const selectedTestId = typeof testId === 'string' ? testId : undefined;
+        const [student, selectedTest] = await Promise.all([prisma.student.findFirst({
             where: {
-                humanId: String(humanId),
+                humanId: String(humanId).trim(),
                 instituteId: user.instituteId
             },
             include: {
                 enrollments: { where: { status: 'ACTIVE' }, include: { batch: true } },
-                marks: testId ? { where: { testId: String(testId) } } : true
+                marks: selectedTestId ? { where: { testId: selectedTestId } } : true
             }
-        });
+        }), selectedTestId ? prisma.test.findFirst({
+            where: { id: selectedTestId, instituteId: user.instituteId,
+                OR: [{ teacherId }, { teacherId: null }] },
+            select: { batchId: true, className: true, batches: { select: { id: true } } }
+        }) : null]);
+
+        if (selectedTestId && !selectedTest) return res.status(404).json({ error: 'Test not found' });
 
         if (!student) {
             res.status(404).json({ error: 'Student not found' });
             return;
         }
-        if (!student.enrollments.some(enrollment => !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId)) {
+        const accessible = student.enrollments.filter(enrollment =>
+            !enrollment.batch.teacherId || enrollment.batch.teacherId === teacherId);
+        if (accessible.length === 0) {
             res.status(403).json({ error: 'Unauthorized' });
             return;
         }
-        res.json({ ...student, batch: student.enrollments[0]?.batch || null });
+        // Match the same enrollment rules as the test's eligible-student list.
+        // A student's first enrollment (or a test's legacy className) may be unrelated.
+        const batchIds = selectedTest
+            ? [...selectedTest.batches.map(batch => batch.id), ...(selectedTest.batchId ? [selectedTest.batchId] : [])] : [];
+        const enrollment = accessible.find(enrollment => !selectedTest || (batchIds.length > 0
+            ? batchIds.includes(enrollment.batchId)
+            : !selectedTest.className || enrollment.batch.className === selectedTest.className));
+        if (!enrollment) return res.status(409).json({ error: 'Student is not enrolled in a batch for this test. Select the correct test or student.' });
+        res.json({ ...student, enrollments: accessible, batch: enrollment.batch, testEligible: !!selectedTest });
     } catch (e) {
         console.error('Student lookup error:', e);
         res.status(500).json({ error: 'Lookup failed' });

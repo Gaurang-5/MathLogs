@@ -1,16 +1,28 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, useColorScheme } from 'react-native';
 import { Search, RefreshCw, ShieldAlert, Monitor, CheckCircle2, User, Clock, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react-native';
 import api from '../../services/api';
 import * as Haptics from 'expo-haptics';
+import { Colors } from '../../constants/theme';
 
-const { width } = Dimensions.get('window');
-
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', emeraldLight: '#d1fae5', amber: '#f59e0b', amberLight: '#fef3c7',
-  red: '#ef4444', redLight: '#fee2e2', border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
+const useQuizPalette = () => {
+    const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+    const colors = Colors[scheme];
+    return useMemo(() => ({
+        bg: colors.background,
+        white: colors.surface,
+        text: colors.text,
+        textSec: colors.textSecondary,
+        textMuted: colors.textMuted,
+        accent: colors.hero,
+        emerald: colors.positive,
+        emeraldLight: scheme === 'dark' ? 'rgba(124,166,150,0.16)' : 'rgba(104,139,125,0.14)',
+        amber: colors.attention,
+        amberLight: scheme === 'dark' ? 'rgba(186,143,112,0.16)' : 'rgba(155,120,95,0.14)',
+        red: Colors.error,
+        redLight: scheme === 'dark' ? 'rgba(255,69,58,0.15)' : 'rgba(255,59,48,0.12)',
+        border: colors.border,
+    }), [colors, scheme]);
 };
 
 interface StudentData {
@@ -52,6 +64,8 @@ interface Props {
 }
 
 const StudentTimer = ({ student, timeLimitMins }: { student: StudentData; timeLimitMins: number }) => {
+    const T = useQuizPalette();
+    const s = useMemo(() => makeStyles(T), [T]);
     const [secondsLeft, setSecondsLeft] = useState(student.remainingSeconds);
 
     useEffect(() => {
@@ -102,6 +116,8 @@ const StudentTimer = ({ student, timeLimitMins }: { student: StudentData; timeLi
 };
 
 export default function QuizLiveMonitor({ quizId }: Props) {
+    const T = useQuizPalette();
+    const s = useMemo(() => makeStyles(T), [T]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -251,7 +267,7 @@ export default function QuizLiveMonitor({ quizId }: Props) {
                         const hasWarnings = student.cheatingEventsCount > 0;
                         const isExpanded = expandedStudentId === student.id;
                         
-                        let statusColor = T.textMuted;
+                        let statusColor: string = T.textMuted;
                         let statusText = 'Offline';
                         if (isCompleted) { statusColor = T.emerald; statusText = 'Completed'; }
                         else if (student.isOffline) { statusColor = T.amber; statusText = 'Offline'; }
@@ -342,7 +358,7 @@ export default function QuizLiveMonitor({ quizId }: Props) {
     );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T: ReturnType<typeof useQuizPalette>) => StyleSheet.create({
     container: { flex: 1, backgroundColor: T.white, borderRadius: 16, borderWidth: 1, borderColor: T.border, overflow: 'hidden' },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, minHeight: 300 },
     loadingText: { marginTop: 12, fontSize: 14, color: T.textSec, fontWeight: '600' },

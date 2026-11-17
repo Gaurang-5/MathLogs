@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { prisma as defaultPrisma } from '../prisma';
 import {
@@ -10,6 +11,7 @@ import {
 import { hashTrialOwnerIdentity } from './subscriptionLifecycleService';
 import type { ProvisioningInput } from './accountProvisioningService';
 import { getRazorpayConfig } from '../utils/env';
+import { hasUnlimitedAccountCreation, scopedAccountOwnerIdentity } from '../domain/accounts/accountCreationPolicy';
 
 export type CheckoutContext =
   | { kind: 'INSTITUTE'; instituteId: string; ownerIdentity: string }
@@ -76,7 +78,12 @@ export function createPlanSubscriptionCheckoutService(options?: {
 
       const product = getMonthlySubscriptionProduct(input.plan, env);
       const now = input.now || new Date();
-      const ownerIdentityHash = hashTrialOwnerIdentity(input.context.ownerIdentity);
+      const unlimitedAccountCreation = input.context.kind !== 'INSTITUTE'
+        && hasUnlimitedAccountCreation(input.context.ownerIdentity);
+      const ownerIdentity = unlimitedAccountCreation
+        ? scopedAccountOwnerIdentity(input.context.ownerIdentity, crypto.randomUUID())
+        : input.context.ownerIdentity;
+      const ownerIdentityHash = hashTrialOwnerIdentity(ownerIdentity);
 
       let institute: any = null;
       let trialEligible = true;
@@ -104,7 +111,7 @@ export function createPlanSubscriptionCheckoutService(options?: {
           });
           if (claim) trialEligible = false;
         }
-      } else {
+      } else if (!unlimitedAccountCreation) {
         const claim = await client.planTrialClaim.findUnique({
           where: { ownerIdentityHash }
         });

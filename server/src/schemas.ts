@@ -169,8 +169,10 @@ export const assignFeeSchema = z.object({
 
 export const paymentSchema = z.object({
     body: z.object({
-        studentId: z.string().uuid("Invalid Student ID"),
-        amount: z.number().positive("Amount must be positive").or(z.string().regex(/^\d+(\.\d+)?$/))
+        studentId: z.string().uuid(),
+        amount: z.union([z.number().positive(), z.string().regex(/^\d+(\.\d{1,2})?$/)]),
+        idempotencyKey: z.string().min(8).max(150),
+        allocations: z.array(z.object({ installmentId: z.string().uuid(), amount: z.union([z.number().positive(), z.string().regex(/^\d+(\.\d{1,2})?$/)]) })).min(1).max(100)
     })
 });
 
@@ -188,7 +190,10 @@ export const submitMarkSchema = z.object({
         testId: z.string().uuid("Invalid Test ID"),
         studentId: z.string().uuid("Invalid Student ID"),
         score: z.number().min(0, "Score cannot be negative")
-            .or(z.string().regex(/^\d+(\.\d+)?$/).transform(Number))
+            .or(z.string().regex(/^\d+(\.\d+)?$/).transform(Number)),
+        researchCaptureId: z.string().uuid().optional(),
+        researchReviewDurationMs: z.number().int().min(0).max(30 * 60 * 1000).optional(),
+        researchIdentitySource: z.enum(['qr', 'manual_picker']).optional(),
     })
 });
 
@@ -243,7 +248,10 @@ const enrollmentFeeChoiceSchema = z.discriminatedUnion('mode', [
     }),
     z.object({
         mode: z.literal('CURRENT_DUE_BASED'),
-        installmentIds: z.array(z.string().uuid('Invalid installment ID')).default([])
+        installmentIds: z.array(z.string().uuid('Invalid installment ID')).default([]),
+        decision: z.enum(['SELECTED', 'NO_FEE', 'LATER']).optional(),
+        applyFutureInstallments: z.boolean().default(false),
+        amounts: z.record(z.string().uuid(), z.number().finite().positive()).optional()
     })
 ]);
 

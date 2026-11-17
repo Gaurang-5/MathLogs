@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { includedCreditPeriod } from '../domain/plans/entitlements';
+import { hasUnlimitedAccountCreation } from '../domain/accounts/accountCreationPolicy';
 
 export type ProvisioningInput = {
   kind: 'PUBLIC' | 'INVITE';
@@ -59,7 +60,7 @@ export async function provisionInstitute(
   const now = activation.startsAt || new Date();
 
   // Check for existing institute with same phone
-  if (input.phone) {
+  if (input.phone && !hasUnlimitedAccountCreation(input.phone)) {
     const existing = await tx.institute.findFirst({
       where: { phoneNumber: input.phone },
       include: {

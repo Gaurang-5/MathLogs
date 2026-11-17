@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { GlassCard, BrandButton, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import { clearCache } from '../../services/offlineSync';
 import { Colors, Spacing, FontSize, FontWeight, BorderRadius } from '../../constants/theme';
+import { ThemeModeSelector } from '../../components/ui/ThemeModeSelector';
 
 function SettingsRow({
   icon,
@@ -117,7 +118,7 @@ export default function SettingsScreen() {
         <Animated.View entering={FadeInDown.duration(400).delay(200)}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>APP</Text>
           <View style={styles.settingsGroup}>
-            <SettingsRow icon="🌙" label="Theme" value="System" isDark={isDark} />
+            <ThemeModeSelector />
             <SettingsRow icon="🔔" label="Notifications" value="On" isDark={isDark} />
             <SettingsRow icon="🗑️" label="Clear cache" onPress={handleClearCache} isDark={isDark} />
           </View>

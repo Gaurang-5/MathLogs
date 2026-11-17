@@ -29,6 +29,7 @@ export type EnrollmentFeeDeps = {
     studentId: string;
     feeStartMonth: string;
   }): Promise<void>;
+  saveFeeDecision?(enrollmentId: string, decision: string, applyFutureInstallments: boolean): Promise<void>;
   assignInstallments(studentId: string, installmentIds: string[]): Promise<string[]>;
 };
 
@@ -53,9 +54,12 @@ export async function previewEnrollmentFees(
     return { mode: choice.mode, feeStartMonth: choice.feeStartMonth };
   }
 
+  if (choice.decision === 'SELECTED' && choice.installmentIds.length === 0) throw new Error('SELECT_INSTALLMENTS_REQUIRED');
+  if ((choice.decision === 'NO_FEE' || choice.decision === 'LATER') && (choice.installmentIds.length || choice.applyFutureInstallments)) throw new Error('INVALID_FEE_DECISION');
   const available = new Map(loaded.installments.map(item => [item.id, item]));
   const requested = [...new Set(choice.installmentIds)];
   if (requested.some(id => !available.has(id))) throw new Error('INVALID_INSTALLMENT_SELECTION');
+  if (choice.amounts && requested.some(id => choice.amounts![id] !== available.get(id)!.amount)) throw new Error('FEE_AMOUNT_CHANGED_REFRESH_REQUIRED');
   return {
     mode: choice.mode,
     installmentIds: requested,
@@ -80,6 +84,9 @@ export async function applyEnrollmentFees(
     return { ...preview, assignmentIds: [] };
   }
 
+  if (choice.mode === 'CURRENT_DUE_BASED') {
+    await deps.saveFeeDecision?.(enrollment.id, choice.decision || (choice.installmentIds.length ? 'SELECTED' : 'LATER'), choice.applyFutureInstallments === true);
+  }
   const assignmentIds = await deps.assignInstallments(enrollment.studentId, preview.installmentIds);
   return { ...preview, assignmentIds };
 }

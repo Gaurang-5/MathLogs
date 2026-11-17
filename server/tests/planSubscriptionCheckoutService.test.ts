@@ -175,6 +175,26 @@ test('eligible checkout schedules 14 days and 120 cycles', async () => {
   assert.equal(provider.createCalls[0].startAt?.toISOString(), '2026-08-31T00:00:00.000Z');
 });
 
+test('superadmin phone can create multiple independent public subscription checkouts', async () => {
+  const provider = new MockSubscriptionProvider();
+  const service = createPlanSubscriptionCheckoutService({ prisma, provider, env });
+  const phone = '9557940807';
+  const context = {
+    kind: 'PUBLIC_ONBOARDING' as const,
+    ownerIdentity: phone,
+    provisioning: { kind: 'PUBLIC' as const, instituteName: 'Superadmin Test', ownerName: 'Owner', phone, email: 'superadmin@example.com' }
+  };
+
+  const first = await service.createMonthlySubscriptionCheckout({ context, plan: 'QUIZ' });
+  const second = await service.createMonthlySubscriptionCheckout({ context, plan: 'QUIZ' });
+
+  assert.equal(first.trialEligible, true);
+  assert.equal(second.trialEligible, true);
+  assert.notEqual(first.attemptId, second.attemptId);
+  assert.notEqual(first.subscriptionId, second.subscriptionId);
+  assert.equal(provider.createCalls.length, 2);
+});
+
 test('used trial starts immediately but grants nothing before charge', async () => {
   const provider = new MockSubscriptionProvider();
   const service = createPlanSubscriptionCheckoutService({ prisma, provider, env });

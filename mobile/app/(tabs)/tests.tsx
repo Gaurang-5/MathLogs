@@ -1,26 +1,56 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, TextInput,
-  RefreshControl, Dimensions, Platform, TouchableOpacity, Alert,
-  Modal, ScrollView, KeyboardAvoidingView
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useColorScheme,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { SkeletonLoader, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
-import { Search, FileText, Calendar, ChevronRight, BarChart2, Plus, X, CheckSquare, Square } from 'lucide-react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Feedback,
+  PressableScale,
+  SkeletonLoader,
+  Surface,
+  TEACHER_TAB_CONTENT_INSET,
+  TeacherSearchSheet,
+} from '../../components/ui';
+import { useAccessibilityPreferences } from '../../components/ui/useAccessibilityPreferences';
+import {
+  BarChart2,
+  Calendar,
+  CheckSquare,
+  ChevronRight,
+  Clock3,
+  FileText,
+  Plus,
+  ScanLine,
+  Search,
+  Square,
+  X,
+} from 'lucide-react-native';
+import {
+  BorderRadius,
+  Colors,
+  FontWeight,
+  Shadows,
+  Spacing,
+  TypeScale,
+} from '../../constants/theme';
 import api from '../../services/api';
+import { executeOrQueueMutation, offlineQuery, updateCachedData } from '../../services/offlineSync';
 import * as Haptics from 'expo-haptics';
-
-const { width } = Dimensions.get('window');
-
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', amber: '#f59e0b', red: '#ef4444',
-  border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
-};
 
 interface Test {
   id: string;
@@ -39,363 +69,628 @@ interface Batch {
   subject: string | null;
 }
 
-function getTestStatus(test: Test): { color: string; label: string } {
+interface StatusColors {
+  attention: string;
+  positive: string;
+  focus: string;
+}
+
+type ThemeColors = typeof Colors.light | typeof Colors.dark;
+
+function getTestStatus(test: Test, colors: StatusColors): { color: string; label: string } {
   const testDate = new Date(test.date);
   const now = new Date();
 
-  if (testDate > now) return { color: T.amber, label: 'Upcoming' };
-  if (test._count.marks > 0) return { color: T.emerald, label: 'Graded' };
-  return { color: T.accent, label: 'Pending' };
+  if (testDate > now) return { color: colors.attention, label: 'Upcoming' };
+  if (test._count.marks > 0) return { color: colors.positive, label: 'Graded' };
+  return { color: colors.focus, label: 'Pending' };
 }
 
-function TestCard({ item, index }: { item: Test; index: number }) {
-  const st = getTestStatus(item);
-  const router = useRouter();
+function TestCard({
+  item,
+  index,
+  onPress,
+  colors,
+  reduceMotion,
+}: {
+  item: Test;
+  index: number;
+  onPress?: () => void;
+  colors: ThemeColors;
+  reduceMotion: boolean;
+}) {
+  const isPendingSync = item.id.startsWith('offline:');
+  const status = isPendingSync ? { color: colors.attention, label: 'Pending sync' } : getTestStatus(item, colors);
   const dateStr = new Date(item.date).toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   });
 
   return (
-    <Animated.View entering={FadeInRight.duration(400).delay(index * 50)}>
-      <TouchableOpacity accessibilityLabel={`Open test ${item.name}`} activeOpacity={0.7} style={s.card} onPress={() => router.push(`/test/${item.id}`)}>
-        <View style={[s.testIcon, { backgroundColor: `${st.color}12` }]}>
-          <FileText size={20} color={st.color} />
+    <Animated.View
+      entering={reduceMotion ? undefined : FadeInDown.duration(260).delay(Math.min(index, 4) * 35)}
+      style={styles.cardSpacing}
+    >
+      <Surface
+        onPress={onPress}
+        accessibilityLabel={isPendingSync ? `${item.name}, pending sync` : `Open test ${item.name}`}
+        style={styles.assessmentCard}
+      >
+        <View style={[styles.assessmentIcon, { backgroundColor: `${status.color}18` }]}>
+          <FileText size={21} color={status.color} strokeWidth={2} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.testName} numberOfLines={1}>{item.name}</Text>
-          <View style={s.testMeta}>
-            <Calendar size={12} color={T.textSec} />
-            <Text style={s.testDate}>{dateStr}</Text>
-            {item._count.marks > 0 && (
+
+        <View style={styles.assessmentCopy}>
+          <View style={styles.cardTitleRow}>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <View style={[styles.statusPill, { backgroundColor: `${status.color}18` }]}>
+              <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+            </View>
+          </View>
+
+          <View style={styles.metaRow}>
+            <Calendar size={14} color={colors.textSecondary} />
+            <Text style={[styles.metaText, { color: colors.textSecondary }]}>{dateStr}</Text>
+            {item._count.marks > 0 ? (
               <>
-                <BarChart2 size={12} color={T.textSec} style={{ marginLeft: 10 }} />
-                <Text style={s.testDate}>{item._count.marks} graded</Text>
+                <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
+                <BarChart2 size={14} color={colors.textSecondary} />
+                <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                  {item._count.marks} graded
+                </Text>
               </>
-            )}
+            ) : null}
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-            <Text style={[s.testDate, { color: T.textMuted }]}>{item.subject}</Text>
-            {item.className && <Text style={[s.testDate, { color: T.textMuted }]}>• {item.className}</Text>}
-            <Text style={[s.testDate, { color: T.textMuted }]}>• Max: {item.maxMarks}</Text>
-          </View>
+
+          <Text style={[styles.detailText, { color: colors.textMuted }]} numberOfLines={2}>
+            {item.subject}{item.className ? ` · ${item.className}` : ''} · {item.maxMarks} marks
+          </Text>
         </View>
-        <View style={[s.statusPill, { backgroundColor: `${st.color}12` }]}>
-          <Text style={[s.statusText, { color: st.color }]}>{st.label}</Text>
-        </View>
-        <ChevronRight size={18} color={T.textMuted} style={{ marginLeft: 8 }} />
-      </TouchableOpacity>
+
+        <ChevronRight size={20} color={colors.textMuted} />
+      </Surface>
     </Animated.View>
   );
 }
 
 export default function TestsScreen() {
+  const queryClient = useQueryClient();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const colors = Colors[scheme];
+  const { reduceMotion } = useAccessibilityPreferences();
+  const { width } = useWindowDimensions();
+  const router = useRouter();
   const [search, setSearch] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  // Form State
   const [name, setName] = useState('');
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [maxMarks, setMaxMarks] = useState('');
 
-  const { data: tests, isLoading, refetch, isRefetching } = useQuery<Test[]>({
+  const {
+    data: tests,
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+  } = useQuery<Test[]>({
     queryKey: ['tests'],
-    queryFn: async () => {
-      const res = await api.get('/tests');
-      return res.data;
-    },
+    queryFn: () => offlineQuery('tests', async () => (await api.get('/tests')).data),
   });
 
   const { data: batches = [] } = useQuery<Batch[]>({
     queryKey: ['batches'],
-    queryFn: async () => {
-      const res = await api.get('/batches');
-      return res.data;
-    },
+    queryFn: () => offlineQuery('batches', async () => (await api.get('/batches')).data),
   });
+  const syncedBatches = useMemo(() => batches.filter(batch => !batch.id.startsWith('offline:')), [batches]);
 
   const filtered = useMemo(() => {
     if (!tests) return [];
     if (!search) return tests;
-    const q = search.toLowerCase();
-    return tests.filter(t =>
-      t.name.toLowerCase().includes(q) ||
-      t.subject.toLowerCase().includes(q)
+    const query = search.toLowerCase();
+    return tests.filter(test =>
+      test.name.toLowerCase().includes(query) ||
+      test.subject.toLowerCase().includes(query)
     );
   }, [tests, search]);
 
-  const upcomingCount = useMemo(() =>
-    (tests || []).filter(t => new Date(t.date) > new Date()).length, [tests]);
-  const gradedCount = useMemo(() =>
-    (tests || []).filter(t => t._count.marks > 0).length, [tests]);
-  const pendingCount = useMemo(() =>
-    (tests || []).filter(t => new Date(t.date) <= new Date() && t._count.marks === 0).length, [tests]);
+  const upcomingCount = useMemo(
+    () => (tests || []).filter(test => new Date(test.date) > new Date()).length,
+    [tests],
+  );
+  const gradedCount = useMemo(
+    () => (tests || []).filter(test => test._count.marks > 0).length,
+    [tests],
+  );
+  const pendingCount = useMemo(
+    () => (tests || []).filter(test => new Date(test.date) <= new Date() && test._count.marks === 0).length,
+    [tests],
+  );
 
   const handleCreate = async () => {
-    if (!name || selectedBatchIds.length === 0 || !date || !maxMarks) {
+    const numericMaxMarks = Number(maxMarks);
+    if (!name.trim() || selectedBatchIds.length === 0 || !date || !Number.isFinite(numericMaxMarks) || numericMaxMarks <= 0) {
       Alert.alert('Missing Fields', 'Please fill in all required fields and select at least one batch.');
       return;
     }
 
-    const batch = batches.find(b => b.id === selectedBatchIds[0]);
+    const batch = syncedBatches.find(item => item.id === selectedBatchIds[0]);
     const subject = batch?.subject || 'General';
     const className = batch?.className;
 
     try {
-      await api.post('/tests', {
-        name,
+      const payload = {
+        name: name.trim(),
         subject,
         date,
-        maxMarks: parseFloat(maxMarks),
+        maxMarks: numericMaxMarks,
         className,
-        batchIds: selectedBatchIds
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        batchIds: selectedBatchIds,
+      };
+      const result = await executeOrQueueMutation<Test>({ method: 'POST', url: '/tests', data: payload });
+      if (result.status === 'queued') {
+        const optimisticTest: Test = {
+          id: `offline:${result.idempotencyKey}`,
+          name: payload.name,
+          subject,
+          className: className ?? null,
+          date,
+          maxMarks: numericMaxMarks,
+          _count: { marks: 0 },
+        };
+        queryClient.setQueryData<Test[]>(['tests'], previous => [optimisticTest, ...(previous ?? [])]);
+        await updateCachedData<Test[]>('tests', previous => [optimisticTest, ...(previous ?? [])]);
+      }
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowForm(false);
-      setName(''); setSelectedBatchIds([]); setMaxMarks('');
-      refetch();
-    } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.error || 'Failed to create test');
+      setName('');
+      setSelectedBatchIds([]);
+      setMaxMarks('');
+      if (result.status === 'queued') Alert.alert('Saved offline', 'The test will sync automatically when the connection returns.');
+      else void refetch();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to create test');
     }
   };
 
   const toggleBatch = (id: string) => {
-    setSelectedBatchIds(prev => 
-      prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
+    setSelectedBatchIds(previous =>
+      previous.includes(id) ? previous.filter(batchId => batchId !== id) : [...previous, id],
     );
   };
 
+  const renderEmptyState = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.skeletonStack}>
+          {[1, 2, 3].map(item => (
+            reduceMotion ? (
+              <View
+                key={item}
+                style={[
+                  styles.staticSkeleton,
+                  {
+                    width: Math.max(width - Spacing['4xl'], 0),
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+            ) : (
+              <SkeletonLoader
+                key={item}
+                width={Math.max(width - Spacing['4xl'], 0)}
+                height={126}
+                borderRadius={BorderRadius.xl}
+              />
+            )
+          ))}
+        </View>
+      );
+    }
+
+    if (isError) {
+      return (
+        <Feedback
+          kind="error"
+          title="Tests could not be loaded"
+          description="Check your connection and try again."
+          action={(
+            <PressableScale
+              accessibilityLabel="Retry loading tests"
+              onPress={() => void refetch()}
+              style={[styles.feedbackAction, { backgroundColor: colors.text }]}
+            >
+              <Text style={[styles.feedbackActionText, { color: colors.background }]}>Try again</Text>
+            </PressableScale>
+          )}
+        />
+      );
+    }
+
+    return (
+      <Feedback
+        kind="empty"
+        title={search ? 'No matching tests' : 'No tests yet'}
+        description={search ? 'Try another name or subject.' : 'Create your first test to start tracking marks and progress.'}
+      />
+    );
+  };
+
+  const header = (
+    <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(280)}>
+      <View style={styles.pageHeader}>
+        <Text accessibilityRole="header" style={[styles.pageTitle, { color: colors.text }]}>Tests</Text>
+        <View style={styles.headerActions}>
+          <PressableScale
+            accessibilityLabel="Search tests"
+            onPress={() => setIsSearchOpen(true)}
+            style={[styles.headerSearchAction, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+          >
+            <Search size={19} color={colors.text} />
+          </PressableScale>
+          <PressableScale
+            accessibilityLabel="Scan student marks"
+            haptic="selection"
+            onPress={() => router.push('/scan' as never)}
+            style={[styles.scanAction, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+          >
+            <ScanLine size={19} color={colors.text} />
+          </PressableScale>
+          <PressableScale
+            accessibilityLabel="Create test"
+            haptic="selection"
+            onPress={() => setShowForm(true)}
+            style={[styles.primaryAction, { backgroundColor: colors.text }]}
+          >
+            <Plus size={18} color={colors.background} />
+            <Text style={[styles.primaryActionText, { color: colors.background }]}>New test</Text>
+          </PressableScale>
+        </View>
+      </View>
+
+      {!isLoading ? (
+        <View style={styles.statsRow}>
+          <Surface style={styles.statCard}>
+            <Clock3 size={18} color={colors.attention} />
+            <Text style={[styles.statValue, { color: colors.text }]}>{upcomingCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Upcoming</Text>
+          </Surface>
+          <Surface style={styles.statCard}>
+            <FileText size={18} color={colors.focus} />
+            <Text style={[styles.statValue, { color: colors.text }]}>{pendingCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Pending</Text>
+          </Surface>
+          <Surface style={styles.statCard}>
+            <BarChart2 size={18} color={colors.positive} />
+            <Text style={[styles.statValue, { color: colors.text }]}>{gradedCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Graded</Text>
+          </Surface>
+        </View>
+      ) : null}
+
+    </Animated.View>
+  );
+
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <Animated.View entering={FadeInDown.duration(400)} style={s.headerArea}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View>
-            <Text accessibilityRole="header" style={s.title}>Tests</Text>
-            <Text style={s.subtitle}>{tests?.length ?? 0} total tests</Text>
-          </View>
-          <TouchableOpacity accessibilityLabel="Create test" style={s.createBtn} onPress={() => setShowForm(true)}>
-            <Plus size={16} color={T.white} />
-            <Text style={s.createBtnText}>New Test</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={s.searchWrap}>
-          <Search size={18} color={T.textMuted} />
-          <TextInput
-            placeholder="Search tests..."
-            placeholderTextColor={T.textMuted}
-            value={search} onChangeText={setSearch}
-            style={s.searchInput}
-          />
-        </View>
-      </Animated.View>
-
-      {/* Stats Row */}
-      {!isLoading && (
-        <Animated.View entering={FadeInDown.duration(400).delay(150)} style={s.statsRow}>
-          <View style={s.miniStat}>
-            <Text style={[s.miniValue, { color: T.amber }]}>{upcomingCount}</Text>
-            <Text style={s.miniLabel}>Upcoming</Text>
-          </View>
-          <View style={s.miniStat}>
-            <Text style={[s.miniValue, { color: T.accent }]}>{pendingCount}</Text>
-            <Text style={s.miniLabel}>Pending</Text>
-          </View>
-          <View style={s.miniStat}>
-            <Text style={[s.miniValue, { color: T.emerald }]}>{gradedCount}</Text>
-            <Text style={s.miniLabel}>Graded</Text>
-          </View>
-        </Animated.View>
-      )}
-
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <FlatList
         data={filtered}
-        renderItem={({ item, index }) => <TestCard item={item} index={index} />}
+        renderItem={({ item, index }) => (
+          <TestCard
+            item={item}
+            index={index}
+            colors={colors}
+            reduceMotion={reduceMotion}
+            onPress={item.id.startsWith('offline:') ? undefined : () => router.push(`/test/${item.id}`)}
+          />
+        )}
         keyExtractor={item => item.id}
-        contentContainerStyle={s.listContent}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={T.accent} />}
-        ListEmptyComponent={
-          isLoading ? (
-            <View style={{ gap: 12 }}>
-              {[1, 2, 3].map(i => <SkeletonLoader key={i} width={width - 48} height={90} borderRadius={16} />)}
-            </View>
-          ) : (
-            <View style={s.empty}>
-              <FileText size={48} color={T.textMuted} />
-              <Text style={s.emptyTitle}>No tests yet</Text>
-              <Text style={s.emptyDesc}>Create your first test using the button above.</Text>
-            </View>
-          )
-        }
+        keyboardShouldPersistTaps="handled"
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => void refetch()}
+            tintColor={colors.focus}
+            colors={[colors.focus]}
+          />
+        )}
+        ListHeaderComponent={header}
+        ListHeaderComponentStyle={styles.listHeader}
+        ListEmptyComponent={renderEmptyState}
       />
 
-      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowForm(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.modalContainer}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Create New Test</Text>
-            <TouchableOpacity onPress={() => setShowForm(false)} style={s.closeBtn}>
-              <X size={20} color={T.textSec} />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView contentContainerStyle={s.modalContent} showsVerticalScrollIndicator={false}>
-            <View style={s.inputGroup}>
-              <Text style={s.label}>Test Name</Text>
-              <View style={s.inputWrap}>
-                <FileText size={18} color={T.textMuted} style={s.inputIcon} />
-                <TextInput 
-                  style={s.input} 
-                  placeholder="e.g. Unit Test 1" 
-                  value={name} 
-                  onChangeText={setName} 
-                />
+      <TeacherSearchSheet
+        visible={isSearchOpen}
+        title="Search tests"
+        placeholder="Search by test or subject"
+        value={search}
+        onChangeText={setSearch}
+        onClose={() => {
+          setIsSearchOpen(false);
+          setSearch('');
+        }}
+      >
+        <View>
+          {filtered.length === 0 ? (
+            <Feedback kind="empty" title="No matching tests" description="Try another test name or subject." />
+          ) : filtered.map((item, index) => (
+            <TestCard
+              key={item.id}
+              item={item}
+              index={index}
+              colors={colors}
+              reduceMotion={reduceMotion}
+              onPress={() => {
+                if (item.id.startsWith('offline:')) return;
+                setIsSearchOpen(false);
+                setSearch('');
+                router.push(`/test/${item.id}`);
+              }}
+            />
+          ))}
+        </View>
+      </TeacherSearchSheet>
+
+      <Modal
+        visible={showForm}
+        animationType={reduceMotion ? 'none' : 'slide'}
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowForm(false)}
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={styles.modalHeadingCopy}>
+                <Text accessibilityRole="header" style={[styles.modalTitle, { color: colors.text }]}>Create new test</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>Assign one assessment to one or more batches.</Text>
               </View>
+              <PressableScale
+                accessibilityLabel="Close create test"
+                onPress={() => setShowForm(false)}
+                style={[styles.closeButton, { backgroundColor: colors.surfaceSecondary }]}
+              >
+                <X size={20} color={colors.textSecondary} />
+              </PressableScale>
             </View>
 
-            <View style={s.inputGroup}>
-              <Text style={s.label}>Select Batches</Text>
-              <View style={s.batchesContainer}>
-                {batches.map(batch => {
-                  const isSelected = selectedBatchIds.includes(batch.id);
-                  return (
-                    <TouchableOpacity 
-                      key={batch.id} 
-                      style={[s.batchOption, isSelected && s.batchOptionSelected]}
-                      onPress={() => toggleBatch(batch.id)}
-                      activeOpacity={0.7}
-                    >
-                      {isSelected ? (
-                        <CheckSquare size={20} color={T.accent} />
-                      ) : (
-                        <Square size={20} color={T.textMuted} />
-                      )}
-                      <Text style={[s.batchOptionText, isSelected && s.batchOptionTextSelected]}>
-                        {batch.name} {batch.className ? `(${batch.className})` : ''}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+            <ScrollView
+              contentContainerStyle={styles.modalContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Test name</Text>
+                <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <FileText size={19} color={colors.textMuted} />
+                  <TextInput
+                    accessibilityLabel="Test name"
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder="e.g. Unit Test 1"
+                    placeholderTextColor={colors.textMuted}
+                    value={name}
+                    onChangeText={setName}
+                  />
+                </View>
               </View>
-            </View>
 
-            <View style={s.inputGroup}>
-              <Text style={s.label}>Date (YYYY-MM-DD)</Text>
-              <View style={s.inputWrap}>
-                <Calendar size={18} color={T.textMuted} style={s.inputIcon} />
-                <TextInput 
-                  style={s.input} 
-                  placeholder="2026-05-17" 
-                  value={date} 
-                  onChangeText={setDate} 
-                />
+              <View style={styles.inputGroup}>
+                <View style={styles.fieldHeadingRow}>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Select batches</Text>
+                  {selectedBatchIds.length > 0 ? (
+                    <Text style={[styles.selectionCount, { color: colors.focus }]}>{selectedBatchIds.length} selected</Text>
+                  ) : null}
+                </View>
+                <Surface style={styles.batchList}>
+                  {syncedBatches.length === 0 ? (
+                    <Text style={[styles.batchEmptyText, { color: colors.textSecondary }]}>No batches available.</Text>
+                  ) : syncedBatches.map(batch => {
+                    const isSelected = selectedBatchIds.includes(batch.id);
+                    return (
+                      <PressableScale
+                        key={batch.id}
+                        accessibilityRole="checkbox"
+                        accessibilityLabel={`Select ${batch.name}`}
+                        accessibilityState={{ checked: isSelected }}
+                        haptic="selection"
+                        onPress={() => toggleBatch(batch.id)}
+                        style={[
+                          styles.batchOption,
+                          {
+                            backgroundColor: isSelected ? colors.surfaceSecondary : colors.background,
+                            borderColor: isSelected ? colors.focus : colors.borderLight,
+                          },
+                        ]}
+                      >
+                        {isSelected ? <CheckSquare size={21} color={colors.focus} /> : <Square size={21} color={colors.textMuted} />}
+                        <Text style={[styles.batchOptionText, { color: isSelected ? colors.text : colors.textSecondary }]}>
+                          {batch.name}{batch.className ? ` (${batch.className})` : ''}
+                        </Text>
+                      </PressableScale>
+                    );
+                  })}
+                </Surface>
               </View>
-            </View>
 
-            <View style={s.inputGroup}>
-              <Text style={s.label}>Max Marks</Text>
-              <View style={s.inputWrap}>
-                <BarChart2 size={18} color={T.textMuted} style={s.inputIcon} />
-                <TextInput 
-                  style={s.input} 
-                  placeholder="e.g. 50" 
-                  keyboardType="numeric"
-                  value={maxMarks} 
-                  onChangeText={setMaxMarks} 
-                />
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Date (YYYY-MM-DD)</Text>
+                <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Calendar size={19} color={colors.textMuted} />
+                  <TextInput
+                    accessibilityLabel="Test date"
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder="2026-05-17"
+                    placeholderTextColor={colors.textMuted}
+                    value={date}
+                    onChangeText={setDate}
+                  />
+                </View>
               </View>
-            </View>
 
-            <TouchableOpacity style={s.submitBtn} onPress={handleCreate}>
-              <Text style={s.submitBtnText}>Create Test</Text>
-              <ChevronRight size={18} color={T.white} />
-            </TouchableOpacity>
-          </ScrollView>
-        </KeyboardAvoidingView>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Maximum marks</Text>
+                <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <BarChart2 size={19} color={colors.textMuted} />
+                  <TextInput
+                    accessibilityLabel="Maximum marks"
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder="e.g. 50"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                    value={maxMarks}
+                    onChangeText={setMaxMarks}
+                  />
+                </View>
+              </View>
+
+              <PressableScale
+                accessibilityLabel="Create test"
+                haptic="commit"
+                onPress={() => void handleCreate()}
+                style={[styles.submitButton, { backgroundColor: colors.text }, Shadows.md]}
+              >
+                <Text style={[styles.submitButtonText, { color: colors.background }]}>Create test</Text>
+                <ChevronRight size={19} color={colors.background} />
+              </PressableScale>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-  headerArea: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  title: { color: T.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { color: T.textSec, fontSize: 14, fontWeight: '500', marginTop: 4, marginBottom: 16 },
-  createBtn: {
-    backgroundColor: T.accent, paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6,
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  listContent: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: TEACHER_TAB_CONTENT_INSET,
   },
-  createBtnText: { color: T.white, fontWeight: '600', fontSize: 13 },
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
-    borderRadius: 14, paddingHorizontal: 14, height: 46,
-    borderWidth: 1, borderColor: T.border,
+  listHeader: { marginBottom: Spacing.xl },
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: T.text, fontWeight: '500' },
-  statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 10, marginBottom: 8 },
-  miniStat: {
-    flex: 1, backgroundColor: T.white, borderRadius: 14, padding: 14,
-    alignItems: 'center', borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 6 },
-      android: { elevation: 1 },
-    }),
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  headerSearchAction: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: BorderRadius.full },
+  scanAction: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: BorderRadius.full },
+  pageTitle: TypeScale.pageTitle,
+  primaryAction: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.full,
   },
-  miniValue: { fontSize: 22, fontWeight: '700' },
-  miniLabel: { color: T.textSec, fontSize: 11, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
-  listContent: { padding: 24, paddingTop: 12, paddingBottom: TEACHER_TAB_CONTENT_INSET },
-  card: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
-    borderRadius: 16, padding: 16, marginBottom: 10,
-    borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 1, shadowRadius: 10 },
-      android: { elevation: 2 },
-    }),
+  primaryActionText: { ...TypeScale.label, fontWeight: FontWeight.bold },
+  statsRow: { flexDirection: 'row', gap: Spacing.sm },
+  statCard: { flex: 1, minWidth: 0, padding: Spacing.md, borderRadius: BorderRadius.lg },
+  statValue: { fontSize: 24, lineHeight: 29, fontWeight: FontWeight.bold, marginTop: Spacing.sm },
+  statLabel: { ...TypeScale.caption, marginTop: 2 },
+  cardSpacing: { marginBottom: Spacing.md },
+  assessmentCard: {
+    minHeight: 118,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
   },
-  testIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  testName: { color: T.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  testMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  testDate: { color: T.textSec, fontSize: 12 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  statusText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
-  empty: { alignItems: 'center', paddingTop: 80 },
-  emptyTitle: { color: T.text, fontSize: 18, fontWeight: '600', marginTop: 16 },
-  emptyDesc: { color: T.textSec, fontSize: 14, marginTop: 6, textAlign: 'center' },
-  
-  modalContainer: { flex: 1, backgroundColor: T.bg },
+  assessmentIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  assessmentCopy: { flex: 1, minWidth: 0, marginRight: Spacing.sm },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  cardTitle: { flex: 1, fontSize: 17, lineHeight: 22, fontWeight: FontWeight.semibold },
+  statusPill: { borderRadius: BorderRadius.full, paddingHorizontal: 9, paddingVertical: 4 },
+  statusText: { ...TypeScale.caption, fontWeight: FontWeight.bold },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.xs, marginTop: Spacing.sm },
+  metaText: { fontSize: 13, lineHeight: 18, fontWeight: FontWeight.medium },
+  metaDivider: { width: 1, height: 13, marginHorizontal: Spacing.xs },
+  detailText: { fontSize: 13, lineHeight: 18, marginTop: Spacing.xs },
+  skeletonStack: { gap: Spacing.md },
+  staticSkeleton: { height: 126, borderRadius: BorderRadius.xl, borderWidth: 1 },
+  feedbackAction: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.full,
+  },
+  feedbackActionText: TypeScale.label,
+  modalContainer: { flex: 1 },
   modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 24, paddingVertical: 20, backgroundColor: T.white,
-    borderBottomWidth: 1, borderBottomColor: T.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 1,
   },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: T.text },
-  closeBtn: { padding: 4, backgroundColor: T.bg, borderRadius: 999 },
-  modalContent: { padding: 24, gap: 20 },
-  inputGroup: { gap: 8 },
-  label: { fontSize: 12, fontWeight: '700', color: T.textSec, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 4 },
+  modalHeadingCopy: { flex: 1, minWidth: 0 },
+  modalTitle: TypeScale.sectionTitle,
+  modalSubtitle: { ...TypeScale.caption, marginTop: 2 },
+  closeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalContent: { padding: Spacing.xl, paddingBottom: Spacing['5xl'], gap: Spacing.xl },
+  inputGroup: { gap: Spacing.sm },
+  fieldHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
+  inputLabel: TypeScale.label,
+  selectionCount: TypeScale.caption,
   inputWrap: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
-    borderWidth: 1, borderColor: T.border, borderRadius: 16, paddingHorizontal: 16, height: 56,
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
   },
-  inputIcon: { marginRight: 12 },
-  input: { flex: 1, fontSize: 16, color: T.text, fontWeight: '500' },
-  batchesContainer: {
-    backgroundColor: T.white, borderWidth: 1, borderColor: T.border, borderRadius: 16,
-    padding: 8, gap: 4, maxHeight: 200,
-  },
+  input: { flex: 1, ...TypeScale.body, minHeight: 44 },
+  batchList: { padding: Spacing.sm, gap: Spacing.sm },
   batchOption: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12,
-    borderRadius: 12, backgroundColor: T.bg,
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
   },
-  batchOptionSelected: { backgroundColor: `${T.accent}08` },
-  batchOptionText: { fontSize: 15, color: T.textSec, fontWeight: '500' },
-  batchOptionTextSelected: { color: T.accent, fontWeight: '600' },
-  submitBtn: {
-    backgroundColor: T.accent, height: 56, borderRadius: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginTop: 12, shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1, shadowRadius: 12, elevation: 4, marginBottom: 40,
+  batchOptionText: { flex: 1, ...TypeScale.body, fontWeight: FontWeight.medium },
+  batchEmptyText: { ...TypeScale.body, padding: Spacing.md },
+  submitButton: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.sm,
   },
-  submitBtnText: { color: T.white, fontSize: 16, fontWeight: '700' },
+  submitButtonText: { fontSize: 16, lineHeight: 22, fontWeight: FontWeight.bold },
 });

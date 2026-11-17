@@ -4,6 +4,7 @@ import { effectiveEntitlements, includedCreditPeriod, nextBillingAnniversary, pa
 import { normalizePlanId, type BillingCycle, type CanonicalPlan } from '../domain/plans/planCatalog';
 import { prisma } from '../prisma';
 import { scheduleLifecycleNotifications } from './planNotificationService';
+import { scopedAccountOwnerIdentity } from '../domain/accounts/accountCreationPolicy';
 
 export type LifecycleResult = {
   plan: CanonicalPlan;
@@ -111,7 +112,7 @@ export function createSubscriptionLifecycleService(client: PrismaClient = prisma
       const now = input.now ?? new Date();
       const plan = normalizePlanId(input.plan);
       if (plan === 'MARKETPLACE') throw new SubscriptionLifecycleError('TRIAL_NOT_AVAILABLE');
-      const normalizedIdentity = normalizeTrialOwnerIdentity(input.ownerIdentity);
+      const normalizedIdentity = normalizeTrialOwnerIdentity(scopedAccountOwnerIdentity(input.ownerIdentity, input.instituteId));
       const ownerIdentityHash = crypto.createHmac('sha256', trialSecret).update(normalizedIdentity).digest('hex');
       const result = await transaction(async tx => {
         await lock(tx, input.instituteId);

@@ -1,146 +1,640 @@
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Platform, Dimensions, Linking, Alert, Modal, TextInput, KeyboardAvoidingView
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useColorScheme,
+  useWindowDimensions,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BookOpen, Users, Clock, ChevronLeft, AlertCircle, Phone, Mail, FileText,
-  Book, User as UserIcon, Eye, Download, Printer, Plus, Settings, Edit2, Trash2, X, QrCode, MonitorPlay, Send, Receipt, Check, IndianRupee
+  ArrowRight,
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Edit2,
+  Eye,
+  IndianRupee,
+  MoreHorizontal,
+  Phone,
+  Plus,
+  Receipt,
+  Search,
+  Send,
+  Users,
+  X,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
-import api from '../../services/api';
-import { SkeletonLoader, BrandButton, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
+import api from '../../services/api';
+import { offlineQuery } from '../../services/offlineSync';
 import { getItemAsync } from '../../services/storage';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  Feedback,
+  PressableScale,
+  SkeletonLoader,
+  Surface,
+} from '../../components/ui';
+import { useAccessibilityPreferences } from '../../components/ui/useAccessibilityPreferences';
+import { BatchActionsSheet } from '../../components/batches/BatchActionsSheet';
+import { BatchFeeStatus } from '../../components/batches/BatchFeeStatus';
+import { BatchStudentProfile } from '../../components/batches/BatchStudentProfile';
+import BatchInviteSheet from '../../components/batches/BatchInviteSheet';
+import {
+  getBatchAssessmentInsights,
+  isBatchInstallmentApplicable,
+} from '../../utils/batchInsights';
+import { coverageFeeStatus, hasUnlinkedReceipts, immediateBatchFeeStatus, installmentFeeStatus, unavailableFeeStatus, type CoverageSource, type PaymentOption, type RosterFeeStatus } from '../../utils/batchFees';
+import { createFeeLookupQueue } from '../../utils/feeLookupQueue';
+import {
+  BorderRadius,
+  Colors,
+  FontSize,
+  FontWeight,
+  Spacing,
+  TypeScale,
+} from '../../constants/theme';
 
-const { width } = Dimensions.get('window');
+type ThemeColors = (typeof Colors)['light'] | (typeof Colors)['dark'];
+type FeeMode = 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE';
+type FeeLookupSource = { mode: 'MONTH_COVERAGE'; profile: CoverageSource } | { mode: 'CURRENT_DUE_BASED'; options: PaymentOption[] };
 
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  teal: '#4B5563', emerald: '#10b981', amber: '#f59e0b', red: '#ef4444', blue: '#3b82f6',
-  border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
+type BatchTest = {
+  id: string;
+  name: string;
+  maxMarks: number;
+  date: string;
+  subject?: string | null;
+  isQuiz?: boolean;
 };
 
-interface BatchDetails {
+type FeeInstallment = {
+  id: string;
+  name: string;
+  amount: number;
+  createdAt: string;
+  studentId?: string | null;
+};
+
+type StudentMark = {
+  id: string;
+  score: number;
+  test: BatchTest;
+};
+
+type MonthCoverageProfile = {
+  id?: string;
+  feeStartMonth?: string | null;
+  feeEndMonth?: string | null;
+  status?: 'PENDING_SETUP' | 'ACTIVE' | 'CLOSED';
+};
+
+type BatchStudent = {
+  id: string;
+  enrollmentId?: string;
+  enrollmentStartedAt?: string;
+  feeDecision?: string;
+  humanId: string | null;
+  name: string;
+  parentName?: string | null;
+  parentWhatsapp?: string | null;
+  schoolName?: string | null;
+  createdAt?: string;
+  feePayments: Array<{
+    id?: string;
+    amountPaid: number;
+    installmentId: string;
+    date?: string;
+  }>;
+  feeAssignments?: Array<{ installmentId: string }>;
+  fees: Array<{ id?: string; amount: number; status: string; date?: string }>;
+  marks: StudentMark[];
+  monthCoverageProfile?: MonthCoverageProfile | null;
+};
+
+type BatchDetails = {
   id: string;
   name: string;
   subject: string | null;
   className: string | null;
   timeSlot: string | null;
   feeAmount: number;
+  startDate?: string | null;
+  endDate?: string | null;
   whatsappGroupLink: string | null;
+  autoSendWelcome?: boolean;
   isRegistrationOpen: boolean;
-  students: Array<{
-    id: string;
-    humanId: string | null;
-    name: string;
-    status: string;
-    parentName: string;
-    parentWhatsapp: string;
-    schoolName: string | null;
-    feePayments: { amountPaid: number; installmentId: string }[];
-    fees: { amount: number; status: string }[];
-    marks: Array<{
-      id: string;
-      score: number;
-      test: { maxMarks: number; name: string };
-    }>;
-  }>;
-  feeInstallments: Array<{
-    id: string;
-    name: string;
-    amount: number;
-    createdAt: string;
-    studentId?: string | null;
-  }>;
+  isRegistrationEnded?: boolean;
+  coachingFeeMode?: FeeMode;
+  timezone?: string;
+  students: BatchStudent[];
+  feeInstallments: FeeInstallment[];
+  tests?: BatchTest[];
+};
+
+type SheetFrameProps = {
+  visible: boolean;
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  onDismiss?: () => void;
+  children: React.ReactNode;
+  colors: ThemeColors;
+  reduceMotion: boolean;
+  keyboard?: boolean;
+  contentStyle?: StyleProp<ViewStyle>;
+};
+
+function SheetFrame({
+  visible,
+  title,
+  subtitle,
+  onClose,
+  onDismiss,
+  children,
+  colors,
+  reduceMotion,
+  keyboard = true,
+  contentStyle,
+}: SheetFrameProps) {
+  const content = (
+    <SafeAreaView style={[styles.sheetSafeArea, { backgroundColor: colors.background }]} edges={['bottom']}>
+      <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+      <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
+        <View style={styles.sheetHeaderCopy}>
+          <Text accessibilityRole="header" style={[styles.sheetTitle, { color: colors.text }]}>{title}</Text>
+          {subtitle ? <Text style={[styles.sheetSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text> : null}
+        </View>
+        <PressableScale
+          accessibilityLabel={`Close ${title}`}
+          onPress={onClose}
+          style={[styles.closeButton, { backgroundColor: colors.surfaceSecondary }]}
+        >
+          <X size={20} color={colors.text} />
+        </PressableScale>
+      </View>
+      <ScrollView
+        contentContainerStyle={[styles.sheetContent, contentStyle]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {children}
+      </ScrollView>
+    </SafeAreaView>
+  );
+
+  return (
+    <Modal
+      accessibilityViewIsModal
+      animationType={reduceMotion ? 'none' : 'slide'}
+      onDismiss={onDismiss}
+      onRequestClose={onClose}
+      presentationStyle="pageSheet"
+      visible={visible}
+    >
+      {keyboard ? (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={[styles.sheetKeyboard, { backgroundColor: colors.background }]}
+        >
+          {content}
+        </KeyboardAvoidingView>
+      ) : content}
+    </Modal>
+  );
+}
+
+function PrimaryButton({
+  label,
+  onPress,
+  colors,
+  icon,
+  disabled,
+  loading,
+  accessibilityLabel,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  colors: ThemeColors;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+  loading?: boolean;
+  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <PressableScale
+      accessibilityLabel={accessibilityLabel || label}
+      disabled={disabled || loading}
+      haptic="commit"
+      onPress={onPress}
+      style={[
+        styles.primaryButton,
+        { backgroundColor: colors.hero },
+        (disabled || loading) && styles.disabled,
+        style,
+      ]}
+    >
+      {loading ? <ActivityIndicator color={colors.heroText} /> : icon}
+      <Text style={[styles.primaryButtonText, { color: colors.heroText }]}>{label}</Text>
+    </PressableScale>
+  );
+}
+
+function SecondaryButton({
+  label,
+  onPress,
+  colors,
+  icon,
+  disabled,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  colors: ThemeColors;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <PressableScale
+      accessibilityLabel={label}
+      disabled={disabled}
+      onPress={onPress}
+      style={[
+        styles.secondaryButton,
+        { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+        disabled && styles.disabled,
+        style,
+      ]}
+    >
+      {icon}
+      <Text style={[styles.secondaryButtonText, { color: colors.text }]}>{label}</Text>
+    </PressableScale>
+  );
+}
+
+function InputField({
+  label,
+  value,
+  onChangeText,
+  colors,
+  placeholder,
+  keyboardType,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  colors: ThemeColors;
+  placeholder?: string;
+  keyboardType?: 'default' | 'phone-pad' | 'numeric';
+  multiline?: boolean;
+}) {
+  return (
+    <View style={styles.inputGroup}>
+      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <TextInput
+        accessibilityLabel={label}
+        keyboardType={keyboardType}
+        multiline={multiline}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        selectionColor={colors.focus}
+        style={[
+          styles.input,
+          multiline && styles.multilineInput,
+          { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.text },
+        ]}
+        value={value}
+      />
+    </View>
+  );
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return 'Date not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date not set';
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatMonth(value?: string | null) {
+  if (!value || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return null;
+  const [year, month] = value.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function weightedRecordedAverage(
+  insights: Array<{ average: number | null; maxMarks: number; recorded: number }>,
+) {
+  let earned = 0;
+  let possible = 0;
+  insights.forEach((insight) => {
+    if (insight.average === null || !Number.isFinite(insight.maxMarks) || insight.maxMarks <= 0 || insight.recorded <= 0) return;
+    const testPossible = insight.maxMarks * insight.recorded;
+    earned += (insight.average / 100) * testPossible;
+    possible += testPossible;
+  });
+  return possible > 0 ? (earned / possible) * 100 : null;
+}
+
+function remainingInstallmentAmount(student: BatchStudent, installment: FeeInstallment) {
+  const paid = student.feePayments
+    .filter((payment) => payment.installmentId === installment.id)
+    .reduce((total, payment) => total + (Number(payment.amountPaid) || 0), 0);
+  return Math.max(0, Number(installment.amount) - paid);
+}
+
+function getErrorStatus(error: unknown) {
+  if (!error || typeof error !== 'object') return undefined;
+  return (error as { response?: { status?: number } }).response?.status;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (!error || typeof error !== 'object') return fallback;
+  const message = (error as { response?: { data?: { error?: string } } }).response?.data?.error;
+  if (typeof message === 'string' && message.length > 0) return message;
+  const localMessage = (error as { message?: unknown }).message;
+  return typeof localMessage === 'string' && localMessage.length > 0 ? localMessage : fallback;
 }
 
 export default function BatchDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { isLoading: isAuthLoading, isLoggedIn, user } = useAuth();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const colors = Colors[scheme];
+  const { width } = useWindowDimensions();
+  const { reduceMotion } = useAccessibilityPreferences();
+  const batchId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const accountScope = `${user?.instituteId || 'no-institute'}:${user?.id || 'no-user'}`;
+  const canLoadBatch = Boolean(batchId && isLoggedIn && user?.id && user.instituteId);
 
-  const { data: batch, isLoading, refetch } = useQuery<BatchDetails>({
-    queryKey: ['batch', id],
-    queryFn: async () => {
-      const res = await api.get(`/batches/${id}`);
-      return res.data;
-    },
+  const [studentSearch, setStudentSearch] = useState('');
+  const [focusedStudent, setFocusedStudent] = useState<BatchStudent | null>(null);
+  const [marksStudent, setMarksStudent] = useState<BatchStudent | null>(null);
+  const [editStudent, setEditStudent] = useState<BatchStudent | null>(null);
+  const [invoiceStudent, setInvoiceStudent] = useState<BatchStudent | null>(null);
+  const [showActions, setShowActions] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [showBatchSettings, setShowBatchSettings] = useState(false);
+  const [showFeeSettings, setShowFeeSettings] = useState(false);
+  const [editInstallment, setEditInstallment] = useState<FeeInstallment | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    humanId: '',
+    parentName: '',
+    parentWhatsapp: '',
+    schoolName: '',
+  });
+  const [batchForm, setBatchForm] = useState({
+    name: '',
+    subject: '',
+    className: '',
+    timeSlot: '',
+    whatsappGroupLink: '',
+    feeAmount: '',
+  });
+  const [feeForm, setFeeForm] = useState({ name: '', amount: '' });
+  const [editInstallmentForm, setEditInstallmentForm] = useState({ name: '', amount: '' });
+  const [invoiceForm, setInvoiceForm] = useState({
+    name: '',
+    amount: '',
+    markAsPaid: false,
+    existingInstallmentId: '',
+  });
+  const focusedStudentActionRef = useRef<(() => void) | null>(null);
+  const feeSettingsActionRef = useRef<(() => void) | null>(null);
+  const actionLockRef = useRef(false);
+  const downloadLockRef = useRef(false);
+
+  const {
+    data: batch,
+    error,
+    isError,
+    isLoading,
+    isRefetching,
+    refetch: refetchBatch,
+  } = useQuery<BatchDetails>({
+    enabled: canLoadBatch,
+    queryKey: ['batch', accountScope, batchId],
+    queryFn: ({ signal }) => offlineQuery(`batch:${batchId}`, async () => (
+      await api.get(`/batches/${batchId}`, { signal })
+    ).data),
     staleTime: 0,
     refetchOnMount: 'always',
   });
 
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [inviteWhatsapp, setInviteWhatsapp] = useState('');
+  const feeMode = batch?.coachingFeeMode || 'CURRENT_DUE_BASED';
 
-  const [editStudentId, setEditStudentId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', humanId: '', parentName: '', parentWhatsapp: '', schoolName: '' });
+  const students = useMemo(() => batch?.students || [], [batch?.students]);
+  const tests = useMemo(
+    () => [...(batch?.tests || [])].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()),
+    [batch?.tests],
+  );
+  const filteredStudents = useMemo(() => {
+    const query = studentSearch.trim().toLowerCase();
+    if (!query) return students;
+    return students.filter((student) => (
+      student.name.toLowerCase().includes(query)
+      || student.humanId?.toLowerCase().includes(query)
+      || student.parentName?.toLowerCase().includes(query)
+      || student.schoolName?.toLowerCase().includes(query)
+    ));
+  }, [studentSearch, students]);
+  const immediateFeeRows = useMemo(() => {
+    const rows: Record<string, RosterFeeStatus | undefined> = {};
+    for (const student of students) {
+      try {
+        rows[student.id] = immediateBatchFeeStatus(student, feeMode, batch?.feeInstallments || [], batch?.feeAmount || 0);
+      } catch {
+        rows[student.id] = unavailableFeeStatus('The fee plan needs review.');
+      }
+    }
+    return rows;
+  }, [students, feeMode, batch?.feeInstallments, batch?.feeAmount]);
+  const remoteFeeStudents = useMemo(() => students.filter(student => !immediateFeeRows[student.id]), [students, immediateFeeRows]);
+  const feeLookupQueue = useMemo(() => createFeeLookupQueue(), [accountScope, batchId]);
+  const feeQueries = useQueries({
+    queries: remoteFeeStudents.map(student => ({
+      queryKey: ['batch-fee-status', accountScope, batchId, feeMode, student.id, student.enrollmentId || ''],
+      enabled: canLoadBatch && Boolean(batch),
+      retry: false,
+      staleTime: 30_000,
+      queryFn: ({ signal }: { signal: AbortSignal }): Promise<FeeLookupSource> => feeLookupQueue.run(async requestSignal => {
+        if (feeMode === 'MONTH_COVERAGE') {
+          const response = await api.get<CoverageSource>(`/students/${student.id}/profile`, { signal: requestSignal, timeout: 10_000 });
+          return { mode: 'MONTH_COVERAGE', profile: response.data };
+        }
+        const response = await api.get<{ studentId: string; installments: PaymentOption[] }>(`/fees/students/${student.id}/payment-options`, { signal: requestSignal, timeout: 10_000 });
+        if (response.data.studentId !== student.id || !Array.isArray(response.data.installments)) throw new Error('Fee response did not match the student');
+        return { mode: 'CURRENT_DUE_BASED', options: response.data.installments };
+      }, signal),
+      select: (source: FeeLookupSource): RosterFeeStatus => source.mode === 'MONTH_COVERAGE'
+        ? coverageFeeStatus(student, batchId!, source.profile, batch?.timezone || 'Asia/Kolkata')
+        : installmentFeeStatus(student, batch?.feeInstallments || [], batch?.feeAmount || 0, source.options),
+    })),
+  });
+  const feeRows: Record<string, RosterFeeStatus | undefined> = { ...immediateFeeRows };
+  const loadingFeeIds = new Set<string>();
+  const pausedFeeIds = new Set<string>();
+  feeQueries.forEach((query, index) => {
+    const studentId = remoteFeeStudents[index].id;
+    feeRows[studentId] = query.isError ? undefined : query.data;
+    if (!query.data && query.fetchStatus === 'fetching') loadingFeeIds.add(studentId);
+    if (!query.data && query.isPaused) pausedFeeIds.add(studentId);
+  });
+  const feeRetryAvailable = feeQueries.some(query => query.isError || query.isPaused || query.data?.status === 'unavailable');
+  const retryFeeStatuses = () => {
+    feeQueries.forEach(query => {
+      if (query.isError || query.isPaused || query.data?.status === 'unavailable') void query.refetch();
+    });
+  };
+  const refetch = useCallback(async () => {
+    const result = await refetchBatch();
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['batch-fee-status', accountScope, batchId] }),
+      queryClient.invalidateQueries({ queryKey: ['batch-student-profile', accountScope, batchId] }),
+    ]);
+    return result;
+  }, [refetchBatch, queryClient, accountScope, batchId]);
+  const studentAverageById = useMemo(() => {
+    const averages = new Map<string, number | null>();
+    students.forEach((student) => {
+      const recorded = getBatchAssessmentInsights([student], batch?.tests || [])
+        .filter((test) => test.average !== null);
+      averages.set(student.id, weightedRecordedAverage(recorded));
+    });
+    return averages;
+  }, [batch?.tests, students]);
 
-  const [viewMarksStudent, setViewMarksStudent] = useState<any>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isQrOpen, setIsQrOpen] = useState(false);
+  const registrationState = batch?.isRegistrationEnded
+    ? 'Registration closed'
+    : batch?.isRegistrationOpen
+      ? 'Registration open'
+      : 'Registration paused';
+  const registrationTone = batch?.isRegistrationEnded
+    ? Colors.error
+    : batch?.isRegistrationOpen
+      ? colors.positive
+      : colors.attention;
+  const publicRegistrationUrl = batchId ? `https://mathlogs.app/register/${batchId}` : '';
 
-  // Custom Invoice State
-  const [showCustomInvoice, setShowCustomInvoice] = useState<any>(null);
-  const [customInvoice, setCustomInvoice] = useState({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
-  const [isBatchSettingsOpen, setIsBatchSettingsOpen] = useState(false);
-  const [batchForm, setBatchForm] = useState({ name: '', subject: '', className: '', timeSlot: '', whatsappGroupLink: '', feeAmount: '' });
-  const [isFeeSettingsOpen, setIsFeeSettingsOpen] = useState(false);
-  const [feeForm, setFeeForm] = useState({ name: '', amount: '' });
-  const [editInstallment, setEditInstallment] = useState<{ id: string; name: string; amount: string } | null>(null);
+  const runAction = useCallback(async (
+    key: string,
+    action: () => Promise<void>,
+    successMessage?: string,
+  ) => {
+    if (actionLockRef.current) return;
+    actionLockRef.current = true;
+    setPendingAction(key);
+    try {
+      await action();
+      if (successMessage) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Done', successMessage);
+      }
+    } catch (actionError) {
+      Alert.alert('Could not complete action', getErrorMessage(actionError, 'Please try again.'));
+    } finally {
+      actionLockRef.current = false;
+      setPendingAction(null);
+    }
+  }, []);
 
-  const handleDownload = async (type: 'pdf' | 'stickers') => {
+  const handleDownload = useCallback(async (type: 'pdf' | 'stickers') => {
+    if (!batchId || downloadLockRef.current) return;
+    downloadLockRef.current = true;
     setIsDownloading(true);
     try {
       const token = await getItemAsync('auth_token');
-      const url = type === 'pdf' ? `/batches/${id}/download` : `/stickers/download?batchId=${id}`;
+      const endpoint = type === 'pdf' ? `/batches/${batchId}/download` : `/stickers/download?batchId=${batchId}`;
       const baseUrl = api.defaults.baseURL;
       if (!baseUrl) throw new Error('API base URL is not configured');
-      const fileUri = FileSystem.documentDirectory + `${type}_${id}.pdf`;
-
-      const res = await FileSystem.downloadAsync(`${baseUrl}${url}`, fileUri, {
-        headers: { Authorization: `Bearer ${token}` }
+      const fileUri = `${FileSystem.documentDirectory}${type}_${batchId}.pdf`;
+      const result = await FileSystem.downloadAsync(`${baseUrl}${endpoint}`, fileUri, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
-
+      if (result.status < 200 || result.status >= 300) throw new Error('The server could not create the file');
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(res.uri);
+        await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf' });
       } else {
-        Alert.alert("Success", "File downloaded, but sharing is not supported.");
+        Alert.alert('File ready', 'The PDF was downloaded to this device.');
       }
-    } catch (e: any) {
-      Alert.alert("Download Failed", "There was an error generating the file.");
+    } catch (downloadError) {
+      Alert.alert('Download failed', getErrorMessage(downloadError, 'The file could not be generated.'));
     } finally {
+      downloadLockRef.current = false;
       setIsDownloading(false);
     }
-  };
+  }, [batchId]);
 
-  const handleAddSubmit = async () => {
-    if (!inviteWhatsapp || inviteWhatsapp.length < 10) return Alert.alert("Required", "10-digit WhatsApp number is mandatory");
-    try {
-      await api.post(`/batches/${id}/invite`, { whatsappNumber: inviteWhatsapp });
-      setIsAddOpen(false);
-      setInviteWhatsapp('');
-      Alert.alert("Success", "Invite link sent to WhatsApp!");
-    } catch(e: any) {
-      Alert.alert("Error", e.response?.data?.error || "Failed to send invite");
-    }
-  };
+  const handleInvite = useCallback(() => {
+    setShowInvite(true);
+  }, []);
 
-  const handleToggleRegistration = async () => {
-    try {
-      await api.put(`/batches/${id}`, { isRegistrationOpen: !batch?.isRegistrationOpen });
-      refetch();
-    } catch(e: any) {
-      Alert.alert("Error", "Failed to toggle registration");
-    }
-  };
+  const handleToggleRegistration = useCallback(async () => {
+    if (!batchId || !batch || batch.isRegistrationEnded) return;
+    const nextOpen = !batch.isRegistrationOpen;
+    await runAction('registration', async () => {
+      await api.put(`/batches/${batchId}/toggle-registration`, { isOpen: nextOpen });
+      await refetch();
+    }, nextOpen ? 'Registration is open.' : 'Registration is paused.');
+  }, [batch, batchId, refetch, runAction]);
 
-  const openBatchSettings = () => {
+  const handleEndRegistration = useCallback(() => {
+    if (!batchId || !batch || batch.isRegistrationEnded) return;
+    Alert.alert(
+      'Close registration permanently?',
+      'New registrations will stop. Existing students remain in this batch.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Close registration',
+          style: 'destructive',
+          onPress: () => {
+            void runAction('end-registration', async () => {
+              await api.put(`/batches/${batchId}/end-registration`, {});
+              await refetch();
+            }, 'Registration is permanently closed.');
+          },
+        },
+      ],
+    );
+  }, [batch, batchId, refetch, runAction]);
+
+  const openBatchSettings = useCallback(() => {
     if (!batch) return;
     setBatchForm({
       name: batch.name || '',
@@ -148,799 +642,1085 @@ export default function BatchDetailScreen() {
       className: batch.className || '',
       timeSlot: batch.timeSlot || '',
       whatsappGroupLink: batch.whatsappGroupLink || '',
-      feeAmount: batch.feeAmount ? batch.feeAmount.toString() : ''
+      feeAmount: batch.feeAmount ? String(batch.feeAmount) : '',
     });
-    setIsBatchSettingsOpen(true);
-  };
+    setShowBatchSettings(true);
+  }, [batch]);
 
-  const handleBatchSettingsSave = async () => {
-    if (!batchForm.name) return Alert.alert("Required", "Batch name is mandatory");
-    try {
-      await api.put(`/batches/${id}`, {
-        name: batchForm.name,
-        subject: batchForm.subject,
-        className: batchForm.className,
-        timeSlot: batchForm.timeSlot,
-        whatsappGroupLink: batchForm.whatsappGroupLink,
-        feeAmount: Number(batchForm.feeAmount) || 0
-      });
-      setIsBatchSettingsOpen(false);
-      refetch();
-      Alert.alert("Success", "Batch settings updated");
-    } catch(e: any) {
-      Alert.alert("Error", e.response?.data?.error || "Failed to update batch");
+  const handleBatchSettingsSave = useCallback(async () => {
+    if (!batchId || !batchForm.name.trim()) {
+      Alert.alert('Batch name required', 'Enter the name teachers and students recognize.');
+      return;
     }
-  };
+    await runAction('batch-settings', async () => {
+      await api.put(`/batches/${batchId}`, {
+        name: batchForm.name.trim(),
+        subject: batchForm.subject.trim(),
+        className: batchForm.className.trim(),
+        timeSlot: batchForm.timeSlot.trim(),
+        whatsappGroupLink: batchForm.whatsappGroupLink.trim(),
+        ...(feeMode === 'CURRENT_DUE_BASED' ? { feeAmount: Number(batchForm.feeAmount) || 0 } : {}),
+      });
+      setShowBatchSettings(false);
+      await refetch();
+    }, 'Batch settings were updated.');
+  }, [batchForm, batchId, feeMode, refetch, runAction]);
 
-  const handleFeeInstallmentAdd = async () => {
-    if (!feeForm.name || !feeForm.amount) return Alert.alert("Required", "Name and Amount are mandatory");
-    try {
-      await api.post(`/batches/${id}/installments`, {
-        name: feeForm.name,
-        amount: Number(feeForm.amount)
+  const handleAddInstallment = useCallback(async () => {
+    if (!batchId || !feeForm.name.trim() || !(Number(feeForm.amount) > 0)) {
+      Alert.alert('Enter fee details', 'A name and an amount greater than zero are required.');
+      return;
+    }
+    await runAction('add-installment', async () => {
+      await api.post(`/batches/${batchId}/installments`, {
+        name: feeForm.name.trim(),
+        amount: Number(feeForm.amount),
       });
       setFeeForm({ name: '', amount: '' });
-      setIsFeeSettingsOpen(false);
-      refetch();
-      Alert.alert("Success", "Installment created");
-    } catch(e: any) {
-      Alert.alert("Error", e.response?.data?.error || "Failed to create installment");
-    }
-  };
+      await refetch();
+    }, 'The fee installment was added.');
+  }, [batchId, feeForm, refetch, runAction]);
 
-  const handleFeeInstallmentEdit = async () => {
-    if (!editInstallment || !editInstallment.name || !editInstallment.amount) return;
-    try {
+  const openInstallmentEditor = useCallback((installment: FeeInstallment) => {
+    const open = () => {
+      setEditInstallment(installment);
+      setEditInstallmentForm({ name: installment.name, amount: String(installment.amount) });
+    };
+    if (showFeeSettings && Platform.OS === 'ios') {
+      feeSettingsActionRef.current = open;
+      setShowFeeSettings(false);
+      return;
+    }
+    if (showFeeSettings) setShowFeeSettings(false);
+    open();
+  }, [showFeeSettings]);
+
+  const handleFeeSettingsDismissed = useCallback(() => {
+    const action = feeSettingsActionRef.current;
+    feeSettingsActionRef.current = null;
+    action?.();
+  }, []);
+
+  const handleEditInstallment = useCallback(async () => {
+    if (!editInstallment || !editInstallmentForm.name.trim() || !(Number(editInstallmentForm.amount) > 0)) {
+      Alert.alert('Enter fee details', 'A name and an amount greater than zero are required.');
+      return;
+    }
+    await runAction('edit-installment', async () => {
       await api.put(`/installments/${editInstallment.id}`, {
-        name: editInstallment.name,
-        amount: Number(editInstallment.amount)
+        name: editInstallmentForm.name.trim(),
+        amount: Number(editInstallmentForm.amount),
       });
       setEditInstallment(null);
-      refetch();
-      Alert.alert('Updated', 'Installment updated successfully');
-    } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.error || 'Failed to update installment');
-    }
-  };
+      await refetch();
+    }, 'The fee installment was updated.');
+  }, [editInstallment, editInstallmentForm, refetch, runAction]);
 
-  const handleCreateCustomInvoice = async () => {
-    if (!showCustomInvoice) return;
-    try {
-      if (customInvoice.existingInstallmentId) {
-        const existingInst = batch?.feeInstallments?.find(i => i.id === customInvoice.existingInstallmentId);
-        
-        if (existingInst && existingInst.studentId) {
-          // This is a custom installment owned by another student. 
-          // Clone it into a NEW custom invoice for the target student.
-          await api.post('/fees/custom-invoices', {
-            name: existingInst.name,
-            amount: Number(existingInst.amount),
-            studentId: showCustomInvoice.id,
-            markAsPaid: customInvoice.markAsPaid
-          });
-          Alert.alert("Success", customInvoice.markAsPaid ? "Invoice cloned and marked as paid" : "Invoice cloned for this student");
-        } else {
-          // This is a global batch installment, safe to reuse directly
-          if (customInvoice.markAsPaid) {
-            const paymentAmount = Number(existingInst?.amount || 0);
-            await api.post('/fees/pay-installment', {
-              studentId: showCustomInvoice.id,
-              installmentId: customInvoice.existingInstallmentId,
-              amount: paymentAmount,
-              date: new Date().toISOString().split('T')[0]
-            });
-          }
-          Alert.alert("Success", customInvoice.markAsPaid ? "Installment marked as paid" : "This installment is already visible for this student");
-        }
-      } else {
-        if (!customInvoice.name || !customInvoice.amount) return Alert.alert("Required", "Invoice Name and Amount are mandatory");
-        await api.post('/fees/custom-invoices', {
-          name: customInvoice.name,
-          amount: Number(customInvoice.amount),
-          studentId: showCustomInvoice.id,
-          markAsPaid: customInvoice.markAsPaid
-        });
-        Alert.alert("Success", "Invoice created successfully");
+  const openStudentProfile = useCallback((student: BatchStudent) => {
+    setFocusedStudent(student);
+  }, []);
+
+  const runAfterStudentActions = useCallback((action: () => void) => {
+    if (Platform.OS === 'ios') {
+      focusedStudentActionRef.current = action;
+      setFocusedStudent(null);
+      return;
+    }
+    setFocusedStudent(null);
+    action();
+  }, []);
+
+  const handleStudentActionsDismissed = useCallback(() => {
+    const action = focusedStudentActionRef.current;
+    focusedStudentActionRef.current = null;
+    action?.();
+  }, []);
+
+  const openStudentEditor = useCallback((student: BatchStudent) => {
+    setFocusedStudent(null);
+    setEditStudent(student);
+    setEditForm({
+      name: student.name || '',
+      humanId: student.humanId || '',
+      parentName: student.parentName || '',
+      parentWhatsapp: student.parentWhatsapp || '',
+      schoolName: student.schoolName || '',
+    });
+  }, []);
+
+  const handleEditStudent = useCallback(async () => {
+    if (!editStudent || !editForm.name.trim()) {
+      Alert.alert('Student name required', 'Enter the student’s name.');
+      return;
+    }
+    await runAction('edit-student', async () => {
+      await api.put(`/students/${editStudent.id}`, {
+        ...editForm,
+        name: editForm.name.trim(),
+      });
+      setEditStudent(null);
+      await refetch();
+    }, 'Student details were updated.');
+  }, [editForm, editStudent, refetch, runAction]);
+
+  const openInvoice = useCallback((student: BatchStudent) => {
+    setFocusedStudent(null);
+    // The direct-payment sheet cannot reconcile unlinked receipts across enrollments.
+    if (hasUnlinkedReceipts(student)) {
+      router.push('/(tabs)/fees');
+      return;
+    }
+    setInvoiceStudent(student);
+    setInvoiceForm({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
+  }, [router]);
+
+  const handleCreateInvoice = useCallback(async () => {
+    if (!invoiceStudent) return;
+    if (!invoiceForm.existingInstallmentId || !invoiceForm.markAsPaid) {
+      Alert.alert('Choose a payment', 'Select an applicable fee plan and confirm that it is being paid today.');
+      return;
+    }
+    await runAction('invoice', async () => {
+      const installment = batch?.feeInstallments.find((item) => item.id === invoiceForm.existingInstallmentId);
+      if (!installment || !isBatchInstallmentApplicable(invoiceStudent, installment)) {
+        throw new Error('Select an applicable fee plan for this student');
       }
-      setShowCustomInvoice(null);
-      setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' });
-      refetch();
-    } catch(e: any) {
-      Alert.alert("Error", e.response?.data?.error || "Failed to process invoice");
-    }
-  };
+      const remainingAmount = remainingInstallmentAmount(invoiceStudent, installment);
+      if (remainingAmount <= 0.01) throw new Error('This fee plan is already fully paid');
+      await api.post('/fees/pay-installment', {
+        studentId: invoiceStudent.id,
+        installmentId: installment.id,
+        amount: remainingAmount,
+        date: new Date().toISOString().split('T')[0],
+      });
+      setInvoiceStudent(null);
+      await refetch();
+    }, 'The payment was recorded.');
+  }, [batch?.feeInstallments, invoiceForm, invoiceStudent, refetch, runAction]);
 
-  const handleEditSubmit = async () => {
-    if (!editForm.name) return Alert.alert("Required", "Name is mandatory");
+  const callParent = useCallback(async (student: BatchStudent) => {
+    setFocusedStudent(null);
+    if (!student.parentWhatsapp) {
+      Alert.alert('No phone number', 'Add a parent phone number in student details first.');
+      return;
+    }
+    const url = `tel:${student.parentWhatsapp}`;
     try {
-      await api.put(`/students/${editStudentId}`, editForm);
-      setEditStudentId(null);
-      refetch();
-    } catch(e: any) {
-      Alert.alert("Error", "Failed to update student");
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) throw new Error('Calling is not available');
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Could not start call', 'Calling is not available on this device.');
     }
-  };
+  }, []);
 
-  const students = useMemo(() => batch?.students || [], [batch]);
-  const invoiceTemplates = useMemo(() => {
-    const seen = new Set<string>();
-    return (batch?.feeInstallments || []).filter(inst => {
-      const key = `${inst.name}::${inst.amount}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [batch?.feeInstallments]);
+  const openKiosk = useCallback(async () => {
+    if (!batchId) return;
+    const url = `https://mathlogs.app/kiosk/register/${batchId}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) throw new Error('Cannot open URL');
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Could not open kiosk', url);
+    }
+  }, [batchId]);
 
-  const getStudentAverage = (student: any) => {
-    if (!student.marks || student.marks.length === 0) return '-';
-    let totalNormalized = 0;
-    student.marks.forEach((m: any) => {
-      const max = m.test?.maxMarks || 0;
-      const normalized = max > 0 ? (m.score / max) * 10 : 0;
-      totalNormalized += normalized;
-    });
-    return (totalNormalized / student.marks.length).toFixed(1);
-  };
+  const openRegistrationPage = useCallback(async () => {
+    if (!publicRegistrationUrl) return;
+    try {
+      const canOpen = await Linking.canOpenURL(publicRegistrationUrl);
+      if (!canOpen) throw new Error('Cannot open URL');
+      await Linking.openURL(publicRegistrationUrl);
+    } catch {
+      Alert.alert('Could not open registration', publicRegistrationUrl);
+    }
+  }, [publicRegistrationUrl]);
 
-  const calcPendingForStudent = (s: any) => {
-    const totalFee = batch?.feeAmount || 0;
-    const paidLinked = s.feePayments?.reduce((sum: number, p: any) => sum + p.amountPaid, 0) || 0;
-    const paidGeneric = s.fees?.filter((f: any) => f.status === 'PAID').reduce((sum: number, f: any) => sum + f.amount, 0) || 0;
-    return Math.max(0, totalFee - (paidLinked + paidGeneric));
-  };
-
-  const totalCollected = useMemo(() => {
-    return students.reduce((sum, s) => {
-      const totalFee = batch?.feeAmount || 0;
-      const pending = calcPendingForStudent(s);
-      return sum + (Math.max(0, totalFee - pending));
-    }, 0);
-  }, [students, batch]);
-
-  const totalPending = useMemo(() => {
-    return students.reduce((sum, s) => sum + calcPendingForStudent(s), 0);
-  }, [students, batch]);
-
-  const onCall = (phone: string) => {
-    if (phone) Linking.openURL(`tel:${phone}`);
-  };
-
-  return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <View style={s.navBar}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to batches">
-          <ChevronLeft size={24} color={T.text} />
-        </TouchableOpacity>
-        <Text style={s.navTitle} numberOfLines={1}>{batch?.name || 'Batch Details'}</Text>
-        <View style={s.navRight}>
-           {!isLoading && batch && (
-             <TouchableOpacity style={s.headerActionBtn} onPress={openBatchSettings} accessibilityRole="button" accessibilityLabel="Batch settings">
-               <Settings size={20} color={T.text} />
-             </TouchableOpacity>
-           )}
+  const renderBatchHeader = () => (
+    <>
+      <View style={[styles.appBar, { borderBottomColor: colors.border }]}>
+        <PressableScale
+          accessibilityLabel="Back to batches"
+          onPress={() => router.back()}
+          style={[styles.appBarButton, { backgroundColor: colors.surfaceSecondary }]}
+        >
+          <ChevronLeft size={23} color={colors.text} />
+        </PressableScale>
+        <View style={styles.appBarTitleWrap}>
+          <Text accessibilityRole="header" numberOfLines={1} style={[styles.appBarTitle, { color: colors.text }]}>Batches</Text>
         </View>
+        <PressableScale
+          accessibilityLabel="Open batch actions"
+          disabled={!batch}
+          onPress={() => setShowActions(true)}
+          style={[styles.appBarButton, { backgroundColor: colors.surfaceSecondary }]}
+        >
+          <MoreHorizontal size={23} color={colors.text} />
+        </PressableScale>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
-        {isLoading ? (
-          <View style={{ gap: 16 }}>
-            <SkeletonLoader width={width - 32} height={180} borderRadius={24} />
-            <SkeletonLoader width={width - 32} height={80} borderRadius={20} />
-            <SkeletonLoader width={width - 32} height={200} borderRadius={20} />
-          </View>
-        ) : !batch ? (
-          <View style={s.empty}>
-            <AlertCircle size={48} color={T.textMuted} />
-            <Text style={s.emptyTitle}>Batch not found</Text>
-          </View>
-        ) : (
-          <View>
-            <Animated.View entering={FadeInDown.duration(400)} style={s.heroCard}>
-              <View style={s.heroTop}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.heroName}>{batch.name}</Text>
-                  <View style={s.heroMetaRow}>
-                    {batch.subject && <Text style={s.heroPill}>{batch.subject}</Text>}
-                    {batch.className && <Text style={[s.heroPill, { backgroundColor: `${T.accent}15`, color: T.accent }]}>{batch.className}</Text>}
-                  </View>
-                </View>
-                {batch.isRegistrationOpen && (
-                  <View style={[s.statusPill, { backgroundColor: `${T.emerald}15` }]}>
-                    <Text style={{ color: T.emerald, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>LIVE</Text>
-                  </View>
-                )}
+      {batch ? (
+        <View style={styles.identityWrap}>
+          <Surface tone="strong" style={styles.identityCard}>
+            <View style={styles.identityTopRow}>
+              <View style={styles.identityCopy}>
+                <Text numberOfLines={2} style={[styles.identityTitle, { color: colors.text }]}>{batch.name}</Text>
+                <Text style={[styles.identitySubtitle, { color: colors.textSecondary }]}>
+                  {[batch.className, batch.subject].filter(Boolean).join(' · ') || 'General batch'}
+                </Text>
               </View>
-
-              <View style={s.heroStatsRow}>
-                {batch.timeSlot && (
-                  <View style={s.heroStat}>
-                    <Clock size={16} color={T.textSec} style={{ marginRight: 6 }} />
-                    <Text style={s.heroStatText}>{batch.timeSlot}</Text>
-                  </View>
-                )}
-                <View style={s.heroStat}>
-                  <Users size={16} color={T.textSec} style={{ marginRight: 6 }} />
-                  <Text style={s.heroStatText}>{students.length} Students</Text>
-                </View>
+              <View style={[styles.statusBadge, { borderColor: `${registrationTone}55`, backgroundColor: `${registrationTone}12` }]}>
+                <View style={[styles.statusDot, { backgroundColor: registrationTone }]} />
+                <Text style={[styles.statusBadgeText, { color: registrationTone }]}>{registrationState}</Text>
               </View>
-
-              {/* Quick Actions mimicking web */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
-                <TouchableOpacity style={s.qActionBtn} onPress={() => setIsQrOpen(true)}>
-                  <QrCode size={16} color={T.text} />
-                  <Text style={s.qActionText}>QR Code</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.qActionBtn} onPress={() => handleDownload('pdf')} disabled={isDownloading}>
-                  <Download size={16} color={T.text} />
-                  <Text style={s.qActionText}>PDF</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.qActionBtn} onPress={() => handleDownload('stickers')} disabled={isDownloading}>
-                  <Printer size={16} color={T.text} />
-                  <Text style={s.qActionText}>Stickers</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.qActionBtn} onPress={() => setIsAddOpen(true)}>
-                  <Send size={16} color={T.text} />
-                  <Text style={s.qActionText}>Invite</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.qActionBtn} onPress={handleToggleRegistration}>
-                  <Settings size={16} color={T.text} />
-                  <Text style={s.qActionText}>{batch.isRegistrationOpen ? 'Close Reg' : 'Open Reg'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.qActionBtn} onPress={() => setIsFeeSettingsOpen(true)}>
-                  <IndianRupee size={16} color={T.text} />
-                  <Text style={s.qActionText}>Fee Cols</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.qActionBtn} onPress={async () => {
-                  const url = `https://mathlogs.app/batch/${id}/kiosk`;
-                  const canOpen = await Linking.canOpenURL(url);
-                  if (canOpen) {
-                    await Linking.openURL(url);
-                  } else {
-                    Alert.alert('Cannot Open', `Open this URL in your browser:\n${url}`);
-                  }
-                }}>
-                  <MonitorPlay size={16} color={T.text} />
-                  <Text style={s.qActionText}>Kiosk</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </Animated.View>
-
-            <Animated.View entering={FadeInDown.duration(400).delay(200)} style={s.studentsContainer}>
-              <Text style={s.sectionTitle}>Students List</Text>
-              <View style={s.studentsList}>
-                {students.length === 0 ? (
-                  <View style={{ padding: 40, alignItems: 'center', backgroundColor: T.white, borderRadius: 20 }}>
-                    <Users size={40} color={T.textMuted} style={{ marginBottom: 12, opacity: 0.5 }} />
-                    <Text style={{ color: T.textSec }}>No students in this batch.</Text>
-                  </View>
-                ) : (
-                  students.map((student, i) => {
-                    const genericPaid = student.fees?.filter((f: any) => f.status === 'PAID').reduce((sum: number, f: any) => sum + f.amount, 0) || 0;
-                    let currentBuffer = genericPaid;
-                    const sortedInsts = [...(batch.feeInstallments || [])]
-                      .filter(inst => !inst.studentId || inst.studentId === student.id)
-                      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-                    const instPaidMap: Record<string, number> = {};
-                    
-                    sortedInsts.forEach(inst => {
-                        const directPayments = student.feePayments?.filter((p: any) => p.installmentId === inst.id) || [];
-                        let paid = directPayments.reduce((sum: number, p: any) => sum + p.amountPaid, 0);
-                        const remaining = inst.amount - paid;
-                        if (remaining > 0 && currentBuffer > 0) {
-                            const coverage = Math.min(remaining, currentBuffer);
-                            paid += coverage;
-                            currentBuffer -= coverage;
-                        }
-                        instPaidMap[inst.id] = paid;
-                    });
-
-                    return (
-                      <View key={student.id} style={s.studentCard}>
-                        {/* Header Row */}
-                        <View style={s.stHeader}>
-                          <View style={{ flex: 1, paddingRight: 12 }}>
-                            <Text style={s.stName}>{student.name}</Text>
-                            {student.humanId && (
-                              <View style={s.stIdPill}>
-                                <Text style={s.stIdText}>{student.humanId}</Text>
-                              </View>
-                            )}
-                          </View>
-                          <View style={s.stActions}>
-                             <TouchableOpacity style={s.stActionIcon} onPress={() => setViewMarksStudent(student)}>
-                               <Eye size={18} color={T.text} />
-                             </TouchableOpacity>
-                             <TouchableOpacity 
-                                style={[s.stActionIcon, { backgroundColor: `${T.blue}15` }]} 
-                                onPress={() => { setShowCustomInvoice(student); setCustomInvoice({ name: '', amount: '', markAsPaid: false, existingInstallmentId: '' }); }}
-                             >
-                                <Receipt size={18} color={T.blue} />
-                             </TouchableOpacity>
-                             <TouchableOpacity style={[s.stActionIcon, { backgroundColor: `${T.emerald}15` }]} onPress={() => onCall(student.parentWhatsapp)}>
-                                <Phone size={18} color={T.emerald} />
-                             </TouchableOpacity>
-                             <TouchableOpacity 
-                                style={[s.stActionIcon, { backgroundColor: `${T.accent}15` }]} 
-                                onPress={() => {
-                                   setEditForm({ name: student.name, humanId: student.humanId || '', parentName: student.parentName, parentWhatsapp: student.parentWhatsapp, schoolName: student.schoolName || '' });
-                                   setEditStudentId(student.id);
-                                }}
-                             >
-                                <Edit2 size={18} color={T.accent} />
-                             </TouchableOpacity>
-                          </View>
-                        </View>
-
-                        {/* Info Grid */}
-                        <View style={s.stInfoGrid}>
-                          <View style={s.stInfoRow}>
-                            <Book size={14} color={T.textMuted} style={{ width: 16 }} />
-                            <Text style={s.stInfoText} numberOfLines={1}>{student.schoolName || <Text style={{ fontStyle: 'italic' }}>No School</Text>}</Text>
-                          </View>
-                          <View style={s.stInfoRow}>
-                            <UserIcon size={14} color={T.textMuted} style={{ width: 16 }} />
-                            <Text style={s.stInfoText} numberOfLines={1}>{student.parentName || 'Unknown Parent'}</Text>
-                          </View>
-                          <View style={s.stInfoRow}>
-                            <FileText size={14} color={T.accent} style={{ width: 16 }} />
-                            <Text style={[s.stInfoText, { color: T.accent, fontWeight: '700' }]}>Avg: {getStudentAverage(student)} / 10</Text>
-                          </View>
-                        </View>
-
-                        {/* Installments */}
-                        {batch.feeInstallments && batch.feeInstallments.length > 0 && (
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.stFeesScroll}>
-                            {sortedInsts.map(inst => {
-                              const paidAmount = instPaidMap[inst.id] || 0;
-                              const isFullyPaid = paidAmount >= inst.amount;
-                              const isPartiallyPaid = paidAmount > 0 && !isFullyPaid;
-
-                              return (
-                                <View key={inst.id} style={[
-                                  s.instCol,
-                                  isFullyPaid && s.instColPaid,
-                                  isPartiallyPaid && s.instColPartial
-                                ]}>
-                                  <View style={[
-                                    s.instDotOuter,
-                                    isFullyPaid && s.instDotOuterPaid,
-                                    isPartiallyPaid && s.instDotOuterPartial
-                                  ]}>
-                                    {isFullyPaid && <View style={s.instDotInner} />}
-                                    {isPartiallyPaid && <Text style={{ fontSize: 8, fontWeight: '800', color: T.amber }}>P</Text>}
-                                  </View>
-                                  <View>
-                                    <Text style={s.instName}>{inst.name}</Text>
-                                    {isPartiallyPaid ? (
-                                      <Text style={s.instDue}>Due: ₹{inst.amount - paidAmount}</Text>
-                                    ) : (
-                                      <Text style={s.instAmount}>₹{inst.amount}</Text>
-                                    )}
-                                  </View>
-                                </View>
-                              );
-                            })}
-                          </ScrollView>
-                        )}
-                      </View>
-                    );
-                  })
-                )}
-              </View>
-            </Animated.View>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Invite Student Modal */}
-      <Modal visible={isAddOpen} animationType="slide" transparent>
-        <View style={s.modalOverlay}>
-          <KeyboardAvoidingView style={s.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={s.modalHeader}>
-              <View>
-                 <Text style={s.modalTitle}>Invite Student</Text>
-                 <Text style={s.modalSub}>Send a secure registration link via WhatsApp.</Text>
-              </View>
-              <TouchableOpacity onPress={() => setIsAddOpen(false)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
             </View>
-            <ScrollView style={{ padding: 20 }}>
-              <Text style={s.inputLabel}>Student's WhatsApp</Text>
-              <TextInput 
-                 style={s.input} 
-                 placeholder="10-digit Number" 
-                 keyboardType="phone-pad" 
-                 maxLength={10}
-                 value={inviteWhatsapp} 
-                 onChangeText={setInviteWhatsapp} 
-              />
-              <BrandButton title="Send Invite Link" onPress={handleAddSubmit} style={{ marginTop: 24, marginBottom: 40 }} />
-            </ScrollView>
-          </KeyboardAvoidingView>
+            <View style={styles.identityMetaRow}>
+              <View style={styles.identityMeta}>
+                <Clock size={16} color={colors.textSecondary} />
+                <Text style={[styles.identityMetaText, { color: colors.textSecondary }]}>{batch.timeSlot || 'Time not set'}</Text>
+              </View>
+              <View style={styles.identityMeta}>
+                <Users size={16} color={colors.textSecondary} />
+                <Text style={[styles.identityMetaText, { color: colors.textSecondary }]}>{students.length} students</Text>
+              </View>
+            </View>
+          </Surface>
         </View>
-      </Modal>
+      ) : null}
 
-      {/* Edit Student Modal */}
-      <Modal visible={!!editStudentId} animationType="slide" transparent>
-        <View style={s.modalOverlay}>
-          <KeyboardAvoidingView style={s.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Edit Student</Text>
-              <TouchableOpacity onPress={() => setEditStudentId(null)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
+    </>
+  );
+
+  const renderStudent = ({ item: student }: { item: BatchStudent }) => {
+    const fee = feeRows[student.id];
+    const rowLoading = loadingFeeIds.has(student.id);
+    const rowPaused = pausedFeeIds.has(student.id);
+    const feeTitle = fee?.title || (rowLoading ? 'Loading fee status…' : rowPaused ? 'Waiting for connection' : 'Fee status unavailable');
+    const feeDetail = fee?.detail || (rowLoading ? 'Checking this enrollment’s payments.' : rowPaused ? 'Fee details will load when you reconnect.' : 'Use Retry fee status above to try again.');
+    const feeItemsLabel = fee?.items?.map(item => `${item.label}: ${item.status === 'paid' ? 'Received' : item.status === 'partial' ? 'Part paid' : 'Pending'}, ${item.remaining} rupees pending.`).join(' ') || '';
+    const initials = student.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || 'ST';
+
+    return (
+      <PressableScale
+        accessibilityLabel={`${student.name}. ${feeTitle}. ${feeDetail}. ${feeItemsLabel} Open student profile.`}
+        onPress={() => openStudentProfile(student)}
+      >
+        <Surface style={styles.studentCard}>
+          <View style={styles.studentIdentityRow}>
+            <View style={[styles.avatar, { backgroundColor: colors.surfaceSecondary }]}>
+              <Text style={[styles.avatarText, { color: colors.text }]}>{initials}</Text>
             </View>
-            <ScrollView style={{ padding: 20 }}>
-              <Text style={s.inputLabel}>Student Name *</Text>
-              <TextInput style={s.input} placeholder="e.g. Rahul Kumar" value={editForm.name} onChangeText={t => setEditForm({...editForm, name: t})} />
-              
-              <Text style={s.inputLabel}>Student ID</Text>
-              <TextInput style={s.input} placeholder="e.g. STD001" value={editForm.humanId} onChangeText={t => setEditForm({...editForm, humanId: t})} />
-
-              <Text style={s.inputLabel}>Parent Name</Text>
-              <TextInput style={s.input} placeholder="e.g. Mr. Kumar" value={editForm.parentName} onChangeText={t => setEditForm({...editForm, parentName: t})} />
-
-              <Text style={s.inputLabel}>Parent WhatsApp *</Text>
-              <TextInput style={s.input} placeholder="e.g. 9876543210" keyboardType="phone-pad" value={editForm.parentWhatsapp} onChangeText={t => setEditForm({...editForm, parentWhatsapp: t})} />
-
-              <Text style={s.inputLabel}>School Name</Text>
-              <TextInput style={s.input} placeholder="e.g. DPS" value={editForm.schoolName} onChangeText={t => setEditForm({...editForm, schoolName: t})} />
-
-              <BrandButton title="Save Changes" onPress={handleEditSubmit} style={{ marginTop: 12, marginBottom: 40 }} />
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
-
-      {/* View Marks Modal */}
-      <Modal visible={!!viewMarksStudent} animationType="fade" transparent>
-        <View style={s.modalOverlayDark}>
-          <View style={[s.modalContent, { maxHeight: '70%', height: 'auto', marginTop: 'auto' }]}>
-            <View style={s.modalHeader}>
-              <View>
-                 <Text style={s.modalTitle}>Performance</Text>
-                 <Text style={s.modalSub}>{viewMarksStudent?.name}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setViewMarksStudent(null)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
+            <View style={styles.studentCopy}>
+              <Text style={[styles.studentName, { color: colors.text }]}>{student.name}</Text>
+              {student.humanId ? <Text style={[styles.idBadgeText, { color: colors.textMuted }]}>{student.humanId}</Text> : null}
             </View>
-            <ScrollView style={{ padding: 20 }}>
-              {viewMarksStudent?.marks?.length === 0 ? (
-                 <Text style={{textAlign: 'center', color: T.textMuted, marginTop: 40}}>No marks recorded yet.</Text>
-              ) : (
-                 viewMarksStudent?.marks?.map((m: any) => (
-                    <View key={m.id} style={s.markRow}>
-                       <View>
-                          <Text style={s.markName}>{m.test.name}</Text>
-                          <Text style={s.markMax}>Max: {m.test.maxMarks}</Text>
-                       </View>
-                       <Text style={s.markScore}>{m.score}</Text>
-                    </View>
-                 ))
-              )}
-              <View style={{height: 40}}/>
-            </ScrollView>
+            <ChevronRight size={20} color={colors.textMuted} />
           </View>
-        </View>
-      </Modal>
+          <BatchFeeStatus fee={fee} mode={feeMode} loading={rowLoading} paused={rowPaused} />
+        </Surface>
+      </PressableScale>
+    );
+  };
 
-      {/* QR Code Modal */}
-      <Modal visible={isQrOpen} animationType="fade" transparent>
-        <View style={s.modalOverlayDark}>
-          <View style={[s.modalContent, { maxHeight: '70%', height: 'auto', marginTop: 'auto', alignItems: 'center', paddingBottom: 40 }]}>
-            <View style={[s.modalHeader, { width: '100%' }]}>
-              <Text style={s.modalTitle}>Batch QR Code</Text>
-              <TouchableOpacity onPress={() => setIsQrOpen(false)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
+  const renderStudents = () => (
+    <FlatList
+      contentContainerStyle={[
+        styles.sectionContent,
+        filteredStudents.length === 0 && styles.emptySectionContent,
+      ]}
+      data={filteredStudents}
+      extraData={{ feeRows, loadingFeeIds, pausedFeeIds }}
+      ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
+      keyboardShouldPersistTaps="handled"
+      keyExtractor={(student) => student.id}
+      ListEmptyComponent={(
+        <Feedback
+          kind="empty"
+          title={studentSearch ? 'No matching students' : 'No students yet'}
+          description={studentSearch ? 'Try another name, ID, parent, or school.' : 'Send a registration invitation to add the first student.'}
+          action={!studentSearch ? (
+            <PrimaryButton colors={colors} icon={<Plus size={18} color={colors.heroText} />} label="Invite student" onPress={handleInvite} />
+          ) : undefined}
+        />
+      )}
+      ListHeaderComponent={(
+        <View style={styles.studentListHeader}>
+          <View style={styles.sectionHeadingRow}>
+            <View style={styles.sectionHeadingCopy}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Student roster</Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>{students.length} enrolled in this batch</Text>
             </View>
-            <View style={{ padding: 40, alignItems: 'center' }}>
-              <QRCode
-                value={`mathlogs://batch/${id}`}
-                size={240}
-                color={T.accent}
-                backgroundColor={T.white}
-              />
-              <Text style={{ marginTop: 24, fontSize: 16, color: T.textSec, textAlign: 'center' }}>
-                Scan to join {batch?.name}
-              </Text>
-            </View>
+            <PressableScale
+              accessibilityLabel="Invite student"
+              onPress={handleInvite}
+              style={[styles.roundAction, { backgroundColor: colors.hero }]}
+            >
+              <Plus size={20} color={colors.heroText} />
+            </PressableScale>
           </View>
-        </View>
-      </Modal>
-      {/* Custom Invoice Modal */}
-      <Modal visible={!!showCustomInvoice} animationType="slide" transparent>
-        <View style={s.modalOverlay}>
-          <KeyboardAvoidingView style={s.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={s.modalHeader}>
-              <View>
-                 <Text style={s.modalTitle}>Custom Invoice</Text>
-                 <Text style={s.modalSub}>For {showCustomInvoice?.name}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowCustomInvoice(null)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
-            </View>
-            <ScrollView style={{ padding: 20 }}>
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-                 <TouchableOpacity 
-                   style={[s.tabBtn, !customInvoice.existingInstallmentId && s.tabBtnActive]} 
-                   onPress={() => setCustomInvoice({ ...customInvoice, existingInstallmentId: '' })}
-                 >
-                    <Text style={[s.tabBtnText, !customInvoice.existingInstallmentId && s.tabBtnTextActive]}>New Custom</Text>
-                 </TouchableOpacity>
-                 <TouchableOpacity 
-                   style={[s.tabBtn, !!customInvoice.existingInstallmentId && s.tabBtnActive]} 
-                   onPress={() => setCustomInvoice({ ...customInvoice, existingInstallmentId: invoiceTemplates[0]?.id || '' })}
-                 >
-                    <Text style={[s.tabBtnText, !!customInvoice.existingInstallmentId && s.tabBtnTextActive]}>Existing</Text>
-                 </TouchableOpacity>
-              </View>
-
-              {customInvoice.existingInstallmentId ? (
-                <View>
-                   <Text style={s.inputLabel}>Select Installment</Text>
-                   {/* In a real app we'd use a picker, but we can list them as buttons for now */}
-                   {invoiceTemplates.map(inst => (
-                     <TouchableOpacity 
-                       key={inst.id} 
-                       style={[s.instSelectBtn, customInvoice.existingInstallmentId === inst.id && s.instSelectBtnActive]}
-                       onPress={() => setCustomInvoice({ ...customInvoice, existingInstallmentId: inst.id })}
-                     >
-                       <Text style={[s.instSelectText, customInvoice.existingInstallmentId === inst.id && { color: T.white }]}>{inst.name} (₹{inst.amount})</Text>
-                     </TouchableOpacity>
-                   ))}
-                </View>
-              ) : (
-                <View>
-                  <Text style={s.inputLabel}>Invoice Name</Text>
-                  <TextInput 
-                     style={s.input} 
-                     placeholder="e.g. Study Material" 
-                     value={customInvoice.name} 
-                     onChangeText={t => setCustomInvoice({...customInvoice, name: t})} 
-                  />
-                  <Text style={s.inputLabel}>Amount (₹)</Text>
-                  <TextInput 
-                     style={s.input} 
-                     placeholder="e.g. 500" 
-                     keyboardType="numeric"
-                     value={customInvoice.amount} 
-                     onChangeText={t => setCustomInvoice({...customInvoice, amount: t})} 
-                  />
-                </View>
-              )}
-
-              <TouchableOpacity 
-                style={s.checkboxRow}
-                onPress={() => setCustomInvoice({...customInvoice, markAsPaid: !customInvoice.markAsPaid})}
+          <Surface tone="material" style={styles.searchSurface}>
+            <Search size={19} color={colors.textMuted} />
+            <TextInput
+              accessibilityLabel="Search students"
+              autoCapitalize="none"
+              autoCorrect={false}
+              onChangeText={setStudentSearch}
+              placeholder="Search name, ID, parent, or school"
+              placeholderTextColor={colors.textMuted}
+              selectionColor={colors.focus}
+              style={[styles.searchInput, { color: colors.text }]}
+              value={studentSearch}
+            />
+            {studentSearch ? (
+              <PressableScale
+                accessibilityLabel="Clear student search"
+                onPress={() => setStudentSearch('')}
+                style={[styles.searchClear, { backgroundColor: colors.surfaceSecondary }]}
               >
-                <View style={[s.checkbox, customInvoice.markAsPaid && s.checkboxActive]}>
-                   {customInvoice.markAsPaid && <Check size={12} color={T.white} />}
-                </View>
-                <Text style={s.checkboxLabel}>Mark as Paid immediately</Text>
-              </TouchableOpacity>
-
-              <BrandButton title="Create Invoice" onPress={handleCreateCustomInvoice} style={{ marginTop: 24, marginBottom: 40 }} />
-            </ScrollView>
-          </KeyboardAvoidingView>
+                <X size={17} color={colors.textSecondary} />
+              </PressableScale>
+            ) : null}
+          </Surface>
+          {feeRetryAvailable ? <SecondaryButton colors={colors} label="Retry fee status" onPress={retryFeeStatuses} /> : null}
+          {studentSearch ? (
+            <Text style={[styles.resultCount, { color: colors.textSecondary }]}>{filteredStudents.length} found</Text>
+          ) : null}
         </View>
-      </Modal>
-      {/* Batch Settings Modal */}
-      <Modal visible={isBatchSettingsOpen} animationType="slide" transparent>
-        <View style={s.modalOverlay}>
-          <KeyboardAvoidingView style={s.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Batch Settings</Text>
-              <TouchableOpacity onPress={() => setIsBatchSettingsOpen(false)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
-            </View>
-            <ScrollView style={{ padding: 20 }}>
-              <Text style={s.inputLabel}>Batch Name *</Text>
-              <TextInput style={s.input} placeholder="e.g. Morning Batch" value={batchForm.name} onChangeText={t => setBatchForm({...batchForm, name: t})} />
-              
-              <Text style={s.inputLabel}>Subject</Text>
-              <TextInput style={s.input} placeholder="e.g. Mathematics" value={batchForm.subject} onChangeText={t => setBatchForm({...batchForm, subject: t})} />
+      )}
+      refreshControl={(
+        <RefreshControl
+          colors={[colors.text]}
+          onRefresh={() => void refetch()}
+          progressBackgroundColor={colors.surfaceElevated}
+          refreshing={isRefetching}
+          tintColor={colors.text}
+        />
+      )}
+      renderItem={renderStudent}
+      showsVerticalScrollIndicator={false}
+    />
+  );
 
-              <Text style={s.inputLabel}>Class</Text>
-              <TextInput style={s.input} placeholder="e.g. 10th" value={batchForm.className} onChangeText={t => setBatchForm({...batchForm, className: t})} />
+  const renderMonthCoverageFees = () => {
+    const setupRequired = students.filter((student) => (
+      !student.monthCoverageProfile
+      || student.monthCoverageProfile.status === 'PENDING_SETUP'
+      || !student.monthCoverageProfile.feeStartMonth
+    ));
+    const activeProfiles = students.filter((student) => student.monthCoverageProfile?.status === 'ACTIVE');
+    const closedProfiles = students.filter((student) => student.monthCoverageProfile?.status === 'CLOSED');
+    return (
+      <>
+        <Surface style={styles.feeIntroCard}>
+          <View style={[styles.feeIntroIcon, { backgroundColor: colors.surfaceSecondary }]}>
+            <CalendarDays size={22} color={colors.text} />
+          </View>
+          <View style={styles.feeIntroCopy}>
+            <Text style={[styles.workflowTitle, { color: colors.text }]}>Month coverage</Text>
+            <Text style={[styles.workflowDescription, { color: colors.textSecondary }]}>Setup status comes from each active enrollment’s month-coverage profile.</Text>
+          </View>
+        </Surface>
 
-              <Text style={s.inputLabel}>Total Fee (₹)</Text>
-              <TextInput style={s.input} placeholder="e.g. 15000" keyboardType="numeric" value={batchForm.feeAmount} onChangeText={t => setBatchForm({...batchForm, feeAmount: t})} />
-
-              <Text style={s.inputLabel}>Time Slot</Text>
-              <TextInput style={s.input} placeholder="e.g. 4:00 PM - 5:00 PM" value={batchForm.timeSlot} onChangeText={t => setBatchForm({...batchForm, timeSlot: t})} />
-
-              <Text style={s.inputLabel}>WhatsApp Group Link</Text>
-              <TextInput style={s.input} placeholder="https://chat.whatsapp.com/..." value={batchForm.whatsappGroupLink} onChangeText={t => setBatchForm({...batchForm, whatsappGroupLink: t})} />
-
-              <BrandButton title="Save Changes" onPress={handleBatchSettingsSave} style={{ marginTop: 24, marginBottom: 40 }} />
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
-
-      {/* Fee Settings Modal */}
-      <Modal visible={isFeeSettingsOpen && !editInstallment} animationType="slide" transparent>
-        <View style={s.modalOverlay}>
-          <KeyboardAvoidingView style={s.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Fee Columns</Text>
-              <TouchableOpacity onPress={() => setIsFeeSettingsOpen(false)} style={s.modalClose}><X size={20} color={T.text}/></TouchableOpacity>
-            </View>
-            <ScrollView style={{ padding: 20 }}>
-              <View style={{ marginBottom: 24 }}>
-                <Text style={[s.sectionTitle, { marginLeft: 0 }]}>Existing Installments</Text>
-                {batch?.feeInstallments?.filter(inst => !inst.studentId).length === 0 ? (
-                  <Text style={{ color: T.textMuted }}>No installments configured.</Text>
-                ) : (
-                  batch?.feeInstallments?.filter(inst => !inst.studentId).map(inst => (
-                    <View key={inst.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: T.white, borderRadius: 12, borderWidth: 1, borderColor: T.border, marginBottom: 8 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: '700', color: T.text }}>{inst.name}</Text>
-                        <Text style={{ fontWeight: '600', color: T.textSec, fontSize: 13 }}>₹{inst.amount}</Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => setEditInstallment({ id: inst.id, name: inst.name, amount: String(inst.amount) })}
-                        style={{ padding: 8, backgroundColor: `${T.blue}12`, borderRadius: 10 }}
-                      >
-                        <Edit2 size={15} color={T.blue} />
-                      </TouchableOpacity>
-                    </View>
-                  ))
-                )}
+        {students.length > 0 ? (
+          <>
+            <Surface tone="strong" style={styles.coverageSummary}>
+              <View style={styles.coverageMetric}>
+                <Text style={[styles.coverageValue, { color: setupRequired.length > 0 ? colors.attention : colors.text }]}>{setupRequired.length}</Text>
+                <Text style={[styles.coverageLabel, { color: colors.textSecondary }]}>Need setup</Text>
               </View>
+              <View style={[styles.coverageDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.coverageMetric}>
+                <Text style={[styles.coverageValue, { color: colors.text }]}>{activeProfiles.length}</Text>
+                <Text style={[styles.coverageLabel, { color: colors.textSecondary }]}>Active profiles</Text>
+              </View>
+              <View style={[styles.coverageDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.coverageMetric}>
+                <Text style={[styles.coverageValue, { color: colors.text }]}>{closedProfiles.length}</Text>
+                <Text style={[styles.coverageLabel, { color: colors.textSecondary }]}>Closed profiles</Text>
+              </View>
+            </Surface>
 
-              <Text style={[s.sectionTitle, { marginLeft: 0 }]}>Add New Installment</Text>
-              <Text style={s.inputLabel}>Installment Name</Text>
-              <TextInput style={s.input} placeholder="e.g. First Installment" value={feeForm.name} onChangeText={t => setFeeForm({...feeForm, name: t})} />
-              
-              <Text style={s.inputLabel}>Amount (₹)</Text>
-              <TextInput style={s.input} placeholder="e.g. 5000" keyboardType="numeric" value={feeForm.amount} onChangeText={t => setFeeForm({...feeForm, amount: t})} />
-
-              <BrandButton title="Create Installment" onPress={handleFeeInstallmentAdd} style={{ marginTop: 24, marginBottom: 40 }} />
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
-
-      {/* ── Edit Installment Modal ── */}
-      <Modal visible={!!editInstallment} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditInstallment(null)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: T.border }}>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: T.text }}>Edit Installment</Text>
-              <TouchableOpacity onPress={() => setEditInstallment(null)} style={{ padding: 8 }}>
-                <X size={22} color={T.text} />
-              </TouchableOpacity>
+            <View style={styles.sectionHeadingRow}>
+              <View style={styles.sectionHeadingCopy}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Enrollment setup</Text>
+                <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>Confirmed coverage windows for students in this batch.</Text>
+              </View>
             </View>
-            <ScrollView style={{ padding: 20 }}>
-              <Text style={s.inputLabel}>Name</Text>
-              <TextInput
-                style={s.input}
-                value={editInstallment?.name || ''}
-                onChangeText={t => setEditInstallment(e => e ? { ...e, name: t } : null)}
-                placeholder="Installment name"
+
+            <View style={styles.cardList}>
+              {students.map((student) => {
+                const profile = student.monthCoverageProfile;
+                const startMonth = formatMonth(profile?.feeStartMonth);
+                const endMonth = formatMonth(profile?.feeEndMonth);
+                const needsSetup = !profile || profile.status === 'PENDING_SETUP' || !startMonth;
+                const isClosed = profile?.status === 'CLOSED';
+                const statusLabel = needsSetup ? 'SETUP' : isClosed ? 'CLOSED' : 'ACTIVE';
+                const statusColor = needsSetup ? colors.attention : isClosed ? colors.textMuted : colors.positive;
+                const detail = needsSetup
+                  ? 'Fee start month needs confirmation'
+                  : isClosed
+                    ? 'Coverage profile closed'
+                    : endMonth
+                      ? `${startMonth} to ${endMonth}`
+                      : `From ${startMonth}`;
+                return (
+                  <Surface key={student.id} style={styles.coverageStudentRow}>
+                    <View style={styles.coverageStudentCopy}>
+                      <Text style={[styles.coverageStudentName, { color: colors.text }]}>{student.name}</Text>
+                      <Text style={[styles.coverageStudentMeta, { color: colors.textSecondary }]}>{detail}</Text>
+                    </View>
+                    <View style={[styles.coverageBadge, { backgroundColor: `${statusColor}18` }]}>
+                      <Text style={[styles.coverageBadgeText, { color: statusColor }]}>{statusLabel}</Text>
+                    </View>
+                  </Surface>
+                );
+              })}
+            </View>
+          </>
+        ) : (
+          <Feedback kind="empty" title="No students yet" description="Invite a student to confirm their first month of coverage." />
+        )}
+
+        <PrimaryButton
+          colors={colors}
+          icon={<ArrowRight size={19} color={colors.heroText} />}
+          label="Open fee workspace"
+          onPress={() => {
+            if (Platform.OS === 'ios') {
+              feeSettingsActionRef.current = () => router.push('/(tabs)/fees');
+              setShowFeeSettings(false);
+            } else {
+              setShowFeeSettings(false);
+              router.push('/(tabs)/fees');
+            }
+          }}
+        />
+      </>
+    );
+  };
+
+  const errorStatus = getErrorStatus(error);
+  const pageLoading = isAuthLoading || (canLoadBatch && isLoading);
+  const body = pageLoading ? (
+    <ScrollView contentContainerStyle={styles.loadingContent} showsVerticalScrollIndicator={false}>
+      <SkeletonLoader width={Math.max(240, width - (Spacing.xl * 2))} height={176} borderRadius={BorderRadius['2xl']} />
+      <SkeletonLoader width={Math.max(240, width - (Spacing.xl * 2))} height={58} borderRadius={BorderRadius.lg} />
+      <SkeletonLoader width={Math.max(240, width - (Spacing.xl * 2))} height={220} borderRadius={BorderRadius.xl} />
+    </ScrollView>
+  ) : !batch ? (
+    <View style={styles.centeredFeedback}>
+      <Feedback
+        action={(
+          <SecondaryButton colors={colors} label={errorStatus === 404 ? 'Back to batches' : 'Try again'} onPress={() => {
+            if (errorStatus === 404) router.back();
+            else void refetch();
+          }} />
+        )}
+        description={errorStatus === 404
+          ? 'This batch may have been removed or is no longer available.'
+          : isError
+            ? 'Check your connection and try loading the batch again.'
+            : 'The batch could not be found.'}
+        kind="error"
+        title={errorStatus === 404 ? 'Batch not found' : 'Batch could not load'}
+      />
+    </View>
+  ) : renderStudents();
+
+  return (
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+      <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} />
+      {renderBatchHeader()}
+      <View style={styles.body}>{body}</View>
+
+      {batch ? (
+        <BatchActionsSheet
+          batchName={batch.name}
+          isDownloading={isDownloading}
+          isRegistrationEnded={Boolean(batch.isRegistrationEnded)}
+          isRegistrationOpen={batch.isRegistrationOpen}
+          onClose={() => setShowActions(false)}
+          onDownloadRoster={() => void handleDownload('pdf')}
+          onDownloadStickers={() => void handleDownload('stickers')}
+          onEndRegistration={handleEndRegistration}
+          onInviteStudent={handleInvite}
+          onOpenFeeSetup={() => setShowFeeSettings(true)}
+          onOpenKiosk={() => void openKiosk()}
+          onOpenQr={() => setShowQr(true)}
+          onOpenSettings={openBatchSettings}
+          onToggleRegistration={() => void handleToggleRegistration()}
+          showFeeSetup
+          feeSetupDescription={feeMode === 'MONTH_COVERAGE' ? 'Review coverage months.' : 'Manage fee installments.'}
+          visible={showActions}
+        />
+      ) : null}
+
+      {batch ? (
+        <BatchInviteSheet
+          batch={batch}
+          key={`${accountScope}:${batch.id}`}
+          onClose={() => setShowInvite(false)}
+          onSuccess={() => void refetch()}
+          visible={showInvite}
+        />
+      ) : null}
+
+      <SheetFrame
+        colors={colors}
+        keyboard={false}
+        onClose={() => setFocusedStudent(null)}
+        onDismiss={handleStudentActionsDismissed}
+        reduceMotion={reduceMotion}
+        subtitle={focusedStudent ? `${focusedStudent.humanId || 'Student'} · ${batch?.name || 'Batch'}` : undefined}
+        title="Student profile"
+        visible={Boolean(focusedStudent)}
+      >
+        {focusedStudent ? (
+          <>
+          <BatchStudentProfile
+            key={`${accountScope}:${focusedStudent.id}:${focusedStudent.enrollmentId || ''}`}
+            student={students.find(student => student.id === focusedStudent.id) || focusedStudent}
+            batchId={batchId!}
+            batchName={batch?.name || 'Batch'}
+            feeMode={feeMode}
+            feeStatus={feeRows[focusedStudent.id]}
+            feeLoading={loadingFeeIds.has(focusedStudent.id)}
+            onRetryFees={retryFeeStatuses}
+          />
+          <Text accessibilityRole="header" style={[styles.sectionTitle, { color: colors.text }]}>Student actions</Text>
+          <View style={styles.studentActionGrid}>
+            <PressableScale
+              accessibilityLabel={`View performance for ${focusedStudent.name}`}
+              onPress={() => runAfterStudentActions(() => setMarksStudent(focusedStudent))}
+              style={[styles.studentActionTile, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            >
+              <View style={[styles.studentActionIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                <Eye size={21} color={colors.text} />
+              </View>
+              <Text style={[styles.studentActionLabel, { color: colors.text }]}>Performance</Text>
+              <Text style={[styles.studentActionDescription, { color: colors.textSecondary }]}>Recorded scores</Text>
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel={`Call parent of ${focusedStudent.name}`}
+              onPress={() => void callParent(focusedStudent)}
+              style={[styles.studentActionTile, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            >
+              <View style={[styles.studentActionIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                <Phone size={21} color={colors.text} />
+              </View>
+              <Text style={[styles.studentActionLabel, { color: colors.text }]}>Call parent</Text>
+              <Text style={[styles.studentActionDescription, { color: colors.textSecondary }]}>Use saved number</Text>
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel={`Edit ${focusedStudent.name}`}
+              onPress={() => runAfterStudentActions(() => openStudentEditor(focusedStudent))}
+              style={[styles.studentActionTile, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            >
+              <View style={[styles.studentActionIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                <Edit2 size={21} color={colors.text} />
+              </View>
+              <Text style={[styles.studentActionLabel, { color: colors.text }]}>Edit details</Text>
+              <Text style={[styles.studentActionDescription, { color: colors.textSecondary }]}>Student and parent info</Text>
+            </PressableScale>
+            {feeMode === 'CURRENT_DUE_BASED' ? (
+              <PressableScale
+                accessibilityLabel={`${hasUnlinkedReceipts(focusedStudent) ? 'Review payments' : 'Record fee payment'} for ${focusedStudent.name}`}
+                onPress={() => runAfterStudentActions(() => openInvoice(focusedStudent))}
+                style={[styles.studentActionTile, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+              >
+                <View style={[styles.studentActionIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                  <Receipt size={21} color={colors.text} />
+                </View>
+                <Text style={[styles.studentActionLabel, { color: colors.text }]}>{hasUnlinkedReceipts(focusedStudent) ? 'Review payments' : 'Record payment'}</Text>
+                <Text style={[styles.studentActionDescription, { color: colors.textSecondary }]}>{hasUnlinkedReceipts(focusedStudent) ? 'Previous receipts in Fees' : 'This batch’s fee plans'}</Text>
+              </PressableScale>
+            ) : null}
+          </View>
+          </>
+        ) : null}
+      </SheetFrame>
+
+      <SheetFrame
+        colors={colors}
+        keyboard={false}
+        onClose={() => setMarksStudent(null)}
+        reduceMotion={reduceMotion}
+        subtitle="Recorded scores and tests after enrollment"
+        title={`${marksStudent?.name || 'Student'} performance`}
+        visible={Boolean(marksStudent)}
+      >
+        {marksStudent ? (() => {
+          const joinDate = new Date(marksStudent.enrollmentStartedAt || marksStudent.createdAt || 0);
+          joinDate.setHours(0, 0, 0, 0);
+          const markByTest = new Map(marksStudent.marks.filter((mark) => {
+            const test = tests.find((item) => item.id === mark.test.id);
+            return test && Number.isFinite(test.maxMarks) && test.maxMarks > 0
+              && Number.isFinite(mark.score) && mark.score >= 0 && mark.score <= test.maxMarks;
+          }).map((mark) => [mark.test.id, mark]));
+          const performanceRows = tests
+            .filter((test) => {
+              const testDate = new Date(test.date);
+              testDate.setHours(0, 0, 0, 0);
+              return markByTest.has(test.id) || testDate >= joinDate;
+            })
+            .map((test) => ({ test, mark: markByTest.get(test.id) }))
+            .sort((left, right) => new Date(right.test.date).getTime() - new Date(left.test.date).getTime());
+          const average = studentAverageById.get(marksStudent.id) ?? null;
+          return (
+            <>
+              <Surface tone="strong" style={styles.performanceSummary}>
+                <View>
+                  <Text style={[styles.performanceSummaryLabel, { color: colors.textSecondary }]}>RECORDED AVERAGE</Text>
+                  <Text style={[styles.performanceSummaryValue, { color: colors.text }]}>{average === null ? '—' : `${Math.round(average)}%`}</Text>
+                </View>
+                <Text style={[styles.performanceSummaryMeta, { color: colors.textSecondary }]}>
+                  {markByTest.size} recorded {markByTest.size === 1 ? 'test' : 'tests'}
+                </Text>
+              </Surface>
+              {performanceRows.length === 0 ? (
+                <Feedback kind="empty" title="No performance records" description="Scores will appear when marks are recorded for this student." />
+              ) : (
+                <View style={styles.cardList}>
+                  {performanceRows.map(({ test, mark }) => (
+                    <Surface key={test.id} style={styles.markRow}>
+                      <View style={styles.markCopy}>
+                        <Text style={[styles.markName, { color: colors.text }]}>{test.name}</Text>
+                        <Text style={[styles.markDate, { color: colors.textSecondary }]}>{formatDate(test.date)} · Max {test.maxMarks}</Text>
+                      </View>
+                      {mark ? (
+                        <View style={styles.markScoreWrap}>
+                          <Text style={[styles.markScore, { color: colors.text }]}>{mark.score}</Text>
+                          <Text style={[styles.markPercent, { color: colors.chart }]}>
+                            {test.maxMarks > 0 ? `${Math.round((mark.score / test.maxMarks) * 100)}%` : '—'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.unrecordedBadge, { backgroundColor: colors.surfaceSecondary }]}>
+                          <Text style={[styles.unrecordedText, { color: colors.textSecondary }]}>Not recorded</Text>
+                        </View>
+                      )}
+                    </Surface>
+                  ))}
+                </View>
+              )}
+            </>
+          );
+        })() : null}
+      </SheetFrame>
+
+      <SheetFrame
+        colors={colors}
+        onClose={() => setEditStudent(null)}
+        reduceMotion={reduceMotion}
+        subtitle="Update the student and parent information used by teachers."
+        title="Edit student"
+        visible={Boolean(editStudent)}
+      >
+        <InputField colors={colors} label="Student name *" onChangeText={(name) => setEditForm((value) => ({ ...value, name }))} placeholder="Student name" value={editForm.name} />
+        <InputField colors={colors} label="Student ID" onChangeText={(humanId) => setEditForm((value) => ({ ...value, humanId }))} placeholder="e.g. STD001" value={editForm.humanId} />
+        <InputField colors={colors} label="Parent name" onChangeText={(parentName) => setEditForm((value) => ({ ...value, parentName }))} placeholder="Parent name" value={editForm.parentName} />
+        <InputField colors={colors} keyboardType="phone-pad" label="Parent phone" onChangeText={(parentWhatsapp) => setEditForm((value) => ({ ...value, parentWhatsapp }))} placeholder="10-digit phone number" value={editForm.parentWhatsapp} />
+        <InputField colors={colors} label="School" onChangeText={(schoolName) => setEditForm((value) => ({ ...value, schoolName }))} placeholder="School name" value={editForm.schoolName} />
+        <PrimaryButton
+          colors={colors}
+          label="Save student"
+          loading={pendingAction === 'edit-student'}
+          onPress={() => void handleEditStudent()}
+        />
+      </SheetFrame>
+
+      <SheetFrame
+        colors={colors}
+        onClose={() => setInvoiceStudent(null)}
+        reduceMotion={reduceMotion}
+        subtitle={invoiceStudent ? `For ${invoiceStudent.name}` : undefined}
+        title="Record fee payment"
+        visible={Boolean(invoiceStudent)}
+      >
+        <Text style={[styles.workflowDescription, { color: colors.textSecondary }]}>Choose an applicable fee plan from this batch. New custom invoices are available in the Fees workspace.</Text>
+          <View style={styles.optionList}>
+            {(batch?.feeInstallments || [])
+              .filter((installment) => invoiceStudent
+                ? isBatchInstallmentApplicable(invoiceStudent, installment)
+                  && remainingInstallmentAmount(invoiceStudent, installment) > 0.01
+                : false)
+              .map((installment) => {
+                const selected = invoiceForm.existingInstallmentId === installment.id;
+                const remaining = invoiceStudent ? remainingInstallmentAmount(invoiceStudent, installment) : installment.amount;
+                return (
+                  <PressableScale
+                    accessibilityLabel={`${installment.name}, ${installment.amount} rupees`}
+                    accessibilityState={{ selected }}
+                    key={installment.id}
+                    onPress={() => setInvoiceForm((value) => ({ ...value, existingInstallmentId: installment.id }))}
+                    style={[
+                      styles.optionRow,
+                      {
+                        backgroundColor: selected ? colors.hero : colors.surfaceElevated,
+                        borderColor: selected ? colors.hero : colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.optionCopy}>
+                      <Text style={[styles.optionTitle, { color: selected ? colors.heroText : colors.text }]}>{installment.name}</Text>
+                      <Text style={[styles.optionMeta, { color: selected ? colors.heroText : colors.textSecondary }]}>₹{remaining.toLocaleString('en-IN')} remaining</Text>
+                    </View>
+                    {selected ? <Check size={20} color={colors.heroText} /> : null}
+                  </PressableScale>
+                );
+              })}
+            {invoiceStudent && !(batch?.feeInstallments || []).some((installment) => (
+              isBatchInstallmentApplicable(invoiceStudent, installment)
+              && remainingInstallmentAmount(invoiceStudent, installment) > 0.01
+            )) ? (
+              <Feedback kind="empty" title="No applicable fee plans" description="Open the Fees workspace to create an invoice or update the student’s fee setup." />
+            ) : null}
+          </View>
+
+        <PressableScale
+          accessibilityLabel="Record this fee plan as paid today"
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: invoiceForm.markAsPaid }}
+          onPress={() => setInvoiceForm((value) => ({ ...value, markAsPaid: !value.markAsPaid }))}
+          style={[styles.checkboxRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+        >
+          <View style={[
+            styles.checkbox,
+            {
+              backgroundColor: invoiceForm.markAsPaid ? colors.hero : colors.surfaceSecondary,
+              borderColor: invoiceForm.markAsPaid ? colors.hero : colors.border,
+            },
+          ]}>
+            {invoiceForm.markAsPaid ? <Check size={16} color={colors.heroText} /> : null}
+          </View>
+          <View style={styles.checkboxCopy}>
+            <Text style={[styles.optionTitle, { color: colors.text }]}>
+              Record this plan as paid today
+            </Text>
+            <Text style={[styles.optionMeta, { color: colors.textSecondary }]}>Records the payment on today’s date.</Text>
+          </View>
+        </PressableScale>
+
+        <PrimaryButton
+          colors={colors}
+          disabled={!invoiceForm.existingInstallmentId || !invoiceForm.markAsPaid}
+          label="Record payment"
+          loading={pendingAction === 'invoice'}
+          onPress={() => void handleCreateInvoice()}
+        />
+        <SecondaryButton colors={colors} label="Open Fees for a new invoice" onPress={() => {
+          setInvoiceStudent(null);
+          router.push('/(tabs)/fees');
+        }} />
+      </SheetFrame>
+
+      <SheetFrame
+        colors={colors}
+        keyboard={false}
+        onClose={() => setShowQr(false)}
+        reduceMotion={reduceMotion}
+        subtitle={registrationState}
+        title="Registration QR"
+        visible={showQr}
+      >
+        <Surface style={styles.qrCard}>
+          <View style={styles.qrCodeWrap}>
+            {publicRegistrationUrl ? (
+              <QRCode
+                backgroundColor="#FFFFFF"
+                color="#111827"
+                size={Math.min(190, width - 120)}
+                value={publicRegistrationUrl}
               />
-              <Text style={s.inputLabel}>Amount (₹)</Text>
-              <TextInput
-                style={s.input}
-                value={editInstallment?.amount || ''}
-                onChangeText={t => setEditInstallment(e => e ? { ...e, amount: t } : null)}
-                keyboardType="numeric"
-                placeholder="e.g. 5000"
-              />
-              <BrandButton title="Save Changes" onPress={handleFeeInstallmentEdit} style={{ marginTop: 24, marginBottom: 40 }} />
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </Modal>
+            ) : null}
+          </View>
+          <Text style={[styles.qrBatchName, { color: colors.text }]}>{batch?.name}</Text>
+          <Text selectable style={[styles.qrUrl, { color: colors.textSecondary }]}>{publicRegistrationUrl}</Text>
+        </Surface>
+        <PrimaryButton
+          colors={colors}
+          icon={<ArrowRight size={19} color={colors.heroText} />}
+          label="Open registration page"
+          onPress={() => void openRegistrationPage()}
+        />
+      </SheetFrame>
+
+      <SheetFrame
+        colors={colors}
+        onClose={() => setShowBatchSettings(false)}
+        reduceMotion={reduceMotion}
+        subtitle="Keep the details used across teacher and registration screens accurate."
+        title="Batch settings"
+        visible={showBatchSettings}
+      >
+        <InputField colors={colors} label="Batch name *" onChangeText={(name) => setBatchForm((value) => ({ ...value, name }))} placeholder="Batch name" value={batchForm.name} />
+        <InputField colors={colors} label="Subject" onChangeText={(subject) => setBatchForm((value) => ({ ...value, subject }))} placeholder="Subject" value={batchForm.subject} />
+        <InputField colors={colors} label="Class or grade" onChangeText={(className) => setBatchForm((value) => ({ ...value, className }))} placeholder="e.g. Class 10" value={batchForm.className} />
+        <InputField colors={colors} label="Time slot" onChangeText={(timeSlot) => setBatchForm((value) => ({ ...value, timeSlot }))} placeholder="e.g. Mon-Wed-Fri 4 PM" value={batchForm.timeSlot} />
+        <InputField colors={colors} label="WhatsApp group link" onChangeText={(whatsappGroupLink) => setBatchForm((value) => ({ ...value, whatsappGroupLink }))} placeholder="https://chat.whatsapp.com/..." value={batchForm.whatsappGroupLink} />
+        {feeMode === 'CURRENT_DUE_BASED' ? (
+          <InputField colors={colors} keyboardType="numeric" label="Legacy batch fee" onChangeText={(feeAmount) => setBatchForm((value) => ({ ...value, feeAmount }))} placeholder="Amount in rupees" value={batchForm.feeAmount} />
+        ) : null}
+        {feeMode === 'MONTH_COVERAGE' ? (
+          <Surface style={styles.dateNotice}>
+            <CalendarDays size={20} color={colors.textSecondary} />
+            <Text style={[styles.dateNoticeText, { color: colors.textSecondary }]}>
+              Coverage range: {formatDate(batch?.startDate)} to {formatDate(batch?.endDate)}
+            </Text>
+          </Surface>
+        ) : null}
+        <PrimaryButton
+          colors={colors}
+          label="Save batch"
+          loading={pendingAction === 'batch-settings'}
+          onPress={() => void handleBatchSettingsSave()}
+        />
+      </SheetFrame>
+
+      <SheetFrame
+        colors={colors}
+        onClose={() => setShowFeeSettings(false)}
+        onDismiss={handleFeeSettingsDismissed}
+        reduceMotion={reduceMotion}
+        subtitle={feeMode === 'MONTH_COVERAGE' ? 'Review enrollment coverage dates and setup.' : 'Create and edit the installments available to this batch.'}
+        title="Fee setup"
+        visible={showFeeSettings}
+      >
+        {feeMode === 'MONTH_COVERAGE' ? renderMonthCoverageFees() : (<>
+        <Surface style={styles.addFeeCard}>
+          <Text style={[styles.formSectionTitle, { color: colors.text }]}>Add fee plan</Text>
+          <InputField colors={colors} label="Name *" onChangeText={(name) => setFeeForm((value) => ({ ...value, name }))} placeholder="e.g. Term 1" value={feeForm.name} />
+          <InputField colors={colors} keyboardType="numeric" label="Amount *" onChangeText={(amount) => setFeeForm((value) => ({ ...value, amount }))} placeholder="Amount in rupees" value={feeForm.amount} />
+          <PrimaryButton
+            colors={colors}
+            icon={<Plus size={18} color={colors.heroText} />}
+            label="Add fee plan"
+            loading={pendingAction === 'add-installment'}
+            onPress={() => void handleAddInstallment()}
+          />
+        </Surface>
+
+        <Text style={[styles.formSectionTitle, { color: colors.text }]}>Existing plans</Text>
+        <View style={styles.optionList}>
+          {(batch?.feeInstallments || []).filter((installment) => !installment.studentId).map((installment) => (
+            <PressableScale
+              accessibilityLabel={`Edit ${installment.name}`}
+              key={installment.id}
+              onPress={() => openInstallmentEditor(installment)}
+              style={[styles.optionRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            >
+              <View style={styles.optionCopy}>
+                <Text style={[styles.optionTitle, { color: colors.text }]}>{installment.name}</Text>
+                <Text style={[styles.optionMeta, { color: colors.textSecondary }]}>₹{installment.amount.toLocaleString('en-IN')}</Text>
+              </View>
+              <Edit2 size={18} color={colors.textMuted} />
+            </PressableScale>
+          ))}
+        </View>
+        </>)}
+      </SheetFrame>
+
+      <SheetFrame
+        colors={colors}
+        onClose={() => setEditInstallment(null)}
+        reduceMotion={reduceMotion}
+        subtitle="Changes apply anywhere this plan is assigned."
+        title="Edit fee plan"
+        visible={Boolean(editInstallment)}
+      >
+        <InputField colors={colors} label="Name *" onChangeText={(name) => setEditInstallmentForm((value) => ({ ...value, name }))} placeholder="Fee plan name" value={editInstallmentForm.name} />
+        <InputField colors={colors} keyboardType="numeric" label="Amount *" onChangeText={(amount) => setEditInstallmentForm((value) => ({ ...value, amount }))} placeholder="Amount in rupees" value={editInstallmentForm.amount} />
+        <PrimaryButton
+          colors={colors}
+          label="Save fee plan"
+          loading={pendingAction === 'edit-installment'}
+          onPress={() => void handleEditInstallment()}
+        />
+      </SheetFrame>
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-  navBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 56 },
-  backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -12 },
-  navTitle: { fontSize: 17, fontWeight: '700', color: T.text, flex: 1, textAlign: 'center' },
-  navRight: { width: 44, alignItems: 'flex-end', justifyContent: 'center' },
-  headerActionBtn: { padding: 8 },
-  scrollContent: { padding: 16, paddingBottom: TEACHER_TAB_CONTENT_INSET },
-  
-  empty: { padding: 40, alignItems: 'center', justifyContent: 'center', marginTop: 100 },
-  emptyTitle: { fontSize: 18, color: T.textMuted, fontWeight: '700', marginTop: 12 },
-
-  heroCard: {
-    backgroundColor: T.white, borderRadius: 24, padding: 20,
-    borderWidth: 1, borderColor: T.border, marginBottom: 16,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 24 },
-      android: { elevation: 4 },
-    }),
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  body: { flex: 1, minHeight: 0 },
+  appBar: {
+    minHeight: 56,
+    paddingHorizontal: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  heroTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
-  heroName: { fontSize: 24, fontWeight: '800', color: T.text, marginBottom: 8, letterSpacing: -0.5 },
-  heroMetaRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  heroPill: { backgroundColor: T.bg, color: T.textSec, fontSize: 11, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
-  statusPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  
-  heroStatsRow: { flexDirection: 'row', gap: 16, marginBottom: 20 },
-  heroStat: { flexDirection: 'row', alignItems: 'center' },
-  heroStatText: { fontSize: 13, color: T.textSec, fontWeight: '600' },
-
-  quickActionsScroll: { gap: 8 },
-  qActionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.bg, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, gap: 6, borderWidth: 1, borderColor: T.border },
-  qActionText: { fontSize: 13, fontWeight: '700', color: T.text },
-
-  financeContainer: { marginBottom: 16 },
-  financeGrid: { flexDirection: 'row', gap: 12 },
-  finCard: {
-    flex: 1, backgroundColor: T.white, padding: 16, borderRadius: 20,
-    borderWidth: 1, borderColor: T.border, borderLeftWidth: 4,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 },
-      android: { elevation: 2 },
-    }),
+  appBarButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  finLabel: { fontSize: 11, color: T.textSec, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  finValue: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: T.text, marginBottom: 12, marginLeft: 4, letterSpacing: -0.3 },
-  studentsContainer: { marginBottom: 24 },
-  studentsList: { gap: 12 },
-  studentCard: {
-    backgroundColor: T.white, borderRadius: 24, padding: 16,
-    borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 },
-      android: { elevation: 2 },
-    }),
+  appBarTitleWrap: { flex: 1, alignItems: 'center', paddingHorizontal: Spacing.sm },
+  appBarTitle: { ...TypeScale.sectionTitle, maxWidth: '100%' },
+  identityWrap: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm },
+  identityCard: {
+    borderRadius: BorderRadius['2xl'],
+    padding: Spacing.lg,
+    overflow: 'hidden',
   },
-  stHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  stName: { fontSize: 16, fontWeight: '700', color: T.text, marginBottom: 6 },
-  stIdPill: { alignSelf: 'flex-start', backgroundColor: T.bg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: T.border },
-  stIdText: { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 10, color: T.textSec, fontWeight: '600' },
-  
-  stActions: { flexDirection: 'row', gap: 6 },
-  stActionIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center' },
-
-  stInfoGrid: { gap: 6, marginBottom: 12 },
-  stInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  stInfoText: { fontSize: 13, color: T.textSec, flex: 1 },
-
-  stFeesScroll: { gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: T.border, marginLeft: -16, paddingLeft: 16, paddingRight: 16 },
-  instCol: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: T.bg, borderRadius: 12, borderWidth: 1, borderColor: T.border },
-  instColPaid: { backgroundColor: T.white, borderColor: T.border },
-  instColPartial: { backgroundColor: `${T.amber}10`, borderColor: `${T.amber}30` },
-  
-  instDotOuter: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: T.textMuted, alignItems: 'center', justifyContent: 'center' },
-  instDotOuterPaid: { borderColor: T.text, backgroundColor: T.white },
-  instDotOuterPartial: { borderColor: T.amber, backgroundColor: `${T.amber}20` },
-  instDotInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: T.text },
-
-  instName: { fontSize: 12, fontWeight: '700', color: T.text, marginBottom: 2 },
-  instAmount: { fontSize: 10, color: T.textSec, fontWeight: '600' },
-  instDue: { fontSize: 10, color: T.amber, fontWeight: '800' },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalOverlayDark: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: T.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: T.border, backgroundColor: T.white, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: T.text },
-  modalSub: { fontSize: 13, color: T.textSec, marginTop: 4 },
-  modalClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center' },
-  inputLabel: { fontSize: 13, fontWeight: '700', color: T.textSec, marginBottom: 8, marginTop: 12, textTransform: 'uppercase' },
-  input: { backgroundColor: T.white, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 16, height: 50, fontSize: 16, color: T.text },
-  
-  markRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: T.white, padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: T.border },
-  markName: { fontSize: 15, fontWeight: '700', color: T.text },
-  markMax: { fontSize: 12, color: T.textSec, marginTop: 4 },
-  markScore: { fontSize: 24, fontWeight: '800', color: T.accent },
-
-  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: T.white, borderRadius: 12, borderWidth: 1, borderColor: T.border },
-  tabBtnActive: { backgroundColor: T.text, borderColor: T.text },
-  tabBtnText: { fontSize: 14, fontWeight: '700', color: T.textSec },
-  tabBtnTextActive: { color: T.white },
-
-  instSelectBtn: { padding: 16, backgroundColor: T.white, borderRadius: 12, borderWidth: 1, borderColor: T.border, marginBottom: 8 },
-  instSelectBtnActive: { backgroundColor: T.text, borderColor: T.text },
-  instSelectText: { fontSize: 14, fontWeight: '700', color: T.text },
-
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 12, paddingVertical: 8 },
-  checkbox: { width: 24, height: 24, borderRadius: 8, borderWidth: 2, borderColor: T.border, alignItems: 'center', justifyContent: 'center', backgroundColor: T.white },
-  checkboxActive: { backgroundColor: T.text, borderColor: T.text },
-  checkboxLabel: { fontSize: 14, color: T.text, fontWeight: '600' }
+  identityTopRow: { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap', gap: Spacing.md },
+  identityCopy: { flex: 1, minWidth: 180 },
+  identityTitle: { fontSize: FontSize.xl, lineHeight: 30, fontWeight: FontWeight.bold, letterSpacing: -0.5 },
+  identitySubtitle: { ...TypeScale.body, marginTop: Spacing.xs },
+  statusBadge: {
+    maxWidth: 132,
+    minHeight: 32,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusBadgeText: { ...TypeScale.caption, flexShrink: 1 },
+  identityMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginTop: Spacing.md },
+  identityMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  identityMetaText: { ...TypeScale.label },
+  sectionContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: Spacing['3xl'], gap: Spacing.lg },
+  emptySectionContent: { flexGrow: 1 },
+  loadingContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, gap: Spacing.lg },
+  centeredFeedback: { flex: 1, justifyContent: 'center', padding: Spacing.xl },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  sectionHeadingCopy: { flex: 1, minWidth: 0 },
+  sectionTitle: { ...TypeScale.sectionTitle },
+  sectionSubtitle: { ...TypeScale.body, marginTop: 2 },
+  workflowTitle: { ...TypeScale.sectionTitle, fontSize: FontSize.base, lineHeight: 21 },
+  workflowDescription: { ...TypeScale.body, fontSize: FontSize.sm, lineHeight: 19, marginTop: 3 },
+  primaryButton: {
+    minHeight: 50,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  primaryButtonText: { ...TypeScale.label, textAlign: 'center' },
+  secondaryButton: {
+    minHeight: 46,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  secondaryButtonText: { ...TypeScale.label, textAlign: 'center' },
+  disabled: { opacity: 0.5 },
+  textAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  textActionLabel: { ...TypeScale.label },
+  studentListHeader: { gap: Spacing.md, marginBottom: Spacing.lg },
+  roundAction: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  searchSurface: {
+    minHeight: 52,
+    paddingVertical: 0,
+    paddingHorizontal: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  searchInput: { flex: 1, minHeight: 48, ...TypeScale.body, paddingVertical: 0 },
+  searchClear: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  resultCount: { ...TypeScale.caption, paddingHorizontal: Spacing.xs },
+  listSeparator: { height: Spacing.sm },
+  studentCard: { padding: Spacing.lg, gap: Spacing.md },
+  studentIdentityRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.bold },
+  studentCopy: { flex: 1, minWidth: 0 },
+  studentName: { ...TypeScale.sectionTitle, fontSize: FontSize.base, lineHeight: 21, flexShrink: 1 },
+  idBadge: { borderRadius: BorderRadius.sm, paddingHorizontal: 7, paddingVertical: 3 },
+  idBadgeText: { ...TypeScale.caption },
+  studentMeta: { ...TypeScale.caption, marginTop: 3 },
+  studentSignals: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Spacing.sm },
+  signalBadge: { minHeight: 28, borderRadius: BorderRadius.full, paddingHorizontal: Spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%' },
+  signalText: { ...TypeScale.caption, flexShrink: 1 },
+  cardList: { gap: Spacing.sm },
+  feeIntroCard: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.md },
+  feeIntroIcon: { width: 48, height: 48, borderRadius: BorderRadius.lg, alignItems: 'center', justifyContent: 'center' },
+  feeIntroCopy: { flex: 1, minWidth: 150 },
+  feePlanRow: { padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  feePlanIcon: { width: 42, height: 42, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center' },
+  feePlanCopy: { flex: 1, minWidth: 0 },
+  feePlanName: { ...TypeScale.label },
+  feePlanMeta: { ...TypeScale.caption, marginTop: 3 },
+  feePlanTrailing: { alignItems: 'flex-end', gap: 4 },
+  feePlanAmount: { ...TypeScale.label },
+  coverageSummary: { flexDirection: 'row', alignItems: 'stretch', padding: Spacing.lg },
+  coverageMetric: { flex: 1, alignItems: 'center', justifyContent: 'center', minWidth: 0 },
+  coverageValue: { fontSize: FontSize.xl, lineHeight: 30, fontWeight: FontWeight.bold },
+  coverageLabel: { ...TypeScale.caption, textAlign: 'center', marginTop: 3 },
+  coverageDivider: { width: StyleSheet.hairlineWidth, marginHorizontal: Spacing.sm },
+  coverageStudentRow: { padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  coverageStudentCopy: { flex: 1, minWidth: 0 },
+  coverageStudentName: { ...TypeScale.label },
+  coverageStudentMeta: { ...TypeScale.caption, marginTop: 3 },
+  coverageBadge: { minWidth: 54, minHeight: 30, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  coverageBadgeText: { fontSize: 10, lineHeight: 14, fontWeight: FontWeight.bold, letterSpacing: 0.4 },
+  sheetKeyboard: { flex: 1 },
+  sheetSafeArea: { flex: 1 },
+  sheetHandle: { width: 42, height: 5, borderRadius: 999, alignSelf: 'center', marginTop: Spacing.sm },
+  sheetHeader: { minHeight: 70, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  sheetHeaderCopy: { flex: 1, minWidth: 0 },
+  sheetTitle: { ...TypeScale.sectionTitle },
+  sheetSubtitle: { ...TypeScale.caption, marginTop: 3 },
+  closeButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  sheetContent: { padding: Spacing.xl, paddingBottom: Spacing['4xl'], gap: Spacing.lg },
+  studentActionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
+  studentActionTile: { width: '47%', flexGrow: 1, minHeight: 124, borderRadius: BorderRadius.xl, borderWidth: 1, padding: Spacing.lg },
+  studentActionIcon: { width: 44, height: 44, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md },
+  studentActionLabel: { ...TypeScale.label, fontSize: 15, lineHeight: 20 },
+  studentActionDescription: { ...TypeScale.body, fontSize: 13, lineHeight: 18, marginTop: 4 },
+  performanceSummary: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Spacing.lg },
+  performanceSummaryLabel: { fontSize: 10, lineHeight: 14, fontWeight: FontWeight.bold, letterSpacing: 0.8 },
+  performanceSummaryValue: { fontSize: FontSize['2xl'], lineHeight: 34, fontWeight: FontWeight.bold, marginTop: 3 },
+  performanceSummaryMeta: { ...TypeScale.caption, textAlign: 'right' },
+  markRow: { padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  markCopy: { flex: 1, minWidth: 0 },
+  markName: { ...TypeScale.label },
+  markDate: { ...TypeScale.caption, marginTop: 3 },
+  markScoreWrap: { alignItems: 'flex-end' },
+  markScore: { fontSize: FontSize.lg, lineHeight: 26, fontWeight: FontWeight.bold },
+  markPercent: { ...TypeScale.caption },
+  unrecordedBadge: { minHeight: 30, borderRadius: BorderRadius.full, paddingHorizontal: Spacing.sm, alignItems: 'center', justifyContent: 'center', flexShrink: 1 },
+  unrecordedText: { ...TypeScale.label, textAlign: 'center' },
+  inputGroup: { gap: 7 },
+  inputLabel: { ...TypeScale.label },
+  input: { minHeight: 50, borderRadius: BorderRadius.md, borderWidth: 1, paddingHorizontal: Spacing.md, ...TypeScale.body },
+  multilineInput: { minHeight: 100, paddingTop: Spacing.md, textAlignVertical: 'top' },
+  modeSwitch: { borderRadius: BorderRadius.lg, padding: 4, flexDirection: 'row', gap: 4 },
+  modeButton: { flex: 1, minHeight: 44, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.sm },
+  modeButtonText: { ...TypeScale.label, textAlign: 'center' },
+  optionList: { gap: Spacing.sm },
+  optionRow: { minHeight: 58, borderRadius: BorderRadius.lg, borderWidth: 1, padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  optionCopy: { flex: 1, minWidth: 0 },
+  optionTitle: { ...TypeScale.label },
+  optionMeta: { ...TypeScale.caption, marginTop: 3 },
+  checkboxRow: { minHeight: 64, borderRadius: BorderRadius.lg, borderWidth: 1, padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  checkbox: { width: 28, height: 28, borderRadius: BorderRadius.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  checkboxCopy: { flex: 1 },
+  qrCard: { alignItems: 'center', paddingVertical: Spacing['2xl'] },
+  qrCodeWrap: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg },
+  qrBatchName: { ...TypeScale.sectionTitle, marginTop: Spacing.lg, textAlign: 'center' },
+  qrUrl: { ...TypeScale.caption, marginTop: Spacing.sm, textAlign: 'center' },
+  dateNotice: { padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  dateNoticeText: { ...TypeScale.body, flex: 1 },
+  addFeeCard: { gap: Spacing.md },
+  formSectionTitle: { ...TypeScale.sectionTitle },
 });

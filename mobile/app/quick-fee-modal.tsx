@@ -1,297 +1,292 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, TextInput,
-  Dimensions, Platform, TouchableOpacity, Alert,
-  KeyboardAvoidingView, Keyboard, ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
-import { Search, IndianRupee, CheckCircle2, User as UserIcon } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
+import { CheckCircle2, ChevronRight, Search, User, X } from 'lucide-react-native';
 import api from '../services/api';
-import { BrandButton, TEACHER_TAB_CONTENT_INSET } from '../components/ui';
+import { offlineQuery } from '../services/offlineSync';
+import { BorderRadius, Colors, FontWeight, Spacing, TypeScale } from '../constants/theme';
+import { Feedback, PressableScale, Surface } from '../components/ui';
+import { RecordPaymentForm, type PaymentStudent } from '../components/fees/RecordPaymentForm';
+import {
+  MonthCoveragePaymentForm,
+  type MonthCoverageStudent,
+} from '../components/fees/MonthCoveragePaymentForm';
 
-const { width } = Dimensions.get('window');
+type FeeMode = 'CURRENT_DUE_BASED' | 'MONTH_COVERAGE';
+type SuccessState = { amount: number; studentName: string; queued?: boolean } | null;
 
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
-};
-
-interface StudentResult {
-  id: string;
-  name: string;
-  humanId: string | null;
-  phone: string | null;
-  batchName: string;
-  totalFee: number;
-  totalPaid: number;
-  balance: number;
+interface FeeStudent extends PaymentStudent {
+  phone?: string | null;
 }
 
+interface MonthCoverageSummary {
+  feeMode: 'MONTH_COVERAGE';
+  students: MonthCoverageStudent[];
+}
+
+const money = (amount: number) => `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
 export default function QuickFeeScreen() {
-  const queryClient = useQueryClient();
+  const router = useRouter();
+  const { studentId } = useLocalSearchParams<{ studentId?: string }>();
+  const colors = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const [search, setSearch] = useState('');
-  const [student, setStudent] = useState<StudentResult | null>(null);
-  const [amount, setAmount] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [selectedCurrentDueStudent, setSelectedCurrentDueStudent] = useState<FeeStudent | null>(null);
+  const [selectedMonthStudent, setSelectedMonthStudent] = useState<MonthCoverageStudent | null>(null);
+  const [success, setSuccess] = useState<SuccessState>(null);
 
-  const amountRef = useRef<TextInput>(null);
+  const modeQuery = useQuery<FeeMode>({
+    queryKey: ['dashboard-summary', 'fee-mode'],
+    queryFn: () => offlineQuery('fee-mode', async () => (
+      await api.get('/dashboard/summary')
+    ).data.feeMode as FeeMode),
+  });
+  const feeMode = modeQuery.data;
 
-  const { data: students = [], refetch } = useQuery<StudentResult[]>({
+  const currentDueQuery = useQuery<FeeStudent[]>({
     queryKey: ['quick-search-fees'],
-    queryFn: async () => {
-      const res = await api.get('/fees');
-      return res.data;
-    },
+    queryFn: () => offlineQuery('fees-current-due', async () => (await api.get('/fees')).data),
+    enabled: feeMode === 'CURRENT_DUE_BASED',
   });
 
+  const monthQuery = useQuery<MonthCoverageSummary>({
+    queryKey: ['month-coverage-summary'],
+    queryFn: () => offlineQuery('fees-month-coverage', async () => (
+      await api.get('/month-coverage/summary')
+    ).data),
+    enabled: feeMode === 'MONTH_COVERAGE',
+  });
+
+  useEffect(() => {
+    if (!studentId || selectedCurrentDueStudent || selectedMonthStudent || success) return;
+    if (feeMode === 'CURRENT_DUE_BASED') {
+      const match = currentDueQuery.data?.find(student => student.id === studentId && student.balance > 0);
+      if (match) setSelectedCurrentDueStudent(match);
+    }
+    if (feeMode === 'MONTH_COVERAGE') {
+      const match = monthQuery.data?.students.find(student => student.studentId === studentId && !student.setupRequired && student.pendingMonths > 0);
+      if (match) setSelectedMonthStudent(match);
+    }
+  }, [currentDueQuery.data, feeMode, monthQuery.data?.students, selectedCurrentDueStudent, selectedMonthStudent, studentId, success]);
+
   const searchResults = useMemo(() => {
-    if (search.length < 2) return [];
-    const lowerSearch = search.toLowerCase();
-    return students.filter(s => 
-      s.name.toLowerCase().includes(lowerSearch) || 
-      (s.humanId && s.humanId.toLowerCase().includes(lowerSearch)) ||
-      (s.phone && s.phone.includes(search.trim()))
-    ).slice(0, 5); // top 5 results
-  }, [search, students]);
+    const needle = search.trim().toLowerCase();
+    if (!needle || selectedCurrentDueStudent || selectedMonthStudent || success) return [];
+    if (feeMode === 'MONTH_COVERAGE') {
+      return (monthQuery.data?.students ?? [])
+        .filter(student => !student.setupRequired && student.pendingMonths > 0)
+        .filter(student => [student.name, student.humanId ?? '', student.batchName]
+          .some(value => value.toLowerCase().includes(needle)))
+        .slice(0, 8);
+    }
+    return (currentDueQuery.data ?? [])
+      .filter(student => student.balance > 0)
+      .filter(student => [student.name, student.humanId ?? '', student.phone ?? '', student.batchName]
+        .some(value => value.toLowerCase().includes(needle)))
+      .slice(0, 8);
+  }, [currentDueQuery.data, feeMode, monthQuery.data?.students, search, selectedCurrentDueStudent, selectedMonthStudent, success]);
 
-  const selectStudent = (s: StudentResult) => {
-    Keyboard.dismiss();
+  const reset = () => {
+    setSelectedCurrentDueStudent(null);
+    setSelectedMonthStudent(null);
     setSearch('');
-    setStudent(s);
-    setAmount(s.balance > 0 ? s.balance.toString() : '');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setTimeout(() => amountRef.current?.focus(), 100);
+    setSuccess(null);
   };
 
-  const handlePayment = async () => {
-    const numericAmount = parseFloat(amount);
-    if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await api.post('/fees/pay', {
-        studentId: student?.id,
-        amount: numericAmount,
-      });
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSuccess(true);
-      refetch();
-      queryClient.invalidateQueries();
-      Keyboard.dismiss();
-      setTimeout(() => {
-        setStudent(null);
-        setSearch('');
-        setAmount('');
-        setSuccess(false);
-      }, 3000);
-    } catch (e: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Payment Failed', e.response?.data?.error || 'Could not record payment.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const loading = modeQuery.isLoading
+    || (feeMode === 'CURRENT_DUE_BASED' && currentDueQuery.isLoading)
+    || (feeMode === 'MONTH_COVERAGE' && monthQuery.isLoading);
+  const loadError = modeQuery.isError
+    || (feeMode === 'CURRENT_DUE_BASED' && currentDueQuery.isError)
+    || (feeMode === 'MONTH_COVERAGE' && monthQuery.isError);
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView 
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: TEACHER_TAB_CONTENT_INSET }}
-          keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View style={styles.headingCopy}>
+            <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>COLLECTION</Text>
+            <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Record fee</Text>
+          </View>
+          <PressableScale accessibilityLabel="Close record fee" onPress={() => router.back()} style={[styles.closeButton, { backgroundColor: colors.surfaceSecondary }]}>
+            <X size={21} color={colors.text} />
+          </PressableScale>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.content}
           keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Animated.View entering={FadeInDown.duration(400)} style={s.headerArea}>
-          <View style={s.iconWrap}><IndianRupee size={32} color={T.white} /></View>
-          <Text style={s.title}>Quick Fee</Text>
-          <Text style={s.subtitle}>Search by name, ID, or phone to log payment</Text>
-        </Animated.View>
-
-        {!student && !success && (
-          <Animated.View entering={FadeInDown.duration(400).delay(100)} style={s.searchSection}>
-            <View style={s.searchBar}>
-              <Search size={22} color={T.textMuted} />
-              <TextInput
-                style={s.searchInput}
-                placeholder="Student Name, ID, or Phone..."
-                placeholderTextColor={T.textMuted}
-                value={search}
-                onChangeText={setSearch}
-                returnKeyType="search"
-                autoCorrect={false}
-              />
-            </View>
-
-            {search.length >= 2 && searchResults.length > 0 && (
-              <ScrollView style={s.resultsContainer} keyboardShouldPersistTaps="handled">
-                {searchResults.map((res, i) => (
-                  <TouchableOpacity 
-                    key={res.id} 
-                    style={[s.resultItem, i < searchResults.length - 1 && s.resultItemBorder]}
-                    onPress={() => selectStudent(res)}
-                  >
-                    <View style={s.resultAvatar}><UserIcon size={16} color={T.textMuted}/></View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.resultName}>{res.name}</Text>
-                      <Text style={s.resultMeta}>{res.humanId} • {res.batchName}</Text>
-                    </View>
-                    {res.balance > 0 && <Text style={s.resultDue}>₹{res.balance}</Text>}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-            
-            {search.length >= 2 && searchResults.length === 0 && (
-              <View style={s.noResults}>
-                <Text style={s.noResultsText}>No students found</Text>
-              </View>
-            )}
-          </Animated.View>
-        )}
-
-        {student && !success && (
-          <Animated.View entering={FadeInDown.duration(300)} style={s.studentCard}>
-            <TouchableOpacity 
-              style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, padding: 8 }} 
-              onPress={() => setStudent(null)}
-            >
-              <Text style={{ color: T.textMuted, fontWeight: '700', fontSize: 13 }}>Cancel</Text>
-            </TouchableOpacity>
-
-            <View style={s.studentInfoRow}>
-              <View style={s.avatar}><UserIcon size={24} color={T.accent} /></View>
-              <View style={{ flex: 1, paddingRight: 40 }}>
-                <Text style={s.studentName} numberOfLines={1}>{student.name}</Text>
-                <Text style={s.studentBatch}>{student.batchName}</Text>
-              </View>
-            </View>
-
-            <View style={s.balanceInfoRow}>
-                <Text style={s.pendingBadgeLabel}>Outstanding Balance</Text>
-                <Text style={[s.pendingBadgeAmount, student.balance > 0 ? { color: '#ef4444' } : { color: T.emerald }]}>
-                  ₹{student.balance.toLocaleString()}
-                </Text>
-            </View>
-
-            <View style={s.amountInputContainer}>
-              <Text style={s.rupeeSymbol}>₹</Text>
-              <TextInput
-                ref={amountRef}
-                style={s.amountInput}
-                placeholder="0"
-                placeholderTextColor={T.textMuted}
-                keyboardType="numeric"
-                value={amount}
-                onChangeText={setAmount}
-              />
-            </View>
-
-            <BrandButton
-              title={`Confirm Payment`}
-              onPress={handlePayment}
-              loading={isSubmitting}
-              style={{ marginTop: 20 }}
+          {loading ? (
+            <Feedback kind="loading" title="Loading students" description="Checking the institute’s active fee system." />
+          ) : loadError ? (
+            <Feedback
+              kind="error"
+              title="Fee records could not be loaded"
+              description="Check the connection and try again."
+              action={(
+                <PressableScale
+                  accessibilityLabel="Retry loading fee records"
+                  onPress={() => {
+                    void modeQuery.refetch();
+                    if (feeMode === 'CURRENT_DUE_BASED') void currentDueQuery.refetch();
+                    if (feeMode === 'MONTH_COVERAGE') void monthQuery.refetch();
+                  }}
+                  style={[styles.outlineAction, { borderColor: colors.border }]}
+                >
+                  <Text style={[styles.outlineActionText, { color: colors.text }]}>Try again</Text>
+                </PressableScale>
+              )}
             />
-          </Animated.View>
-        )}
+          ) : success ? (
+            <Surface tone="strong" style={styles.successCard}>
+              <View style={[styles.successIcon, { backgroundColor: Colors.successBg }]}>
+                <CheckCircle2 size={34} color={Colors.success} />
+              </View>
+              <Text accessibilityRole="header" style={[styles.successTitle, { color: colors.text }]}>
+                {success.queued ? 'Payment saved offline' : 'Payment recorded'}
+              </Text>
+              <Text style={[styles.successDescription, { color: colors.textSecondary }]}>
+                {success.queued
+                  ? `${money(success.amount)} for ${success.studentName} will sync when the connection returns.`
+                  : `${money(success.amount)} received from ${success.studentName}.`}
+              </Text>
+              <View style={styles.successActions}>
+                <PressableScale accessibilityLabel="Record another fee" onPress={reset} style={[styles.outlineAction, { borderColor: colors.border }]}>
+                  <Text style={[styles.outlineActionText, { color: colors.text }]}>Record another</Text>
+                </PressableScale>
+                <PressableScale accessibilityLabel="Finish recording fee" onPress={() => router.back()} style={[styles.primaryAction, { backgroundColor: colors.text }]}>
+                  <Text style={[styles.primaryActionText, { color: colors.background }]}>Done</Text>
+                </PressableScale>
+              </View>
+            </Surface>
+          ) : selectedCurrentDueStudent ? (
+            <RecordPaymentForm student={selectedCurrentDueStudent} onCancel={reset} onSuccess={setSuccess} />
+          ) : selectedMonthStudent ? (
+            <MonthCoveragePaymentForm student={selectedMonthStudent} onCancel={reset} onSuccess={setSuccess} />
+          ) : (
+            <>
+              <View style={styles.intro}>
+                <Text style={[styles.introTitle, { color: colors.text }]}>Find a student</Text>
+                <Text style={[styles.introDescription, { color: colors.textSecondary }]}>
+                  {feeMode === 'MONTH_COVERAGE'
+                    ? 'Select a student, preview the exact months covered, then confirm.'
+                    : 'Select a student, choose the correct installment, then review the allocation.'}
+                </Text>
+              </View>
 
-        {success && (
-          <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut} style={s.successCard}>
-            <View style={s.successIconWrap}><CheckCircle2 size={40} color={T.emerald} /></View>
-            <Text style={s.successTitle}>Payment Recorded!</Text>
-            <Text style={s.successDesc}>₹{amount} collected from {student?.name}</Text>
-          </Animated.View>
-        )}
+              <Surface tone="material" style={styles.searchSurface}>
+                <Search size={20} color={colors.textMuted} />
+                <TextInput
+                  accessibilityLabel="Search students for fee payment"
+                  autoFocus
+                  autoCorrect={false}
+                  onChangeText={setSearch}
+                  placeholder="Name, student ID, phone, or batch"
+                  placeholderTextColor={colors.textMuted}
+                  returnKeyType="search"
+                  style={[styles.searchInput, { color: colors.text }]}
+                  value={search}
+                />
+              </Surface>
+
+              {search.trim() ? (
+                <View style={styles.results}>
+                  {searchResults.length > 0 ? searchResults.map(result => {
+                    const monthResult = 'studentId' in result;
+                    const id = monthResult ? result.studentId : result.id;
+                    const trailing = monthResult
+                      ? `${result.pendingMonths} month${result.pendingMonths === 1 ? '' : 's'}`
+                      : money(result.balance);
+                    return (
+                      <PressableScale
+                        key={id}
+                        accessibilityLabel={`Select ${result.name}, ${trailing} pending`}
+                        haptic="selection"
+                        onPress={() => {
+                          if (monthResult) setSelectedMonthStudent(result);
+                          else setSelectedCurrentDueStudent(result);
+                          setSearch('');
+                        }}
+                      >
+                        <Surface style={styles.resultCard}>
+                          <View style={[styles.avatar, { backgroundColor: colors.surfaceSecondary }]}>
+                            <User size={19} color={colors.textSecondary} />
+                          </View>
+                          <View style={styles.resultCopy}>
+                            <Text style={[styles.resultName, { color: colors.text }]} numberOfLines={1}>{result.name}</Text>
+                            <Text style={[styles.resultMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+                              {[result.humanId, result.batchName].filter(Boolean).join(' · ')}
+                            </Text>
+                          </View>
+                          <View style={styles.resultTrailing}>
+                            <Text style={[styles.resultAmount, { color: colors.attention }]}>{trailing}</Text>
+                            <ChevronRight size={18} color={colors.textMuted} />
+                          </View>
+                        </Surface>
+                      </PressableScale>
+                    );
+                  }) : (
+                    <Feedback kind="empty" title="No matching payable students" description="Try a name, student ID, phone number, or batch." />
+                  )}
+                </View>
+              ) : (
+                <Feedback
+                  kind="empty"
+                  title="Search to begin"
+                  description="Only students with an outstanding installment or pending fee month will appear."
+                />
+              )}
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-  headerArea: { alignItems: 'center', paddingTop: 40, paddingBottom: 24 },
-  iconWrap: {
-    width: 64, height: 64, borderRadius: 20,
-    backgroundColor: T.accent, alignItems: 'center', justifyContent: 'center',
-    marginBottom: 16,
-    ...Platform.select({
-      ios: { shadowColor: T.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 12 },
-      android: { elevation: 6 },
-    }),
-  },
-  title: { color: T.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.5, marginBottom: 8 },
-  subtitle: { color: T.textSec, fontSize: 15, fontWeight: '500' },
-  searchSection: { paddingHorizontal: 20, zIndex: 10 },
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: T.white, borderRadius: 16,
-    paddingHorizontal: 16, height: 56,
-    borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8 },
-      android: { elevation: 2 },
-    }),
-  },
-  searchInput: { flex: 1, marginLeft: 12, fontSize: 16, color: T.text, fontWeight: '600' },
-  
-  resultsContainer: {
-    backgroundColor: T.white, borderRadius: 16, marginTop: 8,
-    borderWidth: 1, borderColor: T.border, maxHeight: 240,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 },
-    }),
-  },
-  resultItem: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-  resultItemBorder: { borderBottomWidth: 1, borderBottomColor: T.border },
-  resultAvatar: { width: 32, height: 32, borderRadius: 8, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  resultName: { fontSize: 15, fontWeight: '700', color: T.text, marginBottom: 2 },
-  resultMeta: { fontSize: 12, color: T.textSec, fontWeight: '500' },
-  resultDue: { fontSize: 14, fontWeight: '800', color: '#ef4444' },
-
-  noResults: { marginTop: 12, alignItems: 'center', padding: 16 },
-  noResultsText: { color: T.textMuted, fontSize: 14, fontWeight: '600' },
-
-  studentCard: {
-    margin: 20, padding: 24, paddingTop: 32,
-    backgroundColor: T.white, borderRadius: 24,
-    borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 1, shadowRadius: 16 },
-      android: { elevation: 4 },
-    }),
-  },
-  studentInfoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  avatar: { width: 48, height: 48, borderRadius: 14, backgroundColor: `${T.accent}15`, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  studentName: { fontSize: 18, color: T.text, fontWeight: '800', marginBottom: 4 },
-  studentBatch: { fontSize: 13, color: T.textSec, fontWeight: '600' },
-  
-  balanceInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderTopWidth: 1, borderTopColor: T.border, borderBottomWidth: 1, borderBottomColor: T.border, marginBottom: 20 },
-  pendingBadgeLabel: { fontSize: 13, color: T.textSec, fontWeight: '600' },
-  pendingBadgeAmount: { fontSize: 18, fontWeight: '800' },
-
-  amountInputContainer: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: T.bg, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 20,
-    borderWidth: 1, borderColor: T.border,
-  },
-  rupeeSymbol: { fontSize: 32, color: T.text, fontWeight: '800', marginRight: 6 },
-  amountInput: { fontSize: 40, color: T.text, fontWeight: '800', minWidth: 80, textAlign: 'center' },
-  
-  successCard: {
-    margin: 24, padding: 40, alignItems: 'center',
-    backgroundColor: T.white, borderRadius: 28,
-    borderWidth: 1, borderColor: T.border,
-  },
-  successIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: `${T.emerald}15`, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  successTitle: { fontSize: 24, color: T.text, fontWeight: '800', marginBottom: 12 },
-  successDesc: { fontSize: 15, color: T.textSec, textAlign: 'center' },
+const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
+  flex: { flex: 1 },
+  header: { minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderBottomWidth: 1 },
+  headingCopy: { flex: 1 },
+  eyebrow: { ...TypeScale.caption, fontWeight: FontWeight.bold },
+  title: { ...TypeScale.sectionTitle, fontWeight: FontWeight.bold, marginTop: 2 },
+  closeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: BorderRadius.full },
+  content: { flexGrow: 1, padding: Spacing.xl, paddingBottom: Spacing['5xl'], gap: Spacing.xl },
+  intro: { gap: Spacing.xs },
+  introTitle: TypeScale.sectionTitle,
+  introDescription: TypeScale.body,
+  searchSurface: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 0 },
+  searchInput: { flex: 1, minHeight: 48, ...TypeScale.body },
+  results: { gap: Spacing.sm },
+  resultCard: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md },
+  avatar: { width: 42, height: 42, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center' },
+  resultCopy: { flex: 1, minWidth: 0 },
+  resultName: { ...TypeScale.body, fontWeight: FontWeight.bold },
+  resultMeta: { ...TypeScale.caption, marginTop: 2 },
+  resultTrailing: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  resultAmount: { ...TypeScale.label, fontWeight: FontWeight.bold },
+  outlineAction: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.lg, borderWidth: 1, borderRadius: BorderRadius.lg },
+  outlineActionText: { ...TypeScale.label, fontWeight: FontWeight.bold },
+  primaryAction: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl, borderRadius: BorderRadius.lg },
+  primaryActionText: { ...TypeScale.label, fontWeight: FontWeight.bold },
+  successCard: { alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing['3xl'] },
+  successIcon: { width: 68, height: 68, borderRadius: BorderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  successTitle: TypeScale.sectionTitle,
+  successDescription: { ...TypeScale.body, textAlign: 'center' },
+  successActions: { width: '100%', flexDirection: 'row', justifyContent: 'center', gap: Spacing.md, marginTop: Spacing.sm },
 });

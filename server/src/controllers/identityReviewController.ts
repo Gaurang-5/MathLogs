@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../prisma';
-import { prismaIdentityReviewService } from '../services/prismaIdentityReviewService';
+import { identityReviewServiceFor } from '../services/prismaIdentityReviewService';
 import { enrollmentNotificationService } from '../services/enrollmentNotificationService';
 
 function fail(res: Response, error: unknown) {
@@ -40,9 +40,12 @@ export async function resolveIdentityReview(req: Request, res: Response) {
       fee: req.body.fee,
       idempotencyKey: req.body.idempotencyKey,
     };
-    const data = req.body.action === 'USE_EXISTING'
-      ? await prismaIdentityReviewService.resolveWithExisting({ ...common, studentId: req.body.studentId })
-      : await prismaIdentityReviewService.resolveAsNew(common);
+    const data = await prisma.$transaction(async tx => {
+      const service = identityReviewServiceFor(tx);
+      return req.body.action === 'USE_EXISTING'
+        ? service.resolveWithExisting({ ...common, studentId: req.body.studentId })
+        : service.resolveAsNew(common);
+    }, { isolationLevel: 'Serializable' });
     const eventKey = 'notificationEventKey' in data ? data.notificationEventKey : undefined;
     const parts = eventKey?.split(':') || [];
     const type = eventKey ? parts[parts.length - 1] as 'ADDED' | 'READDED' : null;

@@ -1,13 +1,23 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, useColorScheme } from 'react-native';
 import { BarChart3, TrendingUp, ShieldAlert, BookOpen, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2 } from 'lucide-react-native';
 import api from '../../services/api';
+import { Colors } from '../../constants/theme';
 
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', emeraldLight: '#d1fae5', amber: '#f59e0b', amberLight: '#fef3c7',
-  red: '#ef4444', redLight: '#fee2e2', border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
+const useQuizPalette = () => {
+    const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+    const colors = Colors[scheme];
+    return useMemo(() => ({
+        bg: colors.background, white: colors.surface, text: colors.text,
+        textSec: colors.textSecondary, textMuted: colors.textMuted, accent: colors.hero,
+        emerald: colors.positive,
+        emeraldLight: scheme === 'dark' ? 'rgba(124,166,150,0.16)' : 'rgba(104,139,125,0.14)',
+        amber: colors.attention,
+        amberLight: scheme === 'dark' ? 'rgba(186,143,112,0.16)' : 'rgba(155,120,95,0.14)',
+        red: Colors.error,
+        redLight: scheme === 'dark' ? 'rgba(255,69,58,0.15)' : 'rgba(255,59,48,0.12)',
+        border: colors.border,
+    }), [colors, scheme]);
 };
 
 interface QuizAnalyticsData {
@@ -26,14 +36,18 @@ interface QuizAnalyticsData {
 
 interface Props { quizId: string; }
 
-const MetricCard = ({ label, value }: { label: string; value: string | number }) => (
-    <View style={s.metricCard}>
+const MetricCard = ({ label, value }: { label: string; value: string | number }) => {
+    const T = useQuizPalette();
+    const s = useMemo(() => makeStyles(T), [T]);
+    return <View style={s.metricCard}>
         <Text style={s.metricLabel}>{label}</Text>
         <Text style={s.metricValue}>{value}</Text>
-    </View>
-);
+    </View>;
+};
 
 const FailureBadge = ({ rate }: { rate: number }) => {
+    const T = useQuizPalette();
+    const s = useMemo(() => makeStyles(T), [T]);
     const isCritical = rate >= 70;
     const isModerate = rate >= 40;
     const bgColor = isCritical ? T.redLight : isModerate ? T.amberLight : T.emeraldLight;
@@ -47,6 +61,8 @@ const FailureBadge = ({ rate }: { rate: number }) => {
 };
 
 export default function QuizAnalytics({ quizId }: Props) {
+    const T = useQuizPalette();
+    const s = useMemo(() => makeStyles(T), [T]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [data, setData] = useState<QuizAnalyticsData | null>(null);
@@ -255,7 +271,7 @@ export default function QuizAnalytics({ quizId }: Props) {
     );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T: ReturnType<typeof useQuizPalette>) => StyleSheet.create({
     container: { flex: 1, backgroundColor: T.bg },
     content: { padding: 16, paddingBottom: 40 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 300, backgroundColor: T.white, borderRadius: 16 },

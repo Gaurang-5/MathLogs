@@ -180,6 +180,50 @@ test('used invite with the selected mode returns a reusable login without rewrit
   assert.equal(transactionCalls, 0);
 });
 
+test('setup gives an institute using the superadmin phone a distinct admin username', async () => {
+  const instituteId = 'inst-superadmin-phone';
+  replaceMethod(prisma.inviteToken, 'findUnique', (async () => ({
+    id: 'invite-superadmin-phone',
+    instituteId,
+    isUsed: false,
+    expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+    institute: {
+      id: instituteId,
+      phoneNumber: '9557940807',
+      email: 'another@example.com',
+      plan: 'MARKETPLACE',
+      config: {},
+      coachingFeeMode: 'CURRENT_DUE_BASED',
+      coachingFeeModeSelectedAt: null,
+    },
+  }) as never) as typeof prisma.inviteToken.findUnique);
+  let createdUsername = '';
+  replaceMethod(prisma, '$transaction', (async (callback: (tx: any) => Promise<unknown>) => callback({
+    institute: {
+      findUnique: async () => ({ config: {}, coachingFeeMode: 'CURRENT_DUE_BASED', coachingFeeModeSelectedAt: null }),
+      updateMany: async () => ({ count: 1 }),
+      update: async () => ({}),
+    },
+    admin: {
+      findFirst: async () => null,
+      create: async ({ data }: { data: { username: string } }) => {
+        createdUsername = data.username;
+        return { id: 'admin-new', username: data.username, passwordVersion: 0, instituteId, role: 'INSTITUTE_ADMIN' };
+      },
+    },
+    inviteToken: { update: async () => ({}) },
+  })) as typeof prisma.$transaction);
+  replaceMethod(prisma.adminSession, 'create', (async () => ({ id: 'session-new' }) as never) as typeof prisma.adminSession.create);
+  replaceMethod(prisma.refreshToken, 'create', (async () => ({ id: 'refresh-new' }) as never) as typeof prisma.refreshToken.create);
+  const res = response();
+
+  await setupAccount(replayRequest, res as never);
+
+  assert.equal(res.statusCode, 200);
+  assert.notEqual(createdUsername, '9557940807');
+  assert.match(createdUsername, /^9557940807/);
+});
+
 test('used invite replay after five minutes is rejected without issuing a token', async () => {
   replaceMethod(
     prisma.inviteToken,

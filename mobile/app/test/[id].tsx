@@ -10,6 +10,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, FileText, Calendar, BarChart2, Scan, Hash, Users, X, PenLine, Check, Edit2 } from 'lucide-react-native';
 import api from '../../services/api';
+import { executeOrQueueMutation, offlineQuery, updateCachedData } from '../../services/offlineSync';
 import { SkeletonLoader, BrandButton, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import * as Haptics from 'expo-haptics';
 
@@ -44,10 +45,7 @@ export default function TestDetailScreen() {
 
   const { data: test, isLoading } = useQuery<TestDetails>({
     queryKey: ['test', id],
-    queryFn: async () => {
-      const res = await api.get(`/tests/${id}`);
-      return res.data;
-    },
+    queryFn: () => offlineQuery(`test:${String(id)}`, async () => (await api.get(`/tests/${id}`)).data),
     staleTime: 0,
     refetchOnMount: 'always',
   });
@@ -108,19 +106,51 @@ export default function TestDetailScreen() {
     }
     setSubmitting(true);
     try {
-      await Promise.all(entries.map(([studentId, score]) =>
-        api.post('/marks', { studentId, testId: id, score: Number(score) })
+      const results = await Promise.all(entries.map(([studentId, score]) =>
+        executeOrQueueMutation({ method: 'POST', url: '/marks', data: { studentId, testId: id, score: Number(score) } })
       ));
+      const queuedCount = results.filter(result => result.status === 'queued').length;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await queryClient.refetchQueries({ queryKey: ['test', id] });
+      if (queuedCount === 0) await queryClient.refetchQueries({ queryKey: ['test', id] });
+      else {
+        const applyOfflineMarks = (previous: TestDetails | undefined): TestDetails | undefined => {
+          if (!previous) return previous;
+          const nextMarks = previous.marks.map(mark => ({ ...mark }));
+          entries.forEach(([studentId, score]) => {
+            const existing = nextMarks.find(mark => mark.student.id === studentId);
+            if (existing) existing.score = Number(score);
+            else {
+              const student = candidateStudents.find(candidate => candidate.id === studentId);
+              if (student) nextMarks.push({
+                id: `offline:${studentId}:${String(id)}`,
+                student: {
+                  id: student.id,
+                  name: student.name,
+                  humanId: student.humanId,
+                  batch: student.batchName ? { name: student.batchName } : undefined,
+                },
+                score: Number(score),
+              });
+            }
+          });
+          return { ...previous, marks: nextMarks };
+        };
+        queryClient.setQueryData<TestDetails>(['test', id], previous => applyOfflineMarks(previous));
+        await updateCachedData<TestDetails>(`test:${String(id)}`, previous => applyOfflineMarks(previous ?? undefined) ?? test!);
+      }
       setIsManualOpen(false);
-      Alert.alert('Saved ✅', `${entries.length} marks saved successfully.`);
+      Alert.alert(
+        queuedCount > 0 ? 'Saved offline' : 'Saved',
+        queuedCount > 0
+          ? `${queuedCount} ${queuedCount === 1 ? 'mark' : 'marks'} will sync automatically when the connection returns.`
+          : `${entries.length} marks saved successfully.`,
+      );
     } catch (e: any) {
       Alert.alert('Error', e.response?.data?.error || 'Failed to save marks.');
     } finally {
       setSubmitting(false);
     }
-  }, [marksInput, test, id]);
+  }, [candidateStudents, marksInput, queryClient, test, id]);
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -175,10 +205,10 @@ export default function TestDetailScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
                 <TouchableOpacity
                   style={[s.qActionBtn, { backgroundColor: T.accent, borderColor: T.accent }]}
-                  onPress={() => router.push(`/test/scan?testId=${id}&maxMarks=${test.maxMarks}`)}
+                  onPress={() => router.push(`/scan?testId=${id}`)}
                 >
                   <Scan size={16} color={T.white} />
-                  <Text style={[s.qActionText, { color: T.white }]}>Scan OMR</Text>
+                  <Text style={[s.qActionText, { color: T.white }]}>Scan marks</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[s.qActionBtn, { backgroundColor: `${T.blue}12`, borderColor: `${T.blue}30` }]}
@@ -269,12 +299,12 @@ export default function TestDetailScreen() {
                 <View style={{ gap: 10, marginBottom: 8 }}>
                   {[1,2,3].map(i => <SkeletonLoader key={i} width={width - 32} height={60} borderRadius={16} />)}
                 </View>
-              ) : null}
+              ) : undefined}
               ListEmptyComponent={!loadingCandidates ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
                   <Text style={{ color: T.textSec }}>No students found. Attach a batch to this test first.</Text>
                 </View>
-              ) : null}
+              ) : undefined}
               renderItem={({ item }) => (
                 <View style={[s.studentCard, { paddingVertical: 12 }]}>
                   <View style={{ flex: 1 }}>
@@ -342,8 +372,21 @@ export default function TestDetailScreen() {
                     return;
                   }
                   try {
-                    await api.post('/marks', { studentId: editingMark.studentId, testId: id, score: scoreNum });
-                    await queryClient.refetchQueries({ queryKey: ['test', id] });
+                    const result = await executeOrQueueMutation({
+                      method: 'POST',
+                      url: '/marks',
+                      data: { studentId: editingMark.studentId, testId: id, score: scoreNum },
+                    });
+                    if (result.status === 'synced') await queryClient.refetchQueries({ queryKey: ['test', id] });
+                    else {
+                      const applyOfflineEdit = (previous: TestDetails | undefined): TestDetails | undefined => previous ? {
+                        ...previous,
+                        marks: previous.marks.map(mark => mark.student.id === editingMark.studentId ? { ...mark, score: scoreNum } : mark),
+                      } : previous;
+                      queryClient.setQueryData<TestDetails>(['test', id], previous => applyOfflineEdit(previous));
+                      await updateCachedData<TestDetails>(`test:${String(id)}`, previous => applyOfflineEdit(previous ?? undefined) ?? test!);
+                      Alert.alert('Saved offline', 'This mark will sync automatically when the connection returns.');
+                    }
                     setEditingMark(null);
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   } catch (e: any) {

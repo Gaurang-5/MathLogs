@@ -51,6 +51,47 @@ test('public provisioning creates one institute and invite token idempotently', 
   await prisma.institute.delete({ where: { id: first.instituteId } });
 });
 
+test('superadmin phone provisions a new institute on every paid account creation', async () => {
+  const phone = '9557940807';
+  const existingIds = new Set((await prisma.institute.findMany({
+    where: { phoneNumber: phone },
+    select: { id: true }
+  })).map(institute => institute.id));
+  const createdIds: string[] = [];
+  const activation: ProvisioningActivation = {
+    kind: 'PAID',
+    plan: 'QUIZ',
+    billingCycle: 'MONTHLY',
+    startsAt: new Date(),
+    endsAt: new Date(Date.now() + 30 * 86_400_000)
+  };
+
+  try {
+    for (const suffix of ['One', 'Two']) {
+      const result = await prisma.$transaction(tx => provisionInstitute(tx, {
+        kind: 'PUBLIC',
+        instituteName: `Superadmin Test ${suffix}`,
+        ownerName: 'Super Admin',
+        phone,
+        email: `superadmin-${suffix.toLowerCase()}-${Date.now()}@example.com`
+      }, activation));
+      if (!existingIds.has(result.instituteId)) createdIds.push(result.instituteId);
+      assert.equal(result.isExisting, false);
+    }
+
+    assert.equal(new Set(createdIds).size, 2);
+    assert.equal(
+      await prisma.institute.count({ where: { phoneNumber: phone } }),
+      existingIds.size + 2
+    );
+  } finally {
+    if (createdIds.length) {
+      await prisma.inviteToken.deleteMany({ where: { instituteId: { in: createdIds } } });
+      await prisma.institute.deleteMany({ where: { id: { in: createdIds } } });
+    }
+  }
+});
+
 test('invite provisioning atomically consumes only its bound link', async () => {
   const token = `inv_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
   const link = await prisma.adminOnboardingLink.create({

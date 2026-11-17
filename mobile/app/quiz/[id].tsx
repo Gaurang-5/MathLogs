@@ -2,8 +2,9 @@ import React, { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   ActivityIndicator, Alert, Modal, Platform,
-  RefreshControl, TextInput, SafeAreaView
+  RefreshControl, TextInput, useColorScheme
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -14,21 +15,34 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import api from '../../services/api';
+import { offlineQuery } from '../../services/offlineSync';
 
 import QuizLiveMonitor from '../../components/quiz/QuizLiveMonitor';
 import QuizAnalytics from '../../components/quiz/QuizAnalytics';
 import QuizSubmissionInspector, { InspectorData } from '../../components/quiz/QuizSubmissionInspector';
-import { TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
-
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', amber: '#f59e0b', red: '#ef4444',
-  border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
-};
+import { PressableScale, Surface, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
+import { BorderRadius, Colors, Spacing, TypeScale } from '../../constants/theme';
 
 export default function QuizDashboardScreen() {
   const router = useRouter();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const colors = Colors[scheme];
+  const T = useMemo(() => ({
+    bg: colors.background,
+    white: colors.heroText,
+    text: colors.text,
+    textSec: colors.textSecondary,
+    textMuted: colors.textMuted,
+    accent: colors.hero,
+    emerald: colors.positive,
+    amber: colors.attention,
+    red: Colors.error,
+    border: colors.border,
+    shadow: colors.shadow,
+    surface: colors.surface,
+    surfaceSecondary: colors.surfaceSecondary,
+  }), [colors]);
+  const s = useMemo(() => makeStyles(T), [T]);
   const { id } = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState<'monitor' | 'analytics' | 'submissions'>('monitor');
   const [finalizing, setFinalizing] = useState(false);
@@ -44,10 +58,7 @@ export default function QuizDashboardScreen() {
 
   const { data: quizzes, isLoading, refetch, isRefetching } = useQuery<any[]>({
     queryKey: ['quizzes'],
-    queryFn: async () => {
-      const res = await api.get('/tests/online');
-      return res.data;
-    },
+    queryFn: () => offlineQuery('online-quizzes', async () => (await api.get('/tests/online')).data),
   });
 
   const quiz = quizzes?.find(q => q.id === id);
@@ -57,9 +68,9 @@ export default function QuizDashboardScreen() {
       <SafeAreaView style={s.container}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={s.header}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to quizzes">
+          <PressableScale style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to quizzes">
             <ArrowLeft size={20} color={T.text} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color={T.accent} />
@@ -202,20 +213,24 @@ export default function QuizDashboardScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to quizzes">
+        <PressableScale style={s.backBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back to quizzes">
           <ArrowLeft size={20} color={T.text} />
-        </TouchableOpacity>
-        <TouchableOpacity style={s.headerIconBtn} onPress={() => setShowOptions(true)} accessibilityRole="button" accessibilityLabel="Quiz options">
+        </PressableScale>
+        <View style={s.headerTitleWrap}>
+          <Text style={s.headerEyebrow}>{quiz.isFinalized ? 'FINALIZED QUIZ' : 'LIVE QUIZ'}</Text>
+          <Text style={s.headerTitle} numberOfLines={1}>{quiz.title}</Text>
+        </View>
+        <PressableScale style={s.headerIconBtn} onPress={() => setShowOptions(true)} accessibilityRole="button" accessibilityLabel="Quiz options">
           <MoreVertical size={20} color={T.text} />
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       <ScrollView 
         contentContainerStyle={s.content} 
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={T.accent} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={T.accent} />}
       >
-        <View style={s.titleSection}>
+        <Surface style={s.titleSection} tone="strong">
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <View style={[s.badge, quiz.isFinalized ? s.badgeFinal : s.badgeLive]}>
               <Text style={[s.badgeText, quiz.isFinalized ? s.badgeTextFinal : s.badgeTextLive]}>
@@ -230,33 +245,35 @@ export default function QuizDashboardScreen() {
             {quiz.topic && <Text style={s.metaText}>• {quiz.topic}</Text>}
             {quiz.difficulty && <Text style={s.metaText}>• {quiz.difficulty}</Text>}
           </View>
-        </View>
+        </Surface>
 
         <View style={s.statsGrid}>
-          <View style={s.statBox}>
+          <Surface style={s.statBox}>
             <Text style={s.statLabel}>QUESTIONS</Text>
             <Text style={s.statVal}>{quiz.studentQuestionCount || 0}</Text>
-          </View>
-          <View style={s.statBox}>
+          </Surface>
+          <Surface style={s.statBox}>
             <Text style={s.statLabel}>WEIGHTING</Text>
             <Text style={s.statVal}>{quiz.totalMarks}</Text>
-          </View>
-          <View style={s.statBox}>
+          </Surface>
+          <Surface style={s.statBox}>
             <Text style={s.statLabel}>LIMIT</Text>
             <Text style={s.statVal}>{quiz.timeLimitMins}m</Text>
-          </View>
-          <View style={s.statBox}>
+          </Surface>
+          <Surface style={s.statBox}>
             <Text style={s.statLabel}>STARTS</Text>
             <Text style={[s.statVal, { fontSize: 13, lineHeight: 18 }]} numberOfLines={2}>
               {quiz.availableFrom ? new Date(quiz.availableFrom).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Instant'}
             </Text>
-          </View>
+          </Surface>
         </View>
 
-        <TouchableOpacity 
+        <PressableScale
           style={[s.finalizeBtn, quiz.isFinalized && s.finalizeBtnDisabled]} 
           onPress={handleFinalize}
           disabled={quiz.isFinalized || finalizing}
+          haptic="commit"
+          accessibilityLabel={quiz.isFinalized ? 'Quiz marks finalized' : 'Finalize quiz marks'}
         >
           {finalizing ? (
             <ActivityIndicator color={T.white} />
@@ -266,25 +283,25 @@ export default function QuizDashboardScreen() {
               <Text style={s.finalizeBtnText}>{quiz.isFinalized ? 'Marks Finalized' : 'Finalize Quiz Marks'}</Text>
             </>
           )}
-        </TouchableOpacity>
+        </PressableScale>
 
         <View style={s.tabsRow}>
-          <TouchableOpacity 
+          <PressableScale
             style={[s.tab, activeTab === 'monitor' && s.tabActive]} 
             onPress={() => { setActiveTab('monitor'); Haptics.selectionAsync(); }}
           >
             <Monitor size={16} color={activeTab === 'monitor' ? T.emerald : T.textSec} />
             <Text style={[s.tabText, activeTab === 'monitor' && s.tabTextActive]}>Monitor</Text>
             {!quiz.isFinalized && <View style={s.liveDot} />}
-          </TouchableOpacity>
-          <TouchableOpacity 
+          </PressableScale>
+          <PressableScale
             style={[s.tab, activeTab === 'analytics' && s.tabActive]} 
             onPress={() => { setActiveTab('analytics'); Haptics.selectionAsync(); }}
           >
             <BarChart3 size={16} color={activeTab === 'analytics' ? T.emerald : T.textSec} />
             <Text style={[s.tabText, activeTab === 'analytics' && s.tabTextActive]}>Analytics</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
+          </PressableScale>
+          <PressableScale
             style={[s.tab, activeTab === 'submissions' && s.tabActive]} 
             onPress={() => { setActiveTab('submissions'); Haptics.selectionAsync(); }}
           >
@@ -293,7 +310,7 @@ export default function QuizDashboardScreen() {
             <View style={s.badgeCount}>
               <Text style={s.badgeCountText}>{submissions.length}</Text>
             </View>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
 
         <View style={s.tabContent}>
@@ -307,7 +324,7 @@ export default function QuizDashboardScreen() {
                 const isActive = !!sub?.startedAt && !sub?.submittedAt;
                 
                 let stLabel = 'Not Started';
-                let stColor = T.textMuted;
+                let stColor: string = T.textMuted;
                 if (isCompleted) { stLabel = 'Completed'; stColor = T.emerald; }
                 else if (isActive) { stLabel = 'Active'; stColor = T.amber; }
 
@@ -423,17 +440,24 @@ export default function QuizDashboardScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T: {
+  bg: string; white: string; text: string; textSec: string; textMuted: string;
+  accent: string; emerald: string; amber: string; red: string; border: string;
+  shadow: string; surface: string; surfaceSecondary: string;
+}) => StyleSheet.create({
   container: { flex: 1, backgroundColor: T.bg },
   header: { 
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: T.border 
+    paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.white, alignItems: 'center', justifyContent: 'center' },
-  headerIconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.border },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: T.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.border },
+  headerIconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: T.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.border },
+  headerTitleWrap: { flex: 1, paddingHorizontal: Spacing.md, alignItems: 'center' },
+  headerEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1, color: T.textMuted },
+  headerTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: T.text, maxWidth: '100%' },
   
-  content: { padding: 24, paddingBottom: TEACHER_TAB_CONTENT_INSET },
-  titleSection: { marginBottom: 24 },
+  content: { padding: Spacing.xl, paddingBottom: TEACHER_TAB_CONTENT_INSET, gap: Spacing.lg },
+  titleSection: { padding: Spacing.xl, marginBottom: 0, backgroundColor: T.accent, borderColor: 'transparent' },
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
   badgeLive: { backgroundColor: `${T.emerald}10`, borderColor: `${T.emerald}30` },
   badgeFinal: { backgroundColor: T.border, borderColor: T.textMuted },
@@ -441,14 +465,14 @@ const s = StyleSheet.create({
   badgeTextLive: { color: T.emerald },
   badgeTextFinal: { color: T.textSec },
   
-  title: { fontSize: 24, fontWeight: '800', color: T.text, marginBottom: 8 },
+  title: { ...TypeScale.pageTitle, color: T.white, marginBottom: 8 },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  metaText: { fontSize: 13, color: T.textSec, fontWeight: '600' },
+  metaText: { fontSize: 13, color: T.white, opacity: 0.72, fontWeight: '600' },
   
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 0 },
   statBox: { 
-    flex: 1, minWidth: '45%', backgroundColor: T.white, padding: 16, 
-    borderRadius: 16, borderWidth: 1, borderColor: T.border,
+    flex: 1, minWidth: '45%', backgroundColor: T.surface, padding: 16,
+    borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: T.border,
     ...Platform.select({ ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 6 }, android: { elevation: 2 } })
   },
   statLabel: { fontSize: 10, fontWeight: '800', color: T.textMuted, letterSpacing: 1, marginBottom: 4 },
@@ -457,15 +481,15 @@ const s = StyleSheet.create({
   finalizeBtn: {
     backgroundColor: T.accent, height: 56, borderRadius: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginBottom: 24, shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 },
+    marginBottom: 0, shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1, shadowRadius: 12, elevation: 4,
   },
   finalizeBtnDisabled: { opacity: 0.6 },
   finalizeBtnText: { color: T.white, fontSize: 16, fontWeight: '700' },
   
-  tabsRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: T.border, marginBottom: 20 },
-  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive: { borderBottomColor: T.emerald },
+  tabsRow: { flexDirection: 'row', padding: 4, borderRadius: BorderRadius.lg, backgroundColor: T.surfaceSecondary, marginBottom: 0 },
+  tab: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 6, borderRadius: BorderRadius.md },
+  tabActive: { backgroundColor: T.surface },
   tabText: { fontSize: 14, fontWeight: '600', color: T.textSec },
   tabTextActive: { color: T.emerald },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: T.emerald },
@@ -474,7 +498,7 @@ const s = StyleSheet.create({
   
   tabContent: { flex: 1, minHeight: 400 },
 
-  studentsList: { backgroundColor: T.white, borderRadius: 16, borderWidth: 1, borderColor: T.border, overflow: 'hidden' },
+  studentsList: { backgroundColor: T.surface, borderRadius: 16, borderWidth: 1, borderColor: T.border, overflow: 'hidden' },
   studentRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: T.border },
   studentName: { fontSize: 15, fontWeight: '600', color: T.text, marginBottom: 4 },
   studentStatus: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
@@ -482,20 +506,20 @@ const s = StyleSheet.create({
   scoreText: { fontSize: 16, fontWeight: '800', color: T.text },
   inspectBtn: { padding: 8, backgroundColor: T.bg, borderRadius: 8 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  actionSheet: { backgroundColor: T.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40, paddingHorizontal: 20 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.58)', justifyContent: 'flex-end' },
+  actionSheet: { backgroundColor: T.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40, paddingHorizontal: 20 },
   actionSheetHeader: { paddingVertical: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: T.border },
   actionSheetTitle: { fontSize: 16, fontWeight: '800', color: T.text },
   actionBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 16 },
   actionBtnText: { fontSize: 16, fontWeight: '600', color: T.text },
 
-  rescheduleModal: { backgroundColor: T.white, margin: 20, borderRadius: 24, padding: 24, alignSelf: 'center', width: '90%', marginTop: 'auto', marginBottom: 'auto' },
+  rescheduleModal: { backgroundColor: T.surface, margin: 20, borderRadius: 24, padding: 24, alignSelf: 'center', width: '90%', marginTop: 'auto', marginBottom: 'auto' },
   rescheduleTitle: { fontSize: 18, fontWeight: '800', color: T.text, marginBottom: 4 },
   rescheduleSub: { fontSize: 12, color: T.textSec, marginBottom: 20 },
   inputLabel: { fontSize: 12, fontWeight: '800', color: T.textMuted, textTransform: 'uppercase', marginBottom: 8 },
-  input: { backgroundColor: T.bg, borderRadius: 12, padding: 16, fontSize: 16, color: T.text, marginBottom: 16, borderWidth: 1, borderColor: T.border },
+  input: { backgroundColor: T.surfaceSecondary, borderRadius: 12, padding: 16, fontSize: 16, color: T.text, marginBottom: 16, borderWidth: 1, borderColor: T.border },
   rescheduleBtns: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  rescheduleCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: T.bg, alignItems: 'center' },
+  rescheduleCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: T.surfaceSecondary, alignItems: 'center' },
   rescheduleCancelText: { fontSize: 15, fontWeight: '700', color: T.textSec },
   rescheduleSubmitBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: T.accent, alignItems: 'center' },
   rescheduleSubmitText: { fontSize: 15, fontWeight: '700', color: T.white }

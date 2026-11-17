@@ -13,6 +13,7 @@ import { OnboardingPaymentError, persistOnboardingOrder, provisionClaimedOnboard
 import { planSubscriptionCheckoutService } from '../services/planSubscriptionCheckoutService';
 import { planSubscriptionLifecycleService } from '../services/planSubscriptionLifecycleService';
 import { type ProvisioningInput } from '../services/accountProvisioningService';
+import { hasUnlimitedAccountCreation } from '../domain/accounts/accountCreationPolicy';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -83,7 +84,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
         // Check if user/institute already exists by email/phone
         const existingAdmin = await prisma.admin.findUnique({ where: { username: phone } });
-        if (existingAdmin) {
+        if (existingAdmin && !hasUnlimitedAccountCreation(phone)) {
             return res.status(400).json({ error: 'An account with this phone number already exists.' });
         }
 
@@ -271,7 +272,7 @@ export const startTrial = async (req: Request, res: Response) => {
         }
 
         const existingAdmin = await prisma.admin.findUnique({ where: { username: phone } });
-        if (existingAdmin) {
+        if (existingAdmin && !hasUnlimitedAccountCreation(phone)) {
             return res.status(400).json({ error: 'An account with this phone number already exists.' });
         }
 

@@ -1,12 +1,23 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, SafeAreaView } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, CheckCircle2, AlertCircle } from 'lucide-react-native';
+import { Colors } from '../../constants/theme';
 
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', emeraldLight: '#d1fae5', amber: '#f59e0b', amberLight: '#fef3c7',
-  red: '#ef4444', redLight: '#fee2e2', border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
+const useQuizPalette = () => {
+    const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+    const colors = Colors[scheme];
+    return useMemo(() => ({
+        bg: colors.background, white: colors.surface, text: colors.text,
+        textSec: colors.textSecondary, textMuted: colors.textMuted, accent: colors.hero,
+        emerald: colors.positive,
+        emeraldLight: scheme === 'dark' ? 'rgba(124,166,150,0.16)' : 'rgba(104,139,125,0.14)',
+        amber: colors.attention,
+        amberLight: scheme === 'dark' ? 'rgba(186,143,112,0.16)' : 'rgba(155,120,95,0.14)',
+        red: Colors.error,
+        redLight: scheme === 'dark' ? 'rgba(255,69,58,0.15)' : 'rgba(255,59,48,0.12)',
+        border: colors.border,
+    }), [colors, scheme]);
 };
 
 interface Question {
@@ -52,6 +63,8 @@ interface Props {
 }
 
 export default function QuizSubmissionInspector({ visible, onClose, data, quiz }: Props) {
+    const T = useQuizPalette();
+    const s = useMemo(() => makeStyles(T), [T]);
     if (!data || !quiz) return null;
 
     const { submission } = data;
@@ -135,9 +148,9 @@ export default function QuizSubmissionInspector({ visible, onClose, data, quiz }
                                             const isCorrectOpt = opt === q.correctOption;
                                             const isSelectedOpt = opt === ans?.selectedOption;
                                             
-                                            let optBorder = T.border;
-                                            let optBg = T.white;
-                                            let optTextColor = T.textSec;
+                                            let optBorder: string = T.border;
+                                            let optBg: string = T.white;
+                                            let optTextColor: string = T.textSec;
 
                                             if (isCorrectOpt) {
                                                 optBg = T.emeraldLight;
@@ -176,7 +189,7 @@ export default function QuizSubmissionInspector({ visible, onClose, data, quiz }
     );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T: ReturnType<typeof useQuizPalette>) => StyleSheet.create({
     container: { flex: 1, backgroundColor: T.bg },
     header: { flexDirection: 'row', alignItems: 'center', padding: 20, backgroundColor: T.white, borderBottomWidth: 1, borderBottomColor: T.border },
     headerSup: { fontSize: 10, fontWeight: '800', color: T.emerald, letterSpacing: 0.5, marginBottom: 2 },

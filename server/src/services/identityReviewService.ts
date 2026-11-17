@@ -7,6 +7,7 @@ type SubmittedStudentData = {
   parentEmail?: string | null;
   schoolName?: string | null;
   additionalData?: Record<string, unknown>;
+  enrollmentIntent?: { fee: EnrollmentFeeChoice; nonce: string };
 };
 
 type ReviewRow = {
@@ -61,13 +62,14 @@ export function createIdentityReviewService(deps: IdentityReviewDeps) {
       if (review.status !== 'PENDING') throw new Error('IDENTITY_REVIEW_ALREADY_RESOLVED');
       const student = await deps.findStudent(input.studentId, input.instituteId);
       if (!student) throw new Error('STUDENT_NOT_FOUND');
+      const savedIntent = (review.submittedData as SubmittedStudentData).enrollmentIntent;
       const result = await deps.enrollExisting({
         instituteId: input.instituteId,
         actorId: input.actorId,
         studentId: input.studentId,
         batchId: review.batchId,
         startedAt: input.startedAt,
-        fee: input.fee,
+        fee: savedIntent?.fee || input.fee,
         idempotencyKey: input.idempotencyKey,
       });
       await deps.markResolved({ reviewId: review.id, studentId: student.id, actorId: input.actorId, status: 'RESOLVED_EXISTING' });
@@ -82,7 +84,7 @@ export function createIdentityReviewService(deps: IdentityReviewDeps) {
       if (!review || review.instituteId !== input.instituteId) throw new Error('IDENTITY_REVIEW_NOT_FOUND');
       if (review.status !== 'PENDING') throw new Error('IDENTITY_REVIEW_ALREADY_RESOLVED');
       if (!deps.createNewAndEnroll) throw new Error('CREATE_NEW_NOT_SUPPORTED');
-      return deps.createNewAndEnroll({ ...input, review });
+      return deps.createNewAndEnroll({ ...input, fee: (review.submittedData as SubmittedStudentData).enrollmentIntent?.fee || input.fee, review });
     },
   };
 }

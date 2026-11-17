@@ -15,6 +15,7 @@ import { scheduleLifecycleNotifications } from '../services/planNotificationServ
 import { planSubscriptionCheckoutService } from '../services/planSubscriptionCheckoutService';
 import { planSubscriptionLifecycleService } from '../services/planSubscriptionLifecycleService';
 import { type ProvisioningInput } from '../services/accountProvisioningService';
+import { hasUnlimitedAccountCreation, scopedAccountOwnerIdentity } from '../domain/accounts/accountCreationPolicy';
 
 const razorpayConfig = getRazorpayConfig();
 
@@ -134,7 +135,7 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
         // Check for existing account
         if (phoneNumber) {
             const existingAdmin = await prisma.admin.findUnique({ where: { username: phoneNumber } });
-            if (existingAdmin) {
+            if (existingAdmin && !hasUnlimitedAccountCreation(phoneNumber)) {
                 return res.status(400).json({ error: 'An account with this phone number already exists.' });
             }
         }
@@ -150,7 +151,8 @@ export const createAdminOnboardingOrder = async (req: Request, res: Response) =>
             const finalEmail = email || '';
             const plan = normalizePlanId(link.plan);
             if (plan === 'MARKETPLACE') return res.status(400).json({ error: 'Free trial requires Quiz or Enterprise.' });
-            const ownerIdentityHash = crypto.createHmac('sha256', process.env.JWT_SECRET || 'local-lifecycle-secret').update(normalizeTrialOwnerIdentity(finalPhone || finalEmail)).digest('hex');
+            const ownerIdentity = scopedAccountOwnerIdentity(finalPhone || finalEmail, link.id);
+            const ownerIdentityHash = crypto.createHmac('sha256', process.env.JWT_SECRET || 'local-lifecycle-secret').update(normalizeTrialOwnerIdentity(ownerIdentity)).digest('hex');
             const period = includedCreditPeriod({ planStartDate }, planStartDate);
             const tokenString = crypto.randomBytes(24).toString('hex');
             const provisioned = await prisma.$transaction(async tx => {

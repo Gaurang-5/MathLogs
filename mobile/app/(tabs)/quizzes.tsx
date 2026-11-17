@@ -1,26 +1,49 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, TextInput,
-  RefreshControl, Dimensions, Platform, TouchableOpacity,
-  Modal, Linking
+  FlatList,
+  Linking,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+  useColorScheme,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { SkeletonLoader, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
-import { Search, Brain, Calendar, ChevronRight, Plus, Sparkles, Timer, ShoppingCart, X, Check } from 'lucide-react-native';
+import {
+  Feedback,
+  PressableScale,
+  SkeletonLoader,
+  Surface,
+  TEACHER_TAB_CONTENT_INSET,
+  TeacherSearchSheet,
+} from '../../components/ui';
+import { useAccessibilityPreferences } from '../../components/ui/useAccessibilityPreferences';
+import {
+  Brain,
+  Calendar,
+  ChevronRight,
+  Clock3,
+  Search,
+  ShoppingCart,
+  Sparkles,
+  Timer,
+  X,
+} from 'lucide-react-native';
+import {
+  BorderRadius,
+  Colors,
+  FontWeight,
+  Shadows,
+  Spacing,
+  TypeScale,
+} from '../../constants/theme';
 import api from '../../services/api';
-import * as Haptics from 'expo-haptics';
-
-const { width } = Dimensions.get('window');
-
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', amber: '#f59e0b', red: '#ef4444', blue: '#2563eb',
-  border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
-};
+import { offlineQuery } from '../../services/offlineSync';
 
 interface OnlineQuiz {
   id: string;
@@ -36,264 +59,437 @@ interface OnlineQuiz {
   batchId?: string | null;
   studentQuestionCount?: number | null;
   batch?: {
-      id?: string;
-      name: string;
-      className?: string | null;
+    id?: string;
+    name: string;
+    className?: string | null;
   };
   _count: { submissions: number };
 }
 
-function getQuizStatus(quiz: OnlineQuiz): { color: string; label: string } {
-  if (quiz.isFinalized) return { color: T.textSec, label: 'Finalized' };
-  
-  if (quiz.availableFrom) {
-    const testDate = new Date(quiz.availableFrom);
-    const now = new Date();
-    if (testDate > now) return { color: T.amber, label: 'Upcoming' };
-  }
-  
-  return { color: T.emerald, label: 'Published' };
+interface StatusColors {
+  textSecondary: string;
+  attention: string;
+  positive: string;
 }
 
-function QuizCard({ item, index }: { item: OnlineQuiz; index: number }) {
-  const st = getQuizStatus(item);
-  const router = useRouter();
-  
-  const dateStr = item.availableFrom 
+type ThemeColors = typeof Colors.light | typeof Colors.dark;
+
+function getQuizStatus(quiz: OnlineQuiz, colors: StatusColors): { color: string; label: string } {
+  if (quiz.isFinalized) return { color: colors.textSecondary, label: 'Finalized' };
+
+  if (quiz.availableFrom) {
+    const quizDate = new Date(quiz.availableFrom);
+    const now = new Date();
+    if (quizDate > now) return { color: colors.attention, label: 'Upcoming' };
+  }
+
+  return { color: colors.positive, label: 'Published' };
+}
+
+function QuizCard({
+  item,
+  index,
+  onPress,
+  colors,
+  reduceMotion,
+}: {
+  item: OnlineQuiz;
+  index: number;
+  onPress: () => void;
+  colors: ThemeColors;
+  reduceMotion: boolean;
+}) {
+  const status = getQuizStatus(item, colors);
+  const dateStr = item.availableFrom
     ? new Date(item.availableFrom).toLocaleString('en-IN', {
-        day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'
+        day: 'numeric',
+        month: 'short',
+        hour: 'numeric',
+        minute: '2-digit',
       })
     : 'Instant';
 
   return (
-    <Animated.View entering={FadeInRight.duration(400).delay(index * 50)}>
-      <TouchableOpacity accessibilityLabel={`Open quiz ${item.title}`} activeOpacity={0.7} style={s.card} onPress={() => router.push((`/quiz/${item.id}`) as any)}>
-        <View style={[s.testIcon, { backgroundColor: `${st.color}12` }]}>
-          <Brain size={20} color={st.color} />
+    <Animated.View
+      entering={reduceMotion ? undefined : FadeInDown.duration(260).delay(Math.min(index, 4) * 35)}
+      style={styles.cardSpacing}
+    >
+      <Surface
+        onPress={onPress}
+        accessibilityLabel={`Open quiz ${item.title}`}
+        style={styles.quizCard}
+      >
+        <View style={[styles.quizIcon, { backgroundColor: `${status.color}18` }]}>
+          <Brain size={22} color={status.color} strokeWidth={2} />
         </View>
-        <View style={{ flex: 1, paddingRight: 12 }}>
-          <Text style={s.testName} numberOfLines={1}>{item.title}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-            <Calendar size={12} color={T.textSec} />
-            <Text style={s.testDate}>{dateStr}</Text>
-            {item.timeLimitMins > 0 && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 4 }}>
-                <Timer size={12} color={T.textSec} />
-                <Text style={s.testDate}>{item.timeLimitMins} mins</Text>
-              </View>
-            )}
+
+        <View style={styles.quizCopy}>
+          <View style={styles.cardTitleRow}>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
+            <View style={[styles.statusPill, { backgroundColor: `${status.color}18` }]}>
+              <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+            </View>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 3 }}>
-            <Text style={[s.testDate, { color: T.textMuted }]} numberOfLines={1}>{item.batch?.name || 'General'}</Text>
-            {item.topic && <Text style={[s.testDate, { color: T.textMuted }]} numberOfLines={1}>• {item.topic}</Text>}
-            <Text style={[s.testDate, { color: T.textMuted }]}>• Max: {item.totalMarks}</Text>
+
+          <View style={styles.metaRow}>
+            <Calendar size={14} color={colors.textSecondary} />
+            <Text style={[styles.metaText, { color: colors.textSecondary }]}>{dateStr}</Text>
+            {item.timeLimitMins > 0 ? (
+              <>
+                <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
+                <Timer size={14} color={colors.textSecondary} />
+                <Text style={[styles.metaText, { color: colors.textSecondary }]}>{item.timeLimitMins} min</Text>
+              </>
+            ) : null}
           </View>
+
+          <Text style={[styles.detailText, { color: colors.textMuted }]} numberOfLines={2}>
+            {item.batch?.name || 'General'}{item.topic ? ` · ${item.topic}` : ''} · {item.totalMarks} marks
+          </Text>
         </View>
-        <View style={[s.statusPill, { backgroundColor: `${st.color}12` }]}>
-          <Text style={[s.statusText, { color: st.color }]}>{st.label}</Text>
-        </View>
-        <ChevronRight size={18} color={T.textMuted} style={{ marginLeft: 8 }} />
-      </TouchableOpacity>
+
+        <ChevronRight size={20} color={colors.textMuted} />
+      </Surface>
     </Animated.View>
   );
 }
 
 export default function QuizzesScreen() {
-  const [search, setSearch] = useState('');
-  const [showBuyModal, setShowBuyModal] = useState(false);
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const colors = Colors[scheme];
+  const { reduceMotion, reduceTransparency } = useAccessibilityPreferences();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [search, setSearch] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useState(false);
 
-  const { data: quizzes, isLoading, refetch, isRefetching } = useQuery<OnlineQuiz[]>({
+  const {
+    data: quizzes,
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+  } = useQuery<OnlineQuiz[]>({
     queryKey: ['quizzes'],
-    queryFn: async () => {
-      const res = await api.get('/tests/online');
-      return res.data;
-    },
+    queryFn: () => offlineQuery('online-quizzes', async () => (await api.get('/tests/online')).data),
   });
 
   const { data: institute, refetch: refetchInstitute } = useQuery<{ quizCredits?: number }>({
     queryKey: ['institute-me'],
-    queryFn: async () => {
-      const res = await api.get('/institute/me');
-      return res.data;
-    },
+    queryFn: () => offlineQuery('institute', async () => (await api.get('/institute/me')).data),
   });
 
   const filtered = useMemo(() => {
     if (!quizzes) return [];
     if (!search) return quizzes;
-    const q = search.toLowerCase();
-    return quizzes.filter(t =>
-      t.title.toLowerCase().includes(q) ||
-      (t.topic && t.topic.toLowerCase().includes(q))
+    const query = search.toLowerCase();
+    return quizzes.filter(quiz =>
+      quiz.title.toLowerCase().includes(query) ||
+      (quiz.topic && quiz.topic.toLowerCase().includes(query))
     );
   }, [quizzes, search]);
 
-  const activeCount = useMemo(() =>
-    (quizzes || []).filter(t => !t.isFinalized).length, [quizzes]);
-  const finalizedCount = useMemo(() =>
-    (quizzes || []).filter(t => t.isFinalized).length, [quizzes]);
+  const activeCount = useMemo(
+    () => (quizzes || []).filter(quiz => !quiz.isFinalized).length,
+    [quizzes],
+  );
+  const finalizedCount = useMemo(
+    () => (quizzes || []).filter(quiz => quiz.isFinalized).length,
+    [quizzes],
+  );
 
   const handleOpenBilling = () => {
     setShowBuyModal(false);
-    const webUrl = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/api\/?$/, '/billing') : 'https://mathlogs.in/billing';
+    const webUrl = api.defaults.baseURL
+      ? api.defaults.baseURL.replace(/\/api\/?$/, '/billing')
+      : 'https://mathlogs.in/billing';
     Linking.openURL(webUrl).catch(() => {
-      Linking.openURL('https://mathlogs.in/billing');
+      void Linking.openURL('https://mathlogs.in/billing');
     });
   };
 
-  return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <Animated.View entering={FadeInDown.duration(400)} style={s.headerArea}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View>
-            <Text accessibilityRole="header" style={s.title}>AI Quizzes</Text>
-            <Text style={s.subtitle}>{quizzes?.length ?? 0} total quizzes</Text>
-          </View>
-          <TouchableOpacity 
-            style={s.createBtn} 
+  const handleRefresh = () => {
+    void refetch();
+    void refetchInstitute();
+  };
+
+  const renderEmptyState = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.skeletonStack}>
+          {[1, 2, 3].map(item => (
+            reduceMotion ? (
+              <View
+                key={item}
+                style={[
+                  styles.staticSkeleton,
+                  {
+                    width: Math.max(width - Spacing['4xl'], 0),
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+            ) : (
+              <SkeletonLoader
+                key={item}
+                width={Math.max(width - Spacing['4xl'], 0)}
+                height={126}
+                borderRadius={BorderRadius.xl}
+              />
+            )
+          ))}
+        </View>
+      );
+    }
+
+    if (isError) {
+      return (
+        <Feedback
+          kind="error"
+          title="Quizzes could not be loaded"
+          description="Check your connection and try again."
+          action={(
+            <PressableScale
+              accessibilityLabel="Retry loading quizzes"
+              onPress={() => void refetch()}
+              style={[styles.feedbackAction, { backgroundColor: colors.text }]}
+            >
+              <Text style={[styles.feedbackActionText, { color: colors.background }]}>Try again</Text>
+            </PressableScale>
+          )}
+        />
+      );
+    }
+
+    return (
+      <Feedback
+        kind="empty"
+        title={search ? 'No matching quizzes' : 'No quizzes yet'}
+        description={search ? 'Try another title or topic.' : 'Generate your first AI quiz when you are ready.'}
+      />
+    );
+  };
+
+  const header = (
+    <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(280)}>
+      <View style={styles.pageHeader}>
+        <Text accessibilityRole="header" style={[styles.pageTitle, { color: colors.text }]}>Quizzes</Text>
+        <View style={styles.headerActions}>
+          <PressableScale
+            accessibilityLabel="Search quizzes"
+            onPress={() => setIsSearchOpen(true)}
+            style={[styles.headerSearchAction, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+          >
+            <Search size={19} color={colors.text} />
+          </PressableScale>
+          <PressableScale
             accessibilityLabel="Generate quiz"
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/quiz-generator' as any);
-            }}
+            haptic="selection"
+            onPress={() => router.push('/quiz-generator' as any)}
+            style={[styles.primaryAction, { backgroundColor: colors.text }]}
           >
-            <Sparkles size={16} color={T.white} />
-            <Text style={s.createBtnText}>Generate</Text>
-          </TouchableOpacity>
+            <Sparkles size={18} color={colors.background} />
+            <Text style={[styles.primaryActionText, { color: colors.background }]}>Generate</Text>
+          </PressableScale>
         </View>
+      </View>
 
-        {/* Quiz Credits Banner Card */}
-        <Animated.View entering={FadeInDown.duration(400).delay(100)} style={s.creditsCard}>
-          <View style={s.creditsLeft}>
-            <View style={s.creditsIconBox}>
-              <Sparkles size={18} color="#2563eb" />
-            </View>
+      <Surface tone="strong" style={[styles.creditsHero, { backgroundColor: colors.hero, borderColor: colors.borderLight }]}>
+        <View style={[styles.creditsIcon, { backgroundColor: colors.heroEnd }]}>
+          <Sparkles size={22} color={colors.heroText} />
+        </View>
+        <View style={styles.creditsCopy}>
+          <View style={styles.creditsValueRow}>
+            <Text style={[styles.creditsValue, { color: colors.heroText }]}>{institute?.quizCredits ?? 0}</Text>
+            <Text style={[styles.creditsTitle, { color: colors.heroText }]}>quiz credits</Text>
+          </View>
+          <Text style={[styles.creditsDescription, { color: colors.heroText }]}>One credit creates one AI quiz.</Text>
+        </View>
+        <PressableScale
+          accessibilityLabel="Buy quiz credits"
+          haptic="commit"
+          onPress={() => setShowBuyModal(true)}
+          style={[styles.buyButton, { backgroundColor: colors.heroText }]}
+        >
+          <ShoppingCart size={16} color={colors.hero} />
+          <Text style={[styles.buyButtonText, { color: colors.hero }]}>Buy more</Text>
+        </PressableScale>
+      </Surface>
+
+      {!isLoading ? (
+        <View style={styles.statsRow}>
+          <Surface style={styles.statCard}>
+            <Sparkles size={19} color={colors.positive} />
             <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={s.creditsVal}>{institute?.quizCredits ?? 0}</Text>
-                <Text style={s.creditsTitle}>Quiz Credits</Text>
-              </View>
-              <Text style={s.creditsSub}>1 credit = 1 AI quiz generation</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>{activeCount}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Active</Text>
             </View>
-          </View>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={s.buyBtn}
-            accessibilityLabel="Buy quiz credits"
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setShowBuyModal(true);
-            }}
-          >
-            <ShoppingCart size={13} color={T.white} />
-            <Text style={s.buyBtnText}>Buy More</Text>
-          </TouchableOpacity>
-        </Animated.View>
-
-        <View style={s.searchWrap}>
-          <Search size={18} color={T.textMuted} />
-          <TextInput
-            placeholder="Search quizzes..."
-            placeholderTextColor={T.textMuted}
-            value={search} onChangeText={setSearch}
-            style={s.searchInput}
-          />
+          </Surface>
+          <Surface style={styles.statCard}>
+            <Clock3 size={19} color={colors.textSecondary} />
+            <View>
+              <Text style={[styles.statValue, { color: colors.text }]}>{finalizedCount}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Finalized</Text>
+            </View>
+          </Surface>
         </View>
-      </Animated.View>
+      ) : null}
+    </Animated.View>
+  );
 
-      {/* Stats Row */}
-      {!isLoading && (
-        <Animated.View entering={FadeInDown.duration(400).delay(150)} style={s.statsRow}>
-          <View style={s.miniStat}>
-            <Text style={[s.miniValue, { color: T.emerald }]}>{activeCount}</Text>
-            <Text style={s.miniLabel}>Active</Text>
-          </View>
-          <View style={s.miniStat}>
-            <Text style={[s.miniValue, { color: T.textSec }]}>{finalizedCount}</Text>
-            <Text style={s.miniLabel}>Finalized</Text>
-          </View>
-        </Animated.View>
-      )}
+  const creditPacks = [
+    { credits: 5, price: '₹250', tagline: '₹50 / credit' },
+    { credits: 10, price: '₹500', tagline: '₹50 / credit' },
+    { credits: 25, price: '₹1,000', tagline: '₹40 / credit', popular: true },
+    { credits: 40, price: '₹1,500', tagline: '₹37.5 / credit' },
+  ];
 
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <FlatList
         data={filtered}
-        renderItem={({ item, index }) => <QuizCard item={item} index={index} />}
+        renderItem={({ item, index }) => (
+          <QuizCard
+            item={item}
+            index={index}
+            colors={colors}
+            reduceMotion={reduceMotion}
+            onPress={() => router.push((`/quiz/${item.id}`) as any)}
+          />
+        )}
         keyExtractor={item => item.id}
-        contentContainerStyle={s.listContent}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); refetchInstitute(); }} tintColor={T.accent} />}
-        ListEmptyComponent={
-          isLoading ? (
-            <View style={{ gap: 12 }}>
-              {[1, 2, 3].map(i => <SkeletonLoader key={i} width={width - 48} height={90} borderRadius={16} />)}
-            </View>
-          ) : (
-            <View style={s.empty}>
-              <Brain size={48} color={T.textMuted} />
-              <Text style={s.emptyTitle}>No quizzes yet</Text>
-              <Text style={s.emptyDesc}>Generate your first AI-powered quiz above.</Text>
-            </View>
-          )
-        }
+        keyboardShouldPersistTaps="handled"
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={handleRefresh}
+            tintColor={colors.focus}
+            colors={[colors.focus]}
+          />
+        )}
+        ListHeaderComponent={header}
+        ListHeaderComponentStyle={styles.listHeader}
+        ListEmptyComponent={renderEmptyState}
       />
 
-      {/* Buy Quiz Credits Bottom Sheet Modal */}
+      <TeacherSearchSheet
+        visible={isSearchOpen}
+        title="Search quizzes"
+        placeholder="Search by quiz or topic"
+        value={search}
+        onChangeText={setSearch}
+        onClose={() => {
+          setIsSearchOpen(false);
+          setSearch('');
+        }}
+      >
+        <View>
+          {filtered.length === 0 ? (
+            <Feedback kind="empty" title="No matching quizzes" description="Try another quiz title or topic." />
+          ) : filtered.map((item, index) => (
+            <QuizCard
+              key={item.id}
+              item={item}
+              index={index}
+              colors={colors}
+              reduceMotion={reduceMotion}
+              onPress={() => {
+                setIsSearchOpen(false);
+                setSearch('');
+                router.push((`/quiz/${item.id}`) as any);
+              }}
+            />
+          ))}
+        </View>
+      </TeacherSearchSheet>
+
       <Modal
         visible={showBuyModal}
         transparent
-        animationType="slide"
+        animationType={reduceMotion ? 'none' : 'slide'}
         onRequestClose={() => setShowBuyModal(false)}
       >
-        <View style={s.modalOverlay}>
-          <View style={s.modalContent}>
-            <View style={s.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={s.modalIconBox}>
-                  <Sparkles size={20} color="#2563eb" />
-                </View>
-                <View>
-                  <Text style={s.modalTitle}>Purchase Quiz Credits</Text>
-                  <Text style={s.modalSub}>1 Credit = 1 AI Quiz Generation</Text>
-                </View>
+        <View
+          style={[
+            styles.modalOverlay,
+            { backgroundColor: reduceTransparency ? colors.backgroundDeep : colors.overlay },
+          ]}
+        >
+          <View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                paddingBottom: Math.max(insets.bottom, Spacing['2xl']),
+              },
+            ]}
+          >
+            <View style={styles.sheetHandleRow}>
+              <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+            </View>
+            <View style={styles.modalHeader}>
+              <View style={[styles.modalIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                <Sparkles size={21} color={colors.focus} />
               </View>
-              <TouchableOpacity onPress={() => setShowBuyModal(false)} style={s.closeBtn}>
-                <X size={20} color={T.textSec} />
-              </TouchableOpacity>
+              <View style={styles.modalHeadingCopy}>
+                <Text accessibilityRole="header" style={[styles.modalTitle, { color: colors.text }]}>Purchase quiz credits</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>One credit creates one AI quiz.</Text>
+              </View>
+              <PressableScale
+                accessibilityLabel="Close purchase quiz credits"
+                onPress={() => setShowBuyModal(false)}
+                style={[styles.closeButton, { backgroundColor: colors.surfaceSecondary }]}
+              >
+                <X size={20} color={colors.textSecondary} />
+              </PressableScale>
             </View>
 
-            <View style={s.packsGrid}>
-              {[
-                { credits: 5, price: '₹250', tagline: '₹50 / credit' },
-                { credits: 10, price: '₹500', tagline: '₹50 / credit' },
-                { credits: 25, price: '₹1,000', tagline: '₹40 / credit', popular: true },
-                { credits: 40, price: '₹1,500', tagline: '₹37.5 / credit' },
-              ].map((pack, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  activeOpacity={0.8}
-                  style={[s.packCard, pack.popular && s.packCardPopular]}
+            <View style={styles.packsGrid}>
+              {creditPacks.map(pack => (
+                <PressableScale
+                  key={pack.credits}
+                  accessibilityLabel={`Buy ${pack.credits} quiz credits for ${pack.price}`}
+                  haptic="selection"
                   onPress={handleOpenBilling}
+                  style={[
+                    styles.packCard,
+                    {
+                      backgroundColor: pack.popular ? colors.surfaceSecondary : colors.background,
+                      borderColor: pack.popular ? colors.focus : colors.border,
+                    },
+                  ]}
                 >
-                  {pack.popular && (
-                    <View style={s.popularBadge}>
-                      <Text style={s.popularBadgeText}>MOST POPULAR</Text>
+                  {pack.popular ? (
+                    <View style={[styles.popularBadge, { backgroundColor: colors.focus }]}>
+                      <Text style={[styles.popularBadgeText, { color: colors.background }]}>Most popular</Text>
                     </View>
-                  )}
-                  <Text style={s.packCredits}>{pack.credits} Credits</Text>
-                  <Text style={s.packPrice}>{pack.price}</Text>
-                  <Text style={s.packTagline}>{pack.tagline}</Text>
-                </TouchableOpacity>
+                  ) : null}
+                  <Text style={[styles.packCredits, { color: colors.text }]}>{pack.credits} credits</Text>
+                  <Text style={[styles.packPrice, { color: colors.focus }]}>{pack.price}</Text>
+                  <Text style={[styles.packTagline, { color: colors.textSecondary }]}>{pack.tagline}</Text>
+                </PressableScale>
               ))}
             </View>
 
-            <TouchableOpacity style={s.proceedBtn} onPress={handleOpenBilling}>
-              <ShoppingCart size={16} color={T.white} />
-              <Text style={s.proceedBtnText}>Proceed to Secure Payment</Text>
-            </TouchableOpacity>
+            <PressableScale
+              accessibilityLabel="Proceed to secure payment"
+              haptic="commit"
+              onPress={handleOpenBilling}
+              style={[styles.proceedButton, { backgroundColor: colors.text }, Shadows.md]}
+            >
+              <ShoppingCart size={18} color={colors.background} />
+              <Text style={[styles.proceedButtonText, { color: colors.background }]}>Proceed to secure payment</Text>
+            </PressableScale>
 
-            <Text style={s.creditsDisclaimer}>Credits never expire and roll over automatically.</Text>
+            <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
+              Credits never expire and roll over automatically.
+            </Text>
           </View>
         </View>
       </Modal>
@@ -301,118 +497,174 @@ export default function QuizzesScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-  headerArea: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  title: { color: T.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { color: T.textSec, fontSize: 14, fontWeight: '500', marginTop: 4, marginBottom: 12 },
-  createBtn: {
-    backgroundColor: T.accent, paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6,
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  listContent: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: TEACHER_TAB_CONTENT_INSET,
   },
-  createBtnText: { color: T.white, fontWeight: '600', fontSize: 13 },
-
-  /* Credits Card */
-  creditsCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE',
-    borderRadius: 18, padding: 14, marginBottom: 14,
-    ...Platform.select({
-      ios: { shadowColor: '#2563eb', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 },
-      android: { elevation: 1 },
-    }),
+  listHeader: { marginBottom: Spacing.xl },
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  creditsLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  creditsIconBox: {
-    width: 38, height: 38, borderRadius: 12, backgroundColor: '#DBEAFE',
-    alignItems: 'center', justifyContent: 'center',
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  headerSearchAction: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: BorderRadius.full },
+  pageTitle: TypeScale.pageTitle,
+  primaryAction: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.full,
   },
-  creditsVal: { color: '#1E3A8A', fontSize: 20, fontWeight: '800' },
-  creditsTitle: { color: '#1E40AF', fontSize: 14, fontWeight: '700' },
-  creditsSub: { color: '#3B82F6', fontSize: 11, fontWeight: '500', marginTop: 1 },
-  buyBtn: {
-    backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 5,
+  primaryActionText: { ...TypeScale.label, fontWeight: FontWeight.bold },
+  creditsHero: {
+    minHeight: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius['2xl'],
+    marginBottom: Spacing.lg,
   },
-  buyBtnText: { color: T.white, fontWeight: '700', fontSize: 12 },
-
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
-    borderRadius: 14, paddingHorizontal: 14, height: 46,
-    borderWidth: 1, borderColor: T.border,
+  creditsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
   },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: T.text, fontWeight: '500' },
-  statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 10, marginBottom: 8 },
-  miniStat: {
-    flex: 1, backgroundColor: T.white, borderRadius: 14, padding: 14,
-    alignItems: 'center', borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 6 },
-      android: { elevation: 1 },
-    }),
+  creditsCopy: { flex: 1, minWidth: 0, marginRight: Spacing.sm },
+  creditsValueRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: Spacing.sm },
+  creditsValue: { fontSize: 28, lineHeight: 34, fontWeight: FontWeight.bold },
+  creditsTitle: { ...TypeScale.label },
+  creditsDescription: { fontSize: 13, lineHeight: 18, marginTop: 2, opacity: 0.82 },
+  buyButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.full,
   },
-  miniValue: { fontSize: 22, fontWeight: '700' },
-  miniLabel: { color: T.textSec, fontSize: 11, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
-  listContent: { padding: 24, paddingTop: 12, paddingBottom: TEACHER_TAB_CONTENT_INSET },
-  card: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: T.white,
-    borderRadius: 16, padding: 16, marginBottom: 10,
-    borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 1, shadowRadius: 10 },
-      android: { elevation: 2 },
-    }),
+  buyButtonText: { ...TypeScale.caption, fontWeight: FontWeight.bold },
+  statsRow: { flexDirection: 'row', gap: Spacing.sm },
+  statCard: {
+    flex: 1,
+    minHeight: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
   },
-  testIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  testName: { color: T.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  testMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  testDate: { color: T.textSec, fontSize: 12 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  statusText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
-  empty: { alignItems: 'center', paddingTop: 80 },
-  emptyTitle: { color: T.text, fontSize: 18, fontWeight: '600', marginTop: 16 },
-  emptyDesc: { color: T.textSec, fontSize: 14, marginTop: 6, textAlign: 'center' },
-
-  /* Purchase Modal Styles */
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end',
+  statValue: { fontSize: 23, lineHeight: 28, fontWeight: FontWeight.bold },
+  statLabel: TypeScale.caption,
+  cardSpacing: { marginBottom: Spacing.md },
+  quizCard: {
+    minHeight: 118,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
   },
+  quizIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  quizCopy: { flex: 1, minWidth: 0, marginRight: Spacing.sm },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  cardTitle: { flex: 1, fontSize: 17, lineHeight: 22, fontWeight: FontWeight.semibold },
+  statusPill: { borderRadius: BorderRadius.full, paddingHorizontal: 9, paddingVertical: 4 },
+  statusText: { ...TypeScale.caption, fontWeight: FontWeight.bold },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.xs, marginTop: Spacing.sm },
+  metaText: { fontSize: 13, lineHeight: 18, fontWeight: FontWeight.medium },
+  metaDivider: { width: 1, height: 13, marginHorizontal: Spacing.xs },
+  detailText: { fontSize: 13, lineHeight: 18, marginTop: Spacing.xs },
+  skeletonStack: { gap: Spacing.md },
+  staticSkeleton: { height: 126, borderRadius: BorderRadius.xl, borderWidth: 1 },
+  feedbackAction: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.full,
+  },
+  feedbackActionText: TypeScale.label,
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
   modalContent: {
-    backgroundColor: T.white, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 24, paddingBottom: 40,
+    borderTopLeftRadius: BorderRadius['2xl'],
+    borderTopRightRadius: BorderRadius['2xl'],
+    borderWidth: 1,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.sm,
   },
+  sheetHandleRow: { alignItems: 'center', paddingVertical: Spacing.sm },
+  sheetHandle: { width: 42, height: 5, borderRadius: BorderRadius.full },
   modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
   },
-  modalIconBox: {
-    width: 42, height: 42, borderRadius: 14, backgroundColor: '#EFF6FF',
-    alignItems: 'center', justifyContent: 'center',
+  modalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modalTitle: { color: T.text, fontSize: 18, fontWeight: '700' },
-  modalSub: { color: T.textSec, fontSize: 12, marginTop: 1 },
-  closeBtn: { padding: 8, borderRadius: 999, backgroundColor: T.bg },
-  packsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
+  modalHeadingCopy: { flex: 1, minWidth: 0 },
+  modalTitle: TypeScale.sectionTitle,
+  modalSubtitle: { ...TypeScale.caption, marginTop: 2 },
+  closeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  packsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginBottom: Spacing.xl },
   packCard: {
-    width: (width - 60) / 2, backgroundColor: '#FAFAFA', borderWidth: 1,
-    borderColor: '#E5E7EB', borderRadius: 18, padding: 16, position: 'relative',
-  },
-  packCardPopular: {
-    borderColor: '#2563eb', backgroundColor: '#EFF6FF',
+    flexGrow: 1,
+    flexBasis: '46%',
+    minHeight: 112,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
   },
   popularBadge: {
-    position: 'absolute', top: -10, right: 12, backgroundColor: '#2563eb',
-    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999,
+    alignSelf: 'flex-start',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    marginBottom: Spacing.sm,
   },
-  popularBadgeText: { color: T.white, fontSize: 8, fontWeight: '800' },
-  packCredits: { fontSize: 16, fontWeight: '800', color: T.text },
-  packPrice: { fontSize: 20, fontWeight: '900', color: '#2563eb', marginTop: 4 },
-  packTagline: { fontSize: 11, color: T.textSec, marginTop: 2, fontWeight: '500' },
-  proceedBtn: {
-    backgroundColor: T.accent, borderRadius: 16, height: 52,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginBottom: 12,
+  popularBadgeText: { fontSize: 10, lineHeight: 14, fontWeight: FontWeight.bold },
+  packCredits: { fontSize: 16, lineHeight: 22, fontWeight: FontWeight.bold },
+  packPrice: { fontSize: 22, lineHeight: 28, fontWeight: FontWeight.bold, marginTop: 2 },
+  packTagline: { fontSize: 13, lineHeight: 18, marginTop: 2 },
+  proceedButton: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    borderRadius: BorderRadius.lg,
   },
-  proceedBtnText: { color: T.white, fontWeight: '700', fontSize: 15 },
-  creditsDisclaimer: { textAlign: 'center', color: T.textSec, fontSize: 12, fontWeight: '500' },
+  proceedButtonText: { fontSize: 15, lineHeight: 21, fontWeight: FontWeight.bold },
+  disclaimer: { ...TypeScale.caption, textAlign: 'center', marginTop: Spacing.md },
 });

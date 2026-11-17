@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, FlatList, ViewToken, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, FlatList, Platform, Image, type ListViewToken } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, withRepeat, withTiming, useSharedValue, useAnimatedStyle, Easing, Extrapolation, interpolate } from 'react-native-reanimated';
 import { ArrowRight, Sparkles, Scan, LayoutDashboard } from 'lucide-react-native';
@@ -77,7 +77,7 @@ export default function WelcomeScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollX = useSharedValue(0);
 
-  const viewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  const viewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
     if (viewableItems[0]) {
       setCurrentIndex(viewableItems[0].index || 0);
     }

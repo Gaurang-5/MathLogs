@@ -4,6 +4,7 @@ import { processOCR } from '../utils/ocr';
 import { buildGeminiOcrResult } from '../utils/ocrResult';
 import { checkOcrCache, setOcrCache } from '../utils/ocrCache';
 import { secureLogger } from '../utils/secureLogger';
+import { readOcrCacheFast } from '../utils/ocrTiming';
 
 
 export const scanOcr = async (req: Request, res: Response) => {
@@ -27,26 +28,26 @@ export const scanOcr = async (req: Request, res: Response) => {
         }
 
         // Compute SHA-256 of raw image bytes for deduplication asynchronously to avoid blocking the event loop
-        const rawBuffer = req.file ? req.file.buffer : Buffer.from(imageBuffer.toString(), 'base64');
-        const hash = crypto.createHash('sha256').update(rawBuffer).digest('hex');
+        const rawBuffer = req.file ? req.file.buffer : Buffer.from(imageBuffer.toString().replace(/^data:image\/[^;]+;base64,/, ''), 'base64');
+        const hash = crypto.createHash('sha256').update('sticker-single-box-v5-gemini35-38:').update(rawBuffer).digest('hex');
 
         // Check DB-backed cache first (works across all server instances)
-        const cached = await checkOcrCache(hash);
+        const cached = await readOcrCacheFast(() => checkOcrCache(hash));
         if (cached) {
             secureLogger.info("♻️ Duplicate Scan — Returning DB-Cached Result");
             return res.json(cached);
         }
 
-        const gemini = await processOCR(imageBuffer).catch((error: any) => ({
+        const gemini = await processOCR(imageBuffer, req.file?.mimetype).catch((error: any) => ({
             score: 'GEMINI_ERROR',
-            confidence: 0,
-            raw: error?.message || 'Unknown error',
+            raw: '',
+            reason: 'provider_error' as const,
         }));
         const primary = buildGeminiOcrResult(gemini);
-        secureLogger.info(`✅ OCR | Gemini: "${gemini.score}" (${(gemini.confidence * 100).toFixed(0)}%)`);
+        secureLogger.info('OCR completed', { status: primary.status, source: primary.source });
 
-        await setOcrCache(hash, primary);
-        res.json({ score: primary.score, confidence: primary.confidence, raw: primary.raw, source: primary.source });
+        if (primary.status === 'read') void setOcrCache(hash, primary);
+        res.json(primary);
 
     } catch (error: any) {
         console.error("❌ OCR Proxy Error:", error);

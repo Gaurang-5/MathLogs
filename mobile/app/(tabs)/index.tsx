@@ -1,391 +1,924 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, RefreshControl,
-  Dimensions, Image, Platform, TouchableOpacity, Modal
+  KeyboardAvoidingView,
+  Platform,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useColorScheme,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle } from 'react-native-svg';
+import { DashboardSearch } from '../../components/dashboard/DashboardSearch';
+import { ProfileAvatar } from '../../components/ui/ProfileAvatar';
+import { ThemeModeSelector } from '../../components/ui/ThemeModeSelector';
 import {
-  Users, BookOpen, AlertCircle, TrendingUp, IndianRupee,
-  X, LogOut, Mail, Phone, ChevronRight, Eye, EyeOff, Bell, Scan, Sparkles,
+  AlertCircle,
+  ChevronRight,
+  ClipboardCheck,
+  Eye,
+  EyeOff,
+  FileText,
+  IndianRupee,
+  Layers,
+  LogOut,
+  Mail,
+  Phone,
+  ScanLine,
+  Search,
+  Sparkles,
+  Users,
+  X,
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { OfflineBanner, SkeletonLoader, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
+import {
+  Feedback,
+  PressableScale,
+  Surface,
+  TeacherPage,
+  TeacherSection,
+} from '../../components/ui';
+import { useAccessibilityPreferences } from '../../components/ui/useAccessibilityPreferences';
+import { BorderRadius, Colors, FontSize, FontWeight, Spacing, TypeScale } from '../../constants/theme';
 import api from '../../services/api';
+import { offlineQuery } from '../../services/offlineSync';
 
-const { width } = Dimensions.get('window');
+type ThemeColors = typeof Colors.light | typeof Colors.dark;
 
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', red: '#ef4444', amber: '#f59e0b',
-  blue: '#3b82f6', border: 'rgba(0,0,0,0.07)', shadow: 'rgba(0,0,0,0.08)',
-};
+function dashboardFailureDescription(error: unknown): string {
+  const status = isAxiosError(error) ? error.response?.status : undefined;
+  if (status === 401) return 'Your login could not be renewed. Please sign in again.';
+  if (status === 403) return 'The server declined access to this dashboard. Check your account access or sign in again.';
+  if (status === 402) return 'Your account needs a plan update. Check billing on the web app.';
+  if (status && status >= 500) return 'The server is temporarily unavailable. Please try again shortly.';
+  return 'The app could not reach your dashboard. Check the connection and try again.';
+}
 
-interface DashboardData {
+interface DashboardBase {
   stats: { batches: number; students: number };
+  userName: string;
+}
+
+interface CurrentDueDashboard extends DashboardBase {
+  feeMode: 'CURRENT_DUE_BASED';
   finances: { collected: number; totalCollected: number; pending: number };
   defaulters: Array<{ name: string; amount: number }>;
-  userName: string;
+}
+
+interface MonthCoverageDashboard extends DashboardBase {
+  feeMode: 'MONTH_COVERAGE';
+  monthCoverage: {
+    collectedRupees: number;
+    receivedMonths: number;
+    pendingMonths: number;
+    overdueMonths: number;
+    applicableMonths: number;
+    progressPercent: number;
+  };
+  followUps: Array<{
+    studentId: string;
+    name: string;
+    batchName: string;
+    overdueMonths: number;
+    oldestOverdueMonth: string;
+  }>;
+}
+
+type DashboardData = CurrentDueDashboard | MonthCoverageDashboard;
+
+interface BatchSummary {
+  id: string;
+  name: string;
+  subject: string | null;
+  className: string | null;
+  timeSlot: string | null;
+  _count: { students: number };
+}
+
+interface ClassAverage {
+  name: string;
+  average: number;
+}
+
+interface TestSummary {
+  id: string;
+  name: string;
+  date: string;
+  _count: { marks: number };
+}
+
+type FeeInsight = {
+  title: string;
+  percentage: number;
+  isCurrency: boolean;
+  segments: Array<{ value: number; color: string; label: string }>;
+};
+
+type FollowUp = {
+  key: string;
+  title: string;
+  detail: string;
+  trailing: string;
+};
+
+const formatCurrency = (value: number) => `₹${Math.max(0, value).toLocaleString('en-IN')}`;
+
+function getFeeInsight(data: DashboardData | undefined, colors: ThemeColors): FeeInsight | null {
+  if (!data) return null;
+
+  if (data.feeMode === 'MONTH_COVERAGE') {
+    const totals = data.monthCoverage;
+    const overdue = Math.min(totals.pendingMonths, totals.overdueMonths);
+    const pending = Math.max(0, totals.pendingMonths - overdue);
+    return {
+      title: 'Fee month coverage',
+      percentage: Math.max(0, Math.min(100, totals.progressPercent)),
+      isCurrency: false,
+      segments: [
+        { value: totals.receivedMonths, color: colors.chart, label: 'Received' },
+        { value: pending, color: colors.chartSoft, label: 'Pending' },
+        { value: overdue, color: colors.attention, label: 'Overdue' },
+      ],
+    };
+  }
+
+  const collected = Math.max(0, data.finances?.totalCollected ?? 0);
+  const pending = Math.max(0, data.finances?.pending ?? 0);
+  const total = collected + pending;
+  return {
+    title: 'Fee collection',
+    percentage: total > 0 ? Math.round((collected / total) * 100) : 0,
+    isCurrency: true,
+    segments: [
+      { value: collected, color: colors.chart, label: 'Collected' },
+      { value: pending, color: colors.attention, label: 'Pending' },
+    ],
+  };
+}
+
+function getFollowUps(data: DashboardData | undefined): FollowUp[] {
+  if (!data) return [];
+  if (data.feeMode === 'MONTH_COVERAGE') {
+    return (data.followUps ?? []).slice(0, 4).map((item) => ({
+      key: item.studentId,
+      title: item.name,
+      detail: item.batchName,
+      trailing: `${item.overdueMonths} ${item.overdueMonths === 1 ? 'month' : 'months'}`,
+    }));
+  }
+  return (data.defaulters ?? []).slice(0, 4).map((item, index) => ({
+    key: `${item.name}-${index}`,
+    title: item.name,
+    detail: 'Batch pending dues',
+    trailing: formatCurrency(item.amount),
+  }));
+}
+
+function ActionTile({
+  icon,
+  label,
+  onPress,
+  colors,
+  wide = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+  colors: ThemeColors;
+  wide?: boolean;
+}) {
+  return (
+    <PressableScale
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={[styles.actionTile, wide && styles.actionTileWide, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+    >
+      <View style={[styles.actionIcon, { backgroundColor: colors.surfaceSecondary }]}>{icon}</View>
+      <Text style={[styles.actionLabel, { color: colors.text }]}>{label}</Text>
+    </PressableScale>
+  );
+}
+
+function MiniMetric({
+  icon,
+  value,
+  label,
+  onPress,
+  accessibilityLabel,
+  colors,
+}: {
+  icon: React.ReactNode;
+  value: string;
+  label: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+  colors: ThemeColors;
+}) {
+  return (
+    <PressableScale
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      style={styles.miniMetricPressable}
+    >
+      <Surface style={styles.miniMetric}>
+        <View style={styles.metricTopRow}>{icon}<ChevronRight size={15} color={colors.textMuted} /></View>
+        <Text style={[styles.metricValue, { color: colors.text }]}>{value}</Text>
+        <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>{label}</Text>
+      </Surface>
+    </PressableScale>
+  );
+}
+
+function FeePulseCard({
+  data,
+  insight,
+  hideAmounts,
+  colors,
+  onPress,
+  stacked,
+}: {
+  data: DashboardData;
+  insight: FeeInsight;
+  hideAmounts: boolean;
+  colors: ThemeColors;
+  onPress: () => void;
+  stacked: boolean;
+}) {
+  const { fontScale } = useWindowDimensions();
+  const ringSize = 92 * Math.min(2, Math.max(1, fontScale));
+  const collected = data.feeMode === 'MONTH_COVERAGE'
+    ? data.monthCoverage.collectedRupees
+    : data.finances.totalCollected;
+  const hasRecords = insight.segments.some((segment) => segment.value > 0);
+  const coverageLabel = data.feeMode === 'MONTH_COVERAGE' ? 'months received' : 'collected';
+  const circumference = 2 * Math.PI * 36;
+  const value = hideAmounts ? '••••' : formatCurrency(collected);
+
+  return (
+    <PressableScale
+      accessibilityLabel={`Fee pulse. ${hideAmounts ? 'Amount hidden.' : `${value} total collected.`} ${hasRecords ? `${insight.percentage}% ${coverageLabel}.` : 'No fee records yet.'} Open fees.`}
+      onPress={onPress}
+      style={[styles.commandHeroPressable, stacked && styles.contentHeight]}
+    >
+      <Surface tone="strong" style={[styles.commandHero, stacked && styles.contentHeight, { backgroundColor: colors.hero, borderColor: colors.border }]}>
+        <LinearGradient colors={[colors.hero, colors.heroEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        <View style={styles.heroHeading}>
+          <Text style={[styles.heroKicker, { color: colors.heroText }]}>Fee pulse</Text>
+          <ChevronRight size={18} color={colors.heroText} />
+        </View>
+        <View style={[styles.pulseChart, { width: ringSize, height: ringSize }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Svg width={ringSize} height={ringSize} viewBox="0 0 92 92" accessible={false}>
+            <Circle cx={46} cy={46} r={36} fill="none" stroke={colors.heroText} strokeOpacity={0.13} strokeWidth={7} />
+            {hasRecords && insight.percentage > 0 ? (
+              <Circle cx={46} cy={46} r={36} fill="none" stroke={colors.heroText} strokeWidth={7}
+                strokeLinecap="round" strokeDasharray={`${circumference * insight.percentage / 100} ${circumference}`}
+                rotation={-90} origin="46, 46" />
+            ) : null}
+          </Svg>
+          <View style={styles.pulseCenter}>
+            <Text style={[styles.pulsePercent, { color: colors.heroText }]}>{hasRecords ? `${insight.percentage}%` : '–'}</Text>
+          </View>
+        </View>
+        <View style={styles.heroAmounts}>
+          <Text style={[styles.heroAmount, { color: colors.heroText }]}>{value}</Text>
+          <Text style={[styles.heroDetail, { color: colors.heroText }]}>Total collected</Text>
+          {data.feeMode === 'MONTH_COVERAGE' || !hasRecords ? <Text style={[styles.heroFootnote, { color: colors.heroText }]}>{hasRecords ? `${insight.percentage}% ${coverageLabel}` : 'No fee records yet'}</Text> : null}
+        </View>
+      </Surface>
+    </PressableScale>
+  );
+}
+
+function InstitutePerformanceCard({
+  averages,
+  loading,
+  failed,
+  onRetry,
+  colors,
+}: {
+  averages: ClassAverage[];
+  loading: boolean;
+  failed: boolean;
+  onRetry: () => void;
+  colors: ThemeColors;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const { fontScale } = useWindowDimensions();
+  const useRows = expanded || fontScale > 1.25;
+  const validAverages = averages.filter((item) => Number.isFinite(item.average));
+  const visibleAverages = expanded ? validAverages : validAverages.slice(0, 4);
+
+  return (
+    <Surface style={styles.insightCard}>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardHeaderCopy}>
+          <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.text }]}>Institute performance</Text>
+          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Class averages · recorded marks</Text>
+        </View>
+        <View style={[styles.chartBadge, { backgroundColor: colors.surfaceSecondary }]}>
+          <Text style={[styles.chartBadgeText, { color: colors.textSecondary }]}>%</Text>
+        </View>
+      </View>
+      {loading ? (
+        <Text accessibilityLiveRegion="polite" style={[styles.chartMessage, { color: colors.textSecondary }]}>Loading class averages…</Text>
+      ) : failed ? (
+        <View style={styles.chartMessageRow}>
+          <Text style={[styles.chartMessage, { color: colors.textSecondary }]}>Couldn't refresh class averages.{validAverages.length > 0 ? ' Showing the last loaded marks.' : ''}</Text>
+          <PressableScale accessibilityLabel="Retry class averages" onPress={onRetry} style={styles.sectionAction}>
+            <Text style={[styles.sectionActionText, { color: colors.text }]}>Retry</Text>
+          </PressableScale>
+        </View>
+      ) : null}
+      {!loading && validAverages.length === 0 && !failed ? (
+        <View style={styles.inlineEmpty}>
+          <ClipboardCheck size={22} color={colors.textSecondary} />
+          <Text style={[styles.inlineEmptyText, { color: colors.textSecondary }]}>Class averages appear after marks are recorded.</Text>
+        </View>
+      ) : (
+        useRows ? (
+          <View style={styles.classChart}>
+            {visibleAverages.map((item) => (
+              <View key={item.name} accessible accessibilityLabel={`${item.name}, average ${item.average.toFixed(1)} percent`} style={styles.classRow}>
+                <View style={styles.classRowHeading}>
+                  <Text style={[styles.className, { color: colors.text }]}>{item.name}</Text>
+                  <Text style={[styles.classValue, { color: colors.text }]}>{item.average.toFixed(1)}%</Text>
+                </View>
+                <View style={[styles.classTrack, { backgroundColor: colors.surfaceSecondary }]}>
+                  <View style={[styles.classFill, { width: `${Math.max(0, Math.min(100, item.average))}%`, backgroundColor: colors.chart }]} />
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : visibleAverages.length > 0 ? (
+          <View style={styles.performanceChart}>
+            <View style={styles.performanceAxis} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              {[100, 50, 0].map((tick) => <Text key={tick} style={[styles.axisLabel, { color: colors.textSecondary }]}>{tick}</Text>)}
+            </View>
+            <View style={styles.performancePlot}>
+              <View pointerEvents="none" style={styles.performanceGrid}>
+                {[0, 50, 100].map((tick) => <View key={tick} style={[styles.gridLine, { top: `${tick}%`, backgroundColor: colors.border }]} />)}
+              </View>
+              <View style={styles.performanceColumns}>
+                {visibleAverages.map((item) => (
+                  <View key={item.name} style={styles.performanceColumn} accessible accessibilityLabel={`${item.name}, average ${item.average.toFixed(1)} percent`}>
+                    <View style={styles.scorePlot}>
+                      <View style={[styles.scoreBar, { height: `${Math.max(0, Math.min(100, item.average))}%`, backgroundColor: colors.chart }]} />
+                    </View>
+                    <Text style={[styles.scoreValue, { color: colors.text }]}>{item.average.toFixed(1)}%</Text>
+                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{item.name}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        ) : null
+      )}
+      {validAverages.length > 4 ? (
+        <PressableScale accessibilityLabel={expanded ? 'Show fewer classes' : `Show all ${validAverages.length} classes`} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={styles.classExpand}>
+          <Text style={[styles.sectionActionText, { color: colors.text }]}>{expanded ? 'Show fewer' : `Show all ${validAverages.length} classes`}</Text>
+          <ChevronRight size={17} color={colors.textSecondary} style={{ transform: [{ rotate: expanded ? '-90deg' : '90deg' }] }} />
+        </PressableScale>
+      ) : null}
+    </Surface>
+  );
 }
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { user, isLoggedIn, logout } = useAuth();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const colors = Colors[scheme];
+  const { reduceMotion } = useAccessibilityPreferences();
+  const { width, fontScale } = useWindowDimensions();
+  const stackBento = width < 360 || fontScale > 1.25;
+  const accountKey = [user?.instituteId ?? '', user?.id ?? ''];
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const hasFocusedOnce = useRef(false);
 
-  const mask = (val: string) => isPrivate ? '••••' : val;
+  const summaryQuery = useQuery<DashboardData>({
+    queryKey: ['dashboard-summary', ...accountKey],
+    queryFn: ({ signal }) => offlineQuery('dashboard-summary', async () => (
+      await api.get('/dashboard/summary', { signal })
+    ).data),
+    enabled: isLoggedIn && !!user?.id,
+    staleTime: 30_000,
+  });
+  const batchesQuery = useQuery<BatchSummary[]>({
+    queryKey: ['dashboard-batches', ...accountKey],
+    queryFn: ({ signal }) => offlineQuery('batches', async () => (
+      await api.get('/batches', { signal })
+    ).data),
+    enabled: isLoggedIn && !!user?.id,
+    staleTime: 30_000,
+  });
+  const testsQuery = useQuery<TestSummary[]>({
+    queryKey: ['dashboard-tests', ...accountKey],
+    queryFn: ({ signal }) => offlineQuery('tests', async () => (
+      await api.get('/tests', { signal })
+    ).data),
+    enabled: isLoggedIn && !!user?.id,
+    staleTime: 30_000,
+  });
 
-  const loadData = useCallback(async () => {
-    try {
-      const dashRes = await api.get('/dashboard/summary');
-      setData(dashRes.data);
-    } catch (e: any) {
-      console.warn('Dashboard load failed:', e?.response?.data || e);
-    } finally {
-      setLoading(false);
+  const averagesQuery = useQuery<ClassAverage[]>({
+    queryKey: ['dashboard-class-averages', ...accountKey],
+    queryFn: ({ signal }) => offlineQuery('class-averages', async () => (
+      await api.get('/stats/class-average', { signal })
+    ).data),
+    enabled: isLoggedIn && !!user?.id && !!summaryQuery.data,
+    staleTime: 30_000,
+  });
+
+  const refreshAll = useCallback(async () => {
+    await Promise.allSettled([
+      summaryQuery.refetch(),
+      batchesQuery.refetch(),
+      testsQuery.refetch(),
+      averagesQuery.refetch(),
+    ]);
+  }, [averagesQuery.refetch, batchesQuery.refetch, summaryQuery.refetch, testsQuery.refetch]);
+
+  useFocusEffect(useCallback(() => {
+    if (!isLoggedIn) return;
+    if (!hasFocusedOnce.current) {
+      hasFocusedOnce.current = true;
+      return;
     }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (isLoggedIn) loadData();
-    }, [isLoggedIn, loadData])
-  );
+    void refreshAll();
+  }, [isLoggedIn, refreshAll]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadData();
+    await refreshAll();
     setRefreshing(false);
-  }, [loadData]);
+  }, [refreshAll]);
 
-  const totalCol = data?.finances?.totalCollected ?? 0;
-  const pending = data?.finances?.pending ?? 0;
-  const thisMonth = data?.finances?.collected ?? 0;
-  const totalGenerated = totalCol + pending;
-  const collectionRate = totalGenerated > 0 ? Math.round((totalCol / totalGenerated) * 100) : 0;
+  const data = summaryQuery.data;
+  const batches = batchesQuery.data ?? [];
+  const tests = testsQuery.data ?? [];
+  const feeInsight = useMemo(() => getFeeInsight(data, colors), [colors, data]);
+  const followUps = useMemo(() => getFollowUps(data), [data]);
 
+  const dateLabel = new Intl.DateTimeFormat('en-IN', {
+    weekday: stackBento ? undefined : 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date());
   const logoUri = user?.logo
     ? (user.logo.startsWith('http') || user.logo.startsWith('data:') ? user.logo : `https://mathlogs.app${user.logo}`)
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.instituteName || user?.name || 'M')}&background=111827&color=fff&size=120&bold=true`;
+    : null;
+  const profileName = user?.name || data?.userName || user?.instituteName || 'Teacher';
+  const isInitialLoading = summaryQuery.isLoading && !data;
+  const partialFailure = batchesQuery.isError || testsQuery.isError;
 
-  const greetingHour = new Date().getHours();
-  const greeting = greetingHour < 12 ? 'Good Morning' : greetingHour < 17 ? 'Good Afternoon' : 'Good Evening';
+  const headerActions = (
+    <View style={styles.headerActions}>
+      <PressableScale
+        accessibilityLabel="Open dashboard search"
+        onPress={() => setIsSearchOpen(true)}
+        style={[styles.headerButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+      >
+        <Search size={19} color={colors.text} />
+      </PressableScale>
+      <PressableScale
+        accessibilityLabel={isPrivate ? 'Show fee amounts' : 'Hide fee amounts'}
+        onPress={() => setIsPrivate((value) => !value)}
+        haptic="selection"
+        style={[styles.headerButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+      >
+        {isPrivate ? <EyeOff size={19} color={colors.text} /> : <Eye size={19} color={colors.text} />}
+      </PressableScale>
+      <PressableScale
+        accessibilityLabel="Open profile"
+        onPress={() => setIsProfileOpen(true)}
+        style={[styles.avatarButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+      >
+        <ProfileAvatar logoUri={logoUri} name={profileName} size={38} />
+      </PressableScale>
+    </View>
+  );
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <OfflineBanner visible={false} />
-
-      {/* ── Top Navbar ── */}
-      <Animated.View entering={FadeInDown.duration(400)} style={s.navbar}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.navGreeting}>{greeting} 👋</Text>
-          <Text style={s.navName} numberOfLines={1}>{data?.userName || user?.name || 'Admin'}</Text>
-        </View>
-        <View style={s.navRight}>
-          <TouchableOpacity
-            style={[s.navIconBtn, { backgroundColor: '#F3E8FF', borderColor: '#D8B4FE' }]}
-            accessibilityLabel="Open quizzes"
-            onPress={() => router.push('/(tabs)/quizzes' as any)}
-            activeOpacity={0.75}
-          >
-            <Sparkles size={18} color="#9333EA" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.navIconBtn}
-            accessibilityLabel="Scan marks"
-            onPress={() => router.push('/scan' as any)}
-            activeOpacity={0.75}
-          >
-            <Scan size={18} color={T.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.navIconBtn}
-            accessibilityLabel={isPrivate ? 'Show fee amounts' : 'Hide fee amounts'}
-            onPress={() => setIsPrivate(p => !p)}
-            activeOpacity={0.75}
-          >
-            {isPrivate
-              ? <EyeOff size={18} color={T.text} />
-              : <Eye size={18} color={T.text} />}
-          </TouchableOpacity>
-          <TouchableOpacity accessibilityLabel="Open profile" onPress={() => setIsProfileOpen(true)} activeOpacity={0.85} style={s.navAvatarWrap}>
-            <Image source={{ uri: logoUri }} style={s.navAvatar} resizeMode="contain" />
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.accent} />}
+    <>
+      <TeacherPage
+        title="Today at a glance"
+        compactTitle="Today"
+        eyebrow={dateLabel}
+        headerLayout="compact"
+        actions={headerActions}
+        scrollProps={{
+          keyboardShouldPersistTaps: 'handled',
+          keyboardDismissMode: 'on-drag',
+          refreshControl: (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.text}
+              colors={[colors.text]}
+              progressBackgroundColor={colors.surfaceElevated}
+            />
+          ),
+        }}
       >
-        {/* ── Finance Hero Card ── */}
-        <Animated.View entering={FadeInDown.duration(500).delay(80)} style={s.heroCard}>
-          <Text style={s.heroCardLabel}>Financial Overview</Text>
-          {loading ? (
-            <View style={{ marginTop: 12 }}>
-              <SkeletonLoader width={width - 96} height={80} borderRadius={12} />
-            </View>
-          ) : (
-            <>
-              <View style={s.heroAmountsRow}>
-                <View>
-                  <Text style={s.heroFinLabel}>Collected</Text>
-                  <Text style={s.heroFinValue}>{mask(`₹${totalCol.toLocaleString()}`)}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[s.heroFinLabel, { color: 'rgba(255,100,100,0.9)' }]}>Pending</Text>
-                  <Text style={[s.heroFinValue, { color: '#ff6b6b' }]}>{mask(`₹${pending.toLocaleString()}`)}</Text>
-                </View>
-              </View>
-              <View style={s.heroPbarBg}>
-                <View style={[s.heroPbarGreen, { flex: collectionRate || 1 }]} />
-                <View style={[s.heroPbarRed, { flex: Math.max(100 - collectionRate, 0) }]} />
-              </View>
-              <Text style={s.heroPbarLabel}>{mask(`${collectionRate}% of total fees collected`)}</Text>
-            </>
-          )}
-        </Animated.View>
-
-        {/* ── Stats Row ── */}
-        <Animated.View entering={FadeInDown.duration(500).delay(160)} style={s.statsRow}>
-          <StatPill
-            icon={<Users size={16} color={T.accent} />}
-            value={loading ? '–' : String(data?.stats.students ?? 0)}
-            label="Students"
-            color={T.accent}
-          />
-          <View style={s.statDivider} />
-          <StatPill
-            icon={<BookOpen size={16} color={T.blue} />}
-            value={loading ? '–' : String(data?.stats.batches ?? 0)}
-            label="Batches"
-            color={T.blue}
-          />
-          <View style={s.statDivider} />
-          <StatPill
-            icon={<IndianRupee size={16} color={T.emerald} />}
-            value={loading ? '–' : mask(`₹${(thisMonth / 1000).toFixed(0)}k`)}
-            label="This Month"
-            color={T.emerald}
-          />
-        </Animated.View>
-
-        {/* ── Batch Pending Dues ── */}
-        <Animated.View entering={FadeInDown.duration(500).delay(240)}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Batch Pending Dues</Text>
-            <TouchableOpacity accessibilityLabel="Manage fees" onPress={() => router.push('/(tabs)/fees' as any)} style={s.seeAllBtn}>
-              <Text style={s.seeAllText}>Manage</Text>
-              <ChevronRight size={14} color={T.accent} />
-            </TouchableOpacity>
-          </View>
-          <View style={s.card}>
-            {loading ? (
-              <View style={{ padding: 16, gap: 12 }}>
-                {[1, 2, 3].map(i => <SkeletonLoader key={i} width={width - 96} height={44} borderRadius={12} />)}
-              </View>
-            ) : data?.defaulters?.length ? (
-              data.defaulters.map((d, i) => (
-                <Animated.View key={d.name + i} entering={FadeInRight.duration(400).delay(i * 60)}>
-                  <View style={[s.txRow, i < data.defaulters.length - 1 && s.txBorder]}>
-                    <View style={[s.txIcon, { backgroundColor: `${T.red}12` }]}>
-                      <AlertCircle size={16} color={T.red} />
-                    </View>
-                    <Text style={[s.txName, { flex: 1 }]}>{d.name}</Text>
-                    <Text style={s.txAmount}>{mask(`₹${d.amount.toLocaleString()}`)}</Text>
-                  </View>
-                </Animated.View>
-              ))
-            ) : (
-              <View style={s.emptyState}>
-                <TrendingUp size={28} color={T.textMuted} />
-                <Text style={s.emptyText}>All dues cleared! 🎉</Text>
-              </View>
+        {isInitialLoading ? (
+          <Feedback kind="loading" title="Preparing your dashboard" description="Loading batches, tests, and fee status." />
+        ) : summaryQuery.isError && !data ? (
+          <Feedback
+            kind="error"
+            title="Dashboard could not load"
+            description={dashboardFailureDescription(summaryQuery.error)}
+            action={(
+              <PressableScale
+                accessibilityLabel="Retry dashboard"
+                onPress={() => void refreshAll()}
+                style={[styles.retryButton, { backgroundColor: colors.hero }]}
+              >
+                <Text style={[styles.retryText, { color: colors.heroText }]}>Try again</Text>
+              </PressableScale>
             )}
-          </View>
-        </Animated.View>
+          />
+        ) : (
+          <>
+            {summaryQuery.isError && data ? (
+              <Feedback kind="warning" title="Dashboard refresh failed" description="Showing the last loaded fee totals. Pull down to retry." />
+            ) : null}
+            {partialFailure ? (
+              <Feedback
+                kind="warning"
+                title="Some insights are unavailable"
+                description="The fee summary is visible. Pull down to retry batches and tests."
+              />
+            ) : null}
 
-      </ScrollView>
+            <TeacherSection>
+              <View style={[styles.bentoRow, stackBento && styles.bentoStack]}>
+                {data && feeInsight ? (
+                  <FeePulseCard data={data} insight={feeInsight} hideAmounts={isPrivate} colors={colors} stacked={stackBento} onPress={() => router.push('/(tabs)/fees' as never)} />
+                ) : null}
 
-      {/* ── Profile Modal ── */}
-      <Modal visible={isProfileOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setIsProfileOpen(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-          <View style={s.profileModalHeader}>
-            <Text style={s.profileModalTitle}>Profile</Text>
-            <TouchableOpacity accessibilityLabel="Close profile" onPress={() => setIsProfileOpen(false)} style={s.profileClose}>
-              <X size={20} color={T.text} />
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={s.profileContent}>
-            <View style={s.profileAvatarWrap}>
-              <View style={s.profileAvatarBg}>
-                <Image source={{ uri: logoUri }} style={s.profileAvatar} resizeMode="contain" />
+                <View style={[styles.metricRail, stackBento && styles.metricRailHorizontal]}>
+                  <MiniMetric
+                    icon={<Users size={18} color={colors.textSecondary} />}
+                    value={String(data?.stats.students ?? 0)}
+                    label="Students"
+                    onPress={() => router.push('/(tabs)/batches' as never)}
+                    accessibilityLabel={`${data?.stats.students ?? 0} students. Open batches.`}
+                    colors={colors}
+                  />
+                  <MiniMetric
+                    icon={<Layers size={18} color={colors.textSecondary} />}
+                    value={String(data?.stats.batches ?? 0)}
+                    label="Batches"
+                    onPress={() => router.push('/(tabs)/batches' as never)}
+                    accessibilityLabel={`${data?.stats.batches ?? 0} batches. Open batches.`}
+                    colors={colors}
+                  />
+                </View>
               </View>
-              <Text style={s.profileName}>{user?.instituteName || user?.name || 'Institute'}</Text>
-              <Text style={s.profileSubtitle}>MathLogs Admin</Text>
-            </View>
-            <View style={s.profileInfoCard}>
-              {user?.email && (
-                <View style={s.profileInfoRow}>
-                  <Mail size={18} color={T.textSec} />
-                  <Text style={s.profileInfoText}>{user.email}</Text>
-                </View>
+            </TeacherSection>
+
+            <TeacherSection>
+              <View style={[styles.actionGrid, stackBento && styles.actionGridWrapped]}>
+                <ActionTile
+                  icon={<ScanLine size={21} color={colors.textSecondary} />}
+                  label="Scan marks"
+                  wide={stackBento}
+                  onPress={() => router.push('/scan' as never)}
+                  colors={colors}
+                />
+                <ActionTile
+                  icon={<IndianRupee size={21} color={colors.textSecondary} />}
+                  label="Record fee"
+                  wide={stackBento}
+                  onPress={() => router.push('/quick-fee-modal' as never)}
+                  colors={colors}
+                />
+                <ActionTile
+                  icon={<FileText size={21} color={colors.textSecondary} />}
+                  label="Tests"
+                  wide={stackBento}
+                  onPress={() => router.push('/(tabs)/tests' as never)}
+                  colors={colors}
+                />
+                <ActionTile
+                  icon={<Sparkles size={21} color={colors.textSecondary} />}
+                  label="Quizzes"
+                  wide={stackBento}
+                  onPress={() => router.push('/(tabs)/quizzes' as never)}
+                  colors={colors}
+                />
+              </View>
+            </TeacherSection>
+
+            <TeacherSection>
+              <InstitutePerformanceCard
+                averages={averagesQuery.data ?? []}
+                loading={averagesQuery.isPending}
+                failed={averagesQuery.isError}
+                onRetry={() => void averagesQuery.refetch()}
+                colors={colors}
+              />
+            </TeacherSection>
+
+            <TeacherSection
+              title="Do next"
+              action={(
+                <PressableScale
+                  accessibilityLabel="Open fees"
+                  onPress={() => router.push('/(tabs)/fees' as never)}
+                  style={styles.sectionAction}
+                >
+                  <Text style={[styles.sectionActionText, { color: colors.text }]}>Manage</Text>
+                  <ChevronRight size={17} color={colors.textSecondary} />
+                </PressableScale>
               )}
-              {(user as any)?.phone && (
-                <View style={[s.profileInfoRow, { borderTopWidth: 1, borderTopColor: T.border }]}>
-                  <Phone size={18} color={T.textSec} />
-                  <Text style={s.profileInfoText}>{(user as any).phone}</Text>
-                </View>
+            >
+              {followUps.length > 0 ? (
+                <Surface style={styles.followUpList}>
+                  {followUps.map((item, index) => (
+                    <PressableScale
+                      key={item.key}
+                      accessibilityLabel={`${item.title}, ${item.detail}, ${isPrivate && data?.feeMode === 'CURRENT_DUE_BASED' ? 'amount hidden' : item.trailing}. Open fees.`}
+                      onPress={() => router.push('/(tabs)/fees' as never)}
+                      style={[
+                        styles.followUpRow,
+                        index < followUps.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                      ]}
+                    >
+                      <View style={[styles.followUpIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                        <AlertCircle size={18} color={colors.attention} />
+                      </View>
+                      <View style={styles.followUpCopy}>
+                        <Text style={[styles.followUpTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
+                        <Text style={[styles.followUpDetail, { color: colors.textSecondary }]} numberOfLines={1}>{item.detail}</Text>
+                      </View>
+                      <Text style={[styles.followUpTrailing, { color: colors.attention }]}>
+                        {isPrivate && data?.feeMode === 'CURRENT_DUE_BASED' ? '••••' : item.trailing}
+                      </Text>
+                    </PressableScale>
+                  ))}
+                </Surface>
+              ) : (
+                <Feedback
+                  kind="success"
+                  title="No fee follow-ups right now"
+                  description="Current fee records do not show any pending follow-up items."
+                />
               )}
+            </TeacherSection>
+          </>
+        )}
+      </TeacherPage>
+
+      {isSearchOpen ? (
+        <Modal
+          visible
+          animationType={reduceMotion ? 'none' : 'slide'}
+          presentationStyle="pageSheet"
+          onRequestClose={() => setIsSearchOpen(false)}
+        >
+          <SafeAreaView style={[styles.profileSafeArea, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+            <View style={[styles.profileHeader, { borderBottomColor: colors.border }]}>
+              <Text accessibilityRole="header" style={[styles.profileTitle, { color: colors.text }]}>Search</Text>
+              <PressableScale accessibilityLabel="Close dashboard search" onPress={() => setIsSearchOpen(false)} style={[styles.profileClose, { backgroundColor: colors.surfaceSecondary }]}>
+                <X size={20} color={colors.text} />
+              </PressableScale>
             </View>
-            <TouchableOpacity style={s.logoutBtn} onPress={logout}>
-              <LogOut size={18} color={T.red} />
-              <Text style={s.logoutBtnText}>Logout from MathLogs</Text>
-            </TouchableOpacity>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.searchBody}>
+              <ScrollView contentContainerStyle={styles.searchContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+                <DashboardSearch
+                  autoFocus
+                  onDismiss={() => setIsSearchOpen(false)}
+                  batches={batches}
+                  tests={tests}
+                  batchesLoading={batchesQuery.isPending}
+                  batchesError={batchesQuery.isError}
+                  testsLoading={testsQuery.isPending}
+                  testsError={testsQuery.isError}
+                />
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </Modal>
+      ) : null}
+
+      <Modal
+        visible={isProfileOpen}
+        animationType={reduceMotion ? 'none' : 'slide'}
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsProfileOpen(false)}
+      >
+        <SafeAreaView style={[styles.profileSafeArea, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+          <View style={[styles.profileHeader, { borderBottomColor: colors.border }]}>
+            <Text accessibilityRole="header" style={[styles.profileTitle, { color: colors.text }]}>Profile</Text>
+            <PressableScale
+              accessibilityLabel="Close profile"
+              onPress={() => setIsProfileOpen(false)}
+              style={[styles.profileClose, { backgroundColor: colors.surfaceSecondary }]}
+            >
+              <X size={20} color={colors.text} />
+            </PressableScale>
+          </View>
+          <ScrollView contentContainerStyle={styles.profileContent}>
+            <View style={styles.profileIdentity}>
+              <Surface style={styles.profileAvatarSurface}>
+                <ProfileAvatar logoUri={logoUri} name={profileName} size={84} />
+              </Surface>
+              <Text style={[styles.profileName, { color: colors.text }]}>{user?.instituteName || user?.name || 'Institute'}</Text>
+              <Text style={[styles.profileSubtitle, { color: colors.textSecondary }]}>MathLogs teacher workspace</Text>
+            </View>
+            <Surface style={styles.profileInfo}>
+              {user?.email ? (
+                <View style={styles.profileInfoRow}>
+                  <Mail size={19} color={colors.textSecondary} />
+                  <Text style={[styles.profileInfoText, { color: colors.text }]}>{user.email}</Text>
+                </View>
+              ) : null}
+              {(user as { phone?: string } | null)?.phone ? (
+                <View style={[styles.profileInfoRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                  <Phone size={19} color={colors.textSecondary} />
+                  <Text style={[styles.profileInfoText, { color: colors.text }]}>{(user as { phone?: string }).phone}</Text>
+                </View>
+              ) : null}
+            </Surface>
+            <View style={styles.appearanceSection}>
+              <Text style={[styles.appearanceTitle, { color: colors.text }]}>Appearance</Text>
+              <Text style={[styles.appearanceDescription, { color: colors.textSecondary }]}>Choose how the teacher workspace looks on this device.</Text>
+              <ThemeModeSelector />
+            </View>
+            <PressableScale
+              accessibilityLabel="Logout from MathLogs"
+              haptic="commit"
+              onPress={() => void logout()}
+              style={[styles.logoutButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            >
+              <LogOut size={19} color={Colors.error} />
+              <Text style={[styles.logoutText, { color: Colors.error }]}>Logout from MathLogs</Text>
+            </PressableScale>
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </>
   );
 }
 
-function StatPill({ icon, value, label, color }: { icon: React.ReactNode; value: string; label: string; color: string }) {
-  return (
-    <View style={s.statPill}>
-      <View style={[s.statPillIcon, { backgroundColor: `${color}15` }]}>{icon}</View>
-      <Text style={s.statPillValue}>{value}</Text>
-      <Text style={s.statPillLabel}>{label}</Text>
-    </View>
-  );
-}
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-  scroll: { paddingHorizontal: 20, paddingBottom: TEACHER_TAB_CONTENT_INSET, paddingTop: 8, gap: 0 },
-
-  // Navbar
-  navbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 12,
-    backgroundColor: T.bg,
+const styles = StyleSheet.create({
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  navGreeting: { fontSize: 12, color: T.textSec, fontWeight: '600', marginBottom: 2 },
-  navName: { fontSize: 20, fontWeight: '800', color: T.text, letterSpacing: -0.4 },
-  navRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  navIconBtn: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: T.white,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 6 },
-      android: { elevation: 2 },
-    }),
+  avatarButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  navAvatarWrap: {
-    width: 44, height: 44, borderRadius: 14, backgroundColor: T.white,
-    borderWidth: 1.5, borderColor: T.border, overflow: 'hidden',
-    alignItems: 'center', justifyContent: 'center',
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 6 },
-      android: { elevation: 2 },
-    }),
+  retryButton: {
+    minHeight: 44,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  navAvatar: { width: 38, height: 38 },
-
-  // Hero Finance Card
-  heroCard: {
-    backgroundColor: T.accent, borderRadius: 24, padding: 22, marginBottom: 16,
-    ...Platform.select({
-      ios: { shadowColor: T.accent, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 20 },
-      android: { elevation: 6 },
-    }),
+  retryText: { ...TypeScale.label },
+  bentoRow: { flexDirection: 'row', alignItems: 'stretch', gap: Spacing.md },
+  bentoStack: { flexDirection: 'column' },
+  commandHeroPressable: { flex: 1.5, minWidth: 0 },
+  commandHero: { flex: 1, minHeight: 226, padding: Spacing.lg, borderRadius: BorderRadius['2xl'], justifyContent: 'space-between', gap: Spacing.sm },
+  contentHeight: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
+  heroHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.xs },
+  heroKicker: { ...TypeScale.body, fontWeight: FontWeight.semibold },
+  pulseChart: { alignSelf: 'flex-start', width: 92, height: 92, marginVertical: Spacing.xs },
+  pulseCenter: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
+  pulsePercent: { fontSize: FontSize.lg, lineHeight: 27, fontWeight: FontWeight.semibold, letterSpacing: -0.7 },
+  heroAmounts: { gap: 2 },
+  heroAmount: { fontSize: FontSize.xl, lineHeight: 30, fontWeight: FontWeight.semibold, letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  heroDetail: { ...TypeScale.label, fontWeight: FontWeight.medium, opacity: 0.84 },
+  heroFootnote: { ...TypeScale.caption, opacity: 0.74, marginTop: Spacing.xs },
+  metricRail: { flex: 0.9, minWidth: 0, gap: Spacing.md },
+  metricRailHorizontal: { flexDirection: 'row' },
+  miniMetricPressable: { flex: 1, minWidth: 0 },
+  miniMetric: { flex: 1, minHeight: 107, padding: Spacing.md, borderRadius: BorderRadius['2xl'], justifyContent: 'space-between', gap: Spacing.xs },
+  metricTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  metricValue: { fontSize: FontSize['2xl'], lineHeight: 34, fontWeight: FontWeight.semibold, letterSpacing: -0.7, fontVariant: ['tabular-nums'] },
+  metricLabel: { ...TypeScale.body, fontWeight: FontWeight.medium },
+  actionGrid: { flexDirection: 'row', gap: Spacing.sm },
+  actionGridWrapped: { flexWrap: 'wrap' },
+  actionTile: { flex: 1, flexBasis: 64, minHeight: 92, paddingVertical: Spacing.md, paddingHorizontal: Spacing.xs, borderWidth: 1, borderRadius: BorderRadius.xl, alignItems: 'center', justifyContent: 'flex-start', gap: Spacing.sm },
+  actionTileWide: { flexBasis: '40%' },
+  actionIcon: { width: 36, height: 36, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { ...TypeScale.label, fontSize: 14, lineHeight: 19, textAlign: 'center' },
+  insightCard: { gap: Spacing.md },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.md },
+  cardHeaderCopy: { flex: 1, minWidth: 0 },
+  cardTitle: { ...TypeScale.sectionTitle },
+  cardSubtitle: { ...TypeScale.label, fontWeight: FontWeight.medium, marginTop: Spacing.xs },
+  chartBadge: { minWidth: 36, minHeight: 36, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center' },
+  chartBadgeText: { ...TypeScale.body, fontWeight: FontWeight.semibold },
+  chartMessage: { ...TypeScale.body, flex: 1 },
+  chartMessageRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  performanceChart: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
+  performanceAxis: { height: 140, justifyContent: 'space-between', width: 24 },
+  axisLabel: { ...TypeScale.caption, textAlign: 'right' },
+  performancePlot: { flex: 1, minWidth: 0 },
+  performanceGrid: { position: 'absolute', top: 0, left: 0, right: 0, height: 140 },
+  gridLine: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth },
+  performanceColumns: { flexDirection: 'row', gap: Spacing.sm, justifyContent: 'flex-start' },
+  performanceColumn: { flex: 1, maxWidth: 92, minWidth: 0, alignItems: 'stretch', gap: Spacing.xs },
+  scorePlot: { height: 140, justifyContent: 'flex-end', alignItems: 'center' },
+  scoreBar: { width: '70%', maxWidth: 42, borderTopLeftRadius: BorderRadius.sm, borderTopRightRadius: BorderRadius.sm },
+  scoreValue: { ...TypeScale.label, textAlign: 'center', fontVariant: ['tabular-nums'], marginTop: Spacing.xs },
+  scoreLabel: { ...TypeScale.label, fontWeight: FontWeight.regular, textAlign: 'center' },
+  classChart: { gap: Spacing.lg },
+  classRow: { gap: Spacing.sm },
+  classRowHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
+  className: { ...TypeScale.body, flex: 1, fontWeight: FontWeight.medium },
+  classValue: { ...TypeScale.body, fontWeight: FontWeight.semibold, fontVariant: ['tabular-nums'] },
+  classTrack: { height: 8, borderRadius: BorderRadius.full, overflow: 'hidden' },
+  classFill: { height: '100%', borderRadius: BorderRadius.full },
+  classExpand: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  inlineEmpty: { minHeight: 82, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  inlineEmptyText: { ...TypeScale.body, textAlign: 'center' },
+  sectionAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingLeft: Spacing.sm },
+  sectionActionText: { ...TypeScale.label },
+  followUpList: { padding: 0, overflow: 'hidden' },
+  followUpRow: {
+    minHeight: 68,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
   },
-  heroCardLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 },
-  heroAmountsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  heroDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 20 },
-  heroFinLabel: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  heroFinValue: { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  heroPbarBg: { height: 6, borderRadius: 3, flexDirection: 'row', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.12)' },
-  heroPbarGreen: { height: '100%', backgroundColor: T.emerald },
-  heroPbarRed: { height: '100%', backgroundColor: 'rgba(239,68,68,0.55)' },
-  heroPbarLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '500', marginTop: 8 },
-
-  // Stats Row
-  statsRow: {
-    flexDirection: 'row', backgroundColor: T.white, borderRadius: 20,
-    padding: 16, marginBottom: 24, alignItems: 'center',
-    borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 },
-      android: { elevation: 2 },
-    }),
+  followUpIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  statPill: { flex: 1, alignItems: 'center', gap: 6 },
-  statDivider: { width: 1, height: 40, backgroundColor: T.border },
-  statPillIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  statPillValue: { fontSize: 18, fontWeight: '800', color: T.text, letterSpacing: -0.3 },
-  statPillLabel: { fontSize: 10, fontWeight: '600', color: T.textSec, textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  // Sections
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { color: T.text, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
-  seeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  seeAllText: { color: T.accent, fontSize: 13, fontWeight: '700' },
-
-  card: {
-    backgroundColor: T.white, borderRadius: 20, borderWidth: 1, borderColor: T.border,
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 },
-      android: { elevation: 2 },
-    }),
+  followUpCopy: { flex: 1, minWidth: 0 },
+  followUpTitle: { ...TypeScale.label },
+  followUpDetail: { ...TypeScale.label, fontWeight: FontWeight.regular, marginTop: 2 },
+  followUpTrailing: { fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.semibold },
+  searchBody: { flex: 1 },
+  searchContent: { padding: Spacing.xl, paddingBottom: Spacing['3xl'] },
+  profileSafeArea: { flex: 1 },
+  profileHeader: {
+    minHeight: 68,
+    paddingHorizontal: Spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-
-  txRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
-  txBorder: { borderBottomWidth: 1, borderBottomColor: T.border },
-  txIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  txName: { fontSize: 14, fontWeight: '700', color: T.text },
-  txAmount: { fontSize: 15, fontWeight: '800', color: T.red },
-
-  emptyState: { paddingVertical: 32, alignItems: 'center', gap: 8 },
-  emptyText: { color: T.textSec, fontSize: 14, fontWeight: '600' },
-
-  // Profile Modal
-  profileModalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 24, paddingVertical: 20,
-    borderBottomWidth: 1, borderBottomColor: T.border,
+  profileTitle: TypeScale.pageTitle,
+  profileClose: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  profileModalTitle: { fontSize: 20, fontWeight: '800', color: T.text },
-  profileClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center' },
-  profileContent: { padding: 24, gap: 20 },
-  profileAvatarWrap: { alignItems: 'center', gap: 8, paddingVertical: 16 },
-  profileAvatarBg: {
-    width: 96, height: 96, borderRadius: 24, backgroundColor: T.white,
-    borderWidth: 2, borderColor: T.border, alignItems: 'center', justifyContent: 'center',
-    ...Platform.select({
-      ios: { shadowColor: T.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 },
-      android: { elevation: 3 },
-    }),
+  profileContent: { padding: Spacing.xl, gap: Spacing.xl },
+  profileIdentity: { alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.lg },
+  profileAvatarSurface: { width: 104, height: 104, padding: Spacing.sm, alignItems: 'center', justifyContent: 'center' },
+  profileName: { fontSize: FontSize.xl, lineHeight: 29, fontWeight: FontWeight.bold, textAlign: 'center' },
+  profileSubtitle: { ...TypeScale.body, textAlign: 'center' },
+  profileInfo: { padding: 0, overflow: 'hidden' },
+  profileInfoRow: { minHeight: 58, paddingHorizontal: Spacing.lg, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  profileInfoText: { ...TypeScale.body, flex: 1 },
+  appearanceSection: { gap: Spacing.sm },
+  appearanceTitle: TypeScale.sectionTitle,
+  appearanceDescription: TypeScale.body,
+  logoutButton: {
+    minHeight: 52,
+    paddingHorizontal: Spacing.lg,
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
   },
-  profileAvatar: { width: 80, height: 80 },
-  profileName: { fontSize: 22, fontWeight: '800', color: T.text, textAlign: 'center' },
-  profileSubtitle: { fontSize: 14, color: T.textSec, fontWeight: '600' },
-  profileInfoCard: { backgroundColor: T.white, borderRadius: 16, borderWidth: 1, borderColor: T.border, overflow: 'hidden' },
-  profileInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
-  profileInfoText: { fontSize: 15, color: T.text, fontWeight: '500' },
-  logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 18,
-    backgroundColor: `${T.red}10`, borderRadius: 16, justifyContent: 'center',
-    borderWidth: 1, borderColor: `${T.red}20`,
-  },
-  logoutBtnText: { color: T.red, fontWeight: '700', fontSize: 16 },
-  privacyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' },
-  privacyBtnText: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600' },
+  logoutText: { ...TypeScale.label },
 });
