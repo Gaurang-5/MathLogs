@@ -10,9 +10,10 @@ import { ArrowLeft, Check, FileText, Layers3, Paperclip, Save, Sparkles, Wifi, X
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import api from '../services/api';
-import { PressableScale, Surface } from '../components/ui';
+import { Feedback, PressableScale, Surface } from '../components/ui';
 import { useAccessibilityPreferences } from '../components/ui/useAccessibilityPreferences';
 import { BorderRadius, Colors, FontWeight, Shadows, Spacing, TypeScale } from '../constants/theme';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Batch { id: string; name: string; className: string | null }
 interface GeneratedQuestion {
@@ -64,6 +65,7 @@ function ProgressLoader({ colors }: { colors: ThemeColors }) {
 
 export default function QuizGeneratorScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
   const { fontScale } = useWindowDimensions();
@@ -85,9 +87,37 @@ export default function QuizGeneratorScreen() {
   const { data: batches = [] } = useQuery<Batch[]>({
     queryKey: ['batches'],
     queryFn: async () => (await api.get('/batches')).data,
+    enabled: user?.productPlan !== 'BASIC',
   });
   const difficulties = useMemo(() => ['Easy', 'Medium', 'Hard', 'Olympiad'], []);
   const canGenerate = topic.trim().length > 0 && grade.trim().length > 0 && !generating;
+
+  if (user?.productPlan === 'BASIC') {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.header}>
+          <PressableScale accessibilityLabel="Back to quizzes" onPress={() => router.back()} style={[styles.iconButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+            <ArrowLeft size={21} color={colors.text} />
+          </PressableScale>
+          <View style={styles.headerCopy}>
+            <Text accessibilityRole="header" style={[styles.headerTitle, { color: colors.text }]}>Generate quiz</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Pro feature</Text>
+          </View>
+        </View>
+        <View style={styles.planGuardContent}>
+          <Surface tone="strong" style={[styles.planGuardCard, { backgroundColor: colors.hero, borderColor: colors.borderLight }]}>
+            <View style={[styles.progressIcon, { backgroundColor: colors.heroEnd }]}>
+              <Sparkles size={22} color={colors.heroText} />
+            </View>
+            <Text style={[styles.planGuardTitle, { color: colors.heroText }]}>AI quiz generation is included with Pro</Text>
+            <Text style={[styles.planGuardDescription, { color: colors.heroText }]}>Basic keeps batches, tests, marks, and fees available offline. Pro adds document-assisted quiz generation, online delivery, and quiz credits.</Text>
+          </Surface>
+          <Feedback kind="empty" title="Use Tests on Basic" description="Create and mark regular tests from the Tests workspace. Pro pricing will appear after the plan details are finalized." />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const pickReferenceDocuments = async () => {
     const availableSlots = MAX_REFERENCE_DOCUMENTS - referenceDocuments.length;
@@ -377,6 +407,10 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, minWidth: 0 }, headerTitle: { ...TypeScale.sectionTitle, fontSize: 19, lineHeight: 24 }, headerSubtitle: { ...TypeScale.caption, marginTop: 1 },
   onlineBadge: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.md, borderRadius: BorderRadius.full }, onlineBadgeText: TypeScale.caption,
   content: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: Spacing['4xl'] }, form: { gap: Spacing.xl }, reviewArea: { gap: Spacing.xl },
+  planGuardContent: { flex: 1, paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, gap: Spacing.xl },
+  planGuardCard: { alignItems: 'center', padding: Spacing['2xl'], borderRadius: BorderRadius.xl },
+  planGuardTitle: { ...TypeScale.sectionTitle, textAlign: 'center' },
+  planGuardDescription: { ...TypeScale.body, textAlign: 'center', opacity: 0.82, marginTop: Spacing.sm },
   fieldRow: { flexDirection: 'row', gap: Spacing.md }, fieldRowStacked: { flexDirection: 'column' }, fieldGroup: { gap: Spacing.sm }, label: { ...TypeScale.label },
   input: { minHeight: 54, borderWidth: 1, borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, fontSize: 16, lineHeight: 22 }, multilineInput: { minHeight: 96, textAlignVertical: 'top' },
   attachButton: { minHeight: 76, flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderWidth: 1, borderStyle: 'dashed', borderRadius: BorderRadius.lg },
