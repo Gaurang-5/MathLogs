@@ -114,6 +114,20 @@ export default function SettingsScreen() {
           </GlassCard>
         </Animated.View>
 
+        {user?.productPlan ? (
+          <Animated.View entering={FadeInDown.duration(400).delay(180)}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PLAN</Text>
+            <View style={styles.settingsGroup}>
+              <SettingsRow
+                icon={user.productPlan === 'PRO' ? '✦' : '✓'}
+                label="Current plan"
+                value={user.productPlan === 'PRO' ? 'Pro' : 'Basic'}
+                isDark={isDark}
+              />
+            </View>
+          </Animated.View>
+        ) : null}
+
         {/* App Settings */}
         <Animated.View entering={FadeInDown.duration(400).delay(200)}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>APP</Text>
