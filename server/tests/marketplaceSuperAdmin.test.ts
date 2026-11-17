@@ -74,7 +74,7 @@ test('superadmin endpoints reject anonymous and institute-admin callers', async 
   assert.equal((await fetch(`${baseUrl}/api/marketplace/super-admin/claims`, { headers: auth(instituteToken) })).status, 403);
 });
 
-test('Marketplace-only owners can use Marketplace routes but cannot mutate ERP data', async () => {
+test('legacy Marketplace owners resolve to Basic and can use core workflows', async () => {
   const lead = await prisma.leadInquiry.create({
     data: { instituteId: pageOnlyInstituteId, studentName: 'Page owner lead', phone: '9888877777', deliveryStatus: 'DELIVERED' }
   });
@@ -98,8 +98,7 @@ test('Marketplace-only owners can use Marketplace routes but cannot mutate ERP d
   const erpMutation = await fetch(`${baseUrl}/api/students/manual`, {
     method: 'POST', headers: auth(pageOnlyToken), body: '{}'
   });
-  assert.equal(erpMutation.status, 403);
-  assert.equal(((await erpMutation.json()) as any).error, 'MARKETPLACE_ONLY_ACCESS_RESTRICTED');
+  assert.notEqual(erpMutation.status, 403);
 
   const paidMutation = await fetch(`${baseUrl}/api/students/manual`, {
     method: 'POST', headers: auth(instituteToken), body: '{}'

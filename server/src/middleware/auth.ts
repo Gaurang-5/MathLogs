@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../prisma';
 import { secureLogger } from '../utils/secureLogger';
 import { effectiveEntitlements } from '../domain/plans/entitlements';
+import { productPlanAccess } from '../domain/plans/productPlan';
 
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -50,48 +51,14 @@ export const invalidateAuthCache = (userId: string) => {
     authCache.delete(userId);
 };
 
-function isMarketplaceOnlyAllowedRequest(req: Request): boolean {
+function isProOnlyRequest(req: Request): boolean {
     const path = req.originalUrl.split('?')[0].replace(/\/$/, '');
-    const method = req.method.toUpperCase();
-
-    if (path === '/api/marketplace/admin/profile') {
-        return method === 'GET' || method === 'PUT';
-    }
-    if (path === '/api/marketplace/admin/leads') {
-        return method === 'GET';
-    }
-    if (/^\/api\/marketplace\/admin\/leads\/[^/]+$/.test(path)) {
-        return method === 'PATCH';
-    }
-    if (path === '/api/institute/me') {
-        return method === 'GET';
-    }
-    if (path === '/api/support/tickets' || /^\/api\/support\/tickets\/[^/]+(?:\/messages)?$/.test(path)) {
-        return method === 'GET' || method === 'POST';
-    }
-    if (path === '/api/communication-preferences') {
-        return method === 'GET' || method === 'PATCH';
-    }
-    if (path === '/api/billing/create' || path === '/api/billing/verify') {
-        return method === 'POST';
-    }
-    if (path === '/api/billing/cancel') {
-        return method === 'DELETE';
-    }
-
-    return false;
-}
-
-function isQuizPlanAllowedRequest(req: Request): boolean {
-    if (isMarketplaceOnlyAllowedRequest(req)) return true;
-    const path = req.originalUrl.split('?')[0].replace(/\/$/, '');
-    const method = req.method.toUpperCase();
-
-    if (path.startsWith('/api/quizzes')) return true;
-    if (path === '/api/tests/online' || /^\/api\/tests\/online\/[^/]+(?:\/.*)?$/.test(path)) return true;
-    if (method === 'GET' && (path === '/api/batches' || path.startsWith('/api/batches/') || path.startsWith('/api/students/search') || path.includes('/eligible-students'))) return true;
-    if (path.startsWith('/api/auth/')) return true;
-    return false;
+    return path.startsWith('/api/quizzes')
+        || path === '/api/tests/generate'
+        || path.startsWith('/api/tests/generate-')
+        || path.startsWith('/api/tests/generate/status/')
+        || path === '/api/tests/online'
+        || path.startsWith('/api/tests/online/');
 }
 
 function supportSessionActionForbidden(req: Request) {
@@ -132,7 +99,8 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
                 const instituteAdmin = await prisma.admin.findFirst({ where: { instituteId: session.instituteId, role: 'INSTITUTE_ADMIN' }, select: { id: true, username: true, passwordVersion: true, instituteId: true, role: true, institute: { select: { planExpiryDate: true, plan: true, trialEndsAt: true, marketplaceAccessGrantedAt: true, includedQuizCredits: true, lifetimeQuizCredits: true } } } });
                 if (!instituteAdmin) return res.status(403).json({ success: false, error: 'SUPPORT_SESSION_INSTITUTE_ADMIN_MISSING' });
                 const entitlements = effectiveEntitlements(instituteAdmin.institute ?? {});
-                req.user = { ...instituteAdmin, entitlements, supportActorAdminId: session.adminId, supportSessionId: session.id, supportTicketId: session.ticketId, supportCaseId: session.caseId } as any;
+                const productAccess = productPlanAccess(instituteAdmin.institute ?? {});
+                req.user = { ...instituteAdmin, entitlements, productAccess, supportActorAdminId: session.adminId, supportSessionId: session.id, supportTicketId: session.ticketId, supportCaseId: session.caseId } as any;
                 if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
                     res.once('finish', () => {
                         void prisma.superAdminAuditLog.create({ data: { action: 'SUPPORT_MUTATION', entityType: 'SupportSessionRequest', entityId: normalizedSupportRoute(req), actorAdminId: session.adminId, instituteId: session.instituteId, correlationId: req.correlationId, supportSessionId: session.id, metadata: { method: req.method, route: normalizedSupportRoute(req), responseStatus: res.statusCode } } }).catch(() => undefined);
@@ -208,23 +176,16 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 
             const institute = dbUser.institute;
             const entitlements = effectiveEntitlements(institute ?? {});
-            const marketplaceOnly = !entitlements.quiz && !entitlements.enterprise;
-            const quizOnly = entitlements.quiz && !entitlements.enterprise;
+            const productAccess = productPlanAccess(institute ?? {});
 
-            if (marketplaceOnly && dbUser.role !== 'SUPER_ADMIN' && !isMarketplaceOnlyAllowedRequest(req)) {
+            if (productAccess.plan === 'BASIC' && dbUser.role !== 'SUPER_ADMIN' && isProOnlyRequest(req)) {
                 return res.status(403).json({
-                    error: 'MARKETPLACE_ONLY_ACCESS_RESTRICTED',
-                    message: 'This account can access marketplace listing, leads, and upgrade features only.'
-                });
-            }
-            if (quizOnly && dbUser.role !== 'SUPER_ADMIN' && !isQuizPlanAllowedRequest(req)) {
-                return res.status(403).json({
-                    error: 'ENTERPRISE_PLAN_REQUIRED',
-                    message: 'This operation requires the Enterprise plan.'
+                    error: 'PRO_PLAN_REQUIRED',
+                    message: 'This online quiz feature requires the Pro plan.'
                 });
             }
 
-            req.user = { ...user, ...dbUser, entitlements };
+            req.user = { ...user, ...dbUser, entitlements, productAccess };
             next();
         } catch (e) {
             console.error('Auth Middleware Error:', e);

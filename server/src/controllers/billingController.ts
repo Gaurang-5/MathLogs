@@ -12,6 +12,7 @@ import { cancelSatisfiedNotifications, scheduleLifecycleNotifications } from '..
 import { includedCreditPeriod, paidPlanExpiry } from '../domain/plans/entitlements';
 import { planSubscriptionCheckoutService } from '../services/planSubscriptionCheckoutService';
 import { planSubscriptionLifecycleService } from '../services/planSubscriptionLifecycleService';
+import { productPlanAccess } from '../domain/plans/productPlan';
 
 export const billingControllerDependencies = { activateMarketplace };
 
@@ -48,6 +49,10 @@ export function resolveCheckoutProduct(planId: unknown, billingCycle: unknown): 
     if (plan === 'MARKETPLACE' && normalizedCycle !== 'ONE_TIME') throw new Error('INVALID_PLAN_CYCLE');
     if (plan !== 'MARKETPLACE' && normalizedCycle === 'ONE_TIME') throw new Error('INVALID_PLAN_CYCLE');
     return { kind: 'PLAN', plan, billingCycle: normalizedCycle, amountPaise };
+}
+
+export function canPurchaseQuizCredits(institute: Parameters<typeof productPlanAccess>[0]): boolean {
+    return productPlanAccess(institute).capabilities.quizCreditTopUps;
 }
 
 export function verifyRazorpaySignature(providerOrderId: string, providerPaymentId: string, signature: string, secret = razorpayConfig.keySecret): boolean {
@@ -121,6 +126,13 @@ export const createBillingSession = async (req: Request, res: Response) => {
             product = resolveCheckoutProduct(planId, billingCycle);
         } catch (error) {
             return res.status(400).json({ error: error instanceof Error ? error.message : 'INVALID_BILLING_PRODUCT' });
+        }
+
+        if (product.kind === 'CREDIT_PACK' && !canPurchaseQuizCredits(admin.institute)) {
+            return res.status(403).json({
+                error: 'PRO_PLAN_REQUIRED',
+                message: 'Quiz credit top-ups require an active Pro plan.'
+            });
         }
 
         if (product.kind === 'PLAN' && product.plan === 'MARKETPLACE' && product.amountPaise === 0) {

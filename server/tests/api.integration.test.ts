@@ -123,7 +123,7 @@ test('POST /api/fees/pay rejects invalid bearer tokens before hitting the contro
     assert.equal(response.status, 403);
 });
 
-test('canonical Marketplace-only and expired Enterprise access cannot mutate ERP routes', async () => {
+test('expired Pro-compatible access falls back to Basic core workflows', async () => {
     replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: (error: unknown, decoded?: unknown) => void) => {
         callback(null, { id: 'marketplace-auth-admin', username: 'marketplace-owner', passwordVersion: 1, instituteId: 'marketplace-auth-inst', role: 'INSTITUTE_ADMIN' });
     }) as unknown) as typeof jwt.verify);
@@ -144,11 +144,10 @@ test('canonical Marketplace-only and expired Enterprise access cannot mutate ERP
     }) as never) as typeof prisma.admin.findUnique);
 
     const response = await postJson('/api/students/manual', {}, { Authorization: 'Bearer valid-token' });
-    assert.equal(response.status, 403);
-    assert.equal((await response.json() as { error: string }).error, 'MARKETPLACE_ONLY_ACCESS_RESTRICTED');
+    assert.notEqual(response.status, 403);
 });
 
-test('canonical Quiz-only access cannot mutate Enterprise ERP routes', async () => {
+test('legacy Quiz access resolves to Pro and can reach core workflows', async () => {
     replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: (error: unknown, decoded?: unknown) => void) => {
         callback(null, { id: 'quiz-auth-admin', username: 'quiz-owner', passwordVersion: 1, instituteId: 'quiz-auth-inst', role: 'INSTITUTE_ADMIN' });
     }) as unknown) as typeof jwt.verify);
@@ -162,8 +161,24 @@ test('canonical Quiz-only access cannot mutate Enterprise ERP routes', async () 
     }) as never) as typeof prisma.admin.findUnique);
 
     const response = await postJson('/api/students/manual', {}, { Authorization: 'Bearer valid-token' });
+    assert.notEqual(response.status, 403);
+});
+
+test('Basic access cannot use AI quiz generation', async () => {
+    replaceMethod(jwt, 'verify', (((token: string, secret: string, callback: (error: unknown, decoded?: unknown) => void) => {
+        callback(null, { id: 'basic-auth-admin', username: 'basic-owner', passwordVersion: 1, instituteId: 'basic-auth-inst', role: 'INSTITUTE_ADMIN' });
+    }) as unknown) as typeof jwt.verify);
+    replaceMethod(prisma.admin, 'findUnique', (async () => ({
+        id: 'basic-auth-admin', username: 'basic-owner', passwordVersion: 1, instituteId: 'basic-auth-inst', role: 'INSTITUTE_ADMIN',
+        institute: {
+            plan: 'BASIC', planExpiryDate: null, marketplaceAccessGrantedAt: null, trialEndsAt: null,
+            includedQuizCredits: 0, lifetimeQuizCredits: 0,
+        },
+    }) as never) as typeof prisma.admin.findUnique);
+
+    const response = await postJson('/api/tests/generate', {}, { Authorization: 'Bearer valid-token' });
     assert.equal(response.status, 403);
-    assert.equal((await response.json() as { error: string }).error, 'ENTERPRISE_PLAN_REQUIRED');
+    assert.equal((await response.json() as { error: string }).error, 'PRO_PLAN_REQUIRED');
 });
 
 test('POST /api/auth/login returns tokens for valid credentials', async () => {

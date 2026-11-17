@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { getPublicPlanCatalogue } from '../src/controllers/planCatalogController';
-import { resolveCheckoutProduct, verifyRazorpaySignature } from '../src/controllers/billingController';
+import { canPurchaseQuizCredits, resolveCheckoutProduct, verifyRazorpaySignature } from '../src/controllers/billingController';
 import { sanitizeBillingWebhook, verifyBillingWebhookSignature } from '../src/controllers/billingWebhookController';
 import { verifyOnboardingPaymentSignature } from '../src/services/onboardingPaymentService';
 import { getRazorpayConfig } from '../src/utils/env';
@@ -73,4 +73,11 @@ test('checkout accepts only canonical plan/cycle pairs and fixed lifetime credit
   assert.throws(() => resolveCheckoutProduct('gold', 'MONTHLY'), /INVALID_PLAN/);
   assert.throws(() => resolveCheckoutProduct('QUIZ', 'ONE_TIME'), /INVALID_PLAN_CYCLE/);
   assert.throws(() => resolveCheckoutProduct('quiz_credits_12', undefined), /INVALID_CREDIT_PACK/);
+});
+
+test('credit top-ups require active Pro access', () => {
+  assert.equal(canPurchaseQuizCredits({ plan: 'BASIC' }), false);
+  assert.equal(canPurchaseQuizCredits({ plan: 'PRO' }), true);
+  assert.equal(canPurchaseQuizCredits({ plan: 'QUIZ', planExpiryDate: new Date('2099-01-01T00:00:00Z') }), true);
+  assert.equal(canPurchaseQuizCredits({ plan: 'ENTERPRISE', planExpiryDate: new Date('2020-01-01T00:00:00Z') }), false);
 });

@@ -11,6 +11,17 @@ import { useRouter } from 'expo-router';
 import api, { isSessionRejection, setApiSession, subscribeToSessionChanges } from '../services/api';
 import { withSessionStorage } from '../services/sessionStorage';
 
+type ProductPlan = 'BASIC' | 'PRO';
+
+interface ProductCapabilities {
+  coreWorkspace: true;
+  offlineReads: true;
+  offlineWrites: true;
+  aiQuizGeneration: boolean;
+  onlineQuizDelivery: boolean;
+  quizCreditTopUps: boolean;
+}
+
 interface User {
   id: string;
   name: string;
@@ -19,6 +30,8 @@ interface User {
   instituteId?: string;
   instituteName?: string;
   logo?: string;
+  productPlan?: ProductPlan;
+  capabilities?: ProductCapabilities;
 }
 
 export interface LoginAccount {
@@ -121,6 +134,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: p.email || parsed.email,
             instituteName: p.instituteName || parsed.instituteName,
             logo: p.logo !== undefined ? (p.logo ?? undefined) : parsed.logo,
+            productPlan: p.productPlan || parsed.productPlan,
+            capabilities: p.capabilities || parsed.capabilities,
           };
           setUser(refreshed);
           await withSessionStorage(async () => {
@@ -197,6 +212,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         instituteId: profile.instituteId,
         instituteName: profile.instituteName,
         logo: profile.logo,
+        productPlan: profile.productPlan,
+        capabilities: profile.capabilities,
       };
 
       const activeToken = await withSessionStorage(async () => {

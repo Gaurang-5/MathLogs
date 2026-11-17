@@ -4,6 +4,7 @@ import {
   Linking,
   Modal,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -44,6 +45,7 @@ import {
 } from '../../constants/theme';
 import api from '../../services/api';
 import { offlineQuery } from '../../services/offlineSync';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface OnlineQuiz {
   id: string;
@@ -161,6 +163,8 @@ export default function QuizzesScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
+  const isBasicPlan = user?.productPlan === 'BASIC';
   const [search, setSearch] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -174,11 +178,13 @@ export default function QuizzesScreen() {
   } = useQuery<OnlineQuiz[]>({
     queryKey: ['quizzes'],
     queryFn: () => offlineQuery('online-quizzes', async () => (await api.get('/tests/online')).data),
+    enabled: !isBasicPlan,
   });
 
   const { data: institute, refetch: refetchInstitute } = useQuery<{ quizCredits?: number }>({
     queryKey: ['institute-me'],
     queryFn: () => offlineQuery('institute', async () => (await api.get('/institute/me')).data),
+    enabled: !isBasicPlan,
   });
 
   const filtered = useMemo(() => {
@@ -347,6 +353,33 @@ export default function QuizzesScreen() {
     { credits: 40, price: '₹1,500', tagline: '₹37.5 / credit' },
   ];
 
+  if (isBasicPlan) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.basicContent}
+        >
+          <Text accessibilityRole="header" style={[styles.pageTitle, { color: colors.text }]}>Quizzes</Text>
+          <Surface tone="strong" style={[styles.basicPlanCard, { backgroundColor: colors.hero, borderColor: colors.borderLight }]}>
+            <View style={[styles.creditsIcon, { backgroundColor: colors.heroEnd }]}>
+              <Sparkles size={22} color={colors.heroText} />
+            </View>
+            <View style={styles.basicPlanCopy}>
+              <Text style={[styles.basicPlanTitle, { color: colors.heroText }]}>Available with Pro</Text>
+              <Text style={[styles.basicPlanDescription, { color: colors.heroText }]}>Basic includes batches, tests, marks, and fees with offline support. Pro adds AI quiz generation, online delivery, and quiz credits.</Text>
+            </View>
+          </Surface>
+          <Feedback
+            kind="empty"
+            title="Your core workspace remains available"
+            description="Use Tests for offline-capable assessments. Pro pricing and upgrades will appear here after the plan details are finalized."
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <FlatList
@@ -505,6 +538,22 @@ const styles = StyleSheet.create({
     paddingBottom: TEACHER_TAB_CONTENT_INSET,
   },
   listHeader: { marginBottom: Spacing.xl },
+  basicContent: {
+    flexGrow: 1,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: TEACHER_TAB_CONTENT_INSET,
+    gap: Spacing.xl,
+  },
+  basicPlanCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.lg,
+    padding: Spacing.xl,
+  },
+  basicPlanCopy: { flex: 1, minWidth: 0 },
+  basicPlanTitle: { ...TypeScale.sectionTitle, marginBottom: Spacing.sm },
+  basicPlanDescription: { ...TypeScale.body, opacity: 0.82 },
   pageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
