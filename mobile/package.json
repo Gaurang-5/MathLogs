@@ -7,7 +7,7 @@
     "tunnel": "PATH=/usr/local/bin:$PATH expo start --tunnel --port 8081",
     "android": "PATH=/usr/local/bin:$PATH expo start --android --port 8081",
     "ios": "PATH=/usr/local/bin:$PATH expo start --ios --port 8081",
-    "demo:ios": "EXPO_PUBLIC_API_URL=http://127.0.0.1:3001/api EXPO_PUBLIC_DEMO_BASIC_PHONE=9999900001 expo start --ios --port 8081",
+    "demo:ios": "EXPO_PUBLIC_API_URL=http://127.0.0.1:3001 EXPO_PUBLIC_DEMO_BASIC_PHONE=9999900001 expo start --go --ios --port 8081",
     "web": "PATH=/usr/local/bin:$PATH expo start --web --port 8081"
   },
   "dependencies": {
