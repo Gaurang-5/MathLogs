@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, Platform, KeyboardAvoidingView, ScrollView, useColorScheme } from 'react-native';
 import { CameraView, useCameraPermissions, type LensInfo } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,18 +10,31 @@ import { captureMarksSticker, createResearchCaptureId } from '../services/sticke
 import { PressableScale } from '../components/ui';
 import { useAccessibilityPreferences } from '../components/ui/useAccessibilityPreferences';
 import { StickerCameraControls } from '../components/StickerCameraControls';
-import { Colors } from '../constants/theme';
+import { Colors, type ThemeScheme } from '../constants/theme';
 import api from '../services/api';
 import { executeOrQueueMutation, offlineQuery } from '../services/offlineSync';
 import { validateMark } from '../utils/marks';
 import { upsertQueuedMark, validateQueuedMarks, type QueuedMark } from '../utils/multiScan';
 import { isProPlanRequiredError } from '../services/proFeatureGate';
 
-const T = {
-  bg: '#000000', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827', emerald: '#10b981',
-  blue: '#3b82f6', red: '#ef4444', border: 'rgba(255,255,255,0.2)'
-};
+function scanPalette(scheme: ThemeScheme) {
+  const colors = Colors[scheme];
+  return {
+    bg: colors.backgroundDeep,
+    white: '#FFFFFF',
+    text: colors.text,
+    textSec: colors.textSecondary,
+    textMuted: colors.textMuted,
+    accent: colors.hero,
+    emerald: colors.positive,
+    blue: colors.focus,
+    red: Colors.error,
+    border: colors.border,
+    surface: colors.surface,
+    surfaceSecondary: colors.surfaceSecondary,
+    errorBackground: Colors.errorBg,
+  };
+}
 
 interface StudentData {
   id: string;
@@ -50,6 +63,9 @@ export default function GlobalScanScreen() {
   const { testId: initialTestId } = useLocalSearchParams<{ testId?: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const T = useMemo(() => scanPalette(scheme), [scheme]);
+  const s = useMemo(() => createStyles(T), [T]);
   const cameraRef = React.useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraReady, setCameraReady] = useState(false);
@@ -474,7 +490,7 @@ export default function GlobalScanScreen() {
                 </View>
               )}
 
-              <Text accessibilityRole="text" style={{ color: Colors.light.textSecondary, textAlign: 'center', marginBottom: 16 }}>
+              <Text accessibilityRole="text" style={{ color: T.textSec, textAlign: 'center', marginBottom: 16 }}>
                 {processing && readStatus === null ? 'Reading marks… You can enter them now.' : ocrError || (readStatus === 'read' ? 'Read successfully. Confirm the marks before saving.' : 'Needs review. Enter the marks or retake the photo.')}
               </Text>
               <View style={s.inputWrap}>
@@ -617,10 +633,10 @@ export default function GlobalScanScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (T: ReturnType<typeof scanPalette>) => StyleSheet.create({
   captureControls: { paddingHorizontal: 24, paddingBottom: 16, gap: 10 },
-  captureButton: { backgroundColor: Colors.light.surfaceElevated, borderRadius: 16, minHeight: 56, alignItems: 'center', justifyContent: 'center', padding: 16 },
-  captureText: { color: Colors.light.text, fontSize: 18, fontWeight: '600' },
+  captureButton: { backgroundColor: T.surface, borderRadius: 16, minHeight: 56, alignItems: 'center', justifyContent: 'center', padding: 16 },
+  captureText: { color: T.text, fontSize: 18, fontWeight: '600' },
   reviewQueueButton: { minHeight: 48, borderRadius: 14, paddingHorizontal: 16, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.32)' },
   reviewQueueText: { color: T.white, fontSize: 15, fontWeight: '700' },
   container: { flex: 1, backgroundColor: T.bg },
@@ -632,12 +648,12 @@ const s = StyleSheet.create({
   
   testDropdownBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   testDropdownText: { color: T.white, fontSize: 16, fontWeight: '600' },
-  testDropdownList: { position: 'absolute', top: 60, left: 16, right: 16, backgroundColor: T.white, borderRadius: 12, paddingVertical: 8, maxHeight: 200 },
+  testDropdownList: { position: 'absolute', top: 60, left: 16, right: 16, backgroundColor: T.surface, borderRadius: 12, paddingVertical: 8, maxHeight: 200 },
   testDropdownItem: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: T.border },
   testDropdownItemText: { fontSize: 15, fontWeight: '600', color: T.text },
   modeSelector: { marginTop: 10, flexDirection: 'row', padding: 4, gap: 4, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
   modeOption: { flex: 1, minHeight: 42, borderRadius: 10, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' },
-  modeOptionSelected: { backgroundColor: T.white },
+  modeOptionSelected: { backgroundColor: T.surface },
   modeLabel: { color: T.white, fontSize: 14, fontWeight: '700' },
   modeLabelSelected: { color: T.text },
 
@@ -651,15 +667,15 @@ const s = StyleSheet.create({
   targetText: { color: T.white, marginTop: 40, fontSize: 14, fontWeight: '500', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, overflow: 'hidden' },
 
   modalContainer: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: T.white, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+  modalContent: { backgroundColor: T.surface, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: T.text },
   
-  stInfo: { backgroundColor: '#F5F5F7', padding: 16, borderRadius: 16, marginBottom: 16 },
+  stInfo: { backgroundColor: T.surfaceSecondary, padding: 16, borderRadius: 16, marginBottom: 16 },
   stName: { fontSize: 18, fontWeight: '700', color: T.text, marginBottom: 4 },
   stBatch: { fontSize: 13, color: T.textSec, fontWeight: '600' },
   
-  warnBox: { backgroundColor: '#FEF2F2', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#FECACA' },
+  warnBox: { backgroundColor: T.errorBackground, padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: T.red },
   warnText: { color: T.red, fontWeight: '600', textAlign: 'center', fontSize: 14 },
 
   inputWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 24, gap: 12 },
@@ -668,39 +684,39 @@ const s = StyleSheet.create({
 
   saveBtn: { backgroundColor: T.emerald, height: 60, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: T.emerald, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 4 },
   saveBtnText: { color: T.white, fontSize: 18, fontWeight: '700' },
-  successSheet: { backgroundColor: T.white, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, alignItems: 'center' },
+  successSheet: { backgroundColor: T.surface, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, alignItems: 'center' },
   successIcon: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(16,185,129,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   successTitle: { color: T.text, fontSize: 22, fontWeight: '800' },
   successText: { color: T.textSec, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 8 },
   successActions: { width: '100%', flexDirection: 'row', gap: 12, marginTop: 24 },
-  doneButton: { flex: 1, minHeight: 52, borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
+  doneButton: { flex: 1, minHeight: 52, borderRadius: 16, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },
   doneButtonText: { color: T.text, fontSize: 15, fontWeight: '700' },
   nextButton: { flex: 1.4, minHeight: 52, borderRadius: 16, backgroundColor: T.accent, alignItems: 'center', justifyContent: 'center' },
   nextButtonText: { color: T.white, fontSize: 15, fontWeight: '700' },
 
-  queueSheet: { backgroundColor: T.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 22, paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 22, maxHeight: '88%' },
+  queueSheet: { backgroundColor: T.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 22, paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 22, maxHeight: '88%' },
   queueSubtitle: { color: T.textSec, fontSize: 13, lineHeight: 19, marginTop: 3 },
   iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   queueList: { maxHeight: 420 },
   queueListContent: { gap: 10, paddingBottom: 8 },
-  queueRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, padding: 10, backgroundColor: '#FAFAFA' },
-  queueIndex: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
+  queueRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 10, backgroundColor: T.surfaceSecondary },
+  queueIndex: { width: 28, height: 28, borderRadius: 14, backgroundColor: T.surfaceSecondary, alignItems: 'center', justifyContent: 'center' },
   queueIndexText: { color: T.text, fontSize: 12, fontWeight: '800' },
   queueIdentity: { flex: 1, minWidth: 0 },
   queueName: { color: T.text, fontSize: 15, fontWeight: '700' },
   queueMeta: { color: T.textSec, fontSize: 11, lineHeight: 16, marginTop: 2 },
   queueError: { color: T.red, fontSize: 11, lineHeight: 15, marginTop: 2 },
   queueScoreWrap: { alignItems: 'center' },
-  queueScore: { width: 58, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: T.white, color: T.text, textAlign: 'center', fontSize: 17, fontWeight: '800', paddingHorizontal: 6 },
-  queueScoreInvalid: { borderColor: T.red, backgroundColor: '#FEF2F2' },
+  queueScore: { width: 58, height: 44, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, color: T.text, textAlign: 'center', fontSize: 17, fontWeight: '800', paddingHorizontal: 6 },
+  queueScoreInvalid: { borderColor: T.red, backgroundColor: T.errorBackground },
   queueMax: { color: T.textMuted, fontSize: 10, marginTop: 2 },
   removeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   emptyQueue: { paddingVertical: 36, alignItems: 'center' },
   emptyQueueTitle: { color: T.text, fontSize: 16, fontWeight: '700' },
   emptyQueueText: { color: T.textSec, fontSize: 13, marginTop: 5 },
-  batchSaveError: { color: T.red, backgroundColor: '#FEF2F2', borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 17, marginTop: 10 },
+  batchSaveError: { color: T.red, backgroundColor: T.errorBackground, borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 17, marginTop: 10 },
   queueActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  scanMoreButton: { flex: 1, minHeight: 54, borderRadius: 15, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' },
+  scanMoreButton: { flex: 1, minHeight: 54, borderRadius: 15, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },
   scanMoreText: { color: T.text, fontSize: 15, fontWeight: '700' },
   saveBatchButton: { flex: 1.5, minHeight: 54, borderRadius: 15, backgroundColor: T.emerald, alignItems: 'center', justifyContent: 'center' },
   saveBatchText: { color: T.white, fontSize: 15, fontWeight: '800' },

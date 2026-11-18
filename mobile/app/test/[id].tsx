@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   Platform, Dimensions, Alert, Modal, TextInput, KeyboardAvoidingView,
-  FlatList,
+  FlatList, useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -14,15 +14,27 @@ import { executeOrQueueMutation, offlineQuery, updateCachedData } from '../../se
 import { SkeletonLoader, BrandButton, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import * as Haptics from 'expo-haptics';
 import { useProUpgrade } from '../../contexts/ProUpgradeContext';
+import { Colors, type ThemeScheme } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 
-const T = {
-  bg: '#F5F5F7', white: '#FFFFFF', text: '#1D1D1F',
-  textSec: '#86868B', textMuted: '#AEAEB2', accent: '#111827',
-  emerald: '#10b981', amber: '#f59e0b', red: '#ef4444', blue: '#3b82f6',
-  border: 'rgba(0,0,0,0.06)', shadow: 'rgba(0,0,0,0.06)',
-};
+function testPalette(scheme: ThemeScheme) {
+  const colors = Colors[scheme];
+  return {
+    bg: colors.background,
+    white: colors.surface,
+    text: colors.text,
+    textSec: colors.textSecondary,
+    textMuted: colors.textMuted,
+    accent: colors.hero,
+    emerald: colors.positive,
+    amber: colors.attention,
+    red: Colors.error,
+    blue: colors.focus,
+    border: colors.border,
+    shadow: colors.shadow,
+  };
+}
 
 interface TestDetails {
   id: string;
@@ -44,6 +56,9 @@ export default function TestDetailScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { runProFeature } = useProUpgrade();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const T = useMemo(() => testPalette(scheme), [scheme]);
+  const s = useMemo(() => createStyles(T), [T]);
 
   const { data: test, isLoading } = useQuery<TestDetails>({
     queryKey: ['test', id],
@@ -408,7 +423,7 @@ export default function TestDetailScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (T: ReturnType<typeof testPalette>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: T.bg },
   navBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 56 },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -12 },

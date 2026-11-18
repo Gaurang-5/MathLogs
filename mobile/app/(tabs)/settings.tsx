@@ -93,8 +93,8 @@ export default function SettingsScreen() {
         <Animated.View entering={FadeInDown.duration(400).delay(100)}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PROFILE</Text>
           <GlassCard style={styles.profileCard}>
-            <View style={styles.avatar}>
-              <Text style={{ fontSize: 32 }}>
+            <View style={[styles.avatar, { backgroundColor: colors.surfaceSecondary }]}>
+              <Text style={{ fontSize: 32, color: colors.text }}>
                 {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
               </Text>
             </View>
@@ -106,7 +106,7 @@ export default function SettingsScreen() {
                 {user?.email || 'Not signed in'}
               </Text>
               {user?.instituteName && (
-                <Text style={[styles.profileInstitute, { color: Colors.primary }]}>
+                <Text style={[styles.profileInstitute, { color: colors.chart }]}>
                   {user.instituteName}
                 </Text>
               )}
@@ -178,7 +178,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.primaryGlow,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.lg,

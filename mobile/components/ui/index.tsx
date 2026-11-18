@@ -58,6 +58,7 @@ export function BrandButton({
 }: BrandButtonProps) {
   const scale = useSharedValue(1);
   const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -91,9 +92,9 @@ export function BrandButton({
       <LinearGradient
         colors={
           isPrimary
-            ? ['#1D1D1F', '#111827']
+            ? [colors.hero, colors.heroEnd]
             : isDanger
-            ? ['#ef4444', '#DC2626']
+            ? [Colors.error, Colors.errorLight]
             : ['transparent', 'transparent']
         }
         start={{ x: 0, y: 0 }}
@@ -108,13 +109,13 @@ export function BrandButton({
             borderColor: isGhost
               ? 'transparent'
               : variant === 'secondary'
-              ? '#1D1D1F'
+              ? colors.border
               : 'transparent',
           },
         ]}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" size="small" />
+          <ActivityIndicator color={colors.heroText} size="small" />
         ) : (
           <View style={styles.buttonContent}>
             {icon && <View style={{ marginRight: Spacing.sm }}>{icon}</View>}
@@ -123,14 +124,7 @@ export function BrandButton({
                 styles.buttonText,
                 {
                   fontSize: fontMap[size],
-                  color:
-                    isPrimary || isDanger
-                      ? '#FFFFFF'
-                      : variant === 'secondary'
-                      ? '#1D1D1F'
-                      : colorScheme === 'dark'
-                      ? Colors.dark.text
-                      : Colors.light.text,
+                  color: isPrimary || isDanger ? colors.heroText : colors.text,
                 },
               ]}
             >
@@ -154,6 +148,7 @@ interface GlassCardProps {
 
 export function GlassCard({ children, style, onPress, intensity = 30 }: GlassCardProps) {
   const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -179,11 +174,8 @@ export function GlassCard({ children, style, onPress, intensity = 30 }: GlassCar
         style={[
           styles.glassCard,
           {
-            borderColor: colorScheme === 'dark' ? Colors.dark.border : Colors.light.border,
-            backgroundColor:
-              colorScheme === 'dark'
-                ? 'rgba(30, 30, 46, 0.6)'
-                : 'rgba(255, 255, 255, 0.7)',
+            borderColor: colors.border,
+            backgroundColor: colors.materialStrong,
           },
           style,
         ]}
@@ -222,17 +214,17 @@ interface StatCardProps {
 
 export function StatCard({ title, value, subtitle, icon, color = Colors.primary, onPress }: StatCardProps) {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
   return (
     <GlassCard onPress={onPress} style={styles.statCard}>
       <View style={[styles.statIconContainer, { backgroundColor: `${color}18` }]}>
         {icon}
       </View>
-      <Text style={[styles.statValue, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+      <Text style={[styles.statValue, { color: colors.text }]}>
         {value}
       </Text>
-      <Text style={[styles.statTitle, { color: isDark ? Colors.dark.textSecondary : Colors.light.textSecondary }]}>
+      <Text style={[styles.statTitle, { color: colors.textSecondary }]}>
         {title}
       </Text>
       {subtitle && (
@@ -271,6 +263,7 @@ export function SkeletonLoader({ width, height, borderRadius = BorderRadius.md }
   borderRadius?: number;
 }) {
   const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
   const opacity = useSharedValue(0.3);
 
   React.useEffect(() => {
@@ -296,7 +289,7 @@ export function SkeletonLoader({ width, height, borderRadius = BorderRadius.md }
           width,
           height,
           borderRadius,
-          backgroundColor: colorScheme === 'dark' ? Colors.dark.surfaceElevated : Colors.light.surfaceElevated,
+          backgroundColor: colors.surfaceElevated,
         },
       ]}
     />

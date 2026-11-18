@@ -3,7 +3,7 @@
  * safe-area handling, and the same React Query cache.
  */
 import { useEffect } from 'react';
-import { ActivityIndicator, StatusBar, View } from 'react-native';
+import { ActivityIndicator, StatusBar, View, useColorScheme } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -36,17 +36,21 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isLoading, hasSeenOnboarding } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const selectedScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const isPublicEntryRoute = segments[0] === 'login' || segments[0] === 'welcome';
+  const scheme = isPublicEntryRoute ? 'light' : selectedScheme;
+  const colors = Colors[scheme];
   const isProtectedRoute = segments[0] === '(tabs)' || segments[0] === 'batch';
 
   useEffect(() => {
     if (isLoading) return;
 
     const routeGroup = segments[0];
-    const isPublicEntryRoute = routeGroup === 'login' || routeGroup === 'welcome';
+    const isPublicEntry = routeGroup === 'login' || routeGroup === 'welcome';
 
     if (!isLoggedIn && isProtectedRoute) {
       router.replace(hasSeenOnboarding ? '/login' : '/welcome');
-    } else if (isLoggedIn && isPublicEntryRoute) {
+    } else if (isLoggedIn && isPublicEntry) {
       router.replace('/(tabs)');
     }
   }, [hasSeenOnboarding, isLoading, isLoggedIn, isProtectedRoute, router, segments]);
@@ -62,7 +66,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: Colors.light.background,
+          backgroundColor: colors.background,
         }}
       >
         <ActivityIndicator color={Colors.primary} />
@@ -74,10 +78,45 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   if (!isLoggedIn && isProtectedRoute) return null;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {children}
       {isLoggedIn ? <OfflineStatusBanner /> : null}
     </View>
+  );
+}
+
+function ThemedAppStack() {
+  const segments = useSegments();
+  const selectedScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const isPublicEntryRoute = segments[0] === 'login' || segments[0] === 'welcome';
+  const scheme = isPublicEntryRoute ? 'light' : selectedScheme;
+  const colors = Colors[scheme];
+
+  return (
+    <AuthGuard>
+      <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+          animation: 'ios_from_right',
+        }}
+      >
+        <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+        <Stack.Screen name="login" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="quick-fee-modal"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="quiz-generator"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+    </AuthGuard>
   );
 }
 
@@ -88,30 +127,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <ProUpgradeProvider>
-              <AuthGuard>
-                <StatusBar barStyle="dark-content" />
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: Colors.light.background },
-                    animation: 'ios_from_right',
-                  }}
-                >
-                  <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-                  <Stack.Screen name="login" options={{ animation: 'fade' }} />
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen
-                    name="quick-fee-modal"
-                    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                  />
-                  <Stack.Screen
-                    name="quiz-generator"
-                    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                  />
-                  <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-                  <Stack.Screen name="+not-found" />
-                </Stack>
-              </AuthGuard>
+              <ThemedAppStack />
             </ProUpgradeProvider>
           </AuthProvider>
         </QueryClientProvider>
