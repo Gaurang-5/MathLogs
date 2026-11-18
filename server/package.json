@@ -7,6 +7,9 @@
     "test": "JWT_SECRET=test-secret NODE_ENV=test tsx --test tests/*.test.ts",
     "dev": "tsx watch --ignore \"*.pdf\" --ignore \"*.log\" --ignore \"*.csv\" --ignore \"tmp/**\" src/index.ts",
     "start:dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx src/index.ts",
+    "demo:migrate": "DATABASE_URL=postgresql://mathlogs_demo:mathlogs_demo@127.0.0.1:55432/mathlogs_demo?schema=public prisma migrate deploy",
+    "demo:seed": "DATABASE_URL=postgresql://mathlogs_demo:mathlogs_demo@127.0.0.1:55432/mathlogs_demo?schema=public DEMO_BASIC_PHONE=9999900001 DEMO_BASIC_OTP=00000 tsx scripts/seedBasicDemo.ts",
+    "demo:dev": "NODE_ENV=development DATABASE_URL=postgresql://mathlogs_demo:mathlogs_demo@127.0.0.1:55432/mathlogs_demo?schema=public DEMO_BASIC_PHONE=9999900001 DEMO_BASIC_OTP=00000 tsx watch src/index.ts",
     "seed:month-coverage-demo": "tsx scripts/seedMonthCoverageDemo.ts",
     "build": "tsc",
     "start": "node dist/index.js"

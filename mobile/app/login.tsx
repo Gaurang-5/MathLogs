@@ -20,6 +20,7 @@ const { width, height } = Dimensions.get('window');
 const T = LoginTokens;
 type LoginStep = 'phone' | 'otp' | 'select_account';
 const cleanPhone = (value: string) => value.replace(/\D/g, '').slice(0, 10);
+const demoBasicPhone = cleanPhone(process.env.EXPO_PUBLIC_DEMO_BASIC_PHONE || '');
 
 function AnimatedBackground() {
   const rotation1 = useSharedValue(0);
@@ -63,6 +64,7 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [resendTimer, setResendTimer] = useState(30);
   const [phoneFocused, setPhoneFocused] = useState(false);
+  const otpLength = demoBasicPhone && cleanPhone(phone) === demoBasicPhone ? 5 : 6;
 
   useEffect(() => {
     if (step !== 'otp' || resendTimer <= 0) return;
@@ -101,8 +103,8 @@ export default function LoginScreen() {
   }, [phone, requestLoginOtp, showError]);
 
   const verifyOtp = useCallback(async (code = otp) => {
-    if (code.length !== 6 || isLoading) {
-      if (code.length !== 6) showError('Please enter the complete 6-digit OTP.');
+    if (code.length !== otpLength || isLoading) {
+      if (code.length !== otpLength) showError(`Please enter the complete ${otpLength}-digit OTP.`);
       return;
     }
     Keyboard.dismiss();
@@ -129,7 +131,7 @@ export default function LoginScreen() {
       setIsLoading(false);
       setLoadingText('');
     }
-  }, [isLoading, otp, phone, router, showError, verifyLoginOtp]);
+  }, [isLoading, otp, otpLength, phone, router, showError, verifyLoginOtp]);
 
   const chooseAccount = useCallback(async (account: LoginAccount) => {
     if (isLoading) return;
@@ -149,8 +151,8 @@ export default function LoginScreen() {
   }, [isLoading, phone, router, selectLoginAccount, showError, tempAuthToken]);
 
   const updateOtp = (value: string) => {
-    const next = value.replace(/\D/g, '').slice(0, 6);
-    const shouldVerify = next.length === 6 && otp.length !== 6;
+    const next = value.replace(/\D/g, '').slice(0, otpLength);
+    const shouldVerify = next.length === otpLength && otp.length !== otpLength;
     setOtp(next);
     setError('');
     if (shouldVerify) setTimeout(() => void verifyOtp(next), 80);
@@ -167,7 +169,9 @@ export default function LoginScreen() {
   const subtitle = step === 'phone'
     ? 'Enter your WhatsApp number to receive a one-time sign-in code.'
     : step === 'otp'
-      ? `Enter the 6-digit code sent to +91 ${cleanPhone(phone)} via WhatsApp.`
+      ? demoBasicPhone && cleanPhone(phone) === demoBasicPhone
+        ? `Enter the ${otpLength}-digit local demo code for +91 ${cleanPhone(phone)}.`
+        : `Enter the ${otpLength}-digit code sent to +91 ${cleanPhone(phone)} via WhatsApp.`
       : 'Choose the coaching account you want to open.';
 
   return (
@@ -234,14 +238,14 @@ export default function LoginScreen() {
               {step === 'otp' ? (
                 <>
                   <View>
-                    <Text style={s.fieldLabel}>6-DIGIT WHATSAPP CODE</Text>
-                    <Pressable style={({ pressed }) => [s.otpRow, pressed && s.otpRowPressed]} onPress={() => otpInputRef.current?.focus()} accessibilityRole="button" accessibilityLabel={`One-time code, ${otp.length} of 6 digits entered`}>
-                      {Array.from({ length: 6 }, (_, index) => (
-                        <View key={index} style={[s.otpBox, index === otp.length && otp.length < 6 && s.otpBoxActive, !!error && s.inputError]}>
+                    <Text style={s.fieldLabel}>{otpLength}-DIGIT {otpLength === 5 ? 'DEMO' : 'WHATSAPP'} CODE</Text>
+                    <Pressable style={({ pressed }) => [s.otpRow, pressed && s.otpRowPressed]} onPress={() => otpInputRef.current?.focus()} accessibilityRole="button" accessibilityLabel={`One-time code, ${otp.length} of ${otpLength} digits entered`}>
+                      {Array.from({ length: otpLength }, (_, index) => (
+                        <View key={index} style={[s.otpBox, index === otp.length && otp.length < otpLength && s.otpBoxActive, !!error && s.inputError]}>
                           <Text style={s.otpDigit}>{otp[index] || ''}</Text>
                         </View>
                       ))}
-                      <TextInput ref={otpInputRef} value={otp} onChangeText={updateOtp} keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="sms-otp" maxLength={6} style={s.hiddenOtpInput} caretHidden autoFocus />
+                      <TextInput ref={otpInputRef} value={otp} onChangeText={updateOtp} keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="sms-otp" maxLength={otpLength} style={s.hiddenOtpInput} caretHidden autoFocus />
                     </Pressable>
                     <View style={s.otpActions}>
                       <Pressable onPress={changeNumber} style={({ pressed }) => [s.smallAction, pressed && s.pressed]} accessibilityRole="button">
@@ -253,7 +257,7 @@ export default function LoginScreen() {
                       </Pressable>
                     </View>
                   </View>
-                  <PrimaryButton label="Verify & enter dashboard" loading={isLoading} loadingText={loadingText} disabled={otp.length !== 6} onPress={() => void verifyOtp()} />
+                  <PrimaryButton label="Verify & enter dashboard" loading={isLoading} loadingText={loadingText} disabled={otp.length !== otpLength} onPress={() => void verifyOtp()} />
                 </>
               ) : null}
 

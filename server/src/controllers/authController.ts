@@ -11,6 +11,7 @@ import { getOrResetQuizCredits } from '../utils/quizCredits';
 import { hashRequestIp, recordAuthenticationEvent, safeDeviceLabel } from '../services/superAdminAuthEventService';
 import { effectiveEntitlements } from '../domain/plans/entitlements';
 import { productPlanAccess } from '../domain/plans/productPlan';
+import { demoBasicCredentials } from '../domain/auth/demoBasicAccount';
 
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -310,6 +311,8 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
                 cleanIdentifier = cleanIdentifier.slice(2);
             }
         }
+        const demoCredentials = demoBasicCredentials();
+        const isDemoBasicAccount = demoCredentials?.phone === cleanIdentifier;
 
         // Search Admin or Institute by phone/email
         let admin: any = await prisma.admin.findFirst({
@@ -355,7 +358,7 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
             where: { identifier: cleanIdentifier }
         });
 
-        if (existingOtp) {
+        if (existingOtp && !isDemoBasicAccount) {
             const timeSinceCreated = Date.now() - new Date(existingOtp.createdAt).getTime();
             if (timeSinceCreated < 30_000) {
                 const remainingSecs = Math.ceil((30_000 - timeSinceCreated) / 1000);
@@ -363,8 +366,11 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
             }
         }
 
-        // Generate a fresh 6-digit cryptographic OTP code
-        const otpCode = crypto.randomInt(100000, 1000000).toString();
+        // Generate the OTP. The configured local demo account uses its fixed
+        // five-digit code; every other account receives a random six-digit code.
+        const otpCode = isDemoBasicAccount
+            ? demoCredentials?.otp ?? ''
+            : crypto.randomInt(100000, 1000000).toString();
         
         // Store OTP in Postgres (upsert = one active OTP per identifier)
         await prisma.otpToken.upsert({
@@ -381,6 +387,11 @@ export const sendMobileOtp = async (req: Request, res: Response) => {
                 expiresAt: new Date(Date.now() + 5 * 60 * 1000)
             }
         });
+
+        if (isDemoBasicAccount) {
+            secureLogger.info('[OTP] Local Basic demo code prepared');
+            return res.json({ success: true, message: 'Demo OTP is ready.' });
+        }
 
         // Parallel Dispatch System
         const dispatchPromises = [];
@@ -446,8 +457,9 @@ export const verifyMobileOtp = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'OTP has already been used' });
         }
 
-        const isDevBypass = process.env.NODE_ENV !== 'production' && otp === "000000";
-        if (storedOtp.otp !== otp && !isDevBypass) { 
+        const demoCredentials = demoBasicCredentials();
+        const isConfiguredDemoOtp = demoCredentials?.phone === cleanIdentifier && demoCredentials?.otp === otp;
+        if (storedOtp.otp !== otp && !isConfiguredDemoOtp) {
             return res.status(400).json({ error: 'Invalid OTP code' });
         }
 

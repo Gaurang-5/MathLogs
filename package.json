@@ -9,6 +9,10 @@
         "dev": "./dev.sh",
         "build": "cd client && npm run build && cd ../server && npm run build",
         "start": "cd server && npm start",
+        "demo:db": "docker compose -f docker-compose.demo.yml up -d --wait",
+        "demo:setup": "npm run demo:db && npm --prefix server run demo:migrate && npm --prefix server run demo:seed",
+        "demo:server": "npm --prefix server run demo:dev",
+        "demo:ios": "npm --prefix mobile run demo:ios",
         "heroku-postbuild": "echo 'Installing Client...' && cd client && npm install --production=false && npm run build && echo 'Installing Server...' && cd ../server && npm install --production=false && npm run build"
     },
     "engines": {

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mathlogs-basic-demo-db
+    environment:
+      POSTGRES_USER: mathlogs_demo
+      POSTGRES_PASSWORD: mathlogs_demo
+      POSTGRES_DB: mathlogs_demo
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mathlogs_demo -d mathlogs_demo"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - mathlogs_basic_demo_data:/var/lib/postgresql/data
+
+volumes:
+  mathlogs_basic_demo_data:
