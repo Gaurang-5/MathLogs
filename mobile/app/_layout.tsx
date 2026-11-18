@@ -37,7 +37,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const router = useRouter();
   const selectedScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const isPublicEntryRoute = segments[0] === 'login' || segments[0] === 'welcome';
+  const isPublicEntryRoute = segments[0] === 'login' || segments[0] === 'signup' || segments[0] === 'welcome';
   const scheme = isPublicEntryRoute ? 'light' : selectedScheme;
   const colors = Colors[scheme];
   const isProtectedRoute = segments[0] === '(tabs)' || segments[0] === 'batch';
@@ -46,7 +46,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
 
     const routeGroup = segments[0];
-    const isPublicEntry = routeGroup === 'login' || routeGroup === 'welcome';
+    const isPublicEntry = routeGroup === 'login' || routeGroup === 'signup' || routeGroup === 'welcome';
 
     if (!isLoggedIn && isProtectedRoute) {
       router.replace(hasSeenOnboarding ? '/login' : '/welcome');
@@ -88,7 +88,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 function ThemedAppStack() {
   const segments = useSegments();
   const selectedScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const isPublicEntryRoute = segments[0] === 'login' || segments[0] === 'welcome';
+  const isPublicEntryRoute = segments[0] === 'login' || segments[0] === 'signup' || segments[0] === 'welcome';
   const scheme = isPublicEntryRoute ? 'light' : selectedScheme;
   const colors = Colors[scheme];
 
@@ -104,6 +104,7 @@ function ThemedAppStack() {
       >
         <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
         <Stack.Screen name="login" options={{ animation: 'fade' }} />
+        <Stack.Screen name="signup" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="quick-fee-modal"

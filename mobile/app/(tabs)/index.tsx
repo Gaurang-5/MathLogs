@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useColorScheme,
   useWindowDimensions,
@@ -35,6 +36,7 @@ import {
   ScanLine,
   Search,
   Sparkles,
+  Save,
   Users,
   X,
 } from 'lucide-react-native';
@@ -394,7 +396,7 @@ function InstitutePerformanceCard({
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { user, isLoggedIn, logout } = useAuth();
+  const { user, isLoggedIn, logout, updateProfile } = useAuth();
   const { runProFeature } = useProUpgrade();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
@@ -406,7 +408,52 @@ export default function DashboardScreen() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [profileTeacherName, setProfileTeacherName] = useState('');
+  const [profileInstituteName, setProfileInstituteName] = useState('');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
   const hasFocusedOnce = useRef(false);
+
+  const openProfile = useCallback(() => {
+    setProfileTeacherName(user?.name || '');
+    setProfileInstituteName(user?.instituteName || '');
+    setProfileEmail(user?.email || '');
+    setProfileError('');
+    setProfileSaved(false);
+    setIsProfileOpen(true);
+  }, [user]);
+
+  const saveProfile = useCallback(async () => {
+    if (profileTeacherName.trim().length < 2) {
+      setProfileError('Enter your name.');
+      return;
+    }
+    if (profileInstituteName.trim().length < 2) {
+      setProfileError('Enter your institute or coaching name.');
+      return;
+    }
+    if (profileEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim())) {
+      setProfileError('Enter a valid email address or leave it blank.');
+      return;
+    }
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileSaved(false);
+    try {
+      await updateProfile({
+        teacherName: profileTeacherName.trim(),
+        instituteName: profileInstituteName.trim(),
+        email: profileEmail.trim() || undefined,
+      });
+      setProfileSaved(true);
+    } catch (reason: any) {
+      setProfileError(reason.message || 'Could not save your profile.');
+    } finally {
+      setProfileSaving(false);
+    }
+  }, [profileEmail, profileInstituteName, profileTeacherName, updateProfile]);
 
   const summaryQuery = useQuery<DashboardData>({
     queryKey: ['dashboard-summary', ...accountKey],
@@ -503,7 +550,7 @@ export default function DashboardScreen() {
       </PressableScale>
       <PressableScale
         accessibilityLabel="Open profile"
-        onPress={() => setIsProfileOpen(true)}
+        onPress={openProfile}
         style={[styles.avatarButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
       >
         <ProfileAvatar logoUri={logoUri} name={profileName} size={38} />
@@ -744,22 +791,37 @@ export default function DashboardScreen() {
                 <ProfileAvatar logoUri={logoUri} name={profileName} size={84} />
               </Surface>
               <Text style={[styles.profileName, { color: colors.text }]}>{user?.instituteName || user?.name || 'Institute'}</Text>
-              <Text style={[styles.profileSubtitle, { color: colors.textSecondary }]}>MathLogs teacher workspace</Text>
+              <Text style={[styles.profileSubtitle, { color: colors.textSecondary }]}>{user?.productPlan === 'PRO' ? 'Pro plan' : 'Basic plan'}</Text>
             </View>
-            <Surface style={styles.profileInfo}>
-              {user?.email ? (
-                <View style={styles.profileInfoRow}>
-                  <Mail size={19} color={colors.textSecondary} />
-                  <Text style={[styles.profileInfoText, { color: colors.text }]}>{user.email}</Text>
+            <View style={styles.profileForm}>
+              <View style={styles.profileField}>
+                <Text style={[styles.profileLabel, { color: colors.textSecondary }]}>Your name</Text>
+                <TextInput value={profileTeacherName} onChangeText={(value) => { setProfileTeacherName(value); setProfileError(''); setProfileSaved(false); }} autoCapitalize="words" placeholder="Teacher name" placeholderTextColor={colors.textMuted} style={[styles.profileInput, { color: colors.text, backgroundColor: colors.surfaceElevated, borderColor: colors.border }]} />
+              </View>
+              <View style={styles.profileField}>
+                <Text style={[styles.profileLabel, { color: colors.textSecondary }]}>Institute or coaching name</Text>
+                <TextInput value={profileInstituteName} onChangeText={(value) => { setProfileInstituteName(value); setProfileError(''); setProfileSaved(false); }} autoCapitalize="words" placeholder="Institute name" placeholderTextColor={colors.textMuted} style={[styles.profileInput, { color: colors.text, backgroundColor: colors.surfaceElevated, borderColor: colors.border }]} />
+              </View>
+              <View style={styles.profileField}>
+                <Text style={[styles.profileLabel, { color: colors.textSecondary }]}>Email</Text>
+                <View style={[styles.profileInputRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <Mail size={18} color={colors.textSecondary} />
+                  <TextInput value={profileEmail} onChangeText={(value) => { setProfileEmail(value); setProfileError(''); setProfileSaved(false); }} autoCapitalize="none" autoComplete="email" keyboardType="email-address" placeholder="Optional" placeholderTextColor={colors.textMuted} style={[styles.profileInputInline, { color: colors.text }]} />
                 </View>
-              ) : null}
+              </View>
               {(user as { phone?: string } | null)?.phone ? (
-                <View style={[styles.profileInfoRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                <View style={[styles.profilePhone, { backgroundColor: colors.surfaceSecondary }]}>
                   <Phone size={19} color={colors.textSecondary} />
                   <Text style={[styles.profileInfoText, { color: colors.text }]}>{(user as { phone?: string }).phone}</Text>
+                  <Text style={[styles.profilePhoneHint, { color: colors.textMuted }]}>Verified</Text>
                 </View>
               ) : null}
-            </Surface>
+              {profileError ? <Text accessibilityRole="alert" style={styles.profileError}>{profileError}</Text> : null}
+              {profileSaved ? <Text accessibilityLiveRegion="polite" style={[styles.profileSaved, { color: colors.positive }]}>Profile saved.</Text> : null}
+              <PressableScale accessibilityLabel="Save profile" accessibilityState={{ busy: profileSaving, disabled: profileSaving }} disabled={profileSaving} haptic="commit" onPress={() => void saveProfile()} style={[styles.profileSaveButton, { backgroundColor: colors.hero }]}>
+                {profileSaving ? <Text style={[styles.profileSaveText, { color: colors.heroText }]}>Saving…</Text> : <><Save size={18} color={colors.heroText} /><Text style={[styles.profileSaveText, { color: colors.heroText }]}>Save profile</Text></>}
+              </PressableScale>
+            </View>
             <View style={styles.appearanceSection}>
               <Text style={[styles.appearanceTitle, { color: colors.text }]}>Appearance</Text>
               <Text style={[styles.appearanceDescription, { color: colors.textSecondary }]}>Choose how the teacher workspace looks on this device.</Text>
@@ -915,6 +977,18 @@ const styles = StyleSheet.create({
   profileInfo: { padding: 0, overflow: 'hidden' },
   profileInfoRow: { minHeight: 58, paddingHorizontal: Spacing.lg, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   profileInfoText: { ...TypeScale.body, flex: 1 },
+  profileForm: { gap: Spacing.lg },
+  profileField: { gap: Spacing.sm },
+  profileLabel: TypeScale.label,
+  profileInput: { minHeight: 52, borderWidth: 1, borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.lg, fontSize: FontSize.base },
+  profileInputRow: { minHeight: 52, borderWidth: 1, borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.lg, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  profileInputInline: { flex: 1, minWidth: 0, fontSize: FontSize.base },
+  profilePhone: { minHeight: 52, borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.lg, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  profilePhoneHint: TypeScale.caption,
+  profileError: { ...TypeScale.label, color: Colors.error },
+  profileSaved: TypeScale.label,
+  profileSaveButton: { minHeight: 52, borderRadius: BorderRadius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  profileSaveText: { ...TypeScale.label, fontSize: FontSize.base },
   appearanceSection: { gap: Spacing.sm },
   appearanceTitle: TypeScale.sectionTitle,
   appearanceDescription: TypeScale.body,

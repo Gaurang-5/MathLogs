@@ -271,6 +271,43 @@ export const getProfile = async (req: Request, res: Response) => {
     }
 };
 
+export const updateProfile = async (req: Request, res: Response) => {
+    const adminId = req.user?.id;
+    const teacherName = String(req.body?.teacherName || '').trim();
+    const instituteName = String(req.body?.instituteName || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+
+    try {
+        const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { instituteId: true } });
+        if (!admin?.instituteId) return res.status(404).json({ error: 'Institute not found' });
+
+        const institute = await prisma.institute.update({
+            where: { id: admin.instituteId },
+            data: {
+                teacherName,
+                name: instituteName,
+                email: email || null,
+            },
+        });
+
+        invalidateAuthCache(adminId);
+        const productAccess = productPlanAccess(institute);
+        return res.json({
+            success: true,
+            username: institute.teacherName || '',
+            email: institute.email || '',
+            phone: institute.phoneNumber || '',
+            instituteName: institute.name,
+            productPlan: productAccess.plan,
+            capabilities: productAccess.capabilities,
+            logo: (institute.config as any)?.logo || null,
+        });
+    } catch (error) {
+        console.error('Profile update error:', error);
+        return res.status(500).json({ error: 'Failed to update profile' });
+    }
+};
+
 // ─── POSTGRES-BACKED OTP STORE ───────────────────────────────────
 // Replaces the previous in-memory Map which was:
 // - Lost on server restart (all pending OTPs gone)
@@ -821,5 +858,107 @@ export const verifySignupOtp = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Verify Signup OTP Error:', error);
         return res.status(500).json({ error: 'Failed to verify OTP' });
+    }
+};
+
+/**
+ * Complete self-service mobile signup after the phone OTP has been verified.
+ * New accounts start on Basic and use passwordless mobile sign-in thereafter.
+ */
+export const completeMobileSignup = async (req: Request, res: Response) => {
+    const phone = String(req.body?.phone || '').replace(/\D/g, '');
+    const teacherName = String(req.body?.teacherName || '').trim();
+    const instituteName = String(req.body?.instituteName || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const verificationToken = String(req.body?.verificationToken || '');
+
+    try {
+        const proof = jwt.verify(verificationToken, JWT_SECRET) as {
+            verifiedPhone?: string;
+            purpose?: string;
+        };
+        if (proof.purpose !== 'signup' || proof.verifiedPhone !== phone) {
+            return res.status(401).json({ error: 'Phone verification is invalid or has expired. Please request a new OTP.' });
+        }
+
+        const existingInstitute = await prisma.institute.findFirst({
+            where: {
+                OR: [
+                    { phoneNumber: phone },
+                    { publicPhone: phone },
+                    { whatsappPhone: phone },
+                    { claimedPhone: phone },
+                ],
+            },
+            select: { id: true },
+        });
+        if (existingInstitute) {
+            return res.status(409).json({ error: 'An account already uses this mobile number. Sign in instead.' });
+        }
+
+        const baseSlug = instituteName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'institute';
+        let slug = baseSlug;
+        let suffix = 1;
+        while (await prisma.institute.findUnique({ where: { slug }, select: { id: true } })) {
+            slug = `${baseSlug}-${suffix++}`;
+        }
+
+        const username = `mobile_${phone}`;
+        const password = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        const result = await prisma.$transaction(async (tx) => {
+            const institute = await tx.institute.create({
+                data: {
+                    name: instituteName,
+                    teacherName,
+                    email: email || null,
+                    phoneNumber: phone,
+                    publicPhone: phone,
+                    whatsappPhone: phone,
+                    claimedPhone: phone,
+                    claimedAt: new Date(),
+                    ownershipStatus: 'CLAIMED',
+                    slug,
+                    plan: 'BASIC',
+                    status: 'ACTIVE',
+                    isPubliclyListed: false,
+                    planStartDate: new Date(),
+                },
+            });
+            const admin = await tx.admin.create({
+                data: {
+                    username,
+                    password,
+                    role: 'INSTITUTE_ADMIN',
+                    instituteId: institute.id,
+                },
+            });
+            return { admin, institute };
+        }, { isolationLevel: 'Serializable' });
+
+        const tokens = await generateAuthTokens(result.admin, req);
+        await recordAuthenticationEvent({
+            adminId: result.admin.id,
+            eventType: 'LOGIN',
+            success: true,
+            ip: req.ip,
+            userAgent: req.get?.('user-agent'),
+        });
+        return res.status(201).json({
+            success: true,
+            adminId: result.admin.id,
+            role: result.admin.role,
+            token: tokens.token,
+            refreshToken: tokens.refreshToken,
+            message: 'Your Basic account is ready.',
+        });
+    } catch (error: any) {
+        if (error?.name === 'TokenExpiredError' || error?.name === 'JsonWebTokenError') {
+            return res.status(401).json({ error: 'Phone verification is invalid or has expired. Please request a new OTP.' });
+        }
+        if (error?.code === 'P2002') {
+            return res.status(409).json({ error: 'An account already uses this mobile number. Sign in instead.' });
+        }
+        console.error('Complete mobile signup error:', error);
+        return res.status(500).json({ error: 'Failed to create account' });
     }
 };

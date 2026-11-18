@@ -61,6 +61,7 @@ const SESSION_RECOVERY_EXCLUDED_ROUTES = new Set([
   '/auth/logout',
   '/auth/send-signup-otp',
   '/auth/verify-signup-otp',
+  '/auth/complete-signup',
   '/auth/setup-account',
   '/super-admin/security/reauth/send',
   '/super-admin/security/reauth/verify',

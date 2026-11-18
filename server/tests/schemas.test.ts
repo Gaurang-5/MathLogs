@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     createMonthCoveragePaymentSchema,
+    completeSignupSchema,
     loginSchema,
     registerStudentSchema,
     paymentSchema,
     payInstallmentSchema,
     setupAccountSchema,
+    updateOwnProfileSchema,
 } from '../src/schemas';
 
 const validUuid = '123e4567-e89b-12d3-a456-426614174000';
@@ -20,6 +22,42 @@ test('loginSchema rejects blank usernames', () => {
     });
 
     assert.equal(result.success, false);
+});
+
+test('mobile signup requires verified account details and a 10-digit phone', () => {
+    const valid = completeSignupSchema.safeParse({
+        body: {
+            verificationToken: 'signed-proof',
+            phone: '9876543210',
+            teacherName: 'Manoj Patil',
+            instituteName: 'Patil Mathematics Academy',
+            email: 'manoj@example.com',
+        },
+    });
+    assert.equal(valid.success, true);
+
+    const invalidPhone = completeSignupSchema.safeParse({
+        body: {
+            verificationToken: 'signed-proof',
+            phone: '1234',
+            teacherName: 'Manoj Patil',
+            instituteName: 'Patil Mathematics Academy',
+        },
+    });
+    assert.equal(invalidPhone.success, false);
+});
+
+test('profile updates accept an optional email but require both display names', () => {
+    assert.equal(updateOwnProfileSchema.safeParse({
+        body: {
+            teacherName: 'Manoj Patil',
+            instituteName: 'Patil Mathematics Academy',
+            email: '',
+        },
+    }).success, true);
+    assert.equal(updateOwnProfileSchema.safeParse({
+        body: { teacherName: '', instituteName: 'Patil Mathematics Academy' },
+    }).success, false);
 });
 
 test('registerStudentSchema accepts normal registration payloads', () => {

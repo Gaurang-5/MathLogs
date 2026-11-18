@@ -17,6 +17,24 @@ export const setupSchema = z.object({
     })
 });
 
+export const completeSignupSchema = z.object({
+    body: z.object({
+        verificationToken: z.string().min(1, 'Phone verification is required'),
+        phone: z.string().regex(/^\d{10}$/, 'A valid 10-digit mobile number is required'),
+        teacherName: z.string().trim().min(2, 'Teacher name is required').max(100),
+        instituteName: z.string().trim().min(2, 'Institute name is required').max(160),
+        email: z.string().trim().email('Enter a valid email address').max(200).optional().or(z.literal('')),
+    }),
+});
+
+export const updateOwnProfileSchema = z.object({
+    body: z.object({
+        teacherName: z.string().trim().min(2, 'Teacher name is required').max(100),
+        instituteName: z.string().trim().min(2, 'Institute name is required').max(160),
+        email: z.string().trim().email('Enter a valid email address').max(200).optional().or(z.literal('')),
+    }),
+});
+
 export const coachingFeeModeSchema = z.enum(['CURRENT_DUE_BASED', 'MONTH_COVERAGE']);
 export const canonicalMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Invalid canonical month');
 export const monthCoverageDurationSchema = z.enum(['MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY']);

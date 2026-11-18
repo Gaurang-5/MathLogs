@@ -27,10 +27,11 @@ interface ProductCapabilities {
   whatsappGroupLinks: boolean;
 }
 
-interface User {
+export interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: string;
   instituteId?: string;
   instituteName?: string;
@@ -66,6 +67,20 @@ export interface OtpVerificationResult {
   tempAuthToken?: string;
 }
 
+export interface SignupDetails {
+  phone: string;
+  verificationToken: string;
+  teacherName: string;
+  instituteName: string;
+  email?: string;
+}
+
+export interface ProfileUpdate {
+  teacherName: string;
+  instituteName: string;
+  email?: string;
+}
+
 interface AuthContextData {
   user: User | null;
   token: string | null;
@@ -75,6 +90,10 @@ interface AuthContextData {
   requestLoginOtp: (phone: string) => Promise<string>;
   verifyLoginOtp: (phone: string, otp: string) => Promise<OtpVerificationResult>;
   selectLoginAccount: (adminId: string, tempAuthToken: string, phone: string) => Promise<void>;
+  requestSignupOtp: (phone: string) => Promise<string>;
+  verifySignupOtp: (phone: string, otp: string) => Promise<string>;
+  completeSignup: (details: SignupDetails) => Promise<void>;
+  updateProfile: (details: ProfileUpdate) => Promise<void>;
   logout: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
 }
@@ -137,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ...parsed,
             name: p.username || parsed.name,
             email: p.email || parsed.email,
+            phone: p.phone || parsed.phone,
             instituteName: p.instituteName || parsed.instituteName,
             logo: p.logo !== undefined ? (p.logo ?? undefined) : parsed.logo,
             productPlan: p.productPlan || parsed.productPlan,
@@ -213,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: auth.adminId || profile.id || '',
         name: profile.username || profile.name || 'Admin',
         email: profile.email || phone,
+        phone: profile.phone || phone,
         role: auth.role || profile.role || 'ADMIN',
         instituteId: profile.instituteId,
         instituteName: profile.instituteName,
@@ -300,6 +321,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [finalizeLogin]);
 
+  const requestSignupOtp = useCallback(async (phone: string) => {
+    try {
+      const response = await api.post<{ success: boolean; message?: string; error?: string }>('/auth/send-signup-otp', { phone });
+      if (!response.data.success) throw new Error(response.data.error || 'Failed to send OTP');
+      return response.data.message || 'WhatsApp OTP sent';
+    } catch (error: any) {
+      throw new Error(getAuthError(error, 'Failed to send OTP'));
+    }
+  }, []);
+
+  const verifySignupOtp = useCallback(async (phone: string, otp: string) => {
+    try {
+      const response = await api.post<{
+        success: boolean;
+        verificationToken?: string;
+        error?: string;
+      }>('/auth/verify-signup-otp', { phone, otp });
+      if (!response.data.success || !response.data.verificationToken) {
+        throw new Error(response.data.error || 'OTP verification failed');
+      }
+      return response.data.verificationToken;
+    } catch (error: any) {
+      throw new Error(getAuthError(error, 'OTP verification failed'));
+    }
+  }, []);
+
+  const completeSignup = useCallback(async (details: SignupDetails) => {
+    try {
+      const response = await api.post<OtpAuthResponse>('/auth/complete-signup', details);
+      await finalizeLogin(response.data, details.phone);
+      await setItemAsync('has_seen_onboarding', 'true');
+      setHasSeenOnboarding(true);
+    } catch (error: any) {
+      throw new Error(getAuthError(error, 'Failed to create account'));
+    }
+  }, [finalizeLogin]);
+
+  const updateProfile = useCallback(async (details: ProfileUpdate) => {
+    try {
+      const response = await api.patch('/auth/me', details);
+      const profile = response.data;
+      if (!user) throw new Error('Your profile is not available. Please sign in again.');
+      const nextUser: User = {
+        ...user,
+        name: profile.username || details.teacherName,
+        email: profile.email ?? details.email ?? user.email,
+        phone: profile.phone || user.phone,
+        instituteName: profile.instituteName || details.instituteName,
+        logo: profile.logo !== undefined ? (profile.logo ?? undefined) : user.logo,
+        productPlan: profile.productPlan || user.productPlan,
+        capabilities: profile.capabilities || user.capabilities,
+      };
+      setUser(nextUser);
+      await setItemAsync('user_data', JSON.stringify(nextUser));
+    } catch (error: any) {
+      throw new Error(getAuthError(error, 'Failed to update profile'));
+    }
+  }, [user]);
+
   const logout = useCallback(async () => {
     const version = ++sessionVersion.current;
     setApiSession(null);
@@ -335,6 +415,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     requestLoginOtp,
     verifyLoginOtp,
     selectLoginAccount,
+    requestSignupOtp,
+    verifySignupOtp,
+    completeSignup,
+    updateProfile,
     logout,
     completeOnboarding,
   }), [
@@ -345,6 +429,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     requestLoginOtp,
     verifyLoginOtp,
     selectLoginAccount,
+    requestSignupOtp,
+    verifySignupOtp,
+    completeSignup,
+    updateProfile,
     logout,
     completeOnboarding,
   ]);

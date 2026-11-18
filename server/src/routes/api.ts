@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { loginAdmin, createInitialAdmin, changePassword, getProfile } from '../controllers/authController';
+import { loginAdmin, createInitialAdmin, changePassword, getProfile, updateProfile } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
 import { requireCoachingFeeMode } from '../middleware/requireCoachingFeeMode';
 import { authLimiter, publicLimiter, paymentLimiter, ocrLimiter, bulkNotifyLimiter, upiPaymentLimiter } from '../middleware/security';
 import { validateRequest } from '../middleware/validation';
 import { teacherMutationIdempotency } from '../middleware/teacherMutationIdempotency';
-import { assignFeeSchema, changePasswordSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resendEnrollmentNotificationSchema, resolveIdentityReviewSchema, retryEnrollmentNotificationSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
+import { assignFeeSchema, changePasswordSchema, completeSignupSchema, confirmMonthCoverageProfileSchema, createBatchSchema, createCustomInvoiceSchema, createEnrollmentSchema, createInstallmentSchema, createMonthCoveragePaymentSchema, createTestSchema, deleteEmptyStudentSchema, endEnrollmentSchema, inviteStudentEnrollmentSchema, loginSchema, payInstallmentSchema, paymentSchema, previewEnrollmentSchema, previewMonthCoveragePaymentSchema, registerStudentSchema, resendEnrollmentNotificationSchema, resolveIdentityReviewSchema, retryEnrollmentNotificationSchema, sendMonthCoverageReminderSchema, setupAccountSchema, setupSchema, submitMarkSchema, updateBatchSchema, updateMonthCoveragePaymentSchema, updateOwnProfileSchema, updateStudentSchema, updateTestSchema, voidMonthCoveragePaymentSchema } from '../schemas';
 import { createBatch, createFeeInstallment, deleteBatch, deleteFeeInstallment, downloadBatchPDF, downloadBatchQRPDF, endBatchRegistration, getBatchDetails, getBatchPublicStatus, getBatches, inviteStudentToBatch, sendBatchWhatsappInvite, sendStudentWhatsappInvite, toggleBatchRegistration, updateBatch, updateFeeInstallment } from '../controllers/batchController';
 import { addStudentManually, approveStudent, archiveStudent, confirmMonthCoverageProfileController, getClassAverageStats, getPendingStudents, getStudentGrowthStats, getStudentProfile, registerStudent, rejectStudent, searchStudents, updateStudent } from '../controllers/studentController';
 import { checkRegistrationStatus } from '../controllers/statusController';
@@ -277,8 +277,9 @@ router.post('/auth/login', authLimiter, validateRequest(loginSchema), loginAdmin
 router.post('/auth/setup', authLimiter, validateRequest(setupSchema), createInitialAdmin as any);
 router.post('/auth/change-password', authenticateToken as any, validateRequest(changePasswordSchema), changePassword as any);
 router.get('/auth/me', authenticateToken as any, getProfile as any);
+router.patch('/auth/me', authenticateToken as any, validateRequest(updateOwnProfileSchema), updateProfile as any);
 
-import { sendMobileOtp, verifyMobileOtp, refreshTokenUser, logoutUser, selectMobileAccount, sendSignupOtp, verifySignupOtp } from '../controllers/authController';
+import { sendMobileOtp, verifyMobileOtp, refreshTokenUser, logoutUser, selectMobileAccount, sendSignupOtp, verifySignupOtp, completeMobileSignup } from '../controllers/authController';
 router.post('/auth/send-otp', authLimiter, sendMobileOtp as any);
 router.post('/auth/send-mobile-otp', authLimiter, sendMobileOtp as any);
 router.post('/auth/verify-otp', authLimiter, verifyMobileOtp as any);
@@ -288,6 +289,7 @@ router.post('/auth/refresh', authLimiter, refreshTokenUser as any);
 router.post('/auth/logout', authenticateToken as any, logoutUser as any);
 router.post('/auth/send-signup-otp', authLimiter, sendSignupOtp as any);
 router.post('/auth/verify-signup-otp', authLimiter, verifySignupOtp as any);
+router.post('/auth/complete-signup', authLimiter, validateRequest(completeSignupSchema), completeMobileSignup as any);
 
 // Batches
 router.get('/batches/:batchId/enrollment-candidates', authenticateToken as any, searchEnrollmentCandidatesController as any);
