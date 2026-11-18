@@ -1,219 +1,209 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, FlatList, Platform, Image, type ListViewToken } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  FlatList, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
+  type NativeScrollEvent, type NativeSyntheticEvent,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, withRepeat, withTiming, useSharedValue, useAnimatedStyle, Easing, Extrapolation, interpolate } from 'react-native-reanimated';
-import { ArrowRight, Sparkles, Scan, LayoutDashboard } from 'lucide-react-native';
-import { useAuth } from '../contexts/AuthContext';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import {
+  ArrowRight, Check, ClipboardCheck, IndianRupee, Layers3, Sparkles, Users, WifiOff,
+  type LucideIcon,
+} from 'lucide-react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { BorderRadius, Colors, FontSize, FontWeight, Spacing, TouchTarget, TypeScale } from '../constants/theme';
 
-const { width, height } = Dimensions.get('window');
+const colors = Colors.light;
 
-const T = {
-  bg: '#FDFDFD',
-  black: '#000000',
-  white: '#FFFFFF',
-  text: '#171717',
-  textMuted: '#9CA3AF',
-  border: '#E5E7EB',
-  emerald: '#10b981',
+type Slide = {
+  id: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  points: Array<{ icon: LucideIcon; label: string }>;
 };
 
-const AnimatedBackground = () => {
-  const rotation1 = useSharedValue(0);
-  const rotation2 = useSharedValue(0);
-  const translateY = useSharedValue(-height * 0.1);
-  const translateX = useSharedValue(-width * 0.1);
-
-  useEffect(() => {
-    rotation1.value = withRepeat(withTiming(360, { duration: 60000, easing: Easing.linear }), -1);
-    rotation2.value = withRepeat(withTiming(-360, { duration: 80000, easing: Easing.linear }), -1);
-    translateY.value = withRepeat(withTiming(height * 1.1, { duration: 8000, easing: Easing.linear }), -1);
-    translateX.value = withRepeat(withTiming(width * 1.1, { duration: 12000, easing: Easing.linear }), -1);
-  }, []);
-
-  const shape1Style = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotation1.value}deg` }] }));
-  const shape2Style = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotation2.value}deg` }] }));
-  const scanHStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
-  const scanVStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* Horizontal Scanning Line */}
-      <Animated.View style={[{ position: 'absolute', left: 0, width: '100%', height: 1, backgroundColor: 'rgba(0,0,0,0.1)' }, scanHStyle]} />
-      
-      {/* Vertical Scanning Line */}
-      <Animated.View style={[{ position: 'absolute', top: 0, height: '100%', width: 1, backgroundColor: 'rgba(0,0,0,0.05)' }, scanVStyle]} />
-
-      {/* Accent Shapes */}
-      <Animated.View style={[s.bgShape1, shape1Style]} />
-      <Animated.View style={[s.bgShape2, shape2Style]} />
-    </View>
-  );
-};
-
-const slides = [
+const slides: Slide[] = [
   {
-    id: '1',
-    title: 'Administration\nGateway.',
-    subtitle: 'Centralized management for batches, students, and secure records. Automate your workflow seamlessly.',
-    image: require('../assets/images/slide_admin.png')
+    id: 'workspace',
+    eyebrow: 'BUILT FOR TEACHERS',
+    title: 'Run your teaching day from one place.',
+    description: 'Keep batches, students, tests, marks and fees organised without jumping between notebooks and spreadsheets.',
+    icon: Layers3,
+    points: [
+      { icon: Users, label: 'Students and batches' },
+      { icon: ClipboardCheck, label: 'Tests and marks' },
+      { icon: IndianRupee, label: 'Fees and payment records' },
+    ],
   },
   {
-    id: '2',
-    title: 'Instant AI\nTests.',
-    subtitle: 'Generate anti-cheat variations and high-quality assessments in seconds using state-of-the-art AI.',
-    image: require('../assets/images/slide_ai_tests.png')
+    id: 'basic',
+    eyebrow: 'BASIC PLAN',
+    title: 'Your core workspace works offline.',
+    description: 'Load your data once, then continue the everyday work that does not need an online service. Changes sync when your connection returns.',
+    icon: WifiOff,
+    points: [
+      { icon: Check, label: 'Offline viewing and supported offline updates' },
+      { icon: Check, label: 'Manual student addition' },
+      { icon: Check, label: 'No quiz credits required' },
+    ],
   },
   {
-    id: '3',
-    title: 'Smart\nScanner.',
-    subtitle: 'Scan and grade physical test papers instantly using edge detection and computer vision.',
-    image: require('../assets/images/slide_smart_scanner.png')
-  }
+    id: 'pro',
+    eyebrow: 'PRO WHEN YOU NEED IT',
+    title: 'Add connected tools without changing your workflow.',
+    description: 'Pro adds online and AI services on top of Basic. The app will explain the upgrade before you use a Pro-only action.',
+    icon: Sparkles,
+    points: [
+      { icon: Check, label: 'Scan marks and AI quiz generation' },
+      { icon: Check, label: 'WhatsApp invites and reminders' },
+      { icon: Check, label: 'Online quizzes and quiz credits' },
+    ],
+  },
 ];
 
 export default function WelcomeScreen() {
+  const router = useRouter();
   const { completeOnboarding } = useAuth();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollX = useSharedValue(0);
+  const { width } = useWindowDimensions();
+  const listRef = useRef<FlatList<Slide>>(null);
+  const [index, setIndex] = useState(0);
+  const lastSlide = index === slides.length - 1;
 
-  const viewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
-    if (viewableItems[0]) {
-      setCurrentIndex(viewableItems[0].index || 0);
-    }
-  }).current;
-
-  const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
-  const flatListRef = useRef<FlatList>(null);
-
-  const handleNext = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (currentIndex < slides.length - 1) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
-    } else {
-      completeOnboarding();
-    }
+  const finish = async (destination: '/login' | '/signup') => {
+    await completeOnboarding();
+    router.replace(destination);
   };
 
-  const renderItem = ({ item, index }: { item: typeof slides[0], index: number }) => {
-    return (
-      <View style={{ width, flex: 1, paddingHorizontal: 32, justifyContent: 'center' }}>
-        <Animated.View entering={FadeInDown.duration(800).delay(100)}>
-          <View style={s.imageContainer}>
-            <Image source={item.image} style={s.slideImage} resizeMode="cover" />
-          </View>
-          <Text style={s.title}>{item.title}</Text>
-          <Text style={s.subtitle}>{item.subtitle}</Text>
-        </Animated.View>
-      </View>
-    );
+  const next = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    listRef.current?.scrollToIndex({ index: Math.min(index + 1, slides.length - 1), animated: true });
+  };
+
+  const onScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / Math.max(width, 1));
+    setIndex(Math.max(0, Math.min(slides.length - 1, nextIndex)));
   };
 
   return (
-    <View style={s.container}>
-      <AnimatedBackground />
-      <SafeAreaView style={s.safeArea}>
-        
-        <Animated.FlatList
-          ref={flatListRef as any}
-          data={slides}
-          renderItem={renderItem}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          pagingEnabled
-          bounces={false}
-          keyExtractor={(item) => item.id}
-          onScroll={(e) => {
-            scrollX.value = e.nativeEvent.contentOffset.x;
-          }}
-          onViewableItemsChanged={viewableItemsChanged}
-          viewabilityConfig={viewConfig}
-          scrollEventThrottle={16}
-        />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <View style={styles.brand}>
+          <View style={styles.brandMark}><Text style={styles.brandMarkText}>M</Text></View>
+          <Text style={styles.brandName}>MathLogs</Text>
+        </View>
+        <Pressable accessibilityRole="button" onPress={() => void finish('/login')} hitSlop={8} style={styles.signInTop}>
+          <Text style={styles.signInTopText}>Sign in</Text>
+        </Pressable>
+      </View>
 
-        <View style={s.bottomContainer}>
-          <View style={s.pagination}>
-            {slides.map((_, i) => {
-              const dotStyle = useAnimatedStyle(() => {
-                const opacity = interpolate(
-                  scrollX.value,
-                  [(i - 1) * width, i * width, (i + 1) * width],
-                  [0.3, 1, 0.3],
-                  Extrapolation.CLAMP
-                );
-                const widthValue = interpolate(
-                  scrollX.value,
-                  [(i - 1) * width, i * width, (i + 1) * width],
-                  [8, 24, 8],
-                  Extrapolation.CLAMP
-                );
-                return { opacity, width: widthValue };
-              });
-              return <Animated.View key={i} style={[s.dot, dotStyle]} />;
-            })}
-          </View>
+      <FlatList
+        ref={listRef}
+        data={slides}
+        horizontal
+        pagingEnabled
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item.id}
+        onMomentumScrollEnd={onScrollEnd}
+        renderItem={({ item }) => <WelcomeSlide slide={item} width={width} />}
+      />
 
-          <TouchableOpacity style={s.nextBtn} onPress={handleNext}>
-            <Text style={s.nextBtnText}>
-              {currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
-            </Text>
-            <ArrowRight size={20} color={T.white} />
-          </TouchableOpacity>
+      <View style={styles.footer}>
+        <View accessibilityLabel={`Page ${index + 1} of ${slides.length}`} style={styles.dots}>
+          {slides.map((slide, dotIndex) => <View key={slide.id} style={[styles.dot, dotIndex === index && styles.dotActive]} />)}
         </View>
 
-      </SafeAreaView>
-    </View>
+        {lastSlide ? (
+          <View style={styles.finalActions}>
+            <Pressable accessibilityRole="button" onPress={() => void finish('/signup')} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+              <Text style={styles.primaryButtonText}>Create Basic account</Text>
+              <ArrowRight size={19} color={colors.heroText} />
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => void finish('/login')} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
+              <Text style={styles.secondaryButtonText}>I already have an account</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable accessibilityRole="button" accessibilityLabel="Show next introduction page" onPress={next} style={({ pressed }) => [styles.nextButton, pressed && styles.pressed]}>
+            <Text style={styles.nextButtonText}>Next</Text>
+            <ArrowRight size={19} color={colors.heroText} />
+          </Pressable>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.bg },
-  safeArea: { flex: 1 },
-  bgShape1: {
-    position: 'absolute', width: width * 1.5, height: width * 1.5,
-    borderRadius: 80, backgroundColor: 'rgba(0,0,0,0.02)',
-    top: -width * 0.5, left: -width * 0.5,
-  },
-  bgShape2: {
-    position: 'absolute', width: width, height: width,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
-    bottom: -width * 0.2, right: -width * 0.2,
-  },
-  imageContainer: {
-    width: '100%', height: height * 0.35, borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.03)',
-    marginBottom: 32, borderWidth: 1, borderColor: T.border,
-    overflow: 'hidden'
-  },
-  slideImage: {
-    width: '100%', height: '100%'
-  },
-  title: {
-    fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif',
-    fontSize: 48, fontWeight: '800', color: T.text,
-    letterSpacing: -1.5, lineHeight: 52, marginBottom: 16
-  },
-  subtitle: {
-    fontSize: 16, color: T.textMuted, lineHeight: 24,
-    maxWidth: '90%'
-  },
-  bottomContainer: {
-    paddingHorizontal: 32,
-    paddingBottom: Platform.OS === 'ios' ? 16 : 32,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    height: 100
-  },
-  pagination: {
-    flexDirection: 'row', alignItems: 'center', gap: 6
-  },
-  dot: {
-    height: 8, borderRadius: 4, backgroundColor: T.text
-  },
-  nextBtn: {
-    backgroundColor: T.black, paddingHorizontal: 24, paddingVertical: 16,
-    borderRadius: 99, flexDirection: 'row', alignItems: 'center', gap: 8
-  },
-  nextBtnText: {
-    color: T.white, fontSize: 16, fontWeight: '600'
-  }
+function WelcomeSlide({ slide, width }: { slide: Slide; width: number }) {
+  const Icon = slide.icon;
+  return (
+    <ScrollView
+      style={{ width }}
+      contentContainerStyle={styles.slide}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
+      <View style={styles.heroCard}>
+        <View style={styles.heroIcon}><Icon size={34} color={colors.heroText} strokeWidth={1.8} /></View>
+        <View style={styles.heroDecorationOne} />
+        <View style={styles.heroDecorationTwo} />
+      </View>
+
+      <View style={styles.copy}>
+        <Text style={styles.eyebrow}>{slide.eyebrow}</Text>
+        <Text accessibilityRole="header" style={styles.title}>{slide.title}</Text>
+        <Text style={styles.description}>{slide.description}</Text>
+      </View>
+
+      <View style={styles.pointList}>
+        {slide.points.map((point) => {
+          const PointIcon = point.icon;
+          return (
+            <View key={point.label} style={styles.pointRow}>
+              <View style={styles.pointIcon}><PointIcon size={17} color={colors.text} strokeWidth={2.2} /></View>
+              <Text style={styles.pointLabel}>{point.label}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  header: { minHeight: 64, paddingHorizontal: Spacing.xl, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  brandMark: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.hero, alignItems: 'center', justifyContent: 'center' },
+  brandMarkText: { color: colors.heroText, fontSize: FontSize.md, fontWeight: FontWeight.black },
+  brandName: { color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.bold, letterSpacing: -0.3 },
+  signInTop: { minHeight: TouchTarget.minimum, justifyContent: 'center', paddingHorizontal: Spacing.sm },
+  signInTopText: { ...TypeScale.label, color: colors.text },
+  slide: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, paddingBottom: Spacing.xl, gap: Spacing['2xl'] },
+  heroCard: { height: 190, borderRadius: BorderRadius['2xl'], backgroundColor: colors.hero, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  heroIcon: { width: 76, height: 76, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  heroDecorationOne: { position: 'absolute', width: 210, height: 210, borderRadius: 105, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', top: -100, right: -60 },
+  heroDecorationTwo: { position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.04)', bottom: -65, left: -25 },
+  copy: { gap: Spacing.sm },
+  eyebrow: { ...TypeScale.caption, color: colors.textSecondary, letterSpacing: 1.4, fontWeight: FontWeight.bold },
+  title: { fontSize: FontSize['3xl'], lineHeight: 40, letterSpacing: -1.1, fontWeight: FontWeight.bold, color: colors.text },
+  description: { ...TypeScale.body, color: colors.textSecondary },
+  pointList: { gap: Spacing.sm },
+  pointRow: { minHeight: 48, borderRadius: BorderRadius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  pointIcon: { width: 30, height: 30, borderRadius: 10, backgroundColor: colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' },
+  pointLabel: { ...TypeScale.label, flex: 1, color: colors.text },
+  footer: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: Spacing.lg, gap: Spacing.lg },
+  dots: { height: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.chartSoft },
+  dotActive: { width: 28, backgroundColor: colors.chart },
+  nextButton: { minHeight: 54, borderRadius: BorderRadius.lg, backgroundColor: colors.hero, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  nextButtonText: { ...TypeScale.label, fontSize: FontSize.base, color: colors.heroText },
+  finalActions: { gap: Spacing.sm },
+  primaryButton: { minHeight: 54, borderRadius: BorderRadius.lg, backgroundColor: colors.hero, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  primaryButtonText: { ...TypeScale.label, fontSize: FontSize.base, color: colors.heroText },
+  secondaryButton: { minHeight: 50, borderRadius: BorderRadius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  secondaryButtonText: { ...TypeScale.label, color: colors.text },
+  pressed: { opacity: 0.72 },
 });
