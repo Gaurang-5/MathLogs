@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { ProUpgradeProvider } from '../contexts/ProUpgradeContext';
 import { ThemePreferenceProvider } from '../contexts/ThemePreferenceContext';
 import { Colors } from '../constants/theme';
 import { OfflineStatusBanner } from '../components/offline/OfflineStatusBanner';
@@ -86,30 +87,32 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <AuthGuard>
-              <StatusBar barStyle="dark-content" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: Colors.light.background },
-                  animation: 'ios_from_right',
-                }}
-              >
-                <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-                <Stack.Screen name="login" options={{ animation: 'fade' }} />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen
-                  name="quick-fee-modal"
-                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                />
-                <Stack.Screen
-                  name="quiz-generator"
-                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                />
-                <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-            </AuthGuard>
+            <ProUpgradeProvider>
+              <AuthGuard>
+                <StatusBar barStyle="dark-content" />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: Colors.light.background },
+                    animation: 'ios_from_right',
+                  }}
+                >
+                  <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+                  <Stack.Screen name="login" options={{ animation: 'fade' }} />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen
+                    name="quick-fee-modal"
+                    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                  />
+                  <Stack.Screen
+                    name="quiz-generator"
+                    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                  />
+                  <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+              </AuthGuard>
+            </ProUpgradeProvider>
           </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

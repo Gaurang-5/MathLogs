@@ -5,6 +5,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { Platform } from 'react-native';
 import { withSessionStorage } from './sessionStorage';
+import { notifyProFeatureRequired } from './proFeatureGate';
 import { deleteItemAsync, getItemAsync, setItemAsync } from './storage';
 import {
   MissingRefreshTokenError,
@@ -281,6 +282,17 @@ api.interceptors.response.use(
     const config = error.config as ReplayableRequestConfig | undefined;
     const route = diagnosticRoute(config?.url);
     logDiagnostic('warn', route, failureCategory(error), getErrorStatus(error));
+
+    const responseData = error.response?.data as { error?: unknown; feature?: unknown; message?: unknown } | undefined;
+    if (responseData?.error === 'PRO_PLAN_REQUIRED') {
+      notifyProFeatureRequired({
+        feature: typeof responseData.feature === 'string' ? responseData.feature : 'Pro feature',
+        description: typeof responseData.message === 'string'
+          ? responseData.message
+          : 'Upgrade to Pro to use AI quiz generation and online quiz delivery.',
+      });
+      return Promise.reject(error);
+    }
 
     if (
       !config

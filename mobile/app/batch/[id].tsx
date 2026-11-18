@@ -49,6 +49,8 @@ import api from '../../services/api';
 import { offlineQuery } from '../../services/offlineSync';
 import { getItemAsync } from '../../services/storage';
 import { useAuth } from '../../contexts/AuthContext';
+import { useProUpgrade } from '../../contexts/ProUpgradeContext';
+import { isProPlanRequiredError } from '../../services/proFeatureGate';
 import {
   Feedback,
   PressableScale,
@@ -390,6 +392,7 @@ export default function BatchDetailScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isLoading: isAuthLoading, isLoggedIn, user } = useAuth();
+  const { openProUpgrade, runProFeature } = useProUpgrade();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
   const { width } = useWindowDimensions();
@@ -566,6 +569,7 @@ export default function BatchDetailScreen() {
         Alert.alert('Done', successMessage);
       }
     } catch (actionError) {
+      if (isProPlanRequiredError(actionError)) return;
       Alert.alert('Could not complete action', getErrorMessage(actionError, 'Please try again.'));
     } finally {
       actionLockRef.current = false;
@@ -601,8 +605,11 @@ export default function BatchDetailScreen() {
   }, [batchId]);
 
   const handleInvite = useCallback(() => {
-    setShowInvite(true);
-  }, []);
+    runProFeature({
+      feature: 'WhatsApp student invitations',
+      description: 'Upgrade to Pro to send student registration invitations through WhatsApp.',
+    }, () => setShowInvite(true));
+  }, [runProFeature]);
 
   const handleToggleRegistration = useCallback(async () => {
     if (!batchId || !batch || batch.isRegistrationEnded) return;
@@ -658,13 +665,13 @@ export default function BatchDetailScreen() {
         subject: batchForm.subject.trim(),
         className: batchForm.className.trim(),
         timeSlot: batchForm.timeSlot.trim(),
-        whatsappGroupLink: batchForm.whatsappGroupLink.trim(),
+        ...(user?.productPlan === 'PRO' ? { whatsappGroupLink: batchForm.whatsappGroupLink.trim() } : {}),
         ...(feeMode === 'CURRENT_DUE_BASED' ? { feeAmount: Number(batchForm.feeAmount) || 0 } : {}),
       });
       setShowBatchSettings(false);
       await refetch();
     }, 'Batch settings were updated.');
-  }, [batchForm, batchId, feeMode, refetch, runAction]);
+  }, [batchForm, batchId, feeMode, refetch, runAction, user?.productPlan]);
 
   const handleAddInstallment = useCallback(async () => {
     if (!batchId || !feeForm.name.trim() || !(Number(feeForm.amount) > 0)) {
@@ -1463,7 +1470,24 @@ export default function BatchDetailScreen() {
         <InputField colors={colors} label="Subject" onChangeText={(subject) => setBatchForm((value) => ({ ...value, subject }))} placeholder="Subject" value={batchForm.subject} />
         <InputField colors={colors} label="Class or grade" onChangeText={(className) => setBatchForm((value) => ({ ...value, className }))} placeholder="e.g. Class 10" value={batchForm.className} />
         <InputField colors={colors} label="Time slot" onChangeText={(timeSlot) => setBatchForm((value) => ({ ...value, timeSlot }))} placeholder="e.g. Mon-Wed-Fri 4 PM" value={batchForm.timeSlot} />
-        <InputField colors={colors} label="WhatsApp group link" onChangeText={(whatsappGroupLink) => setBatchForm((value) => ({ ...value, whatsappGroupLink }))} placeholder="https://chat.whatsapp.com/..." value={batchForm.whatsappGroupLink} />
+        {user?.productPlan === 'PRO' ? (
+          <InputField colors={colors} label="WhatsApp group link" onChangeText={(whatsappGroupLink) => setBatchForm((value) => ({ ...value, whatsappGroupLink }))} placeholder="https://chat.whatsapp.com/..." value={batchForm.whatsappGroupLink} />
+        ) : (
+          <PressableScale
+            accessibilityLabel="WhatsApp group link. Pro feature"
+            onPress={() => openProUpgrade({
+              feature: 'WhatsApp group links',
+              description: 'Upgrade to Pro to add and use a WhatsApp group link for this batch.',
+            })}
+            style={[styles.proLockedField, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+          >
+            <View style={styles.proLockedCopy}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>WhatsApp group link</Text>
+              <Text style={[styles.proLockedValue, { color: colors.text }]}>Available with Pro</Text>
+            </View>
+            <Text style={[styles.proBadge, { color: colors.background, backgroundColor: colors.text }]}>PRO</Text>
+          </PressableScale>
+        )}
         {feeMode === 'CURRENT_DUE_BASED' ? (
           <InputField colors={colors} keyboardType="numeric" label="Legacy batch fee" onChangeText={(feeAmount) => setBatchForm((value) => ({ ...value, feeAmount }))} placeholder="Amount in rupees" value={batchForm.feeAmount} />
         ) : null}
@@ -1702,6 +1726,10 @@ const styles = StyleSheet.create({
   unrecordedText: { ...TypeScale.label, textAlign: 'center' },
   inputGroup: { gap: 7 },
   inputLabel: { ...TypeScale.label },
+  proLockedField: { minHeight: 72, borderWidth: 1, borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  proLockedCopy: { flex: 1, minWidth: 0, gap: 4 },
+  proLockedValue: { ...TypeScale.body },
+  proBadge: { ...TypeScale.caption, overflow: 'hidden', borderRadius: BorderRadius.full, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
   input: { minHeight: 50, borderRadius: BorderRadius.md, borderWidth: 1, paddingHorizontal: Spacing.md, ...TypeScale.body },
   multilineInput: { minHeight: 100, paddingTop: Spacing.md, textAlignVertical: 'top' },
   modeSwitch: { borderRadius: BorderRadius.lg, padding: 4, flexDirection: 'row', gap: 4 },

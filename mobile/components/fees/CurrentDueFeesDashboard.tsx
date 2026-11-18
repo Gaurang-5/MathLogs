@@ -40,6 +40,8 @@ import {
 import { BorderRadius, Colors, FontWeight, Spacing, TypeScale } from '../../constants/theme';
 import { Feedback, PressableScale, Surface, TEACHER_TAB_CONTENT_INSET, TeacherPage, TeacherSearchSheet } from '../ui';
 import { RecordPaymentForm } from './RecordPaymentForm';
+import { useProUpgrade } from '../../contexts/ProUpgradeContext';
+import { isProPlanRequiredError } from '../../services/proFeatureGate';
 
 interface Transaction {
   id: string;
@@ -71,6 +73,7 @@ function dateLabel(value: string | null): string {
 export function CurrentDueFeesDashboard() {
   const colors = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const router = useRouter();
+  const { runProFeature } = useProUpgrade();
   const [search, setSearch] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [status, setStatus] = useState<FeeStudentFilter>('needs_payment');
@@ -130,6 +133,7 @@ export function CurrentDueFeesDashboard() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Reminder sent', `${student.name}’s fee reminder was sent successfully.`);
     } catch (reason) {
+      if (isProPlanRequiredError(reason)) return;
       const message = typeof reason === 'object' && reason && 'response' in reason
         ? (reason as { response?: { data?: { error?: string } } }).response?.data?.error
         : undefined;
@@ -292,7 +296,10 @@ export function CurrentDueFeesDashboard() {
               accessibilityState={{ disabled: Boolean(remindingId) }}
               disabled={Boolean(remindingId)}
               haptic="commit"
-              onPress={() => void remind(student)}
+              onPress={() => runProFeature({
+                feature: 'WhatsApp fee reminders',
+                description: 'Upgrade to Pro to send fee reminders through MathLogs.',
+              }, () => void remind(student))}
               style={[styles.secondaryAction, { borderColor: colors.border }]}
             >
               <Mail size={17} color={colors.textSecondary} />

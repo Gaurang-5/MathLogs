@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Linking,
@@ -46,6 +46,7 @@ import {
 import api from '../../services/api';
 import { offlineQuery } from '../../services/offlineSync';
 import { useAuth } from '../../contexts/AuthContext';
+import { useProUpgrade } from '../../contexts/ProUpgradeContext';
 
 interface OnlineQuiz {
   id: string;
@@ -164,10 +165,19 @@ export default function QuizzesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const { openProUpgrade } = useProUpgrade();
   const isBasicPlan = user?.productPlan === 'BASIC';
   const [search, setSearch] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
+
+  useEffect(() => {
+    if (!isBasicPlan) return;
+    openProUpgrade({
+      feature: 'Online quizzes',
+      description: 'Upgrade to Pro to generate quizzes from documents, publish them online, and use quiz credits.',
+    });
+  }, [isBasicPlan, openProUpgrade]);
 
   const {
     data: quizzes,
@@ -373,8 +383,19 @@ export default function QuizzesScreen() {
           <Feedback
             kind="empty"
             title="Your core workspace remains available"
-            description="Use Tests for offline-capable assessments. Pro pricing and upgrades will appear here after the plan details are finalized."
+            description="Use Tests for offline-capable assessments. Choose Compare plans to review the Pro features."
           />
+          <PressableScale
+            accessibilityLabel="Compare Basic and Pro plans"
+            haptic="selection"
+            onPress={() => openProUpgrade({
+              feature: 'Online quizzes',
+              description: 'Upgrade to Pro to generate quizzes from documents, publish them online, and use quiz credits.',
+            })}
+            style={[styles.basicUpgradeButton, { backgroundColor: colors.text }]}
+          >
+            <Text style={[styles.basicUpgradeButtonText, { color: colors.background }]}>Compare Basic and Pro</Text>
+          </PressableScale>
         </ScrollView>
       </SafeAreaView>
     );
@@ -554,6 +575,8 @@ const styles = StyleSheet.create({
   basicPlanCopy: { flex: 1, minWidth: 0 },
   basicPlanTitle: { ...TypeScale.sectionTitle, marginBottom: Spacing.sm },
   basicPlanDescription: { ...TypeScale.body, opacity: 0.82 },
+  basicUpgradeButton: { minHeight: 52, borderRadius: BorderRadius.lg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.lg },
+  basicUpgradeButtonText: { ...TypeScale.label },
   pageHeader: {
     flexDirection: 'row',
     alignItems: 'center',

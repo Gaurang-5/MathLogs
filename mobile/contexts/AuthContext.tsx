@@ -17,9 +17,14 @@ interface ProductCapabilities {
   coreWorkspace: true;
   offlineReads: true;
   offlineWrites: true;
+  studentAddition: true;
   aiQuizGeneration: boolean;
   onlineQuizDelivery: boolean;
   quizCreditTopUps: boolean;
+  scanMarks: boolean;
+  whatsappInvites: boolean;
+  whatsappReminders: boolean;
+  whatsappGroupLinks: boolean;
 }
 
 interface User {

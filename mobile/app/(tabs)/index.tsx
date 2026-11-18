@@ -39,6 +39,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useProUpgrade } from '../../contexts/ProUpgradeContext';
 import {
   Feedback,
   PressableScale,
@@ -394,6 +395,7 @@ function InstitutePerformanceCard({
 export default function DashboardScreen() {
   const router = useRouter();
   const { user, isLoggedIn, logout } = useAuth();
+  const { runProFeature } = useProUpgrade();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
   const { reduceMotion } = useAccessibilityPreferences();
@@ -594,7 +596,10 @@ export default function DashboardScreen() {
                   icon={<ScanLine size={21} color={colors.textSecondary} />}
                   label="Scan marks"
                   wide={stackBento}
-                  onPress={() => router.push('/scan' as never)}
+                  onPress={() => runProFeature({
+                    feature: 'Scan Marks',
+                    description: 'Upgrade to Pro to scan mark sheets with the online OCR service.',
+                  }, () => router.push('/scan' as never))}
                   colors={colors}
                 />
                 <ActionTile
@@ -615,7 +620,10 @@ export default function DashboardScreen() {
                   icon={<Sparkles size={21} color={colors.textSecondary} />}
                   label="Quizzes"
                   wide={stackBento}
-                  onPress={() => router.push('/(tabs)/quizzes' as never)}
+                  onPress={() => runProFeature({
+                    feature: 'AI quizzes',
+                    description: 'Upgrade to Pro to generate quizzes from documents, publish them online, and use quiz credits.',
+                  }, () => router.push('/(tabs)/quizzes' as never))}
                   colors={colors}
                 />
               </View>

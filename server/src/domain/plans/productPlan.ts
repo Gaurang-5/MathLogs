@@ -4,9 +4,14 @@ export type ProductCapabilities = {
   coreWorkspace: true;
   offlineReads: true;
   offlineWrites: true;
+  studentAddition: true;
   aiQuizGeneration: boolean;
   onlineQuizDelivery: boolean;
   quizCreditTopUps: boolean;
+  scanMarks: boolean;
+  whatsappInvites: boolean;
+  whatsappReminders: boolean;
+  whatsappGroupLinks: boolean;
 };
 
 export type ProductPlanState = {
@@ -26,18 +31,28 @@ const BASIC_CAPABILITIES: ProductCapabilities = Object.freeze({
   coreWorkspace: true,
   offlineReads: true,
   offlineWrites: true,
+  studentAddition: true,
   aiQuizGeneration: false,
   onlineQuizDelivery: false,
   quizCreditTopUps: false,
+  scanMarks: false,
+  whatsappInvites: false,
+  whatsappReminders: false,
+  whatsappGroupLinks: false,
 });
 
 const PRO_CAPABILITIES: ProductCapabilities = Object.freeze({
   coreWorkspace: true,
   offlineReads: true,
   offlineWrites: true,
+  studentAddition: true,
   aiQuizGeneration: true,
   onlineQuizDelivery: true,
   quizCreditTopUps: true,
+  scanMarks: true,
+  whatsappInvites: true,
+  whatsappReminders: true,
+  whatsappGroupLinks: true,
 });
 
 function hasActiveProPeriod(state: ProductPlanState, now: Date): boolean {

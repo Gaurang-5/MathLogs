@@ -15,6 +15,7 @@ import api from '../services/api';
 import { executeOrQueueMutation, offlineQuery } from '../services/offlineSync';
 import { validateMark } from '../utils/marks';
 import { upsertQueuedMark, validateQueuedMarks, type QueuedMark } from '../utils/multiScan';
+import { isProPlanRequiredError } from '../services/proFeatureGate';
 
 const T = {
   bg: '#000000', white: '#FFFFFF', text: '#1D1D1F',
@@ -162,7 +163,9 @@ export default function GlobalScanScreen() {
       setResearchCaptureId(result.researchCaptureId || captureId);
       setExistingMark(result.student.marks?.find((mark: { testId: string; score: number }) => mark.testId === captureTestId)?.score ?? null);
     } catch (error: any) {
-      if (!request.signal.aborted) Alert.alert('Capture failed', error.response?.data?.error || error.message || 'Please try again.');
+      if (!request.signal.aborted && !isProPlanRequiredError(error)) {
+        Alert.alert('Capture failed', error.response?.data?.error || error.message || 'Please try again.');
+      }
     } finally {
       if (captureRequest.current === request) { setProcessing(false); captureLock.current = false; }
       request.abort();

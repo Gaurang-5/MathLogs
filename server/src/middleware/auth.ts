@@ -51,14 +51,48 @@ export const invalidateAuthCache = (userId: string) => {
     authCache.delete(userId);
 };
 
-function isProOnlyRequest(req: Request): boolean {
+type ProCapability = 'aiQuizGeneration'
+    | 'onlineQuizDelivery'
+    | 'scanMarks'
+    | 'whatsappInvites'
+    | 'whatsappReminders'
+    | 'whatsappGroupLinks';
+
+type ProFeatureRequirement = {
+    capability: ProCapability;
+    feature: string;
+    message: string;
+};
+
+export function proFeatureForRequest(req: Pick<Request, 'originalUrl' | 'method' | 'body'>): ProFeatureRequirement | null {
     const path = req.originalUrl.split('?')[0].replace(/\/$/, '');
-    return path.startsWith('/api/quizzes')
-        || path === '/api/tests/generate'
-        || path.startsWith('/api/tests/generate-')
-        || path.startsWith('/api/tests/generate/status/')
-        || path === '/api/tests/online'
-        || path.startsWith('/api/tests/online/');
+    if (path === '/api/tests/generate' || path.startsWith('/api/tests/generate-') || path.startsWith('/api/tests/generate/status/')) {
+        return { capability: 'aiQuizGeneration', feature: 'AI quiz generation', message: 'Upgrade to Pro to generate quizzes with AI.' };
+    }
+    if (path.startsWith('/api/quizzes') || path === '/api/tests/online' || path.startsWith('/api/tests/online/')) {
+        return { capability: 'onlineQuizDelivery', feature: 'Online quizzes', message: 'Upgrade to Pro to publish and manage online quizzes.' };
+    }
+    if (path === '/api/scan-ocr') {
+        return { capability: 'scanMarks', feature: 'Scan Marks', message: 'Upgrade to Pro to scan marks with online OCR.' };
+    }
+    if (path === '/api/fees/scan-receipt' || path === '/api/month-coverage/scan-receipt') {
+        return { capability: 'scanMarks', feature: 'Receipt scanning', message: 'Upgrade to Pro to scan payment receipts.' };
+    }
+    if (path === '/api/fees/remind' || path === '/api/month-coverage/reminders') {
+        return { capability: 'whatsappReminders', feature: 'WhatsApp reminders', message: 'Upgrade to Pro to send fee reminders.' };
+    }
+    if (
+        /^\/api\/batches\/[^/]+\/(?:invite|whatsapp-invite)$/.test(path)
+        || /^\/api\/students\/[^/]+\/whatsapp-invite$/.test(path)
+    ) {
+        return { capability: 'whatsappInvites', feature: 'WhatsApp student invitations', message: 'Upgrade to Pro to invite students through WhatsApp.' };
+    }
+    const changesBatch = req.method.toUpperCase() === 'POST' && path === '/api/batches'
+        || req.method.toUpperCase() === 'PUT' && /^\/api\/batches\/[^/]+$/.test(path);
+    if (changesBatch && typeof req.body?.whatsappGroupLink === 'string' && req.body.whatsappGroupLink.trim()) {
+        return { capability: 'whatsappGroupLinks', feature: 'WhatsApp group links', message: 'Upgrade to Pro to add a WhatsApp group link to a batch.' };
+    }
+    return null;
 }
 
 function supportSessionActionForbidden(req: Request) {
@@ -178,10 +212,17 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
             const entitlements = effectiveEntitlements(institute ?? {});
             const productAccess = productPlanAccess(institute ?? {});
 
-            if (productAccess.plan === 'BASIC' && dbUser.role !== 'SUPER_ADMIN' && isProOnlyRequest(req)) {
+            const requiredProFeature = proFeatureForRequest(req);
+            if (
+                requiredProFeature
+                && dbUser.role !== 'SUPER_ADMIN'
+                && !productAccess.capabilities[requiredProFeature.capability]
+            ) {
                 return res.status(403).json({
                     error: 'PRO_PLAN_REQUIRED',
-                    message: 'This online quiz feature requires the Pro plan.'
+                    feature: requiredProFeature.feature,
+                    capability: requiredProFeature.capability,
+                    message: requiredProFeature.message,
                 });
             }
 

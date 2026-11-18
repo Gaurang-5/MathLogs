@@ -13,6 +13,7 @@ import api from '../../services/api';
 import { executeOrQueueMutation, offlineQuery, updateCachedData } from '../../services/offlineSync';
 import { SkeletonLoader, BrandButton, TEACHER_TAB_CONTENT_INSET } from '../../components/ui';
 import * as Haptics from 'expo-haptics';
+import { useProUpgrade } from '../../contexts/ProUpgradeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -42,6 +43,7 @@ export default function TestDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { runProFeature } = useProUpgrade();
 
   const { data: test, isLoading } = useQuery<TestDetails>({
     queryKey: ['test', id],
@@ -205,7 +207,10 @@ export default function TestDetailScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
                 <TouchableOpacity
                   style={[s.qActionBtn, { backgroundColor: T.accent, borderColor: T.accent }]}
-                  onPress={() => router.push(`/scan?testId=${id}`)}
+                  onPress={() => runProFeature({
+                    feature: 'Scan Marks',
+                    description: 'Upgrade to Pro to scan mark sheets with the online OCR service.',
+                  }, () => router.push(`/scan?testId=${id}`))}
                 >
                   <Scan size={16} color={T.white} />
                   <Text style={[s.qActionText, { color: T.white }]}>Scan marks</Text>

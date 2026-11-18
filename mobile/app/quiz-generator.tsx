@@ -14,6 +14,8 @@ import { Feedback, PressableScale, Surface } from '../components/ui';
 import { useAccessibilityPreferences } from '../components/ui/useAccessibilityPreferences';
 import { BorderRadius, Colors, FontWeight, Shadows, Spacing, TypeScale } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
+import { useProUpgrade } from '../contexts/ProUpgradeContext';
+import { isProPlanRequiredError } from '../services/proFeatureGate';
 
 interface Batch { id: string; name: string; className: string | null }
 interface GeneratedQuestion {
@@ -66,6 +68,7 @@ function ProgressLoader({ colors }: { colors: ThemeColors }) {
 export default function QuizGeneratorScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { openProUpgrade } = useProUpgrade();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
   const { fontScale } = useWindowDimensions();
@@ -92,6 +95,14 @@ export default function QuizGeneratorScreen() {
   const difficulties = useMemo(() => ['Easy', 'Medium', 'Hard', 'Olympiad'], []);
   const canGenerate = topic.trim().length > 0 && grade.trim().length > 0 && !generating;
 
+  useEffect(() => {
+    if (user?.productPlan !== 'BASIC') return;
+    openProUpgrade({
+      feature: 'AI quiz generation',
+      description: 'Upgrade to Pro to generate quizzes from documents, publish them online, and use quiz credits.',
+    });
+  }, [openProUpgrade, user?.productPlan]);
+
   if (user?.productPlan === 'BASIC') {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -113,7 +124,18 @@ export default function QuizGeneratorScreen() {
             <Text style={[styles.planGuardTitle, { color: colors.heroText }]}>AI quiz generation is included with Pro</Text>
             <Text style={[styles.planGuardDescription, { color: colors.heroText }]}>Basic keeps batches, tests, marks, and fees available offline. Pro adds document-assisted quiz generation, online delivery, and quiz credits.</Text>
           </Surface>
-          <Feedback kind="empty" title="Use Tests on Basic" description="Create and mark regular tests from the Tests workspace. Pro pricing will appear after the plan details are finalized." />
+          <Feedback kind="empty" title="Use Tests on Basic" description="Create and mark regular tests from the Tests workspace." />
+          <PressableScale
+            accessibilityLabel="Compare Basic and Pro plans"
+            haptic="selection"
+            onPress={() => openProUpgrade({
+              feature: 'AI quiz generation',
+              description: 'Upgrade to Pro to generate quizzes from documents, publish them online, and use quiz credits.',
+            })}
+            style={[styles.planGuardButton, { backgroundColor: colors.text }]}
+          >
+            <Text style={[styles.planGuardButtonText, { color: colors.background }]}>Compare Basic and Pro</Text>
+          </PressableScale>
         </View>
       </SafeAreaView>
     );
@@ -197,6 +219,7 @@ export default function QuizGeneratorScreen() {
       setGeneratedQuiz({ ...data, questions });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
+      if (isProPlanRequiredError(error)) return;
       Alert.alert('Quiz could not be generated', error?.response?.data?.error || error?.message || 'Please try again.');
     } finally {
       setGenerating(false);
@@ -234,6 +257,7 @@ export default function QuizGeneratorScreen() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (error: any) {
+      if (isProPlanRequiredError(error)) return;
       Alert.alert('Quiz could not be published', error?.response?.data?.error || 'Please try again.');
     } finally { setSaving(false); }
   };
@@ -411,6 +435,8 @@ const styles = StyleSheet.create({
   planGuardCard: { alignItems: 'center', padding: Spacing['2xl'], borderRadius: BorderRadius.xl },
   planGuardTitle: { ...TypeScale.sectionTitle, textAlign: 'center' },
   planGuardDescription: { ...TypeScale.body, textAlign: 'center', opacity: 0.82, marginTop: Spacing.sm },
+  planGuardButton: { minHeight: 52, borderRadius: BorderRadius.lg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.lg },
+  planGuardButtonText: { ...TypeScale.label },
   fieldRow: { flexDirection: 'row', gap: Spacing.md }, fieldRowStacked: { flexDirection: 'column' }, fieldGroup: { gap: Spacing.sm }, label: { ...TypeScale.label },
   input: { minHeight: 54, borderWidth: 1, borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, fontSize: 16, lineHeight: 22 }, multilineInput: { minHeight: 96, textAlignVertical: 'top' },
   attachButton: { minHeight: 76, flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderWidth: 1, borderStyle: 'dashed', borderRadius: BorderRadius.lg },
